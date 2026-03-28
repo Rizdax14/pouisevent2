@@ -11815,7 +11815,7 @@ function App() {
     navBack: navBack,
     currentPlayer: currentPlayer,
     setCurrentPlayer: setCurrentPlayer
-  }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(DataPage, null)));
+  }), page === "admin" && /*#__PURE__*/React.createElement(DataPage, null)));
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
