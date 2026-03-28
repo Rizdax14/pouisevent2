@@ -10621,19 +10621,25 @@ function ProfilePage({
         marginBottom: 8
       }
     }, "Changer mon PIN"), /*#__PURE__*/React.createElement("input", {
-      type: "password",
-      placeholder: "Nouveau PIN",
+      type: "tel",
+      inputMode: "numeric",
+      pattern: "[0-9]*",
+      maxLength: 4,
+      placeholder: "Nouveau PIN (4 chiffres)",
       value: newPin,
-      onChange: e => setNewPin(e.target.value),
+      onChange: e => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4)),
       style: {
         ...S,
         marginBottom: 8
       }
     }), /*#__PURE__*/React.createElement("input", {
-      type: "password",
+      type: "tel",
+      inputMode: "numeric",
+      pattern: "[0-9]*",
+      maxLength: 4,
       placeholder: "Confirmer le PIN",
       value: newPin2,
-      onChange: e => setNewPin2(e.target.value),
+      onChange: e => setNewPin2(e.target.value.replace(/\D/g, "").slice(0, 4)),
       style: {
         ...S,
         marginBottom: 10
