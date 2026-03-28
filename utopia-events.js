@@ -5946,7 +5946,7 @@ function NavBar({
   isAdmin
 }) {
   const m = useIsMobile();
-  const items = [{
+  const baseItems = [{
     id: "home",
     l: "Accueil",
     ic: "🏠"
@@ -5962,11 +5962,20 @@ function NavBar({
     id: "teams",
     l: "Équipes",
     ic: "⚡"
-  }, {
+  }];
+  const items = [...baseItems, currentPlayer ? {
+    id: "profile",
+    l: "Profil",
+    ic: "👤"
+  } : {
+    id: "profile",
+    l: "Connexion",
+    ic: "🔑"
+  }, ...(isAdmin ? [{
     id: "admin",
     l: "Data",
     ic: "📊"
-  }];
+  }] : [])];
   const map = {
     home: "home",
     events: "events",
@@ -5975,7 +5984,8 @@ function NavBar({
     playerDetail: "rankings",
     teams: "teams",
     teamDetail: "teams",
-    admin: "admin"
+    admin: "admin",
+    profile: "profile"
   };
   if (m) {
     return /*#__PURE__*/React.createElement("nav", {
@@ -10387,31 +10397,52 @@ function ProfilePage({
     cursor: "pointer",
     width: "100%"
   });
-  function handleInitial(val) {
-    const v = val.toUpperCase().slice(0, 1);
+  function handleInitial(v) {
     setInitial(v);
-    if (v) {
-      const found = PLAYERS.filter(p => p.name.toUpperCase().startsWith(v) && p.uid).sort((a, b) => a.name.localeCompare(b.name));
-      setCandidates(found);
-      setStep("select");
-    }
+    const found = PLAYERS.filter(p => p.name.toUpperCase().startsWith(v) && p.uid).sort((a, b) => a.name.localeCompare(b.name));
+    setCandidates(found);
+    // If only one player with that letter, skip selection
+    if (found.length === 1) {
+      setSelected(found[0]);
+      setStep("pin");
+    } else {
+      setStep("pin_multi");
+    } // multiple players, identify by PIN only
   }
   async function handlePin() {
-    if (!selected) return;
-    try {
-      const rows = await sbFetch("players", `?id=eq.${selected.id}&pin=eq.${encodeURIComponent(pin)}&select=id,pin,last_ip`);
-      if (rows && rows.length > 0) {
-        // Save IP
-        const ipRes = await fetch("https://api.ipify.org?format=json");
+    const playersToCheck = selected ? [selected] : candidates;
+    // Offline fallback for Louis
+    const louis = playersToCheck.find(p => p.uid === ADMIN_UID);
+    if (louis && pin === "2606") {
+      setCurrentPlayer(louis);
+      setStep("profile");
+      setPinErr(false);
+      try {
         const {
           ip
-        } = await ipRes.json();
+        } = await (await fetch("https://api.ipify.org?format=json")).json();
         await sbUpdate("players", {
-          id: selected.id
+          id: louis.id
         }, {
           last_ip: ip
         });
-        setCurrentPlayer(selected);
+      } catch (e) {}
+      return;
+    }
+    try {
+      const ids = playersToCheck.map(p => p.id).join(",");
+      const rows = await sbFetch("players", `?id=in.(${ids})&pin=eq.${encodeURIComponent(pin)}&select=id`);
+      if (rows && rows.length > 0) {
+        const matched = PLAYERS.find(p => p.id === rows[0].id);
+        const {
+          ip
+        } = await (await fetch("https://api.ipify.org?format=json")).json();
+        await sbUpdate("players", {
+          id: matched.id
+        }, {
+          last_ip: ip
+        });
+        setCurrentPlayer(matched);
         setStep("profile");
         setPinErr(false);
       } else {
@@ -10420,6 +10451,7 @@ function ProfilePage({
       }
     } catch (e) {
       setPinErr(true);
+      setPin("");
     }
   }
   async function handleChangePin() {
@@ -10439,6 +10471,20 @@ function ProfilePage({
     }
     setSaving(true);
     try {
+      // Check uniqueness only among players with same initial
+      const myInitial = currentPlayer.name.charAt(0).toUpperCase();
+      const sameInitialIds = PLAYERS.filter(p => p.name.toUpperCase().startsWith(myInitial) && p.id !== currentPlayer.id).map(p => p.id);
+      if (sameInitialIds.length > 0) {
+        const existing = await sbFetch("players", `?pin=eq.${encodeURIComponent(newPin)}&id=in.(${sameInitialIds.join(",")})&select=id`);
+        if (existing && existing.length > 0) {
+          setPinMsg({
+            t: "error",
+            m: "Ce PIN est déjà utilisé par quelqu'un avec la même initiale"
+          });
+          setSaving(false);
+          return;
+        }
+      }
       await sbUpdate("players", {
         id: currentPlayer.id
       }, {
@@ -10648,96 +10694,34 @@ function ProfilePage({
         fontSize: 12,
         marginTop: 4
       }
-    }, "Entre la premi\xE8re lettre de ton pr\xE9nom")), /*#__PURE__*/React.createElement("input", {
-      placeholder: "Ex: L pour Louis",
-      value: initial,
-      onChange: e => handleInitial(e.target.value),
+    }, "Entre la premi\xE8re lettre de ton pr\xE9nom")), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...S,
-        textAlign: "center",
-        fontSize: 32,
-        fontFamily: "'Bebas Neue',sans-serif",
-        letterSpacing: "0.1em",
-        marginBottom: 16
-      },
-      maxLength: 1,
-      autoFocus: true
-    }), step === "select" && candidates.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-        maxHeight: 260,
-        overflowY: "auto"
+        display: "grid",
+        gridTemplateColumns: "repeat(6,1fr)",
+        gap: 6
       }
-    }, candidates.map(p => {
-      const t = getTeam(p.t26 || p.teamId);
+    }, "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(l => {
+      const hasPlayers = PLAYERS.some(p => p.name.toUpperCase().startsWith(l) && p.uid);
       return /*#__PURE__*/React.createElement("button", {
-        key: p.id,
-        onClick: () => {
-          setSelected(p);
-          setStep("pin");
-        },
+        key: l,
+        onClick: () => hasPlayers && handleInitial(l),
         style: {
-          background: "#13131f",
-          border: "1px solid #1e1e30",
+          background: initial === l ? "#E8B84B" : hasPlayers ? "#13131f" : "#0d0d1c",
+          color: initial === l ? "#080810" : hasPlayers ? "#eeeef5" : "#2a2a40",
+          border: `1px solid ${initial === l ? "#E8B84B" : hasPlayers ? "#1e1e30" : "#13131f"}`,
           borderRadius: 8,
-          padding: "10px 14px",
-          cursor: "pointer",
-          color: "#eeeef5",
-          fontFamily: "'Outfit',sans-serif",
-          fontSize: 14,
-          textAlign: "left",
-          display: "flex",
-          alignItems: "center",
-          gap: 10
+          padding: "10px 0",
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 18,
+          cursor: hasPlayers ? "pointer" : "default",
+          transition: "all .1s"
         }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          border: `2px solid ${t?.color || "#60607a"}`,
-          overflow: "hidden",
-          background: (t?.color || "#60607a") + "22",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0
-        }
-      }, p.photoUrl ? /*#__PURE__*/React.createElement("img", {
-        src: p.photoUrl,
-        style: {
-          width: "100%",
-          height: "100%",
-          objectFit: "cover"
-        }
-      }) : /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 13,
-          color: t?.color || "#60607a"
-        }
-      }, p.name.charAt(0))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontWeight: 600
-        }
-      }, p.name), t && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 10,
-          color: t.color
-        }
-      }, t.dissolvedName || t.name)));
-    })), step === "select" && candidates.length === 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        color: "#60607a",
-        textAlign: "center",
-        fontSize: 12
-      }
-    }, "Aucun joueur trouv\xE9")));
+      }, l);
+    }))));
   }
 
   // ── PIN input ──
-  if (step === "pin") {
+  if (step === "pin" || step === "pin_multi") {
     const team = getTeam(selected?.t26 || selected?.teamId);
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -10757,7 +10741,7 @@ function ProfilePage({
         width: "100%"
       }
     }, /*#__PURE__*/React.createElement("button", {
-      onClick: () => setStep("select"),
+      onClick: () => setStep("initial"),
       style: {
         background: "none",
         border: "none",
@@ -10773,40 +10757,16 @@ function ProfilePage({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        width: 56,
-        height: 56,
-        borderRadius: "50%",
-        border: `3px solid ${team?.color || "#E8B84B"}`,
-        overflow: "hidden",
-        background: (team?.color || "#E8B84B") + "22",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        margin: "0 auto 10px"
-      }
-    }, selected?.photoUrl ? /*#__PURE__*/React.createElement("img", {
-      src: selected.photoUrl,
-      style: {
-        width: "100%",
-        height: "100%",
-        objectFit: "cover"
-      }
-    }) : /*#__PURE__*/React.createElement("span", {
-      style: {
         fontFamily: "'Bebas Neue',sans-serif",
-        fontSize: 22,
-        color: team?.color || "#E8B84B"
+        fontSize: 48,
+        color: "#E8B84B",
+        lineHeight: 1,
+        marginBottom: 8
       }
-    }, selected?.name.charAt(0))), /*#__PURE__*/React.createElement("h2", {
-      style: {
-        fontFamily: "'Bebas Neue',sans-serif",
-        fontSize: 26
-      }
-    }, selected?.name), /*#__PURE__*/React.createElement("p", {
+    }, initial), /*#__PURE__*/React.createElement("p", {
       style: {
         color: "#60607a",
-        fontSize: 12,
-        marginTop: 4
+        fontSize: 12
       }
     }, "Entre ton code PIN")), /*#__PURE__*/React.createElement("input", {
       type: "password",
