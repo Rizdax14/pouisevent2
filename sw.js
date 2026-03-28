@@ -1,4 +1,4 @@
-const CACHE = 'pouis-v1';
+const CACHE = 'pouis-v2';
 const ASSETS = [
   '/',
   '/index.html',
