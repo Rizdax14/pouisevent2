@@ -5941,7 +5941,9 @@ function ColorDot({
 // ─── NAVBAR ──────────────────────────────────────────
 function NavBar({
   page,
-  setPage
+  setPage,
+  currentPlayer,
+  isAdmin
 }) {
   const m = useIsMobile();
   const items = [{
@@ -10343,11 +10345,508 @@ function PlayerDetailPage({
   }, "Rang rating")))))));
 }
 
+// ─── PROFILE PAGE ───────────────────────────────────────
+function ProfilePage({
+  nav,
+  navBack,
+  currentPlayer,
+  setCurrentPlayer
+}) {
+  const m = useIsMobile();
+  const [step, setStep] = useState(currentPlayer ? "profile" : "initial"); // initial | select | pin | profile
+  const [initial, setInitial] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [pin, setPin] = useState("");
+  const [pinErr, setPinErr] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [newPin2, setNewPin2] = useState("");
+  const [pinMsg, setPinMsg] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const S = {
+    background: "#13131f",
+    border: "1px solid #1e1e30",
+    borderRadius: 8,
+    padding: "10px 14px",
+    color: "#eeeef5",
+    fontFamily: "'Outfit',sans-serif",
+    fontSize: 14,
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box"
+  };
+  const BTN = (c = "#E8B84B") => ({
+    background: c,
+    color: c === "#E8B84B" ? "#080810" : "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "12px",
+    fontFamily: "'Outfit',sans-serif",
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: "pointer",
+    width: "100%"
+  });
+  function handleInitial(val) {
+    const v = val.toUpperCase().slice(0, 1);
+    setInitial(v);
+    if (v) {
+      const found = PLAYERS.filter(p => p.name.toUpperCase().startsWith(v) && p.uid).sort((a, b) => a.name.localeCompare(b.name));
+      setCandidates(found);
+      setStep("select");
+    }
+  }
+  async function handlePin() {
+    if (!selected) return;
+    try {
+      const rows = await sbFetch("players", `?id=eq.${selected.id}&pin=eq.${encodeURIComponent(pin)}&select=id,pin,last_ip`);
+      if (rows && rows.length > 0) {
+        // Save IP
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const {
+          ip
+        } = await ipRes.json();
+        await sbUpdate("players", {
+          id: selected.id
+        }, {
+          last_ip: ip
+        });
+        setCurrentPlayer(selected);
+        setStep("profile");
+        setPinErr(false);
+      } else {
+        setPinErr(true);
+        setPin("");
+      }
+    } catch (e) {
+      setPinErr(true);
+    }
+  }
+  async function handleChangePin() {
+    if (newPin.length < 4) {
+      setPinMsg({
+        t: "error",
+        m: "PIN trop court (min 4 chiffres)"
+      });
+      return;
+    }
+    if (newPin !== newPin2) {
+      setPinMsg({
+        t: "error",
+        m: "Les PIN ne correspondent pas"
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      await sbUpdate("players", {
+        id: currentPlayer.id
+      }, {
+        pin: newPin
+      });
+      setPinMsg({
+        t: "success",
+        m: "PIN changé ✓"
+      });
+      setNewPin("");
+      setNewPin2("");
+    } catch (e) {
+      setPinMsg({
+        t: "error",
+        m: e.message
+      });
+    }
+    setSaving(false);
+  }
+  async function handleLogout() {
+    try {
+      await sbUpdate("players", {
+        id: currentPlayer.id
+      }, {
+        last_ip: null
+      });
+    } catch (e) {}
+    setCurrentPlayer(null);
+    setStep("initial");
+    setInitial("");
+    setSelected(null);
+    setPin("");
+  }
+
+  // ── Profile view (logged in) ──
+  if (step === "profile" || currentPlayer) {
+    const player = currentPlayer;
+    const team = getTeam(player.t26 || player.teamId);
+    const tc = team?.color || "#E8B84B";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: m ? "14px 14px 76px" : "40px 32px",
+        maxWidth: 700,
+        margin: "0 auto"
+      },
+      className: "fade"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg,${tc}18,#0d0d1c)`,
+        border: `1px solid ${tc}44`,
+        borderRadius: 14,
+        padding: m ? 16 : 24,
+        marginBottom: 20,
+        cursor: "pointer"
+      },
+      onClick: () => nav("playerDetail", {
+        playerId: player.id
+      })
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 60,
+        height: 60,
+        borderRadius: "50%",
+        border: `3px solid ${tc}`,
+        overflow: "hidden",
+        background: tc + "22",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, player.photoUrl ? /*#__PURE__*/React.createElement("img", {
+      src: player.photoUrl,
+      style: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover"
+      },
+      onError: e => e.target.style.display = "none"
+    }) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 26,
+        color: tc
+      }
+    }, player.name.charAt(0))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 28 : 36,
+        color: tc,
+        lineHeight: 1
+      }
+    }, player.name), team && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: tc,
+        marginTop: 2
+      }
+    }, "\u25CF ", team.dissolvedName || team.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#404058",
+        marginTop: 4
+      }
+    }, "Voir ma fiche joueur \u2192")))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #1e1e30",
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 15,
+        color: "#60607a",
+        marginBottom: 16
+      }
+    }, "ESPACE JOUEUR"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#60607a",
+        marginBottom: 8
+      }
+    }, "Changer mon PIN"), /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      placeholder: "Nouveau PIN",
+      value: newPin,
+      onChange: e => setNewPin(e.target.value),
+      style: {
+        ...S,
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      placeholder: "Confirmer le PIN",
+      value: newPin2,
+      onChange: e => setNewPin2(e.target.value),
+      style: {
+        ...S,
+        marginBottom: 10
+      }
+    }), pinMsg && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: pinMsg.t === "error" ? "#ef4444" : "#34d399",
+        marginBottom: 8
+      }
+    }, pinMsg.m), /*#__PURE__*/React.createElement("button", {
+      onClick: handleChangePin,
+      disabled: saving,
+      style: BTN()
+    }, saving ? "..." : "Changer le PIN")), /*#__PURE__*/React.createElement("button", {
+      onClick: handleLogout,
+      style: BTN("#1e1e30")
+    }, "\uD83D\uDD13 Se d\xE9connecter")));
+  }
+
+  // ── Initial input ──
+  if (step === "initial" || step === "select") {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "75vh",
+        padding: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #1e1e30",
+        borderRadius: 16,
+        padding: m ? 24 : 40,
+        maxWidth: 360,
+        width: "100%"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 24
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 40,
+        marginBottom: 8
+      }
+    }, "\uD83D\uDC64"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 28
+      }
+    }, "CONNEXION"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: "#60607a",
+        fontSize: 12,
+        marginTop: 4
+      }
+    }, "Entre la premi\xE8re lettre de ton pr\xE9nom")), /*#__PURE__*/React.createElement("input", {
+      placeholder: "Ex: L pour Louis",
+      value: initial,
+      onChange: e => handleInitial(e.target.value),
+      style: {
+        ...S,
+        textAlign: "center",
+        fontSize: 32,
+        fontFamily: "'Bebas Neue',sans-serif",
+        letterSpacing: "0.1em",
+        marginBottom: 16
+      },
+      maxLength: 1,
+      autoFocus: true
+    }), step === "select" && candidates.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        maxHeight: 260,
+        overflowY: "auto"
+      }
+    }, candidates.map(p => {
+      const t = getTeam(p.t26 || p.teamId);
+      return /*#__PURE__*/React.createElement("button", {
+        key: p.id,
+        onClick: () => {
+          setSelected(p);
+          setStep("pin");
+        },
+        style: {
+          background: "#13131f",
+          border: "1px solid #1e1e30",
+          borderRadius: 8,
+          padding: "10px 14px",
+          cursor: "pointer",
+          color: "#eeeef5",
+          fontFamily: "'Outfit',sans-serif",
+          fontSize: 14,
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          border: `2px solid ${t?.color || "#60607a"}`,
+          overflow: "hidden",
+          background: (t?.color || "#60607a") + "22",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0
+        }
+      }, p.photoUrl ? /*#__PURE__*/React.createElement("img", {
+        src: p.photoUrl,
+        style: {
+          width: "100%",
+          height: "100%",
+          objectFit: "cover"
+        }
+      }) : /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: t?.color || "#60607a"
+        }
+      }, p.name.charAt(0))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontWeight: 600
+        }
+      }, p.name), t && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: t.color
+        }
+      }, t.dissolvedName || t.name)));
+    })), step === "select" && candidates.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "#60607a",
+        textAlign: "center",
+        fontSize: 12
+      }
+    }, "Aucun joueur trouv\xE9")));
+  }
+
+  // ── PIN input ──
+  if (step === "pin") {
+    const team = getTeam(selected?.t26 || selected?.teamId);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "75vh",
+        padding: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #1e1e30",
+        borderRadius: 16,
+        padding: m ? 24 : 40,
+        maxWidth: 360,
+        width: "100%"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setStep("select"),
+      style: {
+        background: "none",
+        border: "none",
+        color: "#60607a",
+        cursor: "pointer",
+        fontSize: 12,
+        marginBottom: 16
+      }
+    }, "\u2190 Retour"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 24
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 56,
+        height: 56,
+        borderRadius: "50%",
+        border: `3px solid ${team?.color || "#E8B84B"}`,
+        overflow: "hidden",
+        background: (team?.color || "#E8B84B") + "22",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "0 auto 10px"
+      }
+    }, selected?.photoUrl ? /*#__PURE__*/React.createElement("img", {
+      src: selected.photoUrl,
+      style: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover"
+      }
+    }) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 22,
+        color: team?.color || "#E8B84B"
+      }
+    }, selected?.name.charAt(0))), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 26
+      }
+    }, selected?.name), /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: "#60607a",
+        fontSize: 12,
+        marginTop: 4
+      }
+    }, "Entre ton code PIN")), /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      placeholder: "PIN",
+      value: pin,
+      onChange: e => setPin(e.target.value),
+      onKeyDown: e => e.key === "Enter" && handlePin(),
+      style: {
+        ...S,
+        textAlign: "center",
+        fontSize: 28,
+        fontFamily: "'Bebas Neue',sans-serif",
+        letterSpacing: "0.3em",
+        marginBottom: 8
+      },
+      autoFocus: true
+    }), pinErr && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "#ef4444",
+        fontSize: 12,
+        textAlign: "center",
+        marginBottom: 8
+      }
+    }, "PIN incorrect"), /*#__PURE__*/React.createElement("button", {
+      onClick: handlePin,
+      style: {
+        ...BTN(),
+        marginTop: 8
+      }
+    }, "Se connecter")));
+  }
+  return null;
+}
+
 // ─── DATA PAGE ───────────────────────────────────────
 function DataPage() {
   const m = useIsMobile();
   const PIN = "2606";
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("pouis_pin") === "ok");
+  // If accessing data and we're not admin, redirect
   const [input, setInput] = useState("");
   const [err, setErr] = useState(false);
   const [tab, setTab] = useState("players");
@@ -11168,12 +11667,16 @@ function DataPage() {
 }
 
 // ─── APP ─────────────────────────────────────────────
+const ADMIN_UID = "louis";
 function App() {
   const [page, setPage] = useState("home");
   const [sub, setSub] = useState({});
   const [history, setHistory] = useState([]);
   const [dbLoaded, setDbLoaded] = useState(false);
   const [dbError, setDbError] = useState(null);
+  const [currentPlayer, setCurrentPlayer] = useState(null); // logged in player
+
+  const isAdmin = currentPlayer?.uid === ADMIN_UID;
   useEffect(() => {
     const l = document.createElement("link");
     l.href = FONT_URL;
@@ -11181,6 +11684,25 @@ function App() {
     document.head.appendChild(l);
     loadFromSupabase();
   }, []);
+
+  // Auto-login by IP
+  useEffect(() => {
+    if (!dbLoaded) return;
+    const tryAutoLogin = async () => {
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const {
+          ip
+        } = await ipRes.json();
+        const rows = await sbFetch("players", `?last_ip=eq.${encodeURIComponent(ip)}&pin=not.is.null&limit=1`);
+        if (rows && rows.length > 0) {
+          const p = PLAYERS.find(pl => pl.id === rows[0].id);
+          if (p) setCurrentPlayer(p);
+        }
+      } catch (e) {}
+    };
+    tryAutoLogin();
+  }, [dbLoaded]);
   async function loadFromSupabase() {
     try {
       const [players, teams, ratings] = await Promise.all([sbFetch("players", "?select=*&order=name"), sbFetch("teams", "?select=*&order=name"), sbFetch("ratings", "?select=*")]);
@@ -11289,7 +11811,9 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("style", null, css), /*#__PURE__*/React.createElement(NavBar, {
     page: page,
-    setPage: p => nav(p)
+    setPage: p => nav(p),
+    currentPlayer: currentPlayer,
+    isAdmin: isAdmin
   }), dbError && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#1a0a0a",
@@ -11303,7 +11827,8 @@ function App() {
     className: "fade"
   }, page === "home" && /*#__PURE__*/React.createElement(HomePage, {
     nav: nav,
-    navBack: navBack
+    navBack: navBack,
+    currentPlayer: currentPlayer
   }), page === "events" && /*#__PURE__*/React.createElement(EventsPage, {
     nav: nav,
     navBack: navBack
@@ -11325,7 +11850,12 @@ function App() {
     teamId: sub.teamId,
     nav: nav,
     navBack: navBack
-  }), page === "admin" && /*#__PURE__*/React.createElement(DataPage, null)));
+  }), page === "profile" && /*#__PURE__*/React.createElement(ProfilePage, {
+    nav: nav,
+    navBack: navBack,
+    currentPlayer: currentPlayer,
+    setCurrentPlayer: setCurrentPlayer
+  }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(DataPage, null)));
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
