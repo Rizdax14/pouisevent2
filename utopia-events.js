@@ -10001,6 +10001,11 @@ function PlayerDetailPage({
   const edRankPct = edPct > 0 ? Math.round(edTotal / edPct * 100) : 0;
   const transfers = TRANSFERS.filter(t => t.playerId === playerId);
   const tc = team?.color || "#60607a";
+  // Staff roles
+  const staffRoles = STAFF_EVENTS.flatMap(ev => ev.members.filter(m => m.playerId === playerId).map(m => ({
+    ...m,
+    evLabel: ev.label
+  })));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: m ? "14px 14px 76px" : "40px 32px",
@@ -10386,7 +10391,54 @@ function PlayerDetailPage({
         marginTop: 8
       }
     }, "\u2014"));
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), staffRoles.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 12 : 18,
+      marginBottom: m ? 12 : 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 15,
+      color: "#60607a",
+      marginBottom: 12
+    }
+  }, "R\xD4LES STAFF"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, staffRoles.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      background: "#13131f",
+      borderRadius: 8,
+      padding: "8px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      border: `1px solid ${ROLE_COLOR[r.role]}33`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 20
+    }
+  }, ROLE_EMOJI[r.role]), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: ROLE_COLOR[r.role],
+      fontWeight: 600
+    }
+  }, r.evLabel), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#60607a"
+    }
+  }, r.role === "crown" ? "Chef des arbitres" : r.role === "video" ? "Production vlog" : "Arbitre")))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr",
