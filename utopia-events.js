@@ -8642,9 +8642,7 @@ function RankingsPage({
         color: r.team.color
       }
     }, r.avg.toFixed(2))));
-  }))), /*#__PURE__*/React.createElement(StaffSection, {
-    nav: nav
-  }));
+  }))));
 }
 
 // ─── TEAMS PAGE ──────────────────────────────────────
@@ -9135,7 +9133,9 @@ function TeamsPage({
         color: "#404058"
       }
     }, lastPts, " pts")));
-  }))));
+  }))), /*#__PURE__*/React.createElement(StaffSection, {
+    nav: nav
+  }));
 }
 
 // ─── HISTORIC ROSTERS ────────────────────────────────
