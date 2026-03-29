@@ -229,6 +229,13 @@ const PLAYERS = [
   {id:79,uid:"melyne",name:"Mélyne",teamId:14,t25:17,teo:17,t26:14,photoUrl:"/photos/melyne.jpg"},
   {id:68,uid:"lea",name:"Léa",teamId:null,t25:15,photoUrl:"/photos/lea.jpg"},
   {id:67,uid:"lou-ann",name:"Lou-Ann",teamId:15,t25:15,teo:15,t26:15,photoUrl:"/photos/lou-ann.jpg"},
+,
+  {id:156,uid:"maelle",name:"Maëlle",photoUrl:null},
+  {id:157,uid:"tomge",name:"Tom Ge",photoUrl:null},
+  {id:158,uid:"raph",name:"Raph",photoUrl:null},
+  {id:159,uid:"elsa",name:"Elsa",photoUrl:null},
+  {id:160,uid:"louisMae",name:"Louis Mae",photoUrl:null},
+  {id:161,uid:"remy",name:"Rémy",photoUrl:null}
 ];
 
 const TRANSFERS = [
@@ -1607,10 +1614,10 @@ const STAFF_EVENTS = [
     label:"O2024", evId:1,
     members:[
       {name:"Louis",   playerId:116, role:"crown"},
-      {name:"Tom Ge",  role:"referee"},
-      {name:"Maëlle",  role:"referee"},
-      {name:"Raph",    role:"referee"},
-      {name:"Elsa",    role:"referee"},
+      {name:"Tom Ge",  playerId:157, role:"referee"},
+      {name:"Maëlle",  playerId:156, role:"referee"},
+      {name:"Raph",    playerId:158, role:"referee"},
+      {name:"Elsa",    playerId:159, role:"referee"},
     ]
   },
   {
@@ -1618,9 +1625,9 @@ const STAFF_EVENTS = [
     members:[
       {name:"Louis",   playerId:116, role:"crown"},
       {name:"Aylin",   playerId:107, role:"video"},
-      {name:"Maëlle",  role:"referee"},
+      {name:"Maëlle",  playerId:156, role:"referee"},
       {name:"Juline",  playerId:120, role:"referee"},
-      {name:"Elsa",    role:"referee"},
+      {name:"Elsa",    playerId:159, role:"referee"},
       {name:"Laurine", playerId:99,  role:"referee"},
     ]
   },
@@ -1629,9 +1636,9 @@ const STAFF_EVENTS = [
     members:[
       {name:"Louis",    playerId:116, role:"crown"},
       {name:"Aylin",    playerId:107, role:"video"},
-      {name:"Louis Mae",role:"referee"},
+      {name:"Louis Mae",playerId:160, role:"referee"},
       {name:"Eline",    playerId:7,   role:"referee"},
-      {name:"Rémy",     role:"referee"},
+      {name:"Rémy",    playerId:161, role:"referee"},
     ]
   },
 ];
@@ -1670,7 +1677,7 @@ function StaffSection({nav}){
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:18}}>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
             {active.members.map((member,i)=>{
-              const player=member.playerId?PLAYERS.find(p=>p.id===member.playerId):null;
+              const player=member.playerId?getPlayer(member.playerId):null;
               const roleColor=ROLE_COLOR[member.role];
               const isCrown=member.role==="crown";
               return(
@@ -2129,6 +2136,14 @@ function PlayerDetailPage({playerId,nav,navBack}){
       <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?12:18,marginBottom:m?12:18}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:12}}>PARCOURS</div>
         <div style={{display:"flex",gap:m?6:8,flexWrap:"wrap"}}>
+          {/* Staff cards */}
+          {staffRoles.map((r,i)=>(
+            <div key={"staff-"+i} style={{flex:"1 1 55px",minWidth:0,background:"#13131f",borderRadius:10,padding:"10px 10px",textAlign:"center",border:`1px solid ${ROLE_COLOR[r.role]}44`}}>
+              <div style={{fontSize:10,color:ROLE_COLOR[r.role],fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>{r.evLabel}</div>
+              <div style={{fontSize:22,marginBottom:4}}>{ROLE_EMOJI[r.role]}</div>
+              <div style={{fontSize:9,color:ROLE_COLOR[r.role]}}>{r.role==="crown"?"Chef arb.":r.role==="video"?"Vlog":"Arbitre"}</div>
+            </div>
+          ))}
           {[{label:"O2024",key:"t24",evId:1,type:"olympiades"},{label:"O2025",key:"t25",evId:2,type:"olympiades"}].map(({label,key,evId,type})=>{
             const teamId2=player[key];
             const t=getTeam(teamId2);
@@ -2732,12 +2747,16 @@ export default function App(){
         photoUrl:`/photos/${p.uid}.jpg`,
       }));
       const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
+      const hardcodedPlayers=[...PLAYERS]; // keep hardcoded players as fallback
       TEAMS.length=0;
       teams.forEach(t=>TEAMS.push({
         id:t.id, name:t.name, color:t.color||"#E8B84B", color2:t.color2||null,
         active:t.active!==false, logoUrl:savedLogos[t.id]?.logoUrl||null, logoFile:savedLogos[t.id]?.logoFile||null, logo_color2:t.logo_color2||false,
         oldName:t.old_name||null, dissolvedName:t.dissolved_name||null,
       }));
+      // Add hardcoded players not in Supabase (staff-only, etc)
+      const sbIds=new Set(PLAYERS.map(p=>p.id));
+      hardcodedPlayers.forEach(p=>{ if(!sbIds.has(p.id)) PLAYERS.push(p); });
       RATINGS.length=0;
       ratings.forEach(r=>RATINGS.push({p:r.player_id, e:r.event_id, r:r.rating}));
       setDbLoaded(true);

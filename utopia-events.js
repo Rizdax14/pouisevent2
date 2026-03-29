@@ -1447,6 +1447,36 @@ const PLAYERS = [{
   teo: 15,
   t26: 15,
   photoUrl: "/photos/lou-ann.jpg"
+},, {
+  id: 156,
+  uid: "maelle",
+  name: "Maëlle",
+  photoUrl: null
+}, {
+  id: 157,
+  uid: "tomge",
+  name: "Tom Ge",
+  photoUrl: null
+}, {
+  id: 158,
+  uid: "raph",
+  name: "Raph",
+  photoUrl: null
+}, {
+  id: 159,
+  uid: "elsa",
+  name: "Elsa",
+  photoUrl: null
+}, {
+  id: 160,
+  uid: "louisMae",
+  name: "Louis Mae",
+  photoUrl: null
+}, {
+  id: 161,
+  uid: "remy",
+  name: "Rémy",
+  photoUrl: null
 }];
 const TRANSFERS = [{
   playerId: 1,
@@ -8656,15 +8686,19 @@ const STAFF_EVENTS = [{
     role: "crown"
   }, {
     name: "Tom Ge",
+    playerId: 157,
     role: "referee"
   }, {
     name: "Maëlle",
+    playerId: 156,
     role: "referee"
   }, {
     name: "Raph",
+    playerId: 158,
     role: "referee"
   }, {
     name: "Elsa",
+    playerId: 159,
     role: "referee"
   }]
 }, {
@@ -8680,6 +8714,7 @@ const STAFF_EVENTS = [{
     role: "video"
   }, {
     name: "Maëlle",
+    playerId: 156,
     role: "referee"
   }, {
     name: "Juline",
@@ -8687,6 +8722,7 @@ const STAFF_EVENTS = [{
     role: "referee"
   }, {
     name: "Elsa",
+    playerId: 159,
     role: "referee"
   }, {
     name: "Laurine",
@@ -8706,6 +8742,7 @@ const STAFF_EVENTS = [{
     role: "video"
   }, {
     name: "Louis Mae",
+    playerId: 160,
     role: "referee"
   }, {
     name: "Eline",
@@ -8713,6 +8750,7 @@ const STAFF_EVENTS = [{
     role: "referee"
   }, {
     name: "Rémy",
+    playerId: 161,
     role: "referee"
   }]
 }];
@@ -8797,7 +8835,7 @@ function StaffSection({
       gap: 10
     }
   }, active.members.map((member, i) => {
-    const player = member.playerId ? PLAYERS.find(p => p.id === member.playerId) : null;
+    const player = member.playerId ? getPlayer(member.playerId) : null;
     const roleColor = ROLE_COLOR[member.role];
     const isCrown = member.role === "crown";
     return /*#__PURE__*/React.createElement("div", {
@@ -10155,7 +10193,37 @@ function PlayerDetailPage({
       gap: m ? 6 : 8,
       flexWrap: "wrap"
     }
-  }, [{
+  }, staffRoles.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: "staff-" + i,
+    style: {
+      flex: "1 1 55px",
+      minWidth: 0,
+      background: "#13131f",
+      borderRadius: 10,
+      padding: "10px 10px",
+      textAlign: "center",
+      border: `1px solid ${ROLE_COLOR[r.role]}44`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: ROLE_COLOR[r.role],
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      marginBottom: 8
+    }
+  }, r.evLabel), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      marginBottom: 4
+    }
+  }, ROLE_EMOJI[r.role]), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: ROLE_COLOR[r.role]
+    }
+  }, r.role === "crown" ? "Chef arb." : r.role === "video" ? "Vlog" : "Arbitre"))), [{
     label: "O2024",
     key: "t24",
     evId: 1,
@@ -11981,6 +12049,7 @@ function App() {
         logoFile: t.logoFile,
         logo_color2: t.logo_color2
       }]));
+      const hardcodedPlayers = [...PLAYERS]; // keep hardcoded players as fallback
       TEAMS.length = 0;
       teams.forEach(t => TEAMS.push({
         id: t.id,
@@ -11994,6 +12063,11 @@ function App() {
         oldName: t.old_name || null,
         dissolvedName: t.dissolved_name || null
       }));
+      // Add hardcoded players not in Supabase (staff-only, etc)
+      const sbIds = new Set(PLAYERS.map(p => p.id));
+      hardcodedPlayers.forEach(p => {
+        if (!sbIds.has(p.id)) PLAYERS.push(p);
+      });
       RATINGS.length = 0;
       ratings.forEach(r => RATINGS.push({
         p: r.player_id,
