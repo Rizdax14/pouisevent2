@@ -8642,10 +8642,245 @@ function RankingsPage({
         color: r.team.color
       }
     }, r.avg.toFixed(2))));
-  }))));
+  }))), /*#__PURE__*/React.createElement(StaffSection, {
+    nav: nav
+  }));
 }
 
 // ─── TEAMS PAGE ──────────────────────────────────────
+// ─── STAFF DATA ──────────────────────────────────────
+const STAFF_EVENTS = [{
+  label: "O2024",
+  evId: 1,
+  members: [{
+    name: "Louis",
+    playerId: 116,
+    role: "crown"
+  }, {
+    name: "Tom Ge",
+    role: "referee"
+  }, {
+    name: "Maëlle",
+    role: "referee"
+  }, {
+    name: "Raph",
+    role: "referee"
+  }, {
+    name: "Elsa",
+    role: "referee"
+  }]
+}, {
+  label: "O2025",
+  evId: 2,
+  members: [{
+    name: "Louis",
+    playerId: 116,
+    role: "crown"
+  }, {
+    name: "Aylin",
+    playerId: 107,
+    role: "video"
+  }, {
+    name: "Maëlle",
+    role: "referee"
+  }, {
+    name: "Juline",
+    playerId: 120,
+    role: "referee"
+  }, {
+    name: "Elsa",
+    role: "referee"
+  }, {
+    name: "Laurine",
+    playerId: 99,
+    role: "referee"
+  }]
+}, {
+  label: "SG 25'",
+  evId: 3,
+  members: [{
+    name: "Louis",
+    playerId: 116,
+    role: "crown"
+  }, {
+    name: "Aylin",
+    playerId: 107,
+    role: "video"
+  }, {
+    name: "Louis Mae",
+    role: "referee"
+  }, {
+    name: "Eline",
+    playerId: 7,
+    role: "referee"
+  }, {
+    name: "Rémy",
+    role: "referee"
+  }]
+}];
+const ROLE_EMOJI = {
+  crown: "👑",
+  video: "🎥",
+  referee: "🦺"
+};
+const ROLE_COLOR = {
+  crown: "#E8B84B",
+  video: "#818cf8",
+  referee: "#34d399"
+};
+function StaffSection({
+  nav
+}) {
+  const m = useIsMobile();
+  const [sel, setSel] = useState("O2025");
+  const active = STAFF_EVENTS.find(e => e.label === sel);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: m ? 28 : 40
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: m ? 16 : 24
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#1e1e30"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 17,
+      color: "#60607a",
+      whiteSpace: "nowrap"
+    }
+  }, "STAFF"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: "#1e1e30"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16,
+      flexWrap: "wrap"
+    }
+  }, STAFF_EVENTS.map(ev => /*#__PURE__*/React.createElement("button", {
+    key: ev.label,
+    onClick: () => setSel(ev.label),
+    style: {
+      padding: "5px 14px",
+      borderRadius: 7,
+      cursor: "pointer",
+      background: sel === ev.label ? "#E8B84B" : "#13131f",
+      color: sel === ev.label ? "#080810" : "#60607a",
+      border: sel === ev.label ? "none" : "1px solid #1e1e30",
+      fontFamily: "'Outfit',sans-serif",
+      fontSize: 11,
+      fontWeight: 600
+    }
+  }, ev.label))), active && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 14 : 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(auto-fill,minmax(160px,1fr))",
+      gap: 10
+    }
+  }, active.members.map((member, i) => {
+    const player = member.playerId ? PLAYERS.find(p => p.id === member.playerId) : null;
+    const roleColor = ROLE_COLOR[member.role];
+    const isCrown = member.role === "crown";
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      onClick: () => player && nav("playerDetail", {
+        playerId: player.id
+      }),
+      style: {
+        background: "#13131f",
+        borderRadius: 10,
+        padding: "12px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: player ? "pointer" : "default",
+        transition: "background .15s",
+        border: `1px solid ${isCrown ? "#E8B84B33" : "#1e1e30"}`
+      },
+      onMouseEnter: e => player && (e.currentTarget.style.background = "#1e1e30"),
+      onMouseLeave: e => e.currentTarget.style.background = "#13131f"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        flexShrink: 0,
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: `2px solid ${isCrown ? "#E8B84B" : roleColor}`,
+        background: roleColor + "22"
+      }
+    }, player?.photoUrl ? /*#__PURE__*/React.createElement("img", {
+      src: player.photoUrl,
+      style: {
+        width: "100%",
+        height: "100%",
+        objectFit: "cover"
+      },
+      onError: e => e.target.style.display = "none"
+    }) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 16,
+        color: isCrown ? "#E8B84B" : roleColor
+      }
+    }, member.name.charAt(0))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 12,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, member.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 16,
+        marginTop: 2
+      }
+    }, ROLE_EMOJI[member.role])));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      display: "flex",
+      gap: 14,
+      flexWrap: "wrap"
+    }
+  }, Object.entries(ROLE_EMOJI).map(([k, v]) => /*#__PURE__*/React.createElement("span", {
+    key: k,
+    style: {
+      fontSize: 11,
+      color: ROLE_COLOR[k]
+    }
+  }, v, " ", k === "crown" ? "Chef des arbitres" : k === "video" ? "Production vlog" : "Arbitre")))));
+}
 function TeamsPage({
   nav
 }) {
