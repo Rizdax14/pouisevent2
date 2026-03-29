@@ -2738,6 +2738,7 @@ export default function App(){
         sbFetch("ratings","?select=*"),
       ]);
       // Remap Supabase fields → app fields
+      const hardcodedPlayers=[...PLAYERS]; // save before clearing
       PLAYERS.length=0;
       players.forEach(p=>PLAYERS.push({
         id:p.id, uid:p.uid, name:p.name,
@@ -2747,7 +2748,6 @@ export default function App(){
         photoUrl:`/photos/${p.uid}.jpg`,
       }));
       const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
-      const hardcodedPlayers=[...PLAYERS]; // keep hardcoded players as fallback
       TEAMS.length=0;
       teams.forEach(t=>TEAMS.push({
         id:t.id, name:t.name, color:t.color||"#E8B84B", color2:t.color2||null,

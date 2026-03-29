@@ -12028,6 +12028,7 @@ function App() {
     try {
       const [players, teams, ratings] = await Promise.all([sbFetch("players", "?select=*&order=name"), sbFetch("teams", "?select=*&order=name"), sbFetch("ratings", "?select=*")]);
       // Remap Supabase fields → app fields
+      const hardcodedPlayers = [...PLAYERS]; // save before clearing
       PLAYERS.length = 0;
       players.forEach(p => PLAYERS.push({
         id: p.id,
@@ -12049,7 +12050,6 @@ function App() {
         logoFile: t.logoFile,
         logo_color2: t.logo_color2
       }]));
-      const hardcodedPlayers = [...PLAYERS]; // keep hardcoded players as fallback
       TEAMS.length = 0;
       teams.forEach(t => TEAMS.push({
         id: t.id,
