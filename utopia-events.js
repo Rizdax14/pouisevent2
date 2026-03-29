@@ -9058,7 +9058,96 @@ function TeamsPage({
         cursor: "pointer"
       }
     }, p.name)))));
-  })), former.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }), (() => {
+    const staffCurrent = [{
+      playerId: 116,
+      role: "crown"
+    }, {
+      playerId: 107,
+      role: "video"
+    }, {
+      playerId: 7,
+      role: "referee"
+    }];
+    const ac = "#E8B84B";
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: () => nav("staff"),
+      style: {
+        background: "#0d0d1c",
+        border: `1px solid ${ac}33`,
+        borderRadius: 12,
+        overflow: "hidden",
+        cursor: "pointer",
+        transition: "transform .2s,border-color .2s"
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.borderColor = ac + "77";
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.borderColor = ac + "33";
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        height: 3,
+        background: `linear-gradient(90deg,${ac},${ac}88)`
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: m ? 12 : 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: m ? 24 : 30,
+        marginRight: 8
+      }
+    }, "\uD83E\uDDBA"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        textAlign: "center",
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 14 : 18,
+        color: ac
+      }
+    }, "STAFF")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 4,
+        flexWrap: "wrap"
+      }
+    }, staffCurrent.map(({
+      playerId,
+      role
+    }) => {
+      const p = getPlayer(playerId);
+      if (!p) return null;
+      return /*#__PURE__*/React.createElement("div", {
+        key: playerId,
+        onClick: e => {
+          e.stopPropagation();
+          nav("playerDetail", {
+            playerId
+          });
+        },
+        style: {
+          background: ac + "22",
+          border: `1px solid ${ROLE_COLOR[role]}44`,
+          borderRadius: 4,
+          padding: "2px 6px",
+          fontSize: 10,
+          color: ROLE_COLOR[role],
+          cursor: "pointer"
+        }
+      }, ROLE_EMOJI[role], " ", p.name);
+    }))));
+  })()), former.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
