@@ -8759,6 +8759,7 @@ const O2026_EPREUVES = [{
   format: "6V6 — Groupe + Arbre",
   color: "#E84D9B",
   lieu: null,
+  lieuImg: "/lieux/bp.png",
   regles: ["L'objectif : avoir le + de joueurs dans son camp que les adversaires au terme des 4 minutes.", "Toucher un adversaire OU sauver un allié en lançant la balle par-dessus.", "Si une équipe n'a plus de joueur avant la fin du temps, elle a perdu.", "Les matchs se jouent au meilleur des 3 manches.", "Pour récupérer la possession : attraper la balle, qu'elle finisse dans sa moitié, ou être touché.", "Si la balle est attrapée en plusieurs temps sans toucher le sol, la réception est validée."],
   notesSpeciales: [{
     titre: "LOI DEVILLE 🔴",
@@ -8782,6 +8783,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Groupe + Arbre",
   color: "#3b82f6",
   lieu: null,
+  lieuImg: "/lieux/beerpong.png",
   regles: ["Match de 5 minutes — l'équipe qui a le moins de gobelets à la fin gagne.", "Chaque joueur tire 1 fois sur 2 avec son partenaire."],
   notesSpeciales: [{
     titre: "⏱ Interdit",
@@ -8801,6 +8803,7 @@ const O2026_EPREUVES = [{
   format: "3V3 — Groupe + Arbre",
   color: "#3b82f6",
   lieu: null,
+  lieuImg: null,
   regles: ["Match de 4 minutes."],
   notesSpeciales: [{
     titre: "🏅 Départage",
@@ -8817,6 +8820,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Tout le monde en même temps",
   color: "#3b82f6",
   lieu: null,
+  lieuImg: "/lieux/cultureg.png",
   regles: ["Un grand Kahoot portant sur plein de sujets différents.", "Tout le monde joue en même temps — classement individuel."],
   notesSpeciales: [],
   groupes: 0,
@@ -8830,6 +8834,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Tout le monde en même temps",
   color: "#f97316",
   lieu: null,
+  lieuImg: "/lieux/marathon.png",
   regles: ["Un tour entier du complexe à faire (environ 1km).", "Tous les hommes courent en même temps.", "Classement par ordre d'arrivée."],
   notesSpeciales: [],
   groupes: 0,
@@ -8843,6 +8848,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Tout le monde en même temps",
   color: "#f97316",
   lieu: null,
+  lieuImg: "/lieux/marathon.png",
   regles: ["Un tour entier du complexe à faire (environ 1km).", "Toutes les femmes courent en même temps.", "Classement par ordre d'arrivée."],
   notesSpeciales: [],
   groupes: 0,
@@ -8856,6 +8862,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Tout le monde en même temps",
   color: "#ef4444",
   lieu: "Bowling",
+  lieuImg: null,
   regles: ["RDV directement au bowling pour les joueurs assignés.", "4 pistes louées — chaque joueur fait le meilleur score possible sur sa piste."],
   notesSpeciales: [],
   groupes: 0,
@@ -8869,6 +8876,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Groupe (drag & drop par groupe, puis phase finale)",
   color: "#ef4444",
   lieu: null,
+  lieuImg: "/lieux/molky.png",
   regles: ["But : atteindre exactement 50 points. Le premier qualifié va dans le groupe des 1ers, etc.", "Limite de temps : 20 minutes. Ordre de passage : du plus jeune au plus vieux.", "Les 4 joueurs d'un groupe jouent en même temps — classement par drag & drop."],
   notesSpeciales: [{
     titre: "📐 Règles additionnelles",
@@ -8885,6 +8893,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Groupe + Arbre",
   color: "#ef4444",
   lieu: null,
+  lieuImg: "/lieux/overcooked.png",
   regles: ["Match 2v2 Overcooked sur la map Sushi Station.", "Victoire = 1 point, défaite = 0 point."],
   notesSpeciales: [{
     titre: "🏅 Départage",
@@ -8901,6 +8910,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Tout le monde en même temps",
   color: "#ef4444",
   lieu: null,
+  lieuImg: "/lieux/puzzlerun.png",
   regles: ["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.", "Un joueur fait le puzzle pendant que l'autre cherche les sacs — on alterne obligatoirement.", "50 minutes pour finir le puzzle, sinon 0 points.", "Le binôme doit obligatoirement être composé d'1 garçon et 1 fille."],
   notesSpeciales: [{
     titre: "⚠️ Attention",
@@ -8920,6 +8930,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Tout le monde en même temps",
   color: "#22c55e",
   lieu: null,
+  lieuImg: "/lieux/mathsprint.png",
   regles: ["Nouvelle épreuve !", "Vous avez un tableau 10×10. L'un va voir un 2ème tableau, revient donner les infos, le 2ème remplit un 3ème tableau avec la somme des cases correspondantes.", "2 manches — le classement final est la MOYENNE des positions des 2 manches.", "Ex : 2ème manche 1 + 4ème manche 2 = moyenne 3ème place.", "En cas d'égalité de moyenne → la meilleure position en manche 2 départage."],
   notesSpeciales: [{
     titre: "📊 Calcul du score",
@@ -8936,6 +8947,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — Poule + Arbre",
   color: "#22c55e",
   lieu: null,
+  lieuImg: "/lieux/puissance4.png",
   regles: ["Match en 1 manche."],
   notesSpeciales: [{
     titre: "🏅 Départage",
@@ -8952,6 +8964,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Tout le monde en même temps",
   color: "#22c55e",
   lieu: null,
+  lieuImg: "/lieux/cercles.png",
   regles: ["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (16 balles).", "Quand la musique s'arrête : être dans un cerceau (extérieur) OU récupérer une balle (intérieur). Sinon → éliminé.", "1 seule partie avec les 32 participants (2 joueurs par équipe).", "Score d'équipe = position du meilleur joueur × 2 + position du moins bon × 1, divisé par 3. Plus bas = meilleur.", "Les 2 joueurs par équipe doivent obligatoirement être 1 garçon et 1 fille."],
   notesSpeciales: [{
     titre: "📊 Score d'équipe",
@@ -8968,6 +8981,7 @@ const O2026_EPREUVES = [{
   format: "1V1 — 2 groupes de 8 → re-groupes",
   color: "#22c55e",
   lieu: null,
+  lieuImg: "/lieux/flechette.png",
   regles: ["Phase 1 : 2 groupes de 8 joueurs, chacun joue en même temps pendant 25 minutes.", "Les 4 meilleurs de chaque groupe → Finale des Gagnants (8 meilleurs).", "Les 4 moins bons de chaque groupe → Finale des Perdants (8 moins bons).", "Phase 2 : on refait la même chose dans chaque nouveau groupe (25 minutes).", "Le score de chaque phase est saisi individuellement."],
   notesSpeciales: [],
   groupes: 0,
@@ -8981,6 +8995,7 @@ const O2026_EPREUVES = [{
   format: "4V4 — Bracket Bo3",
   color: "#8b5cf6",
   lieu: null,
+  lieuImg: "/lieux/tircorde.png",
   regles: ["Bracket direct — matchs au meilleur des 3 manches.", "D'abord un 2v2 filles, puis 2v2 garçons, si 1-1 → 4v4.", "Dès que les 2 ou 4 joueurs dépassent le cône du milieu → partie terminée."],
   notesSpeciales: [{
     titre: "⚠️ Restriction",
@@ -8997,6 +9012,7 @@ const O2026_EPREUVES = [{
   format: "4V4 — 2 courses de 8 → re-groupes",
   color: "#06b6d4",
   lieu: null,
+  lieuImg: "/lieux/biathlon.png",
   regles: ["2 courses de 8 équipes chacune — classement par ordre d'arrivée (drag & drop).", "Les 4 meilleures équipes de chaque course → Finale des Gagnants.", "Les 4 moins bonnes de chaque course → Finale des Perdants.", "Ordre dans la course : 1 Précision H → 1 Sprint F → 1 Précision F → 1 Sprint H.", "Précision : 5 balles, 5 verres. Chaque verre non tombé = malus de distance pour le sprinter suivant."],
   notesSpeciales: [{
     titre: "⚠️ Restriction",
@@ -12496,76 +12512,7 @@ function EpreuveO2026Page({
     onClick: () => setBiathlonFinalLocked(true),
     disabled: biathlonFinalLocked || biathlonWin.length === 0,
     style: BTN(biathlonFinalLocked ? "#404058" : "#34d399")
-  }, biathlonFinalLocked ? "✅ Classement officiel" : "📋 Valider le classement final")))), [...new Set(["cultureg", "marathonH", "marathonF", "bowling", "mathsprint", "cercles"])].includes(ep.id) && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: m ? 14 : 20,
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 14,
-      color: "#60607a",
-      marginBottom: 14
-    }
-  }, "\uD83D\uDCCB STARTLIST"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
-      gap: 10
-    }
-  }, getO2026ActiveTeams().map(team => {
-    const players = getTeamPlayers(team.id);
-    return /*#__PURE__*/React.createElement("div", {
-      key: team.id,
-      style: {
-        background: "#13131f",
-        borderRadius: 8,
-        padding: "10px 12px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginBottom: 6
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: team.color,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: "'Bebas Neue',sans-serif",
-        fontSize: 13,
-        color: team.color
-      }
-    }, team.name)), players.length > 0 ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: 2
-      }
-    }, players.map(p => /*#__PURE__*/React.createElement("span", {
-      key: p.id,
-      style: {
-        fontSize: 11,
-        color: "#cccce0"
-      }
-    }, p.name))) : /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: "#2a2a40"
-      }
-    }, "Non assign\xE9"));
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, biathlonFinalLocked ? "✅ Classement officiel" : "📋 Valider le classement final")))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
       border: "1px solid #1e1e30",
@@ -13230,7 +13177,101 @@ function EpreuveO2026Page({
         color: "#E8B84B"
       }
     }, pts, " pts"));
-  })), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  })), ep.lieuImg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      overflow: "hidden",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#60607a",
+      padding: "14px 20px 8px"
+    }
+  }, "\uD83D\uDCCD LIEU"), /*#__PURE__*/React.createElement("img", {
+    src: ep.lieuImg,
+    alt: `Lieu ${ep.nom}`,
+    style: {
+      width: "100%",
+      display: "block",
+      maxHeight: 300,
+      objectFit: "cover"
+    },
+    onError: e => e.target.style.display = "none"
+  })), [...new Set(["cultureg", "marathonH", "marathonF", "bowling", "mathsprint", "cercles"])].includes(ep.id) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#60607a",
+      marginBottom: 14
+    }
+  }, "\uD83D\uDCCB STARTLIST"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10
+    }
+  }, getO2026ActiveTeams().map(team => {
+    const players = getTeamPlayers(team.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: team.id,
+      style: {
+        background: "#13131f",
+        borderRadius: 8,
+        padding: "10px 12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: team.color,
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: team.color
+      }
+    }, team.name)), players.length > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 2
+      }
+    }, players.map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      style: {
+        fontSize: 11,
+        color: "#cccce0"
+      }
+    }, p.name))) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#2a2a40"
+      }
+    }, "Non assign\xE9"));
+  }))), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
       border: "1px solid #1e1e30",

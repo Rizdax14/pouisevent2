@@ -1622,61 +1622,77 @@ const PHASE_COLOR={1:"#E84D9B",2:"#3b82f6",3:"#f97316",4:"#ef4444",5:"#22c55e",6
 
 const O2026_EPREUVES = [
   {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",color:"#E84D9B",lieu:null,
+    lieuImg:"/lieux/bp.png",
     regles:["L'objectif : avoir le + de joueurs dans son camp que les adversaires au terme des 4 minutes.","Toucher un adversaire OU sauver un allié en lançant la balle par-dessus.","Si une équipe n'a plus de joueur avant la fin du temps, elle a perdu.","Les matchs se jouent au meilleur des 3 manches.","Pour récupérer la possession : attraper la balle, qu'elle finisse dans sa moitié, ou être touché.","Si la balle est attrapée en plusieurs temps sans toucher le sol, la réception est validée."],
     notesSpeciales:[{titre:"LOI DEVILLE 🔴",texte:"Si le ballon tape la tête, la touche est annulée et la balle est rendue à celui qui s'est pris le ballon dans la tête."},{titre:"⏱ Interdit",texte:"Il est interdit de perdre du temps exprès."},{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct entre les deux équipes."}],
     groupes:4,scoreType:"mini_bracket",groupFormat:"mini_bracket"},
   {id:"beerpong",phase:2,nom:"Beer Pong",emoji:"🏓",horaire:"11H30 - 12H30",format:"2V2 — Groupe + Arbre",color:"#3b82f6",lieu:null,
+    lieuImg:"/lieux/beerpong.png",
     regles:["Match de 5 minutes — l'équipe qui a le moins de gobelets à la fin gagne.","Chaque joueur tire 1 fois sur 2 avec son partenaire."],
     notesSpeciales:[{titre:"⏱ Interdit",texte:"NE PAS GAGNER DU TEMPS !"},{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"victoire"},
   {id:"football",phase:2,nom:"Football",emoji:"⚽",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",color:"#3b82f6",lieu:null,
+    lieuImg:null,
     regles:["Match de 4 minutes."],
     notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"buts"},
   {id:"cultureg",phase:2,nom:"Culture G",emoji:"🧠",horaire:"11H30 - 12H30",format:"1V1 — Tout le monde en même temps",color:"#3b82f6",lieu:null,
+    lieuImg:"/lieux/cultureg.png",
     regles:["Un grand Kahoot portant sur plein de sujets différents.","Tout le monde joue en même temps — classement individuel."],
     notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
   {id:"marathonH",phase:3,nom:"Marathon Hommes",emoji:"🏃‍♂️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",color:"#f97316",lieu:null,
+    lieuImg:"/lieux/marathon.png",
     regles:["Un tour entier du complexe à faire (environ 1km).","Tous les hommes courent en même temps.","Classement par ordre d'arrivée."],
     notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
   {id:"marathonF",phase:3,nom:"Marathon Femmes",emoji:"🏃‍♀️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",color:"#f97316",lieu:null,
+    lieuImg:"/lieux/marathon.png",
     regles:["Un tour entier du complexe à faire (environ 1km).","Toutes les femmes courent en même temps.","Classement par ordre d'arrivée."],
     notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
   {id:"bowling",phase:4,nom:"Bowling",emoji:"🎳",horaire:"14H - 15H",format:"1V1 — Tout le monde en même temps",color:"#ef4444",lieu:"Bowling",
+    lieuImg:null,
     regles:["RDV directement au bowling pour les joueurs assignés.","4 pistes louées — chaque joueur fait le meilleur score possible sur sa piste."],
     notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
   {id:"molky",phase:4,nom:"Mölky",emoji:"🪵",horaire:"14H - 15H",format:"1V1 — Groupe (drag & drop par groupe, puis phase finale)",color:"#ef4444",lieu:null,
+    lieuImg:"/lieux/molky.png",
     regles:["But : atteindre exactement 50 points. Le premier qualifié va dans le groupe des 1ers, etc.","Limite de temps : 20 minutes. Ordre de passage : du plus jeune au plus vieux.","Les 4 joueurs d'un groupe jouent en même temps — classement par drag & drop."],
     notesSpeciales:[{titre:"📐 Règles additionnelles",texte:"Checkpoint à 25 pts. Si le score dépasse 50 → retour à 25. 3 erreurs d'affilée → retour au checkpoint (ou à 0 si < 25). Si limite de temps atteinte → classement par points acquis."}],
     groupes:0,scoreType:"drag_rank_group"},
   {id:"overcooked",phase:4,nom:"Overcooked",emoji:"👨‍🍳",horaire:"14H - 15H",format:"2V2 — Groupe + Arbre",color:"#ef4444",lieu:null,
+    lieuImg:"/lieux/overcooked.png",
     regles:["Match 2v2 Overcooked sur la map Sushi Station.","Victoire = 1 point, défaite = 0 point."],
     notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"victoire"},
   {id:"puzzlerun",phase:4,nom:"Puzzle & Run",emoji:"🧩",horaire:"14H - 15H",format:"2V2 — Tout le monde en même temps",color:"#ef4444",lieu:null,
+    lieuImg:"/lieux/puzzlerun.png",
     regles:["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.","Un joueur fait le puzzle pendant que l'autre cherche les sacs — on alterne obligatoirement.","50 minutes pour finir le puzzle, sinon 0 points.","Le binôme doit obligatoirement être composé d'1 garçon et 1 fille."],
     notesSpeciales:[{titre:"⚠️ Attention",texte:"Quand vous ramenez un sac, l'arbitre vous donne 10 pièces (10 endroits = puzzle de 100 pièces). Si la même personne vient 2 fois d'affilée → disqualification."},{titre:"📝 Note",texte:"Tous les binômes ont le même puzzle cette année."}],
     groupes:0,scoreType:"drag_rank"},
   {id:"mathsprint",phase:5,nom:"Math Sprint",emoji:"🔢",horaire:"15H - 16H",format:"2V2 — Tout le monde en même temps",color:"#22c55e",lieu:null,
+    lieuImg:"/lieux/mathsprint.png",
     regles:["Nouvelle épreuve !","Vous avez un tableau 10×10. L'un va voir un 2ème tableau, revient donner les infos, le 2ème remplit un 3ème tableau avec la somme des cases correspondantes.","2 manches — le classement final est la MOYENNE des positions des 2 manches.","Ex : 2ème manche 1 + 4ème manche 2 = moyenne 3ème place.","En cas d'égalité de moyenne → la meilleure position en manche 2 départage."],
     notesSpeciales:[{titre:"📊 Calcul du score",texte:"Classement final = (position manche 1 + position manche 2) ÷ 2. La meilleure moyenne gagne."}],
     groupes:0,scoreType:"drag_rank_2"},
   {id:"puissance4",phase:5,nom:"Puissance 4",emoji:"🔴",horaire:"15H - 16H",format:"1V1 — Poule + Arbre",color:"#22c55e",lieu:null,
+    lieuImg:"/lieux/puissance4.png",
     regles:["Match en 1 manche."],
     notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"victoire"},
   {id:"cercles",phase:5,nom:"Cercles Musical",emoji:"⭕",horaire:"15H - 16H",format:"2V2 — Tout le monde en même temps",color:"#22c55e",lieu:null,
+    lieuImg:"/lieux/cercles.png",
     regles:["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (16 balles).","Quand la musique s'arrête : être dans un cerceau (extérieur) OU récupérer une balle (intérieur). Sinon → éliminé.","1 seule partie avec les 32 participants (2 joueurs par équipe).","Score d'équipe = position du meilleur joueur × 2 + position du moins bon × 1, divisé par 3. Plus bas = meilleur.","Les 2 joueurs par équipe doivent obligatoirement être 1 garçon et 1 fille."],
     notesSpeciales:[{titre:"📊 Score d'équipe",texte:"Coef 2 pour le meilleur joueur, coef 1 pour l'autre. Score = (pos_meilleur×2 + pos_autre×1) ÷ 3. L'équipe avec le score le plus BAS gagne."}],
     groupes:0,scoreType:"drag_rank_coef"},
   {id:"flechette",phase:5,nom:"Fléchette",emoji:"🎯",horaire:"15H - 16H",format:"1V1 — 2 groupes de 8 → re-groupes",color:"#22c55e",lieu:null,
+    lieuImg:"/lieux/flechette.png",
     regles:["Phase 1 : 2 groupes de 8 joueurs, chacun joue en même temps pendant 25 minutes.","Les 4 meilleurs de chaque groupe → Finale des Gagnants (8 meilleurs).","Les 4 moins bons de chaque groupe → Finale des Perdants (8 moins bons).","Phase 2 : on refait la même chose dans chaque nouveau groupe (25 minutes).","Le score de chaque phase est saisi individuellement."],
     notesSpeciales:[],groupes:0,scoreType:"flechette"},
   {id:"tircorde",phase:6,nom:"Tir à la Corde",emoji:"🪢",horaire:"16H - 16H30",format:"4V4 — Bracket Bo3",color:"#8b5cf6",lieu:null,
+    lieuImg:"/lieux/tircorde.png",
     regles:["Bracket direct — matchs au meilleur des 3 manches.","D'abord un 2v2 filles, puis 2v2 garçons, si 1-1 → 4v4.","Dès que les 2 ou 4 joueurs dépassent le cône du milieu → partie terminée."],
     notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Biathlon Relais ne peuvent pas participer (sauf si pas assez de filles/garçons)."}],
     groupes:0,scoreType:"bracket_direct"},
   {id:"biathlon",phase:7,nom:"Biathlon Relais",emoji:"🎯🏃",horaire:"16H30 - 17H",format:"4V4 — 2 courses de 8 → re-groupes",color:"#06b6d4",lieu:null,
+    lieuImg:"/lieux/biathlon.png",
     regles:["2 courses de 8 équipes chacune — classement par ordre d'arrivée (drag & drop).","Les 4 meilleures équipes de chaque course → Finale des Gagnants.","Les 4 moins bonnes de chaque course → Finale des Perdants.","Ordre dans la course : 1 Précision H → 1 Sprint F → 1 Précision F → 1 Sprint H.","Précision : 5 balles, 5 verres. Chaque verre non tombé = malus de distance pour le sprinter suivant."],
     notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Tir à la Corde ne peuvent pas participer (sauf si pas assez de filles/garçons)."}],
     groupes:0,scoreType:"biathlon"},
@@ -3109,33 +3125,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         </div>
       )}
 
-      {/* ── STARTLIST for "tout le monde" epreuves ────────────────── */}
-      {[...new Set(["cultureg","marathonH","marathonF","bowling","mathsprint","cercles"])].includes(ep.id)&&(
-        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
-          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
-            {getO2026ActiveTeams().map(team=>{
-              const players=getTeamPlayers(team.id);
-              return(
-                <div key={team.id} style={{background:"#13131f",borderRadius:8,padding:"10px 12px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:team.color,flexShrink:0}}/>
-                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:team.color}}>{team.name}</span>
-                  </div>
-                  {players.length>0?(
-                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                      {players.map(p=><span key={p.id} style={{fontSize:11,color:"#cccce0"}}>{p.name}</span>)}
-                    </div>
-                  ):(
-                    <span style={{fontSize:10,color:"#2a2a40"}}>Non assigné</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── RÈGLES ──────────────────────────────────────────────── */}
       <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:12}}>RÈGLES</div>
@@ -3321,6 +3310,42 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B"}}>{pts} pts</span>
             </div>
           );})}
+        </div>
+      )}
+
+      {/* ── LIEU ────────────────────────────────────────────────── */}
+      {ep.lieuImg&&(
+        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,overflow:"hidden",marginBottom:14}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",padding:"14px 20px 8px"}}>📍 LIEU</div>
+          <img src={ep.lieuImg} alt={`Lieu ${ep.nom}`} style={{width:"100%",display:"block",maxHeight:300,objectFit:"cover"}}
+            onError={e=>e.target.style.display="none"}/>
+        </div>
+      )}
+
+      {/* ── STARTLIST for "tout le monde" epreuves ────────────────── */}
+      {[...new Set(["cultureg","marathonH","marathonF","bowling","mathsprint","cercles"])].includes(ep.id)&&(
+        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
+          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
+            {getO2026ActiveTeams().map(team=>{
+              const players=getTeamPlayers(team.id);
+              return(
+                <div key={team.id} style={{background:"#13131f",borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:team.color,flexShrink:0}}/>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:team.color}}>{team.name}</span>
+                  </div>
+                  {players.length>0?(
+                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                      {players.map(p=><span key={p.id} style={{fontSize:11,color:"#cccce0"}}>{p.name}</span>)}
+                    </div>
+                  ):(
+                    <span style={{fontSize:10,color:"#2a2a40"}}>Non assigné</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
