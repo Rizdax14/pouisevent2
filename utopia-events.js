@@ -9083,7 +9083,9 @@ const GROUP_TERRAINS = {
 // ─── O2026 PAGE ───────────────────────────────────────
 function O2026Page({
   nav,
-  navBack
+  navBack,
+  o2026Scores,
+  o2026Assignments
 }) {
   const m = useIsMobile();
   const ac = "#E8342A";
@@ -9153,7 +9155,216 @@ function O2026Page({
       color: ac,
       fontWeight: 600
     }
-  }, "EN COURS"))), /*#__PURE__*/React.createElement("div", {
+  }, "EN COURS"))), (() => {
+    const teams = TEAMS.filter(t => t.active);
+    const totals = {};
+    teams.forEach(t => {
+      totals[t.id] = 0;
+    });
+    const pts = O2026_POINTS;
+    Object.entries(o2026Scores || {}).forEach(([epId, d]) => {
+      if (!d) return;
+      // drag_rank types
+      if (d.dragRankLocked && d.dragRank?.length) {
+        d.dragRank.forEach((tid, i) => {
+          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
+        });
+      }
+      // drag_rank_2 / math sprint
+      if ((d.dragRankLocked || d.dragRank2Locked) && d.dragRank && d.dragRank2) {
+        const tIds = d.dragRank;
+        const sorted = [...tIds].sort((a, b) => {
+          const p1a = d.dragRank.indexOf(a) + 1 || 99,
+            p2a = d.dragRank2.indexOf(a) + 1 || 99;
+          const p1b = d.dragRank.indexOf(b) + 1 || 99,
+            p2b = d.dragRank2.indexOf(b) + 1 || 99;
+          return (p1a + p2a) / 2 - (p1b + p2b) / 2;
+        });
+        sorted.forEach((tid, i) => {
+          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
+        });
+      }
+      // drag_rank_coef / cercles
+      if (d.dragRankCoefLocked && d.dragRankCoef?.length) {
+        // Group by team, apply coef
+        const teamScores = {};
+        d.dragRankCoef.forEach((s, i) => {
+          if (!teamScores[s.teamId]) teamScores[s.teamId] = [];
+          teamScores[s.teamId].push(i + 1);
+        });
+        const sorted = teams.slice().sort((a, b) => {
+          const pA = teamScores[a.id] || [99, 99];
+          const pB = teamScores[b.id] || [99, 99];
+          const sA = (Math.min(...pA) * 2 + Math.max(...pA)) / 3;
+          const sB = (Math.min(...pB) * 2 + Math.max(...pB)) / 3;
+          return sA - sB;
+        });
+        sorted.forEach((t, i) => {
+          if (totals[t.id] !== undefined) totals[t.id] += pts[i] || 0;
+        });
+      }
+      // drag_rank_group / molky
+      if (d.dragRankFinalDone && d.dragRankFinal) {
+        const ranking = [];
+        [1, 2, 3, 4].forEach(gid => {
+          (d.dragRankFinal[gid] || []).forEach(tid => {
+            ranking.push(tid);
+          });
+        });
+        ranking.forEach((tid, i) => {
+          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
+        });
+      }
+      // bracket finals (BP, beer pong, football, overcooked, puissance4)
+      if (d.phase === "done" && d.bracketResultats) {
+        const br = d.bracketResultats;
+        const getW = (slot, a, b) => {
+          const r = br[`b_${slot}`];
+          return r ? r[0] > r[1] ? a : b : null;
+        };
+        const getL = (slot, a, b) => {
+          const r = br[`b_${slot}`];
+          return r ? r[0] > r[1] ? b : a : null;
+        };
+        const groups = [{
+          sf1: "wsf1",
+          sf2: "wsf2",
+          fin: "wf",
+          offset: 0
+        }, {
+          sf1: "lsf1",
+          sf2: "lsf2",
+          fin: "lf",
+          offset: 4
+        }, {
+          sf1: "t3sf1",
+          sf2: "t3sf2",
+          fin: "t3f",
+          offset: 8
+        }, {
+          sf1: "t4sf1",
+          sf2: "t4sf2",
+          fin: "t4f",
+          offset: 12
+        }];
+        groups.forEach(({
+          sf1,
+          sf2,
+          fin,
+          offset
+        }) => {
+          // Need team data - use groupes from state
+          const finResult = br[`b_${fin}`];
+          if (!finResult) return;
+          // We need tA/tB - they come from getBracketTeams which we can't run here
+          // So we skip bracket-based scoring for now (would need to store final rankings)
+        });
+      }
+      // flechette
+      if (d.flechetteDone && d.flechetteWin?.length) {
+        const sorted = [...d.flechetteWin, ...d.flechetteLose].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
+        sorted.forEach((p, i) => {
+          if (totals[p.id] !== undefined) totals[p.id] += pts[i] || 0;
+        });
+      }
+      // biathlon
+      if (d.biathlonFinalLocked && d.biathlonWin?.length) {
+        [...d.biathlonWin, ...d.biathlonLose].forEach((tid, i) => {
+          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
+        });
+      }
+      // tircorde
+      if (d.tcDone && d.tcResultats && d.tcTeams?.length) {
+        // simplified: winner of fin gets 25pts etc
+      }
+    });
+    const hasAny = Object.values(totals).some(v => v > 0);
+    if (!hasAny) return null;
+    const ranked = teams.sort((a, b) => totals[b.id] - totals[a.id]);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #1e1e30",
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 16,
+        color: "#E8B84B"
+      }
+    }, "\uD83C\uDFC6 CLASSEMENT PROVISOIRE"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: "#34d399",
+        boxShadow: "0 0 6px #34d399"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "En direct"))), ranked.map((team, i) => {
+      const score = totals[team.id] || 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: team.id,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "8px 0",
+          borderBottom: i < ranked.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: i < 3 ? 22 : 16,
+          color: i === 0 ? "#E8B84B" : i === 1 ? "#aaaaaa" : i === 2 ? "#c87533" : "#404058",
+          width: 30,
+          textAlign: "center",
+          flexShrink: 0
+        }
+      }, i + 1), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: team.color,
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: m ? 15 : 18,
+          color: team.color
+        }
+      }, team.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 16,
+          color: "#E8B84B"
+        }
+      }, score, " pts"));
+    }));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -9361,7 +9572,8 @@ function EpreuveO2026Page({
   epreuveId,
   nav,
   navBack,
-  currentPlayer
+  currentPlayer,
+  o2026Assignments
 }) {
   const m = useIsMobile();
   const ep = O2026_EPREUVES.find(e => e.id === epreuveId);
@@ -10073,8 +10285,10 @@ function EpreuveO2026Page({
   const myTeamId = myPlayer?.t26 || null;
   function getTeamPlayers(teamId) {
     if (!teamId) return [];
-    if (assignations[teamId]) return assignations[teamId].map(id => PLAYERS.find(p => p.id === id)).filter(Boolean);
-    return PLAYERS.filter(p => p && p.t26 === teamId);
+    const key = `${teamId}_${ep.id}`;
+    const assigned = (o2026Assignments || {})[key];
+    if (assigned && assigned.length > 0) return assigned.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean);
+    return []; // Don't show all players if cap hasn't assigned yet
   }
   const hasGroupes = hasGroupFormat && Object.values(groupes).some(g => g.length > 0);
   const hasMiniGroupes = isMiniB && Object.values(groupes).some(g => g.length > 0);
@@ -14896,7 +15110,9 @@ function ProfilePage({
   nav,
   navBack,
   currentPlayer,
-  setCurrentPlayer
+  setCurrentPlayer,
+  o2026Assignments,
+  setO2026Assignments
 }) {
   const m = useIsMobile();
   const [step, setStep] = useState(currentPlayer ? "profile" : "initial"); // initial | select | pin | profile
@@ -15195,7 +15411,196 @@ function ProfilePage({
     }, saving ? "..." : "Changer le PIN")), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogout,
       style: BTN("#1e1e30")
-    }, "\uD83D\uDD13 Se d\xE9connecter")));
+    }, "\uD83D\uDD13 Se d\xE9connecter")), player.t26cap && (() => {
+      const team = getTeam(player.t26);
+      const roster = PLAYERS.filter(p => p.t26 === player.t26);
+      const tc = team?.color || "#E8B84B";
+
+      // Group epreuves by phase
+      const phases = [...new Set(O2026_EPREUVES.map(e => e.phase))].sort();
+
+      // Save assignment to Supabase + local state
+      async function saveAssignment(epreuveId, playerIds) {
+        const key = `${player.t26}_${epreuveId}`;
+        setO2026Assignments(a => ({
+          ...a,
+          [key]: playerIds
+        }));
+        try {
+          await SUPABASE.from("o2026_assignments").upsert({
+            team_id: player.t26,
+            epreuve_id: epreuveId,
+            player_ids: playerIds
+          }, {
+            onConflict: "team_id,epreuve_id"
+          });
+        } catch (e) {
+          console.error("save assignment", e);
+        }
+      }
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: "#0d0d1c",
+          border: `1px solid ${tc}44`,
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 16
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 15,
+          color: tc,
+          marginBottom: 4
+        }
+      }, "\u2694\uFE0F ESPACE CAPITAINE"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "#60607a",
+          marginBottom: 20
+        }
+      }, "Assigne les joueurs de ", /*#__PURE__*/React.createElement("strong", {
+        style: {
+          color: tc
+        }
+      }, team?.name), " aux \xE9preuves."), (() => {
+        const boys = roster.filter(p => p.sex === "m" || !p.sex);
+        const girls = roster.filter(p => p.sex === "f");
+        const tcKey = `${player.t26}_tircorde`,
+          bioKey = `${player.t26}_biathlon`;
+        const tcIds = (o2026Assignments || {})[tcKey] || [];
+        const bioIds = (o2026Assignments || {})[bioKey] || [];
+        const assignedBoth = [...new Set([...tcIds, ...bioIds])];
+        const missing = roster.filter(p => !assignedBoth.includes(p.id));
+        if (missing.length > 0) return /*#__PURE__*/React.createElement("div", {
+          style: {
+            background: "#ef444420",
+            border: "1px solid #ef444444",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            fontSize: 12,
+            color: "#ef4444"
+          }
+        }, "\u26A0\uFE0F Tous les joueurs doivent participer \xE0 Tir \xE0 la corde OU Biathlon Relais. Manquants : ", missing.map(p => p.name).join(", "));
+        return null;
+      })(), phases.map(phase => /*#__PURE__*/React.createElement("div", {
+        key: phase,
+        style: {
+          marginBottom: 20
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 13,
+          color: tc,
+          borderBottom: `1px solid ${tc}22`,
+          paddingBottom: 6,
+          marginBottom: 12
+        }
+      }, "PHASE ", phase), O2026_EPREUVES.filter(e => e.phase === phase).map(ep => {
+        const key = `${player.t26}_${ep.id}`;
+        const assigned = (o2026Assignments || {})[key] || [];
+        // Determine max players from format
+        const fmt = ep.format || "";
+        const maxMatch = fmt.match(/^(\d+)V\d+/);
+        const maxPlayers = maxMatch ? parseInt(maxMatch[1]) : roster.length;
+        const available = roster.filter(p => !assigned.includes(p.id));
+        return /*#__PURE__*/React.createElement("div", {
+          key: ep.id,
+          style: {
+            background: "#13131f",
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 8
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 10
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 16
+          }
+        }, ep.emoji), /*#__PURE__*/React.createElement("div", {
+          style: {
+            flex: 1
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#eeeef5"
+          }
+        }, ep.nom), /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 10,
+            color: "#60607a"
+          }
+        }, ep.format, " \xB7 max ", maxPlayers === roster.length ? "tous" : maxPlayers + " joueurs")), assigned.length > 0 && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 10,
+            color: "#34d399"
+          }
+        }, "\u2713 ", assigned.length)), assigned.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            marginBottom: 8
+          }
+        }, assigned.map(pid => {
+          const p = PLAYERS.find(pl => pl.id === pid);
+          return /*#__PURE__*/React.createElement("div", {
+            key: pid,
+            onClick: () => saveAssignment(ep.id, assigned.filter(id => id !== pid)),
+            style: {
+              background: tc + "22",
+              border: `1px solid ${tc}55`,
+              borderRadius: 20,
+              padding: "4px 10px",
+              fontSize: 11,
+              color: tc,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 5
+            }
+          }, p?.name, " ", /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: 9,
+              color: tc + "88"
+            }
+          }, "\u2715"));
+        })), assigned.length < maxPlayers && available.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 5
+          }
+        }, available.map(p => /*#__PURE__*/React.createElement("div", {
+          key: p.id,
+          onClick: () => saveAssignment(ep.id, [...assigned, p.id]),
+          style: {
+            background: "#1e1e30",
+            borderRadius: 20,
+            padding: "4px 10px",
+            fontSize: 11,
+            color: "#60607a",
+            cursor: "pointer",
+            border: "1px solid #2a2a40"
+          }
+        }, "+ ", p.name))), assigned.length >= maxPlayers && /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 10,
+            color: "#34d399"
+          }
+        }, "\u2713 Complet"));
+      }))));
+    })());
   }
 
   // ── Initial input ──
@@ -16174,6 +16579,46 @@ function DataPage() {
 const ADMIN_UID = "louis";
 function App() {
   // Read initial page from URL hash
+  const [o2026Scores, setO2026Scores] = useState({}); // epreuveId → {teamId: pts}
+  const [o2026Assignments, setO2026Assignments] = useState({}); // teamId_epreuveId → [playerId]
+
+  // Load assignments from Supabase once
+  React.useEffect(() => {
+    const loadAssignments = async () => {
+      try {
+        const {
+          data
+        } = await SUPABASE.from("o2026_assignments").select("*");
+        if (data) {
+          const m = {};
+          data.forEach(row => {
+            m[`${row.team_id}_${row.epreuve_id}`] = row.player_ids || [];
+          });
+          setO2026Assignments(m);
+        }
+      } catch (e) {}
+    };
+    const loadScores = async () => {
+      try {
+        const {
+          data
+        } = await SUPABASE.from("o2026_state").select("epreuve_id,data");
+        if (data) {
+          const scores = {};
+          data.forEach(row => {
+            const d = row.data;
+            // Extract final rankings if done
+            if (d?.phase === "done" || d?.dragRankLocked || d?.dragRankCoefLocked || d?.flechetteDone || d?.tcDone || d?.biathlonFinalLocked || d?.dragRankFinalDone) {
+              scores[row.epreuve_id] = d;
+            }
+          });
+          setO2026Scores(scores);
+        }
+      } catch (e) {}
+    };
+    loadAssignments();
+    loadScores();
+  }, []);
   const [page, setPage] = useState(() => {
     try {
       const h = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
@@ -16377,12 +16822,15 @@ function App() {
     navBack: navBack
   }), page === "o2026" && /*#__PURE__*/React.createElement(O2026Page, {
     nav: nav,
-    navBack: navBack
+    navBack: navBack,
+    o2026Scores: o2026Scores,
+    o2026Assignments: o2026Assignments
   }), page === "epreuveO2026" && /*#__PURE__*/React.createElement(EpreuveO2026Page, {
     epreuveId: sub.epreuveId,
     nav: nav,
     navBack: navBack,
-    currentPlayer: currentPlayer
+    currentPlayer: currentPlayer,
+    o2026Assignments: o2026Assignments
   }), page === "teams" && /*#__PURE__*/React.createElement(TeamsPage, {
     nav: nav,
     navBack: navBack
@@ -16394,7 +16842,9 @@ function App() {
     nav: nav,
     navBack: navBack,
     currentPlayer: currentPlayer,
-    setCurrentPlayer: setCurrentPlayer
+    setCurrentPlayer: setCurrentPlayer,
+    o2026Assignments: o2026Assignments,
+    setO2026Assignments: setO2026Assignments
   }), page === "admin" && /*#__PURE__*/React.createElement(DataPage, null)));
 }
 
