@@ -12496,7 +12496,76 @@ function EpreuveO2026Page({
     onClick: () => setBiathlonFinalLocked(true),
     disabled: biathlonFinalLocked || biathlonWin.length === 0,
     style: BTN(biathlonFinalLocked ? "#404058" : "#34d399")
-  }, biathlonFinalLocked ? "✅ Classement officiel" : "📋 Valider le classement final")))), /*#__PURE__*/React.createElement("div", {
+  }, biathlonFinalLocked ? "✅ Classement officiel" : "📋 Valider le classement final")))), [...new Set(["cultureg", "marathonH", "marathonF", "bowling", "mathsprint", "cercles"])].includes(ep.id) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#60607a",
+      marginBottom: 14
+    }
+  }, "\uD83D\uDCCB STARTLIST"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10
+    }
+  }, getO2026ActiveTeams().map(team => {
+    const players = getTeamPlayers(team.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: team.id,
+      style: {
+        background: "#13131f",
+        borderRadius: 8,
+        padding: "10px 12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: team.color,
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: team.color
+      }
+    }, team.name)), players.length > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 2
+      }
+    }, players.map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      style: {
+        fontSize: 11,
+        color: "#cccce0"
+      }
+    }, p.name))) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#2a2a40"
+      }
+    }, "Non assign\xE9"));
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
       border: "1px solid #1e1e30",
@@ -12602,14 +12671,18 @@ function EpreuveO2026Page({
   }, "\u2705 Valid\xE9")), dragRank.map((tid, i) => {
     const t = getO2026Team(tid);
     const pts = O2026_POINTS[i] || 0;
+    const players = getTeamPlayers(tid);
     return /*#__PURE__*/React.createElement("div", {
       key: tid,
       style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
         padding: "7px 0",
         borderBottom: i < dragRank.length - 1 ? "1px solid #1e1e30" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -12617,7 +12690,8 @@ function EpreuveO2026Page({
         fontSize: i < 3 ? 22 : 15,
         color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
         width: 30,
-        textAlign: "center"
+        textAlign: "center",
+        flexShrink: 0
       }
     }, i + 1), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -12640,7 +12714,24 @@ function EpreuveO2026Page({
         fontSize: 14,
         color: "#E8B84B"
       }
-    }, pts, " pts"));
+    }, pts, " pts")), players.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        paddingLeft: 38,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 4,
+        marginTop: 3
+      }
+    }, players.map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      style: {
+        fontSize: 9,
+        color: t?.color,
+        background: t?.color + "15",
+        borderRadius: 3,
+        padding: "1px 5px"
+      }
+    }, p.name))));
   })), scoreType === "drag_rank_2" && (dragRankLocked || dragRank2Locked) && dragRank.length > 0 && dragRank2.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
@@ -13628,14 +13719,18 @@ function EpreuveO2026Page({
       const rank = entry.rank || i + 1;
       const tied = entry.tied;
       const t = getO2026Team(tid);
+      const players = getTeamPlayers(tid);
       return /*#__PURE__*/React.createElement("div", {
         key: tid,
         style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
           padding: "7px 0",
           borderBottom: i < ranking.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
@@ -13643,7 +13738,8 @@ function EpreuveO2026Page({
           fontSize: rank <= 3 ? 22 : 15,
           color: rank === 1 ? "#E8B84B" : rank === 2 ? "#aaaaaa" : rank === 3 ? "#c87533" : "#404058",
           width: 30,
-          textAlign: "center"
+          textAlign: "center",
+          flexShrink: 0
         }
       }, tied ? "=" : "", rank), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -13666,7 +13762,24 @@ function EpreuveO2026Page({
           fontSize: 15,
           color: "#E8B84B"
         }
-      }, pts, " pts"));
+      }, pts, " pts")), players.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          paddingLeft: 39,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 4,
+          marginTop: 3
+        }
+      }, players.map(p => /*#__PURE__*/React.createElement("span", {
+        key: p.id,
+        style: {
+          fontSize: 9,
+          color: t?.color,
+          background: t?.color + "15",
+          borderRadius: 3,
+          padding: "1px 5px"
+        }
+      }, p.name))));
     }));
   })()));
 }
@@ -15399,6 +15512,7 @@ function ProfilePage({
   const [newPin2, setNewPin2] = useState("");
   const [pinMsg, setPinMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [profileTab, setProfileTab] = useState("compte");
   const S = {
     background: "#13131f",
     border: "1px solid #1e1e30",
@@ -15633,12 +15747,27 @@ function ProfilePage({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: "'Bebas Neue',sans-serif",
-        fontSize: 15,
-        color: "#60607a",
-        marginBottom: 16
+        display: "flex",
+        gap: 0,
+        marginBottom: 16,
+        borderBottom: "1px solid #1e1e30"
       }
-    }, "ESPACE JOUEUR"), /*#__PURE__*/React.createElement("div", {
+    }, ["compte", "epreuves"].map(t => /*#__PURE__*/React.createElement("button", {
+      key: t,
+      onClick: () => setProfileTab(t),
+      style: {
+        padding: "8px 16px",
+        background: "none",
+        border: "none",
+        borderBottom: `2px solid ${profileTab === t ? "#E8B84B" : "transparent"}`,
+        color: profileTab === t ? "#E8B84B" : "#60607a",
+        cursor: "pointer",
+        fontFamily: "'Outfit',sans-serif",
+        fontSize: 12,
+        fontWeight: 600,
+        marginBottom: "-1px"
+      }
+    }, t === "compte" ? "⚙️ Compte" : "📅 Épreuves à venir"))), profileTab === "compte" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 20
       }
@@ -15685,7 +15814,101 @@ function ProfilePage({
     }, saving ? "..." : "Changer le PIN")), /*#__PURE__*/React.createElement("button", {
       onClick: handleLogout,
       style: BTN("#1e1e30")
-    }, "\uD83D\uDD13 Se d\xE9connecter")), player.t26cap && (() => {
+    }, "\uD83D\uDD13 Se d\xE9connecter")), profileTab === "epreuves" && (() => {
+      // Find epreuves assigned to this player
+      const myEpreuves = O2026_EPREUVES.filter(ep => {
+        const key = `${player.t26}_${ep.id}`;
+        const assigned = (o2026Assignments || {})[key] || [];
+        return assigned.includes(player.id);
+      });
+      if (myEpreuves.length === 0) return /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center",
+          padding: "24px 0",
+          color: "#2a2a40",
+          fontSize: 13
+        }
+      }, "Aucune \xE9preuve assign\xE9e \u2014 attends que ton capitaine compl\xE8te les assignations.");
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 10
+        }
+      }, myEpreuves.map(ep => {
+        const key = `${player.t26}_${ep.id}`;
+        const assigned = (o2026Assignments || {})[key] || [];
+        const teammates = assigned.filter(id => id !== player.id).map(id => PLAYERS.find(p => p.id === id)).filter(Boolean);
+        return /*#__PURE__*/React.createElement("div", {
+          key: ep.id,
+          onClick: () => nav("epreuveO2026", {
+            epreuveId: ep.id
+          }),
+          style: {
+            background: "#13131f",
+            borderRadius: 10,
+            padding: "12px 14px",
+            cursor: "pointer",
+            border: `1px solid ${ep.color}33`,
+            transition: "all .15s"
+          },
+          onMouseEnter: e => e.currentTarget.style.borderColor = ep.color + "66",
+          onMouseLeave: e => e.currentTarget.style.borderColor = ep.color + "33"
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: teammates.length ? 6 : 0
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 20
+          }
+        }, ep.emoji), /*#__PURE__*/React.createElement("div", {
+          style: {
+            flex: 1
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontFamily: "'Bebas Neue',sans-serif",
+            fontSize: 16,
+            color: ep.color
+          }
+        }, ep.nom), /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 11,
+            color: "#60607a"
+          }
+        }, ep.horaire)), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 12,
+            color: "#404058"
+          }
+        }, "\u203A")), teammates.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            paddingLeft: 30,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 5
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 10,
+            color: "#404058"
+          }
+        }, "Avec :"), teammates.map(p => /*#__PURE__*/React.createElement("span", {
+          key: p.id,
+          style: {
+            fontSize: 10,
+            color: ep.color,
+            background: ep.color + "15",
+            borderRadius: 10,
+            padding: "2px 8px"
+          }
+        }, p.name))));
+      }));
+    })()), player.t26cap && (() => {
       const team = getTeam(player.t26);
       const roster = PLAYERS.filter(p => p.t26 === player.t26);
       const tc = team?.color || "#E8B84B";
