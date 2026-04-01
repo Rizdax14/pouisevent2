@@ -8901,7 +8901,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Tout le monde en même temps",
   color: "#ef4444",
   lieu: null,
-  regles: ["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.", "Un joueur fait le puzzle pendant que l'autre cherche les sacs — on alterne obligatoirement.", "50 minutes pour finir le puzzle, sinon 0 points."],
+  regles: ["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.", "Un joueur fait le puzzle pendant que l'autre cherche les sacs — on alterne obligatoirement.", "50 minutes pour finir le puzzle, sinon 0 points.", "Le binôme doit obligatoirement être composé d'1 garçon et 1 fille."],
   notesSpeciales: [{
     titre: "⚠️ Attention",
     texte: "Quand vous ramenez un sac, l'arbitre vous donne 10 pièces (10 endroits = puzzle de 100 pièces). Si la même personne vient 2 fois d'affilée → disqualification."
@@ -8952,7 +8952,7 @@ const O2026_EPREUVES = [{
   format: "2V2 — Tout le monde en même temps",
   color: "#22c55e",
   lieu: null,
-  regles: ["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (16 balles).", "Quand la musique s'arrête : être dans un cerceau (extérieur) OU récupérer une balle (intérieur). Sinon → éliminé.", "1 seule partie avec les 32 participants (2 joueurs par équipe).", "Score d'équipe = position du meilleur joueur × 2 + position du moins bon × 1, divisé par 3. Plus bas = meilleur."],
+  regles: ["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (16 balles).", "Quand la musique s'arrête : être dans un cerceau (extérieur) OU récupérer une balle (intérieur). Sinon → éliminé.", "1 seule partie avec les 32 participants (2 joueurs par équipe).", "Score d'équipe = position du meilleur joueur × 2 + position du moins bon × 1, divisé par 3. Plus bas = meilleur.", "Les 2 joueurs par équipe doivent obligatoirement être 1 garçon et 1 fille."],
   notesSpeciales: [{
     titre: "📊 Score d'équipe",
     texte: "Coef 2 pour le meilleur joueur, coef 1 pour l'autre. Score = (pos_meilleur×2 + pos_autre×1) ÷ 3. L'équipe avec le score le plus BAS gagne."
@@ -9216,8 +9216,74 @@ function O2026Page({
         });
       }
       // bracket finals (BP, beer pong, football, overcooked, puissance4)
-      if (d.phase === "done" && d.bracketResultats) {
+      if (d.phase === "done" && d.bracketResultats && d.groupes) {
         const br = d.bracketResultats;
+        const gs = d.groupes;
+        // Compute standings per group from saved resultats
+        const getStandingsLocal = gid => {
+          const tms = gs[gid] || [];
+          const stats = {};
+          tms.forEach(t => {
+            stats[t] = {
+              pts: 0
+            };
+          });
+          // Use mini bracket results if available (BP)
+          if (d.miniRes) {
+            const w = (r, a, b) => r ? r[0] > r[1] ? a : b : null;
+            const l = (r, a, b) => r ? r[0] > r[1] ? b : a : null;
+            const sf1 = d.miniRes[`g${gid}_sf1`],
+              sf2 = d.miniRes[`g${gid}_sf2`];
+            const fin = d.miniRes[`g${gid}_fin`],
+              trd = d.miniRes[`g${gid}_3rd`];
+            const sf1w = w(sf1, tms[0], tms[3]),
+              sf2w = w(sf2, tms[1], tms[2]);
+            const sf1l = l(sf1, tms[0], tms[3]),
+              sf2l = l(sf2, tms[1], tms[2]);
+            const finW = w(fin, sf1w, sf2w),
+              finL = l(fin, sf1w, sf2w);
+            const trdW = w(trd, sf1l, sf2l),
+              trdL = l(trd, sf1l, sf2l);
+            return [finW, finL, trdW, trdL].filter(Boolean);
+          }
+          // Round-robin standings
+          if (d.resultats) {
+            tms.forEach(tA => {
+              tms.forEach(tB => {
+                if (tA >= tB) return;
+                const k = `g${gid}_${Math.min(tA, tB)}_${Math.max(tA, tB)}`;
+                const r = d.resultats[k];
+                if (!r) return;
+                if (r[0] > r[1]) {
+                  stats[tA].pts += 3;
+                } else if (r[1] > r[0]) {
+                  stats[tB].pts += 3;
+                } else {
+                  stats[tA].pts += 1;
+                  stats[tB].pts += 1;
+                }
+              });
+            });
+          }
+          return tms.sort((a, b) => (stats[b]?.pts || 0) - (stats[a]?.pts || 0));
+        };
+        const seeds = {
+          w: [],
+          l: [],
+          t3: [],
+          t4: []
+        };
+        [1, 2, 3, 4].forEach(gid => {
+          const st = getStandingsLocal(gid);
+          if (st[0]) seeds.w.push(st[0]);
+          if (st[1]) seeds.l.push(st[1]);
+          if (st[2]) seeds.t3.push(st[2]);
+          if (st[3]) seeds.t4.push(st[3]);
+        });
+        const w = seeds.w,
+          l = seeds.l,
+          t3 = seeds.t3,
+          t4 = seeds.t4;
         const getW = (slot, a, b) => {
           const r = br[`b_${slot}`];
           return r ? r[0] > r[1] ? a : b : null;
@@ -9226,38 +9292,50 @@ function O2026Page({
           const r = br[`b_${slot}`];
           return r ? r[0] > r[1] ? b : a : null;
         };
-        const groups = [{
-          sf1: "wsf1",
-          sf2: "wsf2",
-          fin: "wf",
-          offset: 0
-        }, {
-          sf1: "lsf1",
-          sf2: "lsf2",
-          fin: "lf",
-          offset: 4
-        }, {
-          sf1: "t3sf1",
-          sf2: "t3sf2",
-          fin: "t3f",
-          offset: 8
-        }, {
-          sf1: "t4sf1",
-          sf2: "t4sf2",
-          fin: "t4f",
-          offset: 12
-        }];
-        groups.forEach(({
-          sf1,
-          sf2,
-          fin,
-          offset
-        }) => {
-          // Need team data - use groupes from state
-          const finResult = br[`b_${fin}`];
-          if (!finResult) return;
-          // We need tA/tB - they come from getBracketTeams which we can't run here
-          // So we skip bracket-based scoring for now (would need to store final rankings)
+        const sharedPts = (i, j) => Math.round(((pts[i] || 0) + (pts[j] || 0)) / 2);
+        // Winners bracket
+        const wf1 = getW("wf", getW("wsf1", w[0], w[3]), getW("wsf2", w[1], w[2]));
+        const wf2 = getL("wf", getW("wsf1", w[0], w[3]), getW("wsf2", w[1], w[2]));
+        const wsf1L = getL("wsf1", w[0], w[3]),
+          wsf2L = getL("wsf2", w[1], w[2]);
+        if (wf1 && totals[wf1] !== undefined) totals[wf1] += pts[0] || 0;
+        if (wf2 && totals[wf2] !== undefined) totals[wf2] += pts[1] || 0;
+        const sp34 = sharedPts(2, 3);
+        [wsf1L, wsf2L].forEach(t => {
+          if (t && totals[t] !== undefined) totals[t] += sp34;
+        });
+        // Losers bracket
+        const lf1 = getW("lf", getW("lsf1", l[0], l[3]), getW("lsf2", l[1], l[2]));
+        const lf2 = getL("lf", getW("lsf1", l[0], l[3]), getW("lsf2", l[1], l[2]));
+        const lsf1L = getL("lsf1", l[0], l[3]),
+          lsf2L = getL("lsf2", l[1], l[2]);
+        if (lf1 && totals[lf1] !== undefined) totals[lf1] += pts[4] || 0;
+        if (lf2 && totals[lf2] !== undefined) totals[lf2] += pts[5] || 0;
+        const sp78 = sharedPts(6, 7);
+        [lsf1L, lsf2L].forEach(t => {
+          if (t && totals[t] !== undefined) totals[t] += sp78;
+        });
+        // 3rd bracket
+        const t3f1 = getW("t3f", getW("t3sf1", t3[0], t3[3]), getW("t3sf2", t3[1], t3[2]));
+        const t3f2 = getL("t3f", getW("t3sf1", t3[0], t3[3]), getW("t3sf2", t3[1], t3[2]));
+        const t3sf1L = getL("t3sf1", t3[0], t3[3]),
+          t3sf2L = getL("t3sf2", t3[1], t3[2]);
+        if (t3f1 && totals[t3f1] !== undefined) totals[t3f1] += pts[8] || 0;
+        if (t3f2 && totals[t3f2] !== undefined) totals[t3f2] += pts[9] || 0;
+        const sp1112 = sharedPts(10, 11);
+        [t3sf1L, t3sf2L].forEach(t => {
+          if (t && totals[t] !== undefined) totals[t] += sp1112;
+        });
+        // 4th bracket
+        const t4f1 = getW("t4f", getW("t4sf1", t4[0], t4[3]), getW("t4sf2", t4[1], t4[2]));
+        const t4f2 = getL("t4f", getW("t4sf1", t4[0], t4[3]), getW("t4sf2", t4[1], t4[2]));
+        const t4sf1L = getL("t4sf1", t4[0], t4[3]),
+          t4sf2L = getL("t4sf2", t4[1], t4[2]);
+        if (t4f1 && totals[t4f1] !== undefined) totals[t4f1] += pts[12] || 0;
+        if (t4f2 && totals[t4f2] !== undefined) totals[t4f2] += pts[13] || 0;
+        const sp1516 = sharedPts(14, 15);
+        [t4sf1L, t4sf2L].forEach(t => {
+          if (t && totals[t] !== undefined) totals[t] += sp1516;
         });
       }
       // flechette
@@ -15415,11 +15493,26 @@ function ProfilePage({
       const team = getTeam(player.t26);
       const roster = PLAYERS.filter(p => p.t26 === player.t26);
       const tc = team?.color || "#E8B84B";
-
-      // Group epreuves by phase
       const phases = [...new Set(O2026_EPREUVES.map(e => e.phase))].sort();
+      const getAssigned = epId => (o2026Assignments || {})[`${player.t26}_${epId}`] || [];
+      const allAssigned = new Set(O2026_EPREUVES.flatMap(e => getAssigned(e.id)));
 
-      // Save assignment to Supabase + local state
+      // Count epreuves per player
+      const playerCount = {};
+      roster.forEach(p => {
+        playerCount[p.id] = 0;
+      });
+      O2026_EPREUVES.forEach(e => {
+        getAssigned(e.id).forEach(pid => {
+          if (playerCount[pid] !== undefined) playerCount[pid]++;
+        });
+      });
+
+      // TC / Biathlon constraint: everyone must be in at least one
+      const tcIds = getAssigned("tircorde"),
+        bioIds = getAssigned("biathlon");
+      const inTcOrBio = new Set([...tcIds, ...bioIds]);
+      const missingTcBio = roster.filter(p => !inTcOrBio.has(p.id));
       async function saveAssignment(epreuveId, playerIds) {
         const key = `${player.t26}_${epreuveId}`;
         setO2026Assignments(a => ({
@@ -15463,7 +15556,52 @@ function ProfilePage({
         style: {
           color: tc
         }
-      }, team?.name), " aux \xE9preuves."), (() => {
+      }, team?.name), " aux \xE9preuves."), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          marginBottom: 16
+        }
+      }, roster.map(p => {
+        const count = playerCount[p.id] || 0;
+        const isInTcBio = inTcOrBio.has(p.id);
+        return /*#__PURE__*/React.createElement("div", {
+          key: p.id,
+          style: {
+            background: "#13131f",
+            borderRadius: 8,
+            padding: "6px 10px",
+            display: "flex",
+            alignItems: "center",
+            gap: 6
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: tc,
+            flexShrink: 0
+          }
+        }), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 11,
+            color: "#cccce0"
+          }
+        }, p.name), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontFamily: "'Bebas Neue',sans-serif",
+            fontSize: 13,
+            color: count >= 3 ? "#34d399" : count >= 1 ? "#E8B84B" : "#404058"
+          }
+        }, count, " \xE9pr."), !isInTcBio && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 8,
+            color: "#ef4444"
+          }
+        }, "\u26A0\uFE0FTC/Bio"));
+      })), (() => {
         const boys = roster.filter(p => p.sex === "m" || !p.sex);
         const girls = roster.filter(p => p.sex === "f");
         const tcKey = `${player.t26}_tircorde`,
@@ -15501,11 +15639,30 @@ function ProfilePage({
       }, "PHASE ", phase), O2026_EPREUVES.filter(e => e.phase === phase).map(ep => {
         const key = `${player.t26}_${ep.id}`;
         const assigned = (o2026Assignments || {})[key] || [];
-        // Determine max players from format
         const fmt = ep.format || "";
-        const maxMatch = fmt.match(/^(\d+)V\d+/);
+        const maxMatch = fmt.match(/(\d+)V\d+/);
         const maxPlayers = maxMatch ? parseInt(maxMatch[1]) : roster.length;
-        const available = roster.filter(p => !assigned.includes(p.id));
+        // Sex filter for gendered events
+        const needsSex = ep.id === "marathonH" ? "m" : ep.id === "marathonF" ? "f" : null;
+        // TC/Biathlon gender slot constraint
+        const isTcBio = ep.id === "tircorde" || ep.id === "biathlon" || ep.id === "cercles" || ep.id === "puzzlerun";
+        const assignedMen = assigned.filter(pid => {
+          const p = roster.find(r => r.id === pid);
+          return (p?.sex || "m") === "m";
+        });
+        const assignedWomen = assigned.filter(pid => {
+          const p = roster.find(r => r.id === pid);
+          return (p?.sex || "m") === "f";
+        });
+        const maxMen = isTcBio ? 2 : maxPlayers,
+          maxWomen = isTcBio ? 2 : maxPlayers;
+        // Players used in same phase in OTHER epreuves
+        const usedInPhase = new Set(O2026_EPREUVES.filter(e => e.phase === ep.phase && e.id !== ep.id).flatMap(e => getAssigned(e.id)));
+        const available = roster.filter(p => {
+          if (assigned.includes(p.id)) return false;
+          if (needsSex && (p.sex || "m") !== needsSex) return false;
+          return true;
+        });
         return /*#__PURE__*/React.createElement("div", {
           key: ep.id,
           style: {
@@ -15575,25 +15732,39 @@ function ProfilePage({
               color: tc + "88"
             }
           }, "\u2715"));
-        })), assigned.length < maxPlayers && available.length > 0 && /*#__PURE__*/React.createElement("div", {
+        })), assigned.length < maxPlayers && /*#__PURE__*/React.createElement("div", {
           style: {
             display: "flex",
             flexWrap: "wrap",
             gap: 5
           }
-        }, available.map(p => /*#__PURE__*/React.createElement("div", {
-          key: p.id,
-          onClick: () => saveAssignment(ep.id, [...assigned, p.id]),
-          style: {
-            background: "#1e1e30",
-            borderRadius: 20,
-            padding: "4px 10px",
-            fontSize: 11,
-            color: "#60607a",
-            cursor: "pointer",
-            border: "1px solid #2a2a40"
-          }
-        }, "+ ", p.name))), assigned.length >= maxPlayers && /*#__PURE__*/React.createElement("div", {
+        }, available.map(p => {
+          const isUsedPhase = usedInPhase.has(p.id);
+          const pSex = p.sex || "m";
+          const genderFull = isTcBio && (pSex === "m" && assignedMen.length >= maxMen || pSex === "f" && assignedWomen.length >= maxWomen);
+          const disabled = isUsedPhase || genderFull;
+          return /*#__PURE__*/React.createElement("div", {
+            key: p.id,
+            onClick: () => !disabled && saveAssignment(ep.id, [...assigned, p.id]),
+            style: {
+              background: disabled ? "#13131f" : "#1e1e30",
+              borderRadius: 20,
+              padding: "4px 10px",
+              fontSize: 11,
+              color: disabled ? "#2a2a40" : "#60607a",
+              cursor: disabled ? "not-allowed" : "pointer",
+              border: `1px solid ${disabled ? "#1e1e30" : "#2a2a40"}`,
+              textDecoration: disabled ? "line-through" : "none",
+              opacity: disabled ? 0.5 : 1
+            },
+            title: isUsedPhase ? `${p.name} joue déjà dans cette phase` : genderFull ? `Places ${pSex === "m" ? "hommes" : "femmes"} complètes` : ""
+          }, disabled ? "" : "+ ", p.name, isUsedPhase && /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: 8,
+              marginLeft: 3
+            }
+          }, "Ph.", ep.phase));
+        })), assigned.length >= maxPlayers && /*#__PURE__*/React.createElement("div", {
           style: {
             fontSize: 10,
             color: "#34d399"
