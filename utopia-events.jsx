@@ -1719,6 +1719,7 @@ const GROUP_TERRAINS={1:[1,2],2:[3,4],3:[5,6],4:[7,8]};
 function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
   const m=useIsMobile();
   const ac="#E8342A";
+  const [selectedTeam,setSelectedTeam]=React.useState(null);
   return(
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1000,margin:"0 auto"}} className="fade">
       <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`,borderRadius:2,marginBottom:18}}/>
@@ -1738,12 +1739,21 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
         const teams=TEAMS.filter(t=>t.active);
         const totals={};teams.forEach(t=>{totals[t.id]=0;});
         const pts=O2026_POINTS;
+        const epBreakdown=[]; // {epId, teamId, rank, pts}
+        function trackPts(epId, teamId, rank, p){
+          if(totals[teamId]!==undefined){totals[teamId]+=p;epBreakdown.push({epId,teamId,rank,pts:p});}
+        }
 
         Object.entries(o2026Scores||{}).forEach(([epId,d])=>{
+          // Use pre-computed finalRanking if available (most reliable)
+          if(d.finalRanking?.length){
+            d.finalRanking.forEach(({teamId,rank,pts:p})=>trackPts(epId,teamId,rank,p||0));
+            return;
+          }
           if(!d)return;
           // drag_rank types
           if(d.dragRankLocked&&d.dragRank?.length){
-            d.dragRank.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
+            d.dragRank.forEach((tid,i)=>trackPts(epId,tid,i+1,(pts[i]||0)));
           }
           // drag_rank_2 / math sprint
           if((d.dragRankLocked||d.dragRank2Locked)&&d.dragRank&&d.dragRank2){
@@ -1753,7 +1763,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
               const p1b=d.dragRank.indexOf(b)+1||99,p2b=d.dragRank2.indexOf(b)+1||99;
               return ((p1a+p2a)/2)-((p1b+p2b)/2);
             });
-            sorted.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
+            sorted.forEach((tid,i)=>trackPts(epId,tid,i+1,(pts[i]||0)));
           }
           // drag_rank_coef / cercles
           if(d.dragRankCoefLocked&&d.dragRankCoef?.length){
@@ -1769,13 +1779,13 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
               const sB=(Math.min(...pB)*2+Math.max(...pB))/3;
               return sA-sB;
             });
-            sorted.forEach((t,i)=>{if(totals[t.id]!==undefined)totals[t.id]+=(pts[i]||0);});
+            sorted.forEach((t,i)=>trackPts(epId,t.id,i+1,(pts[i]||0)));
           }
           // drag_rank_group / molky
           if(d.dragRankFinalDone&&d.dragRankFinal){
             const ranking=[];
             [1,2,3,4].forEach(gid=>{(d.dragRankFinal[gid]||[]).forEach(tid=>{ranking.push(tid);});});
-            ranking.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
+            ranking.forEach((tid,i)=>trackPts(epId,tid,i+1,(pts[i]||0)));
           }
           // bracket finals (BP, beer pong, football, overcooked, puissance4)
           if(d.phase==="done"&&d.bracketResultats&&d.groupes){
@@ -1822,43 +1832,44 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
             const wf1=getW("wf",getW("wsf1",w[0],w[3]),getW("wsf2",w[1],w[2]));
             const wf2=getL("wf",getW("wsf1",w[0],w[3]),getW("wsf2",w[1],w[2]));
             const wsf1L=getL("wsf1",w[0],w[3]),wsf2L=getL("wsf2",w[1],w[2]);
-            if(wf1&&totals[wf1]!==undefined)totals[wf1]+=(pts[0]||0);
-            if(wf2&&totals[wf2]!==undefined)totals[wf2]+=(pts[1]||0);
+            if(wf1)trackPts(epId,wf1,1,(pts[0]||0));
+            if(wf2)trackPts(epId,wf2,2,(pts[1]||0));
             const sp34=sharedPts(2,3);
-            [wsf1L,wsf2L].forEach(t=>{if(t&&totals[t]!==undefined)totals[t]+=sp34;});
+            [wsf1L,wsf2L].forEach(t=>{if(t)trackPts(epId,t,3,sp34);});
             // Losers bracket
             const lf1=getW("lf",getW("lsf1",l[0],l[3]),getW("lsf2",l[1],l[2]));
             const lf2=getL("lf",getW("lsf1",l[0],l[3]),getW("lsf2",l[1],l[2]));
             const lsf1L=getL("lsf1",l[0],l[3]),lsf2L=getL("lsf2",l[1],l[2]);
-            if(lf1&&totals[lf1]!==undefined)totals[lf1]+=(pts[4]||0);
-            if(lf2&&totals[lf2]!==undefined)totals[lf2]+=(pts[5]||0);
+            if(lf1)trackPts(epId,lf1,5,(pts[4]||0));
+            if(lf2)trackPts(epId,lf2,6,(pts[5]||0));
             const sp78=sharedPts(6,7);
-            [lsf1L,lsf2L].forEach(t=>{if(t&&totals[t]!==undefined)totals[t]+=sp78;});
+            [lsf1L,lsf2L].forEach(t=>{if(t)trackPts(epId,t,7,sp78);});
             // 3rd bracket
             const t3f1=getW("t3f",getW("t3sf1",t3[0],t3[3]),getW("t3sf2",t3[1],t3[2]));
             const t3f2=getL("t3f",getW("t3sf1",t3[0],t3[3]),getW("t3sf2",t3[1],t3[2]));
             const t3sf1L=getL("t3sf1",t3[0],t3[3]),t3sf2L=getL("t3sf2",t3[1],t3[2]);
-            if(t3f1&&totals[t3f1]!==undefined)totals[t3f1]+=(pts[8]||0);
-            if(t3f2&&totals[t3f2]!==undefined)totals[t3f2]+=(pts[9]||0);
+            if(t3f1)trackPts(epId,t3f1,9,(pts[8]||0));
+            if(t3f2)trackPts(epId,t3f2,10,(pts[9]||0));
             const sp1112=sharedPts(10,11);
-            [t3sf1L,t3sf2L].forEach(t=>{if(t&&totals[t]!==undefined)totals[t]+=sp1112;});
+            [t3sf1L,t3sf2L].forEach(t=>{if(t)trackPts(epId,t,11,sp1112);});
             // 4th bracket
             const t4f1=getW("t4f",getW("t4sf1",t4[0],t4[3]),getW("t4sf2",t4[1],t4[2]));
             const t4f2=getL("t4f",getW("t4sf1",t4[0],t4[3]),getW("t4sf2",t4[1],t4[2]));
             const t4sf1L=getL("t4sf1",t4[0],t4[3]),t4sf2L=getL("t4sf2",t4[1],t4[2]);
-            if(t4f1&&totals[t4f1]!==undefined)totals[t4f1]+=(pts[12]||0);
-            if(t4f2&&totals[t4f2]!==undefined)totals[t4f2]+=(pts[13]||0);
+            if(t4f1)trackPts(epId,t4f1,13,(pts[12]||0));
+            if(t4f2)trackPts(epId,t4f2,14,(pts[13]||0));
             const sp1516=sharedPts(14,15);
-            [t4sf1L,t4sf2L].forEach(t=>{if(t&&totals[t]!==undefined)totals[t]+=sp1516;});
+            [t4sf1L,t4sf2L].forEach(t=>{if(t)trackPts(epId,t,15,sp1516);});
           }
-          // flechette
+          // flechette - winners sorted separately (1-8), losers separately (9-16)
           if(d.flechetteDone&&d.flechetteWin?.length){
-            const sorted=[...d.flechetteWin,...d.flechetteLose].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0));
-            sorted.forEach((p,i)=>{if(totals[p.id]!==undefined)totals[p.id]+=(pts[i]||0);});
+            const sWin=[...d.flechetteWin].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0));
+            const sLose=[...d.flechetteLose].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0));
+            [...sWin,...sLose].forEach((p,i)=>trackPts(epId,p.id,i+1,(pts[i]||0)));
           }
           // biathlon
           if(d.biathlonFinalLocked&&d.biathlonWin?.length){
-            [...d.biathlonWin,...d.biathlonLose].forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
+            [...d.biathlonWin,...d.biathlonLose].forEach((tid,i)=>trackPts(epId,tid,i+1,(pts[i]||0)));
           }
           // tircorde
           if(d.tcDone&&d.tcResultats&&d.tcTeams?.length){
@@ -1882,11 +1893,28 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
             {ranked.map((team,i)=>{
               const score=totals[team.id]||0;
               return(
-                <div key={team.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:16,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:30,textAlign:"center",flexShrink:0}}>{i+1}</span>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:team.color,flexShrink:0}}/>
-                  <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?15:18,color:team.color}}>{team.name}</span>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#E8B84B"}}>{score} pts</span>
+                <div key={team.id}
+                  onClick={()=>setSelectedTeam(selectedTeam===team.id?null:team.id)}
+                  style={{cursor:"pointer",padding:"8px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:16,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:30,textAlign:"center",flexShrink:0}}>{i+1}</span>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:team.color,flexShrink:0}}/>
+                    <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?15:18,color:team.color}}>{team.name}</span>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#E8B84B"}}>{score} pts</span>
+                    <span style={{fontSize:12,color:"#404058"}}>{selectedTeam===team.id?"▲":"›"}</span>
+                  </div>
+                  {selectedTeam===team.id&&(
+                    <div style={{marginTop:8,paddingLeft:40,display:"flex",flexDirection:"column",gap:3}}>
+                      {epBreakdown.filter(e=>e.pts>0&&e.teamId===team.id).map(e=>(
+                        <div key={e.epId} style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:11}}>{O2026_EPREUVES.find(ep=>ep.id===e.epId)?.emoji}</span>
+                          <span style={{fontSize:11,color:"#60607a",flex:1}}>{O2026_EPREUVES.find(ep=>ep.id===e.epId)?.nom}</span>
+                          <span style={{fontSize:11,color:"#aaa"}}>#{e.rank}</span>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#E8B84B"}}>{e.pts} pts</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1967,7 +1995,7 @@ function DragRankList({items,onReorder,getLabel,getColor,getKey,compact,locked})
 }
 
 // ─── EPREUVE O2026 PAGE ───────────────────────────────
-function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}){
+function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,setO2026Scores}){
   const m=useIsMobile();
   const ep=O2026_EPREUVES.find(e=>e.id===epreuveId);
   if(!ep)return null;
@@ -2040,6 +2068,32 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}
   const saveTimeoutRef=React.useRef(null);
 
   // Serialize all mutable state
+  function buildFinalRanking(){
+    // Build [{teamId, rank, pts}] for this epreuve — used by provisional ranking
+    const pts=O2026_POINTS;
+    const result=[];
+    const track=(teamId,rank,p)=>{if(teamId)result.push({teamId,rank,pts:p});};
+    if(scoreType==="drag_rank"&&dragRankLocked&&dragRank.length){
+      dragRank.forEach((tid,i)=>track(tid,i+1,pts[i]||0));
+    } else if(scoreType==="drag_rank_2"&&dragRank.length&&dragRank2.length){
+      getMathFinal().forEach((tid,i)=>track(tid,i+1,pts[i]||0));
+    } else if(scoreType==="drag_rank_coef"&&dragRankCoefLocked){
+      getCerclesFinal().forEach((t,i)=>track(t.id,i+1,pts[i]||0));
+    } else if(scoreType==="drag_rank_group"&&dragRankFinalDone){
+      let i=0;[1,2,3,4].forEach(gid=>{(dragRankFinal[gid]||[]).forEach(tid=>{track(tid,i+1,pts[i]||0);i++;});});
+    } else if(scoreType==="flechette"&&flechetteDone){
+      const sW=[...flechetteWin].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0));
+      const sL=[...flechetteLose].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0));
+      [...sW,...sL].forEach((p,i)=>track(p.id,i+1,pts[i]||0));
+    } else if(scoreType==="biathlon"&&biathlonFinalLocked){
+      [...biathlonWin,...biathlonLose].forEach((tid,i)=>track(tid,i+1,pts[i]||0));
+    } else if((hasGroupFormat||isMiniB)&&phase==="done"&&br){
+      const ranking=getFinalRanking();
+      ranking.forEach(entry=>track(entry.teamId,entry.rank,entry.pts));
+    }
+    return result;
+  }
+
   function getStateSnapshot(){
     return{groupes,resultats,miniRes,bracketResultats,phase,finalizedGroupes,
       dragRank,dragRank2,dragRankLocked,dragRank2Locked,dragRankGroups,dragRankGroupLocked,
@@ -2047,7 +2101,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone};
+      tcResultats,tcTeams,tcDone,
+      finalRanking:buildFinalRanking()};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2109,8 +2164,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}
     if(saveTimeoutRef.current)clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current=setTimeout(async()=>{
       try{
-        await SUPABASE.from("o2026_state").upsert({epreuve_id:ep.id,data:getStateSnapshot(),updated_by:"louis"},{onConflict:"epreuve_id"});
+        const snap=getStateSnapshot();
+        await SUPABASE.from("o2026_state").upsert({epreuve_id:ep.id,data:snap,updated_by:"louis"},{onConflict:"epreuve_id"});
         setLastSaveTs(Date.now());
+        if(setO2026Scores)setO2026Scores(prev=>({...prev,[ep.id]:snap}));
       }catch(e){console.error("Save error",e);}
     },800); // debounce 800ms
   },[groupes,resultats,miniRes,bracketResultats,phase,finalizedGroupes,
@@ -2551,33 +2608,34 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}
       {/* ── ADMIN ─────────────────────────────────────────────── */}
       {tab==="admin"&&isLouis&&(
         <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:16,marginBottom:16}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12}}>PANEL ARBITRE</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>PANEL ARBITRE</div>
+            {isLouis&&(
+              <button onClick={async()=>{
+                if(!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?"))return;
+                setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});
+                setPhase("groupes");setFinalizedGroupes({1:false,2:false,3:false,4:false});
+                setDragRank([]);setDragRank2([]);setDragRankLocked(false);setDragRank2Locked(false);
+                setDragRankGroups({1:[],2:[],3:[],4:[]});setDragRankGroupLocked({1:false,2:false,3:false,4:false});
+                setDragRankFinal({1:[],2:[],3:[],4:[]});setDragRankFinalLocked({1:false,2:false,3:false,4:false});setDragRankFinalDone(false);
+                setDragRankCoef([]);setDragRankCoefLocked(false);
+                setFlechetteGroup1([]);setFlechetteGroup2([]);setFlechettePhase("poules");setFlechetteWin([]);setFlechetteLose([]);setFlechetteDone(false);
+                setBiathlonRace1([]);setBiathlonRace2([]);setBiathlonRace1Locked(false);setBiathlonRace2Locked(false);
+                setBiathlonPhase("courses");setBiathlonWin([]);setBiathlonLose([]);setBiathlonFinalLocked(false);
+                setTcResultats({});setTcTeams([]);setTcDone(false);
+                try{await SUPABASE.from("o2026_state").delete().eq("epreuve_id",ep.id);}catch(e){}
+                if(setO2026Scores)setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});
+              }} style={{background:"#ef444422",border:"1px solid #ef444466",borderRadius:8,padding:"5px 12px",color:"#ef4444",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
+                🗑 Remettre à zéro
+              </button>
+            )}
+          </div>
 
           {/* ── Group-format epreuves (BP, Beer Pong, Football, Puissance4, Overcooked) */}
           {(hasGroupFormat||isMiniB)&&(
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
                 <button onClick={tirageSortGroups} style={BTN(ac)}>🎲 {(hasGroupes||hasMiniGroupes)?"Nouveau tirage":"Tirage au sort"}</button>
-                {isLouis&&(
-                  <button onClick={async()=>{
-                    if(!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?"))return;
-                    // Reset all state
-                    setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});
-                    setPhase("groupes");setFinalizedGroupes({1:false,2:false,3:false,4:false});
-                    setDragRank([]);setDragRank2([]);setDragRankLocked(false);setDragRank2Locked(false);
-                    setDragRankGroups({1:[],2:[],3:[],4:[]});setDragRankGroupLocked({1:false,2:false,3:false,4:false});
-                    setDragRankFinal({1:[],2:[],3:[],4:[]});setDragRankFinalLocked({1:false,2:false,3:false,4:false});setDragRankFinalDone(false);
-                    setDragRankCoef([]);setDragRankCoefLocked(false);
-                    setFlechetteGroup1([]);setFlechetteGroup2([]);setFlechettePhase("poules");setFlechetteWin([]);setFlechetteLose([]);setFlechetteDone(false);
-                    setBiathlonRace1([]);setBiathlonRace2([]);setBiathlonRace1Locked(false);setBiathlonRace2Locked(false);
-                    setBiathlonPhase("courses");setBiathlonWin([]);setBiathlonLose([]);setBiathlonFinalLocked(false);
-                    setTcResultats({});setTcTeams([]);setTcDone(false);
-                    // Delete from Supabase
-                    try{await SUPABASE.from("o2026_state").delete().eq("epreuve_id",ep.id);}catch(e){}
-                  }} style={{...BTN("#ef4444","10px 16px"),marginLeft:"auto"}}>
-                    🗑 Remettre à zéro
-                  </button>
-                )}
                 {(hasGroupes||hasMiniGroupes)&&phase==="groupes"&&(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                     {[1,2,3,4].map(gid=>(
@@ -4655,7 +4713,7 @@ export default function App(){
         {page==="rankings"     &&<RankingsPage nav={nav} navBack={navBack}/>}
         {page==="playerDetail" &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
         {page==="o2026"        &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
-        {page==="epreuveO2026"&&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments}/>}
+        {page==="epreuveO2026"&&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores}/>}
         {page==="teams"        &&<TeamsPage nav={nav} navBack={navBack}/>}
         {page==="teamDetail"   &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
         {page==="profile"      &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}

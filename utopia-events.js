@@ -9089,6 +9089,7 @@ function O2026Page({
 }) {
   const m = useIsMobile();
   const ac = "#E8342A";
+  const [selectedTeam, setSelectedTeam] = React.useState(null);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: m ? "14px 14px 76px" : "40px 32px",
@@ -9162,13 +9163,32 @@ function O2026Page({
       totals[t.id] = 0;
     });
     const pts = O2026_POINTS;
+    const epBreakdown = []; // {epId, teamId, rank, pts}
+    function trackPts(epId, teamId, rank, p) {
+      if (totals[teamId] !== undefined) {
+        totals[teamId] += p;
+        epBreakdown.push({
+          epId,
+          teamId,
+          rank,
+          pts: p
+        });
+      }
+    }
     Object.entries(o2026Scores || {}).forEach(([epId, d]) => {
+      // Use pre-computed finalRanking if available (most reliable)
+      if (d.finalRanking?.length) {
+        d.finalRanking.forEach(({
+          teamId,
+          rank,
+          pts: p
+        }) => trackPts(epId, teamId, rank, p || 0));
+        return;
+      }
       if (!d) return;
       // drag_rank types
       if (d.dragRankLocked && d.dragRank?.length) {
-        d.dragRank.forEach((tid, i) => {
-          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
-        });
+        d.dragRank.forEach((tid, i) => trackPts(epId, tid, i + 1, pts[i] || 0));
       }
       // drag_rank_2 / math sprint
       if ((d.dragRankLocked || d.dragRank2Locked) && d.dragRank && d.dragRank2) {
@@ -9180,9 +9200,7 @@ function O2026Page({
             p2b = d.dragRank2.indexOf(b) + 1 || 99;
           return (p1a + p2a) / 2 - (p1b + p2b) / 2;
         });
-        sorted.forEach((tid, i) => {
-          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
-        });
+        sorted.forEach((tid, i) => trackPts(epId, tid, i + 1, pts[i] || 0));
       }
       // drag_rank_coef / cercles
       if (d.dragRankCoefLocked && d.dragRankCoef?.length) {
@@ -9199,9 +9217,7 @@ function O2026Page({
           const sB = (Math.min(...pB) * 2 + Math.max(...pB)) / 3;
           return sA - sB;
         });
-        sorted.forEach((t, i) => {
-          if (totals[t.id] !== undefined) totals[t.id] += pts[i] || 0;
-        });
+        sorted.forEach((t, i) => trackPts(epId, t.id, i + 1, pts[i] || 0));
       }
       // drag_rank_group / molky
       if (d.dragRankFinalDone && d.dragRankFinal) {
@@ -9211,9 +9227,7 @@ function O2026Page({
             ranking.push(tid);
           });
         });
-        ranking.forEach((tid, i) => {
-          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
-        });
+        ranking.forEach((tid, i) => trackPts(epId, tid, i + 1, pts[i] || 0));
       }
       // bracket finals (BP, beer pong, football, overcooked, puissance4)
       if (d.phase === "done" && d.bracketResultats && d.groupes) {
@@ -9298,58 +9312,55 @@ function O2026Page({
         const wf2 = getL("wf", getW("wsf1", w[0], w[3]), getW("wsf2", w[1], w[2]));
         const wsf1L = getL("wsf1", w[0], w[3]),
           wsf2L = getL("wsf2", w[1], w[2]);
-        if (wf1 && totals[wf1] !== undefined) totals[wf1] += pts[0] || 0;
-        if (wf2 && totals[wf2] !== undefined) totals[wf2] += pts[1] || 0;
+        if (wf1) trackPts(epId, wf1, 1, pts[0] || 0);
+        if (wf2) trackPts(epId, wf2, 2, pts[1] || 0);
         const sp34 = sharedPts(2, 3);
         [wsf1L, wsf2L].forEach(t => {
-          if (t && totals[t] !== undefined) totals[t] += sp34;
+          if (t) trackPts(epId, t, 3, sp34);
         });
         // Losers bracket
         const lf1 = getW("lf", getW("lsf1", l[0], l[3]), getW("lsf2", l[1], l[2]));
         const lf2 = getL("lf", getW("lsf1", l[0], l[3]), getW("lsf2", l[1], l[2]));
         const lsf1L = getL("lsf1", l[0], l[3]),
           lsf2L = getL("lsf2", l[1], l[2]);
-        if (lf1 && totals[lf1] !== undefined) totals[lf1] += pts[4] || 0;
-        if (lf2 && totals[lf2] !== undefined) totals[lf2] += pts[5] || 0;
+        if (lf1) trackPts(epId, lf1, 5, pts[4] || 0);
+        if (lf2) trackPts(epId, lf2, 6, pts[5] || 0);
         const sp78 = sharedPts(6, 7);
         [lsf1L, lsf2L].forEach(t => {
-          if (t && totals[t] !== undefined) totals[t] += sp78;
+          if (t) trackPts(epId, t, 7, sp78);
         });
         // 3rd bracket
         const t3f1 = getW("t3f", getW("t3sf1", t3[0], t3[3]), getW("t3sf2", t3[1], t3[2]));
         const t3f2 = getL("t3f", getW("t3sf1", t3[0], t3[3]), getW("t3sf2", t3[1], t3[2]));
         const t3sf1L = getL("t3sf1", t3[0], t3[3]),
           t3sf2L = getL("t3sf2", t3[1], t3[2]);
-        if (t3f1 && totals[t3f1] !== undefined) totals[t3f1] += pts[8] || 0;
-        if (t3f2 && totals[t3f2] !== undefined) totals[t3f2] += pts[9] || 0;
+        if (t3f1) trackPts(epId, t3f1, 9, pts[8] || 0);
+        if (t3f2) trackPts(epId, t3f2, 10, pts[9] || 0);
         const sp1112 = sharedPts(10, 11);
         [t3sf1L, t3sf2L].forEach(t => {
-          if (t && totals[t] !== undefined) totals[t] += sp1112;
+          if (t) trackPts(epId, t, 11, sp1112);
         });
         // 4th bracket
         const t4f1 = getW("t4f", getW("t4sf1", t4[0], t4[3]), getW("t4sf2", t4[1], t4[2]));
         const t4f2 = getL("t4f", getW("t4sf1", t4[0], t4[3]), getW("t4sf2", t4[1], t4[2]));
         const t4sf1L = getL("t4sf1", t4[0], t4[3]),
           t4sf2L = getL("t4sf2", t4[1], t4[2]);
-        if (t4f1 && totals[t4f1] !== undefined) totals[t4f1] += pts[12] || 0;
-        if (t4f2 && totals[t4f2] !== undefined) totals[t4f2] += pts[13] || 0;
+        if (t4f1) trackPts(epId, t4f1, 13, pts[12] || 0);
+        if (t4f2) trackPts(epId, t4f2, 14, pts[13] || 0);
         const sp1516 = sharedPts(14, 15);
         [t4sf1L, t4sf2L].forEach(t => {
-          if (t && totals[t] !== undefined) totals[t] += sp1516;
+          if (t) trackPts(epId, t, 15, sp1516);
         });
       }
-      // flechette
+      // flechette - winners sorted separately (1-8), losers separately (9-16)
       if (d.flechetteDone && d.flechetteWin?.length) {
-        const sorted = [...d.flechetteWin, ...d.flechetteLose].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
-        sorted.forEach((p, i) => {
-          if (totals[p.id] !== undefined) totals[p.id] += pts[i] || 0;
-        });
+        const sWin = [...d.flechetteWin].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
+        const sLose = [...d.flechetteLose].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
+        [...sWin, ...sLose].forEach((p, i) => trackPts(epId, p.id, i + 1, pts[i] || 0));
       }
       // biathlon
       if (d.biathlonFinalLocked && d.biathlonWin?.length) {
-        [...d.biathlonWin, ...d.biathlonLose].forEach((tid, i) => {
-          if (totals[tid] !== undefined) totals[tid] += pts[i] || 0;
-        });
+        [...d.biathlonWin, ...d.biathlonLose].forEach((tid, i) => trackPts(epId, tid, i + 1, pts[i] || 0));
       }
       // tircorde
       if (d.tcDone && d.tcResultats && d.tcTeams?.length) {
@@ -9403,12 +9414,17 @@ function O2026Page({
       const score = totals[team.id] || 0;
       return /*#__PURE__*/React.createElement("div", {
         key: team.id,
+        onClick: () => setSelectedTeam(selectedTeam === team.id ? null : team.id),
+        style: {
+          cursor: "pointer",
+          padding: "8px 0",
+          borderBottom: i < ranked.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "8px 0",
-          borderBottom: i < ranked.length - 1 ? "1px solid #1e1e30" : "none"
+          gap: 10
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: {
@@ -9440,7 +9456,48 @@ function O2026Page({
           fontSize: 16,
           color: "#E8B84B"
         }
-      }, score, " pts"));
+      }, score, " pts"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "#404058"
+        }
+      }, selectedTeam === team.id ? "▲" : "›")), selectedTeam === team.id && /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 8,
+          paddingLeft: 40,
+          display: "flex",
+          flexDirection: "column",
+          gap: 3
+        }
+      }, epBreakdown.filter(e => e.pts > 0 && e.teamId === team.id).map(e => /*#__PURE__*/React.createElement("div", {
+        key: e.epId,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11
+        }
+      }, O2026_EPREUVES.find(ep => ep.id === e.epId)?.emoji), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "#60607a",
+          flex: 1
+        }
+      }, O2026_EPREUVES.find(ep => ep.id === e.epId)?.nom), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: "#aaa"
+        }
+      }, "#", e.rank), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 13,
+          color: "#E8B84B"
+        }
+      }, e.pts, " pts")))));
     }));
   })(), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9651,7 +9708,8 @@ function EpreuveO2026Page({
   nav,
   navBack,
   currentPlayer,
-  o2026Assignments
+  o2026Assignments,
+  setO2026Scores
 }) {
   const m = useIsMobile();
   const ep = O2026_EPREUVES.find(e => e.id === epreuveId);
@@ -9755,6 +9813,43 @@ function EpreuveO2026Page({
   const saveTimeoutRef = React.useRef(null);
 
   // Serialize all mutable state
+  function buildFinalRanking() {
+    // Build [{teamId, rank, pts}] for this epreuve — used by provisional ranking
+    const pts = O2026_POINTS;
+    const result = [];
+    const track = (teamId, rank, p) => {
+      if (teamId) result.push({
+        teamId,
+        rank,
+        pts: p
+      });
+    };
+    if (scoreType === "drag_rank" && dragRankLocked && dragRank.length) {
+      dragRank.forEach((tid, i) => track(tid, i + 1, pts[i] || 0));
+    } else if (scoreType === "drag_rank_2" && dragRank.length && dragRank2.length) {
+      getMathFinal().forEach((tid, i) => track(tid, i + 1, pts[i] || 0));
+    } else if (scoreType === "drag_rank_coef" && dragRankCoefLocked) {
+      getCerclesFinal().forEach((t, i) => track(t.id, i + 1, pts[i] || 0));
+    } else if (scoreType === "drag_rank_group" && dragRankFinalDone) {
+      let i = 0;
+      [1, 2, 3, 4].forEach(gid => {
+        (dragRankFinal[gid] || []).forEach(tid => {
+          track(tid, i + 1, pts[i] || 0);
+          i++;
+        });
+      });
+    } else if (scoreType === "flechette" && flechetteDone) {
+      const sW = [...flechetteWin].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
+      const sL = [...flechetteLose].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0));
+      [...sW, ...sL].forEach((p, i) => track(p.id, i + 1, pts[i] || 0));
+    } else if (scoreType === "biathlon" && biathlonFinalLocked) {
+      [...biathlonWin, ...biathlonLose].forEach((tid, i) => track(tid, i + 1, pts[i] || 0));
+    } else if ((hasGroupFormat || isMiniB) && phase === "done" && br) {
+      const ranking = getFinalRanking();
+      ranking.forEach(entry => track(entry.teamId, entry.rank, entry.pts));
+    }
+    return result;
+  }
   function getStateSnapshot() {
     return {
       groupes,
@@ -9790,7 +9885,8 @@ function EpreuveO2026Page({
       biathlonFinalLocked,
       tcResultats,
       tcTeams,
-      tcDone
+      tcDone,
+      finalRanking: buildFinalRanking()
     };
   }
 
@@ -9855,14 +9951,19 @@ function EpreuveO2026Page({
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       try {
+        const snap = getStateSnapshot();
         await SUPABASE.from("o2026_state").upsert({
           epreuve_id: ep.id,
-          data: getStateSnapshot(),
+          data: snap,
           updated_by: "louis"
         }, {
           onConflict: "epreuve_id"
         });
         setLastSaveTs(Date.now());
+        if (setO2026Scores) setO2026Scores(prev => ({
+          ...prev,
+          [ep.id]: snap
+        }));
       } catch (e) {
         console.error("Save error", e);
       }
@@ -10967,25 +11068,20 @@ function EpreuveO2026Page({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 14,
-      color: ac,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
       marginBottom: 12
     }
-  }, "PANEL ARBITRE"), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap",
-      marginBottom: 14
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: tirageSortGroups,
-    style: BTN(ac)
-  }, "\uD83C\uDFB2 ", hasGroupes || hasMiniGroupes ? "Nouveau tirage" : "Tirage au sort"), isLouis && /*#__PURE__*/React.createElement("button", {
+  }, "PANEL ARBITRE"), isLouis && /*#__PURE__*/React.createElement("button", {
     onClick: async () => {
       if (!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?")) return;
-      // Reset all state
       setGroupes({
         1: [],
         2: [],
@@ -11050,16 +11146,39 @@ function EpreuveO2026Page({
       setTcResultats({});
       setTcTeams([]);
       setTcDone(false);
-      // Delete from Supabase
       try {
         await SUPABASE.from("o2026_state").delete().eq("epreuve_id", ep.id);
       } catch (e) {}
+      if (setO2026Scores) setO2026Scores(prev => {
+        const n = {
+          ...prev
+        };
+        delete n[ep.id];
+        return n;
+      });
     },
     style: {
-      ...BTN("#ef4444", "10px 16px"),
-      marginLeft: "auto"
+      background: "#ef444422",
+      border: "1px solid #ef444466",
+      borderRadius: 8,
+      padding: "5px 12px",
+      color: "#ef4444",
+      fontSize: 11,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: "'Outfit',sans-serif"
     }
-  }, "\uD83D\uDDD1 Remettre \xE0 z\xE9ro"), (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDDD1 Remettre \xE0 z\xE9ro")), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: tirageSortGroups,
+    style: BTN(ac)
+  }, "\uD83C\uDFB2 ", hasGroupes || hasMiniGroupes ? "Nouveau tirage" : "Tirage au sort"), (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -17095,7 +17214,8 @@ function App() {
     nav: nav,
     navBack: navBack,
     currentPlayer: currentPlayer,
-    o2026Assignments: o2026Assignments
+    o2026Assignments: o2026Assignments,
+    setO2026Scores: setO2026Scores
   }), page === "teams" && /*#__PURE__*/React.createElement(TeamsPage, {
     nav: nav,
     navBack: navBack
