@@ -16857,6 +16857,7 @@ function App() {
         t25cap: p.t25cap || false,
         teocap: p.teocap || false,
         t26cap: p.t26cap || false,
+        sex: p.sex || "m",
         photoUrl: `/photos/${p.uid}.jpg`
       }));
       const savedLogos = Object.fromEntries(TEAMS.map(t => [t.id, {

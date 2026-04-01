@@ -4572,6 +4572,7 @@ export default function App(){
         teamId:p.team_id||null,
         t24:p.t24||null, t25:p.t25||null, teo:p.teo||null, t26:p.t26||null,
         t24cap:p.t24cap||false, t25cap:p.t25cap||false, teocap:p.teocap||false, t26cap:p.t26cap||false,
+        sex:p.sex||"m",
         photoUrl:`/photos/${p.uid}.jpg`,
       }));
       const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
