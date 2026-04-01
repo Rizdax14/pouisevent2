@@ -10982,7 +10982,84 @@ function EpreuveO2026Page({
   }, /*#__PURE__*/React.createElement("button", {
     onClick: tirageSortGroups,
     style: BTN(ac)
-  }, "\uD83C\uDFB2 ", hasGroupes || hasMiniGroupes ? "Nouveau tirage" : "Tirage au sort"), (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFB2 ", hasGroupes || hasMiniGroupes ? "Nouveau tirage" : "Tirage au sort"), isLouis && /*#__PURE__*/React.createElement("button", {
+    onClick: async () => {
+      if (!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?")) return;
+      // Reset all state
+      setGroupes({
+        1: [],
+        2: [],
+        3: [],
+        4: []
+      });
+      setResultats({});
+      setMiniRes({});
+      setBracketResultats({});
+      setPhase("groupes");
+      setFinalizedGroupes({
+        1: false,
+        2: false,
+        3: false,
+        4: false
+      });
+      setDragRank([]);
+      setDragRank2([]);
+      setDragRankLocked(false);
+      setDragRank2Locked(false);
+      setDragRankGroups({
+        1: [],
+        2: [],
+        3: [],
+        4: []
+      });
+      setDragRankGroupLocked({
+        1: false,
+        2: false,
+        3: false,
+        4: false
+      });
+      setDragRankFinal({
+        1: [],
+        2: [],
+        3: [],
+        4: []
+      });
+      setDragRankFinalLocked({
+        1: false,
+        2: false,
+        3: false,
+        4: false
+      });
+      setDragRankFinalDone(false);
+      setDragRankCoef([]);
+      setDragRankCoefLocked(false);
+      setFlechetteGroup1([]);
+      setFlechetteGroup2([]);
+      setFlechettePhase("poules");
+      setFlechetteWin([]);
+      setFlechetteLose([]);
+      setFlechetteDone(false);
+      setBiathlonRace1([]);
+      setBiathlonRace2([]);
+      setBiathlonRace1Locked(false);
+      setBiathlonRace2Locked(false);
+      setBiathlonPhase("courses");
+      setBiathlonWin([]);
+      setBiathlonLose([]);
+      setBiathlonFinalLocked(false);
+      setTcResultats({});
+      setTcTeams([]);
+      setTcDone(false);
+      // Delete from Supabase
+      try {
+        await SUPABASE.from("o2026_state").delete().eq("epreuve_id", ep.id);
+      } catch (e) {}
+    },
+    style: {
+      ...BTN("#ef4444", "10px 16px"),
+      marginLeft: "auto"
+    }
+  }, "\uD83D\uDDD1 Remettre \xE0 z\xE9ro"), (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -15941,7 +16018,8 @@ function DataPage() {
   const [newPlayer, setNewPlayer] = useState({
     name: "",
     uid: "",
-    team_id: ""
+    team_id: "",
+    sex: "m"
   });
   const [newTeam, setNewTeam] = useState({
     name: "",
@@ -15998,7 +16076,8 @@ function DataPage() {
         uid: newPlayer.uid || uid,
         name: newPlayer.name,
         team_id: newPlayer.team_id || null,
-        t26: newPlayer.team_id || null
+        t26: newPlayer.team_id || null,
+        sex: newPlayer.sex || "m"
       });
       setMsg({
         type: "success",
@@ -16338,6 +16417,20 @@ function DataPage() {
       width: "100%"
     }
   }), /*#__PURE__*/React.createElement("select", {
+    value: newPlayer.sex,
+    onChange: e => setNewPlayer({
+      ...newPlayer,
+      sex: e.target.value
+    }),
+    style: {
+      ...INPUT,
+      width: "100%"
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "m"
+  }, "\uD83D\uDC66 Homme"), /*#__PURE__*/React.createElement("option", {
+    value: "f"
+  }, "\uD83D\uDC67 Femme")), /*#__PURE__*/React.createElement("select", {
     value: newPlayer.team_id,
     onChange: e => setNewPlayer({
       ...newPlayer,

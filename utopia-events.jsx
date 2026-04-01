@@ -2558,6 +2558,26 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
                 <button onClick={tirageSortGroups} style={BTN(ac)}>🎲 {(hasGroupes||hasMiniGroupes)?"Nouveau tirage":"Tirage au sort"}</button>
+                {isLouis&&(
+                  <button onClick={async()=>{
+                    if(!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?"))return;
+                    // Reset all state
+                    setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});
+                    setPhase("groupes");setFinalizedGroupes({1:false,2:false,3:false,4:false});
+                    setDragRank([]);setDragRank2([]);setDragRankLocked(false);setDragRank2Locked(false);
+                    setDragRankGroups({1:[],2:[],3:[],4:[]});setDragRankGroupLocked({1:false,2:false,3:false,4:false});
+                    setDragRankFinal({1:[],2:[],3:[],4:[]});setDragRankFinalLocked({1:false,2:false,3:false,4:false});setDragRankFinalDone(false);
+                    setDragRankCoef([]);setDragRankCoefLocked(false);
+                    setFlechetteGroup1([]);setFlechetteGroup2([]);setFlechettePhase("poules");setFlechetteWin([]);setFlechetteLose([]);setFlechetteDone(false);
+                    setBiathlonRace1([]);setBiathlonRace2([]);setBiathlonRace1Locked(false);setBiathlonRace2Locked(false);
+                    setBiathlonPhase("courses");setBiathlonWin([]);setBiathlonLose([]);setBiathlonFinalLocked(false);
+                    setTcResultats({});setTcTeams([]);setTcDone(false);
+                    // Delete from Supabase
+                    try{await SUPABASE.from("o2026_state").delete().eq("epreuve_id",ep.id);}catch(e){}
+                  }} style={{...BTN("#ef4444","10px 16px"),marginLeft:"auto"}}>
+                    🗑 Remettre à zéro
+                  </button>
+                )}
                 {(hasGroupes||hasMiniGroupes)&&phase==="groupes"&&(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                     {[1,2,3,4].map(gid=>(
@@ -4247,7 +4267,7 @@ function DataPage(){
   const [saving,setSaving]=useState(false);
   const [msg,setMsg]=useState(null);
   // Forms
-  const [newPlayer,setNewPlayer]=useState({name:"",uid:"",team_id:""});
+  const [newPlayer,setNewPlayer]=useState({name:"",uid:"",team_id:"",sex:"m"});
   const [newTeam,setNewTeam]=useState({name:"",color:"#E8B84B",color2:"#FFFFFF",active:true});
   const [editPlayer,setEditPlayer]=useState(null);
   const [editTeam,setEditTeam]=useState(null);
@@ -4278,7 +4298,7 @@ function DataPage(){
     try{
       const uid=newPlayer.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
       const maxId=Math.max(...data.players.map(p=>p.id),0);
-      await sbInsert("players",{id:maxId+1,uid:newPlayer.uid||uid,name:newPlayer.name,team_id:newPlayer.team_id||null,t26:newPlayer.team_id||null});
+      await sbInsert("players",{id:maxId+1,uid:newPlayer.uid||uid,name:newPlayer.name,team_id:newPlayer.team_id||null,t26:newPlayer.team_id||null,sex:newPlayer.sex||"m"});
       setMsg({type:"success",text:`${newPlayer.name} ajouté !`});
       setNewPlayer({name:"",uid:"",team_id:""});
       await loadData();
@@ -4367,6 +4387,10 @@ function DataPage(){
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:14}}>AJOUTER UN JOUEUR</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               <input placeholder="Prénom *" value={newPlayer.name} onChange={e=>setNewPlayer({...newPlayer,name:e.target.value})} style={{...INPUT,width:"100%"}}/>
+              <select value={newPlayer.sex} onChange={e=>setNewPlayer({...newPlayer,sex:e.target.value})} style={{...INPUT,width:"100%"}}>
+                <option value="m">👦 Homme</option>
+                <option value="f">👧 Femme</option>
+              </select>
               <select value={newPlayer.team_id} onChange={e=>setNewPlayer({...newPlayer,team_id:e.target.value})} style={{...INPUT,width:"100%"}}>
                 <option value="">-- Équipe actuelle --</option>
                 {data.teams.filter(t=>t.active).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
