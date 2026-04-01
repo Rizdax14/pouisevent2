@@ -3,6 +3,18 @@ const { useState, useEffect } = React;
 // ─── SUPABASE ────────────────────────────────────────
 const SUPABASE_URL = "https://daerxouhvmvqhirgyrjr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZXJ4b3Vodm12cWhpcmd5cmpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NzM1NTMsImV4cCI6MjA5MDA0OTU1M30.CHaqQj8dd-C6NmA6JUkjzL5xtY8drzHqlYZAtJwCzGA";
+const SUPABASE = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY) || {
+  from: () => ({
+    select: () => ({
+      eq: () => ({
+        single: async () => ({
+          data: null
+        })
+      })
+    }),
+    upsert: async () => ({})
+  })
+};
 async function sbFetch(table, params = "") {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
     headers: {
@@ -5960,6 +5972,10 @@ function NavBar({
     l: "Événements",
     ic: "📅"
   }, {
+    id: "o2026",
+    l: "O2026",
+    ic: "🔴"
+  }, {
     id: "rankings",
     l: "Classements",
     ic: "🏆"
@@ -5990,7 +6006,9 @@ function NavBar({
     teams: "teams",
     teamDetail: "teams",
     admin: "admin",
-    profile: "profile"
+    profile: "profile",
+    o2026: "o2026",
+    epreuveO2026: "o2026"
   };
   if (m) {
     return /*#__PURE__*/React.createElement("nav", {
@@ -6039,7 +6057,33 @@ function NavBar({
           letterSpacing: "0.05em"
         }
       }, l));
-    }));
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: () => window.location.reload(),
+      style: {
+        flex: 1,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: "10px 4px 8px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3,
+        color: "#404058",
+        fontFamily: "'Outfit',sans-serif"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 18
+      }
+    }, "\u21BA"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em"
+      }
+    }, "Reload")));
   }
   return /*#__PURE__*/React.createElement("nav", {
     style: {
@@ -6089,7 +6133,24 @@ function NavBar({
         if (!a) e.currentTarget.style.color = "#60607a";
       }
     }, l);
-  }));
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => window.location.reload(),
+    style: {
+      marginLeft: "auto",
+      background: "none",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      cursor: "pointer",
+      padding: "6px 12px",
+      color: "#60607a",
+      fontSize: 13,
+      fontFamily: "'Outfit',sans-serif",
+      transition: "color .15s"
+    },
+    onMouseEnter: e => e.currentTarget.style.color = "#cccce0",
+    onMouseLeave: e => e.currentTarget.style.color = "#60607a",
+    title: "Recharger la page"
+  }, "\u21BA"));
 }
 
 // ─── COUNTDOWN ───────────────────────────────────────
@@ -7408,7 +7469,36 @@ function SquidGameDetailPage({
       borderRadius: 2,
       marginBottom: 18
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }), supaLoading && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#13131f",
+      borderRadius: 8,
+      padding: "8px 12px",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      animation: "spin 1s linear infinite",
+      display: "inline-block"
+    }
+  }, "\u27F3"), " Chargement des donn\xE9es..."), !supaLoading && isLouis && lastSaveTs > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#13131f",
+      borderRadius: 8,
+      padding: "6px 12px",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 11,
+      color: "#34d399"
+    }
+  }, "\u2713 Sauvegard\xE9"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -8648,6 +8738,4449 @@ function RankingsPage({
       }
     }, r.avg.toFixed(2))));
   }))));
+}
+
+// ─── O2026 DATA ───────────────────────────────────────
+const PHASE_COLOR = {
+  1: "#E84D9B",
+  2: "#3b82f6",
+  3: "#f97316",
+  4: "#ef4444",
+  5: "#22c55e",
+  6: "#8b5cf6",
+  7: "#06b6d4"
+};
+const O2026_EPREUVES = [{
+  id: "bp",
+  phase: 1,
+  nom: "Ballon-Prisonnier",
+  emoji: "🏐",
+  horaire: "10H - 11H30",
+  format: "6V6 — Groupe + Arbre",
+  color: "#E84D9B",
+  lieu: null,
+  regles: ["L'objectif : avoir le + de joueurs dans son camp que les adversaires au terme des 4 minutes.", "Toucher un adversaire OU sauver un allié en lançant la balle par-dessus.", "Si une équipe n'a plus de joueur avant la fin du temps, elle a perdu.", "Les matchs se jouent au meilleur des 3 manches.", "Pour récupérer la possession : attraper la balle, qu'elle finisse dans sa moitié, ou être touché.", "Si la balle est attrapée en plusieurs temps sans toucher le sol, la réception est validée."],
+  notesSpeciales: [{
+    titre: "LOI DEVILLE 🔴",
+    texte: "Si le ballon tape la tête, la touche est annulée et la balle est rendue à celui qui s'est pris le ballon dans la tête."
+  }, {
+    titre: "⏱ Interdit",
+    texte: "Il est interdit de perdre du temps exprès."
+  }, {
+    titre: "🏅 Départage",
+    texte: "En cas d'égalité de points : résultat du match direct entre les deux équipes."
+  }],
+  groupes: 4,
+  scoreType: "mini_bracket",
+  groupFormat: "mini_bracket"
+}, {
+  id: "beerpong",
+  phase: 2,
+  nom: "Beer Pong",
+  emoji: "🏓",
+  horaire: "11H30 - 12H30",
+  format: "2V2 — Groupe + Arbre",
+  color: "#3b82f6",
+  lieu: null,
+  regles: ["Match de 5 minutes — l'équipe qui a le moins de gobelets à la fin gagne.", "Chaque joueur tire 1 fois sur 2 avec son partenaire."],
+  notesSpeciales: [{
+    titre: "⏱ Interdit",
+    texte: "NE PAS GAGNER DU TEMPS !"
+  }, {
+    titre: "🏅 Départage",
+    texte: "En cas d'égalité de points : résultat du match direct."
+  }],
+  groupes: 4,
+  scoreType: "victoire"
+}, {
+  id: "football",
+  phase: 2,
+  nom: "Football",
+  emoji: "⚽",
+  horaire: "11H30 - 12H30",
+  format: "3V3 — Groupe + Arbre",
+  color: "#3b82f6",
+  lieu: null,
+  regles: ["Match de 4 minutes."],
+  notesSpeciales: [{
+    titre: "🏅 Départage",
+    texte: "En cas d'égalité de points : résultat du match direct."
+  }],
+  groupes: 4,
+  scoreType: "buts"
+}, {
+  id: "cultureg",
+  phase: 2,
+  nom: "Culture G",
+  emoji: "🧠",
+  horaire: "11H30 - 12H30",
+  format: "1V1 — Tout le monde en même temps",
+  color: "#3b82f6",
+  lieu: null,
+  regles: ["Un grand Kahoot portant sur plein de sujets différents.", "Tout le monde joue en même temps — classement individuel."],
+  notesSpeciales: [],
+  groupes: 0,
+  scoreType: "drag_rank"
+}, {
+  id: "marathonH",
+  phase: 3,
+  nom: "Marathon Hommes",
+  emoji: "🏃‍♂️",
+  horaire: "12H30 - 13H",
+  format: "1V1 — Tout le monde en même temps",
+  color: "#f97316",
+  lieu: null,
+  regles: ["Un tour entier du complexe à faire (environ 1km).", "Tous les hommes courent en même temps.", "Classement par ordre d'arrivée."],
+  notesSpeciales: [],
+  groupes: 0,
+  scoreType: "drag_rank"
+}, {
+  id: "marathonF",
+  phase: 3,
+  nom: "Marathon Femmes",
+  emoji: "🏃‍♀️",
+  horaire: "12H30 - 13H",
+  format: "1V1 — Tout le monde en même temps",
+  color: "#f97316",
+  lieu: null,
+  regles: ["Un tour entier du complexe à faire (environ 1km).", "Toutes les femmes courent en même temps.", "Classement par ordre d'arrivée."],
+  notesSpeciales: [],
+  groupes: 0,
+  scoreType: "drag_rank"
+}, {
+  id: "bowling",
+  phase: 4,
+  nom: "Bowling",
+  emoji: "🎳",
+  horaire: "14H - 15H",
+  format: "1V1 — Tout le monde en même temps",
+  color: "#ef4444",
+  lieu: "Bowling",
+  regles: ["RDV directement au bowling pour les joueurs assignés.", "4 pistes louées — chaque joueur fait le meilleur score possible sur sa piste."],
+  notesSpeciales: [],
+  groupes: 0,
+  scoreType: "drag_rank"
+}, {
+  id: "molky",
+  phase: 4,
+  nom: "Mölky",
+  emoji: "🪵",
+  horaire: "14H - 15H",
+  format: "1V1 — Groupe (drag & drop par groupe, puis phase finale)",
+  color: "#ef4444",
+  lieu: null,
+  regles: ["But : atteindre exactement 50 points. Le premier qualifié va dans le groupe des 1ers, etc.", "Limite de temps : 20 minutes. Ordre de passage : du plus jeune au plus vieux.", "Les 4 joueurs d'un groupe jouent en même temps — classement par drag & drop."],
+  notesSpeciales: [{
+    titre: "📐 Règles additionnelles",
+    texte: "Checkpoint à 25 pts. Si le score dépasse 50 → retour à 25. 3 erreurs d'affilée → retour au checkpoint (ou à 0 si < 25). Si limite de temps atteinte → classement par points acquis."
+  }],
+  groupes: 0,
+  scoreType: "drag_rank_group"
+}, {
+  id: "overcooked",
+  phase: 4,
+  nom: "Overcooked",
+  emoji: "👨‍🍳",
+  horaire: "14H - 15H",
+  format: "2V2 — Groupe + Arbre",
+  color: "#ef4444",
+  lieu: null,
+  regles: ["Match 2v2 Overcooked sur la map Sushi Station.", "Victoire = 1 point, défaite = 0 point."],
+  notesSpeciales: [{
+    titre: "🏅 Départage",
+    texte: "En cas d'égalité de points : résultat du match direct."
+  }],
+  groupes: 4,
+  scoreType: "victoire"
+}, {
+  id: "puzzlerun",
+  phase: 4,
+  nom: "Puzzle & Run",
+  emoji: "🧩",
+  horaire: "14H - 15H",
+  format: "2V2 — Tout le monde en même temps",
+  color: "#ef4444",
+  lieu: null,
+  regles: ["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.", "Un joueur fait le puzzle pendant que l'autre cherche les sacs — on alterne obligatoirement.", "50 minutes pour finir le puzzle, sinon 0 points."],
+  notesSpeciales: [{
+    titre: "⚠️ Attention",
+    texte: "Quand vous ramenez un sac, l'arbitre vous donne 10 pièces (10 endroits = puzzle de 100 pièces). Si la même personne vient 2 fois d'affilée → disqualification."
+  }, {
+    titre: "📝 Note",
+    texte: "Tous les binômes ont le même puzzle cette année."
+  }],
+  groupes: 0,
+  scoreType: "drag_rank"
+}, {
+  id: "mathsprint",
+  phase: 5,
+  nom: "Math Sprint",
+  emoji: "🔢",
+  horaire: "15H - 16H",
+  format: "2V2 — Tout le monde en même temps",
+  color: "#22c55e",
+  lieu: null,
+  regles: ["Nouvelle épreuve !", "Vous avez un tableau 10×10. L'un va voir un 2ème tableau, revient donner les infos, le 2ème remplit un 3ème tableau avec la somme des cases correspondantes.", "2 manches — le classement final est la MOYENNE des positions des 2 manches.", "Ex : 2ème manche 1 + 4ème manche 2 = moyenne 3ème place.", "En cas d'égalité de moyenne → la meilleure position en manche 2 départage."],
+  notesSpeciales: [{
+    titre: "📊 Calcul du score",
+    texte: "Classement final = (position manche 1 + position manche 2) ÷ 2. La meilleure moyenne gagne."
+  }],
+  groupes: 0,
+  scoreType: "drag_rank_2"
+}, {
+  id: "puissance4",
+  phase: 5,
+  nom: "Puissance 4",
+  emoji: "🔴",
+  horaire: "15H - 16H",
+  format: "1V1 — Poule + Arbre",
+  color: "#22c55e",
+  lieu: null,
+  regles: ["Match en 1 manche."],
+  notesSpeciales: [{
+    titre: "🏅 Départage",
+    texte: "En cas d'égalité de points : résultat du match direct."
+  }],
+  groupes: 4,
+  scoreType: "victoire"
+}, {
+  id: "cercles",
+  phase: 5,
+  nom: "Cercles Musical",
+  emoji: "⭕",
+  horaire: "15H - 16H",
+  format: "2V2 — Tout le monde en même temps",
+  color: "#22c55e",
+  lieu: null,
+  regles: ["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (16 balles).", "Quand la musique s'arrête : être dans un cerceau (extérieur) OU récupérer une balle (intérieur). Sinon → éliminé.", "1 seule partie avec les 32 participants (2 joueurs par équipe).", "Score d'équipe = position du meilleur joueur × 2 + position du moins bon × 1, divisé par 3. Plus bas = meilleur."],
+  notesSpeciales: [{
+    titre: "📊 Score d'équipe",
+    texte: "Coef 2 pour le meilleur joueur, coef 1 pour l'autre. Score = (pos_meilleur×2 + pos_autre×1) ÷ 3. L'équipe avec le score le plus BAS gagne."
+  }],
+  groupes: 0,
+  scoreType: "drag_rank_coef"
+}, {
+  id: "flechette",
+  phase: 5,
+  nom: "Fléchette",
+  emoji: "🎯",
+  horaire: "15H - 16H",
+  format: "1V1 — 2 groupes de 8 → re-groupes",
+  color: "#22c55e",
+  lieu: null,
+  regles: ["Phase 1 : 2 groupes de 8 joueurs, chacun joue en même temps pendant 25 minutes.", "Les 4 meilleurs de chaque groupe → Finale des Gagnants (8 meilleurs).", "Les 4 moins bons de chaque groupe → Finale des Perdants (8 moins bons).", "Phase 2 : on refait la même chose dans chaque nouveau groupe (25 minutes).", "Le score de chaque phase est saisi individuellement."],
+  notesSpeciales: [],
+  groupes: 0,
+  scoreType: "flechette"
+}, {
+  id: "tircorde",
+  phase: 6,
+  nom: "Tir à la Corde",
+  emoji: "🪢",
+  horaire: "16H - 16H30",
+  format: "4V4 — Bracket Bo3",
+  color: "#8b5cf6",
+  lieu: null,
+  regles: ["Bracket direct — matchs au meilleur des 3 manches.", "D'abord un 2v2 filles, puis 2v2 garçons, si 1-1 → 4v4.", "Dès que les 2 ou 4 joueurs dépassent le cône du milieu → partie terminée."],
+  notesSpeciales: [{
+    titre: "⚠️ Restriction",
+    texte: "Les joueurs du Biathlon Relais ne peuvent pas participer (sauf si pas assez de filles/garçons)."
+  }],
+  groupes: 0,
+  scoreType: "bracket_direct"
+}, {
+  id: "biathlon",
+  phase: 7,
+  nom: "Biathlon Relais",
+  emoji: "🎯🏃",
+  horaire: "16H30 - 17H",
+  format: "4V4 — 2 courses de 8 → re-groupes",
+  color: "#06b6d4",
+  lieu: null,
+  regles: ["2 courses de 8 équipes chacune — classement par ordre d'arrivée (drag & drop).", "Les 4 meilleures équipes de chaque course → Finale des Gagnants.", "Les 4 moins bonnes de chaque course → Finale des Perdants.", "Ordre dans la course : 1 Précision H → 1 Sprint F → 1 Précision F → 1 Sprint H.", "Précision : 5 balles, 5 verres. Chaque verre non tombé = malus de distance pour le sprinter suivant."],
+  notesSpeciales: [{
+    titre: "⚠️ Restriction",
+    texte: "Les joueurs du Tir à la Corde ne peuvent pas participer (sauf si pas assez de filles/garçons)."
+  }],
+  groupes: 0,
+  scoreType: "biathlon"
+}];
+const O2026_POINTS = [25, 22, 20, 18, 16, 14, 12, 10, 8, 7, 6, 5, 4, 3, 2, 1];
+
+// Fake teams for testing only (not in Supabase)
+const O2026_FAKE_TEAMS = [{
+  id: 901,
+  name: "Équipe 14",
+  color: "#7c3aed",
+  color2: null,
+  active: true,
+  logoUrl: null
+}, {
+  id: 902,
+  name: "Équipe 15",
+  color: "#0ea5e9",
+  color2: null,
+  active: true,
+  logoUrl: null
+}, {
+  id: 903,
+  name: "Équipe 16",
+  color: "#f97316",
+  color2: null,
+  active: true,
+  logoUrl: null
+}];
+function getO2026Team(id) {
+  return getTeam(id) || O2026_FAKE_TEAMS.find(t => t.id === id) || null;
+}
+function getO2026ActiveTeams() {
+  const real = TEAMS.filter(t => t.active);
+  const fakes = O2026_FAKE_TEAMS.slice(0, Math.max(0, 16 - real.length));
+  return [...real, ...fakes].slice(0, 16);
+}
+
+// Build round-robin schedule for a group, putting JPEGCORP_ID last to delay their matches
+const JPEGCORP_ID = 11;
+function buildGroupSchedule(teams, terrains) {
+  // Sort: put JPEGCORP last
+  const sorted = [...teams.filter(t => t !== JPEGCORP_ID), ...teams.filter(t => t === JPEGCORP_ID)];
+  const [A, B, C, D] = sorted;
+  // Fixed rounds: each round 2 matches on 2 terrains simultaneously
+  const rounds = [[{
+    tA: A,
+    tB: B,
+    terrain: terrains[0]
+  }, {
+    tA: C,
+    tB: D,
+    terrain: terrains[1]
+  }], [{
+    tA: A,
+    tB: C,
+    terrain: terrains[0]
+  }, {
+    tA: B,
+    tB: D,
+    terrain: terrains[1]
+  }], [{
+    tA: A,
+    tB: D,
+    terrain: terrains[0]
+  }, {
+    tA: B,
+    tB: C,
+    terrain: terrains[1]
+  }]];
+  return rounds;
+}
+const GROUP_TERRAINS = {
+  1: [1, 2],
+  2: [3, 4],
+  3: [5, 6],
+  4: [7, 8]
+};
+
+// ─── O2026 PAGE ───────────────────────────────────────
+function O2026Page({
+  nav,
+  navBack
+}) {
+  const m = useIsMobile();
+  const ac = "#E8342A";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: m ? "14px 14px 76px" : "40px 32px",
+      maxWidth: 1000,
+      margin: "0 auto"
+    },
+    className: "fade"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 4,
+      background: `linear-gradient(90deg,${ac},${ac}44)`,
+      borderRadius: 2,
+      marginBottom: 18
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+      marginBottom: 24,
+      flexWrap: "wrap",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: ac,
+      fontWeight: 700,
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      marginBottom: 4
+    }
+  }, "Olympiade"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: m ? 42 : 64,
+      lineHeight: 1
+    }
+  }, "O", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: ac
+    }
+  }, "2026"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "rgba(232,52,42,0.1)",
+      border: "1px solid rgba(232,52,42,0.3)",
+      borderRadius: 10,
+      padding: "8px 16px",
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: ac,
+      boxShadow: `0 0 8px ${ac}`
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: ac,
+      fontWeight: 600
+    }
+  }, "EN COURS"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, O2026_EPREUVES.map(ep => /*#__PURE__*/React.createElement("div", {
+    key: ep.id,
+    onClick: () => nav("epreuveO2026", {
+      epreuveId: ep.id
+    }),
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ep.color}33`,
+      borderRadius: 12,
+      padding: m ? 14 : 18,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      transition: "all .2s"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.borderColor = ep.color + "88";
+      e.currentTarget.style.transform = "translateX(4px)";
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.borderColor = ep.color + "33";
+      e.currentTarget.style.transform = "translateX(0)";
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      background: ep.color + "22",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      fontSize: 22
+    }
+  }, ep.emoji), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: m ? 18 : 22,
+      color: ep.color
+    }
+  }, "PHASE ", ep.phase, " \u2014 ", ep.nom), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      marginTop: 2
+    }
+  }, ep.horaire, " \xB7 ", ep.format)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#404058",
+      fontSize: 18
+    }
+  }, "\u203A")))));
+}
+
+// ─── ÉPREUVE O2026 PAGE ───────────────────────────────
+// Helper: generate round-robin matches for a group
+function getRoundRobin(teams) {
+  const matches = [];
+  for (let i = 0; i < teams.length; i++) for (let j = i + 1; j < teams.length; j++) matches.push([teams[i], teams[j]]);
+  return matches;
+}
+
+// ─── DRAG RANK LIST ───────────────────────────────────
+// ─── DRAG RANK LIST ───────────────────────────────────
+function DragRankList({
+  items,
+  onReorder,
+  getLabel,
+  getColor,
+  getKey,
+  compact,
+  locked
+}) {
+  const [dragging, setDragging] = React.useState(null);
+  const [over, setOver] = React.useState(null);
+  function handleDragStart(i) {
+    if (locked) return;
+    setDragging(i);
+  }
+  function handleDragEnter(i) {
+    if (locked) return;
+    setOver(i);
+  }
+  function handleDragEnd() {
+    if (!locked && dragging !== null && over !== null && dragging !== over) {
+      const n = [...items];
+      const [r] = n.splice(dragging, 1);
+      n.splice(over, 0, r);
+      onReorder(n);
+    }
+    setDragging(null);
+    setOver(null);
+  }
+  function mv(i, dir) {
+    if (locked) return;
+    const n = [...items];
+    [n[i], n[i + dir]] = [n[i + dir], n[i]];
+    onReorder(n);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 3,
+      opacity: locked ? 0.7 : 1
+    }
+  }, items.map((item, i) => {
+    const key = getKey ? getKey(item) : item;
+    const label = getLabel ? getLabel(item) : String(item);
+    const color = getColor ? getColor(item) : "#60607a";
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      draggable: !locked,
+      onDragStart: () => handleDragStart(i),
+      onDragEnter: () => handleDragEnter(i),
+      onDragOver: e => e.preventDefault(),
+      onDragEnd: handleDragEnd,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: compact ? "5px 8px" : "7px 10px",
+        borderRadius: 7,
+        background: over === i ? "#1e1e30" : "#13131f",
+        border: `1px solid ${over === i ? color + "66" : "#1e1e30"}`,
+        cursor: locked ? "default" : "grab",
+        opacity: dragging === i ? 0.4 : 1,
+        transition: "all .1s"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: compact ? 14 : 16,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaaaaa" : i === 2 ? "#c87533" : "#404058",
+        width: 20,
+        textAlign: "center",
+        flexShrink: 0
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: color,
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: compact ? 10 : 12,
+        color: "#eeeef5"
+      }
+    }, label), !locked && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 2,
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => mv(i, -1),
+      disabled: i === 0,
+      style: {
+        background: "none",
+        border: "1px solid #1e1e30",
+        borderRadius: 4,
+        color: i === 0 ? "#2a2a40" : "#60607a",
+        cursor: i === 0 ? "default" : "pointer",
+        padding: "1px 5px",
+        fontSize: 9
+      }
+    }, "\u25B2"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => mv(i, 1),
+      disabled: i === items.length - 1,
+      style: {
+        background: "none",
+        border: "1px solid #1e1e30",
+        borderRadius: 4,
+        color: i === items.length - 1 ? "#2a2a40" : "#60607a",
+        cursor: i === items.length - 1 ? "default" : "pointer",
+        padding: "1px 5px",
+        fontSize: 9
+      }
+    }, "\u25BC")), locked && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: "#2a2a40"
+      }
+    }, "\uD83D\uDD12"));
+  }));
+}
+
+// ─── EPREUVE O2026 PAGE ───────────────────────────────
+function EpreuveO2026Page({
+  epreuveId,
+  nav,
+  navBack,
+  currentPlayer
+}) {
+  const m = useIsMobile();
+  const ep = O2026_EPREUVES.find(e => e.id === epreuveId);
+  if (!ep) return null;
+  const ac = ep.color;
+  const isLouis = currentPlayer?.uid === "louis";
+  const scoreType = ep.scoreType || "manche";
+  const isDragRank = ["drag_rank", "drag_rank_2", "drag_rank_coef", "drag_rank_group"].includes(scoreType);
+  const hasGroupFormat = ep.groupes > 0; // round-robin groups (beerpong, football, puissance4, overcooked)
+  const isMiniB = ep.groupFormat === "mini_bracket"; // BP-style mini brackets in groups
+
+  // ── State ──────────────────────────────────────────────────────
+  const [groupes, setGroupes] = useState({
+    1: [],
+    2: [],
+    3: [],
+    4: []
+  });
+  const [resultats, setResultats] = useState({});
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [tab, setTab] = useState("view");
+  const [editMatch, setEditMatch] = useState(null);
+  const [scoreA, setScoreA] = useState("");
+  const [scoreB, setScoreB] = useState("");
+  const [phase, setPhase] = useState("groupes");
+  const [bracketResultats, setBracketResultats] = useState({});
+  const [editBracket, setEditBracket] = useState(null);
+  const [bracketScoreA, setBracketScoreA] = useState("");
+  const [bracketScoreB, setBracketScoreB] = useState("");
+  const [finalizedGroupes, setFinalizedGroupes] = useState({
+    1: false,
+    2: false,
+    3: false,
+    4: false
+  });
+  const [assignations, setAssignations] = useState({});
+  // Mini-bracket group results (BP)
+  const [miniRes, setMiniRes] = useState({}); // key: "gX_sf1" "gX_sf2" "gX_3rd" "gX_fin"
+  const [editMini, setEditMini] = useState(null);
+  const [miniScoreA, setMiniScoreA] = useState("");
+  const [miniScoreB, setMiniScoreB] = useState("");
+  // Drag rank
+  const [dragRank, setDragRank] = useState([]);
+  const [dragRank2, setDragRank2] = useState([]);
+  const [dragRankLocked, setDragRankLocked] = useState(false);
+  const [dragRank2Locked, setDragRank2Locked] = useState(false);
+  const [dragRankGroups, setDragRankGroups] = useState({
+    1: [],
+    2: [],
+    3: [],
+    4: []
+  });
+  const [dragRankGroupLocked, setDragRankGroupLocked] = useState({
+    1: false,
+    2: false,
+    3: false,
+    4: false
+  });
+  const [dragRankFinal, setDragRankFinal] = useState({
+    1: [],
+    2: [],
+    3: [],
+    4: []
+  });
+  const [dragRankCoef, setDragRankCoef] = useState([]);
+  const [dragRankCoefLocked, setDragRankCoefLocked] = useState(false);
+  const [dragRankFinalDone, setDragRankFinalDone] = useState(false);
+  const [dragRankFinalLocked, setDragRankFinalLocked] = useState({
+    1: false,
+    2: false,
+    3: false,
+    4: false
+  });
+  // Fléchette
+  const [flechetteGroup1, setFlechetteGroup1] = useState([]);
+  const [flechetteGroup2, setFlechetteGroup2] = useState([]);
+  const [flechettePhase, setFlechettePhase] = useState("poules");
+  const [flechetteDone, setFlechetteDone] = useState(false);
+  const [flechetteWin, setFlechetteWin] = useState([]);
+  const [flechetteLose, setFlechetteLose] = useState([]);
+  // Biathlon
+  const [biathlonRace1, setBiathlonRace1] = useState([]);
+  const [biathlonRace2, setBiathlonRace2] = useState([]);
+  const [biathlonRace1Locked, setBiathlonRace1Locked] = useState(false);
+  const [biathlonRace2Locked, setBiathlonRace2Locked] = useState(false);
+  const [biathlonPhase, setBiathlonPhase] = useState("courses");
+  const [biathlonFinalLocked, setBiathlonFinalLocked] = useState(false);
+  const [biathlonWin, setBiathlonWin] = useState([]);
+  const [biathlonLose, setBiathlonLose] = useState([]);
+  // Tir à la corde - 16-team bracket
+  const [tcResultats, setTcResultats] = useState({});
+  const [tcTeams, setTcTeams] = useState([]); // shuffled team order for bracket
+  const [editTC, setEditTC] = useState(null);
+  const [tcScoreA, setTcScoreA] = useState("");
+  const [tcScoreB, setTcScoreB] = useState("");
+  const [tcDone, setTcDone] = useState(false);
+
+  // ── Supabase persistence ──────────────────────────────────────
+  const [supaLoading, setSupaLoading] = React.useState(true);
+  const [lastSaveTs, setLastSaveTs] = React.useState(0);
+  const saveTimeoutRef = React.useRef(null);
+
+  // Serialize all mutable state
+  function getStateSnapshot() {
+    return {
+      groupes,
+      resultats,
+      miniRes,
+      bracketResultats,
+      phase,
+      finalizedGroupes,
+      dragRank,
+      dragRank2,
+      dragRankLocked,
+      dragRank2Locked,
+      dragRankGroups,
+      dragRankGroupLocked,
+      dragRankFinal,
+      dragRankFinalLocked,
+      dragRankFinalDone,
+      dragRankCoef,
+      dragRankCoefLocked,
+      flechetteGroup1,
+      flechetteGroup2,
+      flechettePhase,
+      flechetteWin,
+      flechetteLose,
+      flechetteDone,
+      biathlonRace1,
+      biathlonRace2,
+      biathlonRace1Locked,
+      biathlonRace2Locked,
+      biathlonPhase,
+      biathlonWin,
+      biathlonLose,
+      biathlonFinalLocked,
+      tcResultats,
+      tcTeams,
+      tcDone
+    };
+  }
+
+  // Apply a snapshot from Supabase (remote state)
+  function applySnapshot(d) {
+    if (!d) return;
+    if (d.groupes) setGroupes(d.groupes);
+    if (d.resultats) setResultats(d.resultats);
+    if (d.miniRes) setMiniRes(d.miniRes);
+    if (d.bracketResultats) setBracketResultats(d.bracketResultats);
+    if (d.phase) setPhase(d.phase);
+    if (d.finalizedGroupes) setFinalizedGroupes(d.finalizedGroupes);
+    if (d.dragRank?.length) setDragRank(d.dragRank);
+    if (d.dragRank2?.length) setDragRank2(d.dragRank2);
+    if (d.dragRankLocked !== undefined) setDragRankLocked(d.dragRankLocked);
+    if (d.dragRank2Locked !== undefined) setDragRank2Locked(d.dragRank2Locked);
+    if (d.dragRankGroups) setDragRankGroups(d.dragRankGroups);
+    if (d.dragRankGroupLocked) setDragRankGroupLocked(d.dragRankGroupLocked);
+    if (d.dragRankFinal) setDragRankFinal(d.dragRankFinal);
+    if (d.dragRankFinalLocked) setDragRankFinalLocked(d.dragRankFinalLocked);
+    if (d.dragRankFinalDone !== undefined) setDragRankFinalDone(d.dragRankFinalDone);
+    if (d.dragRankCoef?.length) setDragRankCoef(d.dragRankCoef);
+    if (d.dragRankCoefLocked !== undefined) setDragRankCoefLocked(d.dragRankCoefLocked);
+    if (d.flechetteGroup1?.length) setFlechetteGroup1(d.flechetteGroup1);
+    if (d.flechetteGroup2?.length) setFlechetteGroup2(d.flechetteGroup2);
+    if (d.flechettePhase) setFlechettePhase(d.flechettePhase);
+    if (d.flechetteWin?.length) setFlechetteWin(d.flechetteWin);
+    if (d.flechetteLose?.length) setFlechetteLose(d.flechetteLose);
+    if (d.flechetteDone !== undefined) setFlechetteDone(d.flechetteDone);
+    if (d.biathlonRace1?.length) setBiathlonRace1(d.biathlonRace1);
+    if (d.biathlonRace2?.length) setBiathlonRace2(d.biathlonRace2);
+    if (d.biathlonRace1Locked !== undefined) setBiathlonRace1Locked(d.biathlonRace1Locked);
+    if (d.biathlonRace2Locked !== undefined) setBiathlonRace2Locked(d.biathlonRace2Locked);
+    if (d.biathlonPhase) setBiathlonPhase(d.biathlonPhase);
+    if (d.biathlonWin?.length) setBiathlonWin(d.biathlonWin);
+    if (d.biathlonLose?.length) setBiathlonLose(d.biathlonLose);
+    if (d.biathlonFinalLocked !== undefined) setBiathlonFinalLocked(d.biathlonFinalLocked);
+    if (d.tcResultats) setTcResultats(d.tcResultats);
+    if (d.tcTeams?.length) setTcTeams(d.tcTeams);
+    if (d.tcDone !== undefined) setTcDone(d.tcDone);
+  }
+
+  // Load state from Supabase on mount
+  React.useEffect(() => {
+    const load = async () => {
+      setSupaLoading(true);
+      try {
+        const {
+          data
+        } = await SUPABASE.from("o2026_state").select("data").eq("epreuve_id", ep.id).single();
+        if (data?.data) applySnapshot(data.data);
+      } catch (e) {}
+      setSupaLoading(false);
+    };
+    load();
+  }, [ep.id]);
+
+  // Debounced save on state change (arbitre only)
+  const isArbitre = isLouis;
+  React.useEffect(() => {
+    if (!isArbitre || supaLoading) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await SUPABASE.from("o2026_state").upsert({
+          epreuve_id: ep.id,
+          data: getStateSnapshot(),
+          updated_by: "louis"
+        }, {
+          onConflict: "epreuve_id"
+        });
+        setLastSaveTs(Date.now());
+      } catch (e) {
+        console.error("Save error", e);
+      }
+    }, 800); // debounce 800ms
+  }, [groupes, resultats, miniRes, bracketResultats, phase, finalizedGroupes, dragRank, dragRank2, dragRankLocked, dragRank2Locked, dragRankGroups, dragRankGroupLocked, dragRankFinal, dragRankFinalLocked, dragRankFinalDone, dragRankCoef, dragRankCoefLocked, flechetteGroup1, flechetteGroup2, flechettePhase, flechetteWin, flechetteLose, flechetteDone, biathlonRace1, biathlonRace2, biathlonRace1Locked, biathlonRace2Locked, biathlonPhase, biathlonWin, biathlonLose, biathlonFinalLocked, tcResultats, tcTeams, tcDone]);
+
+  // ── Init ────────────────────────────────────────────────────────
+  React.useEffect(() => {
+    const teams = getO2026ActiveTeams();
+    const tIds = teams.map(t => t.id);
+    if (scoreType === "drag_rank" && dragRank.length === 0) setDragRank(tIds);
+    if (scoreType === "drag_rank_2") {
+      if (dragRank.length === 0) setDragRank([...tIds]);
+      if (dragRank2.length === 0) setDragRank2([...tIds]);
+    }
+    if (scoreType === "drag_rank_coef" && dragRankCoef.length === 0) {
+      const slots = [];
+      teams.slice(0, 16).forEach(t => {
+        slots.push({
+          teamId: t.id,
+          slot: 0
+        });
+        slots.push({
+          teamId: t.id,
+          slot: 1
+        });
+      });
+      setDragRankCoef(slots);
+    }
+    if (scoreType === "flechette" && flechetteGroup1.length === 0) {
+      setFlechetteGroup1(tIds.slice(0, 8).map(id => ({
+        id,
+        score: ""
+      })));
+      setFlechetteGroup2(tIds.slice(8, 16).map(id => ({
+        id,
+        score: ""
+      })));
+    }
+    if (scoreType === "biathlon" && biathlonRace1.length === 0) {
+      setBiathlonRace1([...tIds].slice(0, 8));
+      setBiathlonRace2([...tIds].slice(8, 16));
+    }
+    if (scoreType === "bracket_direct" && Object.keys(tcResultats).length === 0) {
+      // 16 teams, 8 R1 matches
+    }
+  }, [ep.id]);
+
+  // ── Helpers ────────────────────────────────────────────────────
+  function getMatchKey(gid, tA, tB) {
+    return `g${gid}_${Math.min(tA, tB)}_${Math.max(tA, tB)}`;
+  }
+  function getMiniKey(gid, slot) {
+    return `g${gid}_${slot}`;
+  }
+
+  // Round-robin standings (beer pong, football, puissance4, overcooked)
+  function getStandings(gid) {
+    const teams = groupes[gid] || [];
+    const stats = {};
+    teams.forEach(t => {
+      stats[t] = {
+        wins: 0,
+        losses: 0,
+        pts: 0
+      };
+    });
+    getRoundRobin(teams).forEach(([tA, tB]) => {
+      const r = resultats[getMatchKey(gid, tA, tB)];
+      if (!r) return;
+      const [sA, sB] = r;
+      if (sA > sB) {
+        stats[tA].wins++;
+        stats[tA].pts += 3;
+        stats[tB].losses++;
+      } else if (sB > sA) {
+        stats[tB].wins++;
+        stats[tB].pts += 3;
+        stats[tA].losses++;
+      } else {
+        stats[tA].pts += 1;
+        stats[tB].pts += 1;
+      }
+    });
+    return teams.map(t => ({
+      teamId: t,
+      ...stats[t]
+    })).sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      const h2h = resultats[getMatchKey(gid, a.teamId, b.teamId)];
+      if (h2h) {
+        const aF = Math.min(a.teamId, b.teamId) === a.teamId;
+        const [s1, s2] = h2h;
+        if (aF ? s1 > s2 : s2 > s1) return -1;
+        if (aF ? s2 > s1 : s1 > s2) return 1;
+      }
+      return 0;
+    });
+  }
+
+  // Mini-bracket group top4 (BP)
+  function getMiniTop4(gid) {
+    const teams = groupes[gid] || [];
+    if (teams.length < 4) return teams.map((t, i) => ({
+      teamId: t,
+      rank: i + 1
+    }));
+    const sf1 = miniRes[getMiniKey(gid, "sf1")];
+    const sf2 = miniRes[getMiniKey(gid, "sf2")];
+    const fin = miniRes[getMiniKey(gid, "fin")];
+    const trd = miniRes[getMiniKey(gid, "3rd")];
+    const w = (r, a, b) => r ? r[0] > r[1] ? a : b : null;
+    const l = (r, a, b) => r ? r[0] > r[1] ? b : a : null;
+    const sf1w = w(sf1, teams[0], teams[3]),
+      sf1l = l(sf1, teams[0], teams[3]);
+    const sf2w = w(sf2, teams[1], teams[2]),
+      sf2l = l(sf2, teams[1], teams[2]);
+    const finW = w(fin, sf1w, sf2w),
+      finL = l(fin, sf1w, sf2w);
+    const trdW = w(trd, sf1l, sf2l),
+      trdL = l(trd, sf1l, sf2l);
+    const result = [finW, finL, trdW, trdL].map((t, i) => ({
+      teamId: t,
+      rank: i + 1
+    }));
+    // Fill missing ranks for teams not yet placed (no results yet)
+    const placed = result.map(r => r.teamId).filter(Boolean);
+    const unplaced = teams.filter(t => !placed.includes(t));
+    unplaced.forEach((t, i) => result.push({
+      teamId: t,
+      rank: placed.length + i + 1
+    }));
+    return result.filter(r => r.teamId);
+  }
+  function tirageSortGroups() {
+    const teams = getO2026ActiveTeams().map(t => t.id);
+    const sh = [...teams].sort(() => Math.random() - 0.5);
+    const g = {
+      1: [],
+      2: [],
+      3: [],
+      4: []
+    };
+    sh.forEach((tid, i) => g[i % 4 + 1].push(tid));
+    setGroupes(g);
+    setResultats({});
+    setMiniRes({});
+    setBracketResultats({});
+    setPhase("groupes");
+    setFinalizedGroupes({
+      1: false,
+      2: false,
+      3: false,
+      4: false
+    });
+  }
+  function tirageMolky() {
+    const teams = getO2026ActiveTeams().map(t => t.id);
+    const sh = [...teams].sort(() => Math.random() - 0.5);
+    const g = {
+      1: sh.slice(0, 4),
+      2: sh.slice(4, 8),
+      3: sh.slice(8, 12),
+      4: sh.slice(12, 16)
+    };
+    setDragRankGroups(g);
+    setDragRankGroupLocked({
+      1: false,
+      2: false,
+      3: false,
+      4: false
+    });
+    setDragRankFinal({
+      1: [],
+      2: [],
+      3: [],
+      4: []
+    });
+    setDragRankFinalDone(false);
+  }
+
+  // Bracket seeds from group results
+  function getBracketTeams() {
+    let getTop;
+    if (isMiniB) getTop = (gid, rank) => {
+      const t = getMiniTop4(gid);
+      return t.find(x => x.rank === rank)?.teamId;
+    };else getTop = (gid, rank) => {
+      const st = getStandings(gid);
+      return st[rank - 1]?.teamId;
+    };
+    const w = [1, 2, 3, 4].map(g => getTop(g, 1));
+    const l = [1, 2, 3, 4].map(g => getTop(g, 2));
+    const t3 = [1, 2, 3, 4].map(g => getTop(g, 3));
+    const t4 = [1, 2, 3, 4].map(g => getTop(g, 4));
+    const res = slot => bracketResultats[`b_${slot}`];
+    const win = (slot, a, b) => {
+      const r = res(slot);
+      return r ? r[0] > r[1] ? a : b : null;
+    };
+    return {
+      wsf1: {
+        slot: "wsf1",
+        tA: w[0],
+        tB: w[3]
+      },
+      wsf2: {
+        slot: "wsf2",
+        tA: w[1],
+        tB: w[2]
+      },
+      wf: {
+        slot: "wf",
+        tA: win("wsf1", w[0], w[3]),
+        tB: win("wsf2", w[1], w[2])
+      },
+      lsf1: {
+        slot: "lsf1",
+        tA: l[0],
+        tB: l[3]
+      },
+      lsf2: {
+        slot: "lsf2",
+        tA: l[1],
+        tB: l[2]
+      },
+      lf: {
+        slot: "lf",
+        tA: win("lsf1", l[0], l[3]),
+        tB: win("lsf2", l[1], l[2])
+      },
+      t3sf1: {
+        slot: "t3sf1",
+        tA: t3[0],
+        tB: t3[3]
+      },
+      t3sf2: {
+        slot: "t3sf2",
+        tA: t3[1],
+        tB: t3[2]
+      },
+      t3f: {
+        slot: "t3f",
+        tA: win("t3sf1", t3[0], t3[3]),
+        tB: win("t3sf2", t3[1], t3[2])
+      },
+      t4sf1: {
+        slot: "t4sf1",
+        tA: t4[0],
+        tB: t4[3]
+      },
+      t4sf2: {
+        slot: "t4sf2",
+        tA: t4[1],
+        tB: t4[2]
+      },
+      t4f: {
+        slot: "t4f",
+        tA: win("t4sf1", t4[0], t4[3]),
+        tB: win("t4sf2", t4[1], t4[2])
+      }
+    };
+  }
+  function getMathFinal() {
+    const teams = getO2026ActiveTeams().map(t => t.id);
+    return [...teams].sort((a, b) => {
+      const p1a = dragRank.indexOf(a) + 1 || 99,
+        p2a = dragRank2.indexOf(a) + 1 || 99;
+      const p1b = dragRank.indexOf(b) + 1 || 99,
+        p2b = dragRank2.indexOf(b) + 1 || 99;
+      const avgA = (p1a + p2a) / 2,
+        avgB = (p1b + p2b) / 2;
+      return avgA !== avgB ? avgA - avgB : p2a - p2b;
+    });
+  }
+  function getCerclesFinal() {
+    const teams = getO2026ActiveTeams();
+    return [...teams].sort((a, b) => {
+      const pf = teamId => {
+        const idxs = dragRankCoef.map((s, i) => s.teamId === teamId ? i + 1 : null).filter(Boolean).sort((x, y) => x - y);
+        return idxs;
+      };
+      const pA = pf(a.id),
+        pB = pf(b.id);
+      const sA = (pA[0] * 2 + (pA[1] || pA[0])) / 3,
+        sB = (pB[0] * 2 + (pB[1] || pB[0])) / 3;
+      return sA - sB;
+    });
+  }
+
+  // Tir à la corde: 16-team single elimination
+  function getTCBracket() {
+    const allTeams = getO2026ActiveTeams().map(t => t.id);
+    const teams = tcTeams.length === allTeams.length ? tcTeams : allTeams;
+    // R1: 8 matches, R2: 4, SF: 2, F: 1
+    const getW = (slot, a, b) => {
+      const r = tcResultats[slot];
+      return r ? r[0] > r[1] ? a : b : null;
+    };
+    const r1 = [0, 1, 2, 3, 4, 5, 6, 7].map(i => ({
+      slot: `r1_${i}`,
+      tA: teams[i * 2],
+      tB: teams[i * 2 + 1]
+    }));
+    const r2 = [0, 1, 2, 3].map(i => ({
+      slot: `r2_${i}`,
+      tA: getW(`r1_${i * 2}`, teams[i * 4], teams[i * 4 + 1]),
+      tB: getW(`r1_${i * 2 + 1}`, teams[i * 4 + 2], teams[i * 4 + 3])
+    }));
+    const sf = [{
+      slot: "sf_0",
+      tA: getW("r2_0", r2[0].tA, r2[0].tB),
+      tB: getW("r2_1", r2[1].tA, r2[1].tB)
+    }, {
+      slot: "sf_1",
+      tA: getW("r2_2", r2[2].tA, r2[2].tB),
+      tB: getW("r2_3", r2[3].tA, r2[3].tB)
+    }];
+    const fin = {
+      slot: "fin",
+      tA: getW("sf_0", sf[0].tA, sf[0].tB),
+      tB: getW("sf_1", sf[1].tA, sf[1].tB)
+    };
+    return {
+      r1,
+      r2,
+      sf,
+      fin,
+      teams
+    };
+  }
+
+  // Random score helpers
+  function randomScore() {
+    if (scoreType === "victoire" || scoreType === "bracket_direct") return Math.random() > .5 ? [1, 0] : [0, 1];
+    if (scoreType === "buts") {
+      const a = Math.floor(Math.random() * 6),
+        b = Math.floor(Math.random() * 6);
+      return [a, b];
+    }
+    const opts = [[2, 0], [2, 1], [1, 2], [0, 2]];
+    return opts[Math.floor(Math.random() * 4)];
+  }
+  function simulateGroupes() {
+    let g = groupes;
+    const hasG = Object.values(groupes).some(gg => gg.length > 0);
+    if (!hasG) {
+      const teams = getO2026ActiveTeams().map(t => t.id);
+      const sh = [...teams].sort(() => Math.random() - 0.5);
+      g = {
+        1: [],
+        2: [],
+        3: [],
+        4: []
+      };
+      sh.forEach((tid, i) => g[i % 4 + 1].push(tid));
+      setGroupes(g);
+    }
+    if (isMiniB) {
+      const nm = {};
+      [1, 2, 3, 4].forEach(gid => {
+        const teams = g[gid] || [];
+        if (teams.length < 4) return;
+        const opts = [[2, 0], [2, 1], [1, 2], [0, 2]];
+        const rnd = () => opts[Math.floor(Math.random() * 4)];
+        nm[getMiniKey(gid, "sf1")] = rnd();
+        nm[getMiniKey(gid, "sf2")] = rnd();
+        nm[getMiniKey(gid, "fin")] = rnd();
+        nm[getMiniKey(gid, "3rd")] = rnd();
+      });
+      setMiniRes(nm);
+    } else {
+      const nr = {};
+      [1, 2, 3, 4].forEach(gid => {
+        const teams = g[gid] || [];
+        getRoundRobin(teams).forEach(([tA, tB]) => {
+          nr[getMatchKey(gid, tA, tB)] = randomScore();
+        });
+      });
+      setResultats(nr);
+    }
+    setPhase("groupes");
+  }
+  function simulateBracket() {
+    const nb = {};
+    ["wsf1", "wsf2", "lsf1", "lsf2", "t3sf1", "t3sf2", "t4sf1", "t4sf2", "wf", "lf", "t3f", "t4f"].forEach(s => {
+      nb[`b_${s}`] = randomScore();
+    });
+    setBracketResultats(nb);
+    setPhase("done");
+  }
+  function simulateDragRank() {
+    const teams = getO2026ActiveTeams().map(t => t.id);
+    setDragRank([...teams].sort(() => Math.random() - 0.5));
+  }
+  function simulateDragRank2() {
+    const teams = getO2026ActiveTeams().map(t => t.id);
+    setDragRank([...teams].sort(() => Math.random() - 0.5));
+    setDragRank2([...teams].sort(() => Math.random() - 0.5));
+  }
+  function simulateCercles() {
+    setDragRankCoef(c => [...c].sort(() => Math.random() - 0.5));
+  }
+  function saveMiniScore() {
+    if (!editMini) return;
+    const {
+      gid,
+      slot
+    } = editMini;
+    setMiniRes(r => ({
+      ...r,
+      [getMiniKey(gid, slot)]: [parseInt(miniScoreA) || 0, parseInt(miniScoreB) || 0]
+    }));
+    setEditMini(null);
+    setMiniScoreA("");
+    setMiniScoreB("");
+  }
+  function saveGroupScore() {
+    if (!editMatch) return;
+    const {
+      groupId,
+      teamA,
+      teamB
+    } = editMatch;
+    setResultats(r => ({
+      ...r,
+      [getMatchKey(groupId, teamA, teamB)]: [parseInt(scoreA) || 0, parseInt(scoreB) || 0]
+    }));
+    setEditMatch(null);
+    setScoreA("");
+    setScoreB("");
+  }
+  function saveBracketScore() {
+    if (!editBracket) return;
+    setBracketResultats(r => ({
+      ...r,
+      [`b_${editBracket}`]: [parseInt(bracketScoreA) || 0, parseInt(bracketScoreB) || 0]
+    }));
+    setEditBracket(null);
+    setBracketScoreA("");
+    setBracketScoreB("");
+  }
+  function saveTCScore() {
+    if (!editTC) return;
+    setTcResultats(r => ({
+      ...r,
+      [editTC]: [parseInt(tcScoreA) || 0, parseInt(tcScoreB) || 0]
+    }));
+    setEditTC(null);
+    setTcScoreA("");
+    setTcScoreB("");
+  }
+  function launchFlechetteFinales() {
+    const sort = g => [...g].map(p => ({
+      ...p,
+      score: parseInt(p.score) || 0
+    })).sort((a, b) => b.score - a.score);
+    const g1 = sort(flechetteGroup1);
+    const g2 = sort(flechetteGroup2);
+    // Top 4 of each group → winners final, bottom 4 of each → losers final
+    const winners = [...g1.slice(0, 4), ...g2.slice(0, 4)].map(p => ({
+      id: p.id,
+      score: ""
+    }));
+    const losers = [...g1.slice(4), ...g2.slice(4)].map(p => ({
+      id: p.id,
+      score: ""
+    }));
+    setFlechetteWin(winners);
+    setFlechetteLose(losers);
+    setFlechettePhase("finales");
+  }
+  function launchBiathlonFinals() {
+    setBiathlonRace1Locked(true);
+    setBiathlonRace2Locked(true);
+    const winTeams = [...biathlonRace1.slice(0, 4), ...biathlonRace2.slice(0, 4)];
+    const loseTeams = [...biathlonRace1.slice(4), ...biathlonRace2.slice(4)];
+    setBiathlonWin(winTeams);
+    setBiathlonLose(loseTeams);
+    setBiathlonPhase("finales");
+  }
+  function launchMolkyFinal() {
+    const seeds = {
+      1: [],
+      2: [],
+      3: [],
+      4: []
+    };
+    [1, 2, 3, 4].forEach(gid => {
+      (dragRankGroups[gid] || []).forEach((tid, rank) => {
+        seeds[rank + 1] = seeds[rank + 1] || [];
+        seeds[rank + 1].push(tid);
+      });
+    });
+    setDragRankFinal(seeds);
+  }
+  const myPlayer = currentPlayer ? PLAYERS.find(p => p.id === currentPlayer.id) : null;
+  const myTeamId = myPlayer?.t26 || null;
+  function getTeamPlayers(teamId) {
+    if (!teamId) return [];
+    if (assignations[teamId]) return assignations[teamId].map(id => PLAYERS.find(p => p.id === id)).filter(Boolean);
+    return PLAYERS.filter(p => p && p.t26 === teamId);
+  }
+  const hasGroupes = hasGroupFormat && Object.values(groupes).some(g => g.length > 0);
+  const hasMiniGroupes = isMiniB && Object.values(groupes).some(g => g.length > 0);
+  const BTN = (c = "#E8B84B", s = "10px 16px") => ({
+    background: c,
+    color: c === "#E8B84B" || c === "#34d399" ? "#080810" : "#fff",
+    border: "none",
+    borderRadius: 8,
+    padding: s,
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "'Outfit',sans-serif"
+  });
+
+  // ── Bracket Match ─────────────────────────────────────────────
+  function BM({
+    slot,
+    tA,
+    tB,
+    phA,
+    phB,
+    label,
+    isAdmin,
+    setRes,
+    getRes
+  }) {
+    const getR = getRes || (s => bracketResultats[`b_${s}`]);
+    const setR = setRes || ((s, v) => setBracketResultats(r => ({
+      ...r,
+      [`b_${s}`]: v
+    })));
+    const res = getR(slot);
+    const teamA = getO2026Team(tA),
+      teamB = getO2026Team(tB);
+    const isEditing = editBracket === slot;
+    const wA = res && res[0] > res[1],
+      wB = res && res[1] > res[0];
+    const validA = scoreType === "victoire" || scoreType === "bracket_direct" ? [0, 1] : [0, 1, 2];
+    if (isEditing && isAdmin) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#13131f",
+        borderRadius: 8,
+        padding: "8px 10px",
+        border: `1px solid ${ac}44`,
+        marginBottom: 5
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#60607a",
+        marginBottom: 4,
+        textTransform: "uppercase"
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: teamA?.color,
+        fontWeight: 600,
+        flex: 1
+      }
+    }, teamA?.name || phA || "TBD"), scoreType === "buts" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      value: bracketScoreA,
+      onChange: e => setBracketScoreA(e.target.value),
+      style: {
+        width: 36,
+        textAlign: "center",
+        background: "#0d0d1c",
+        border: `1px solid ${ac}`,
+        borderRadius: 5,
+        color: "#eeeef5",
+        fontSize: 16,
+        padding: "2px",
+        fontFamily: "'Bebas Neue',sans-serif"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#404058"
+      }
+    }, "\u2014"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      value: bracketScoreB,
+      onChange: e => setBracketScoreB(e.target.value),
+      style: {
+        width: 36,
+        textAlign: "center",
+        background: "#0d0d1c",
+        border: `1px solid ${ac}`,
+        borderRadius: 5,
+        color: "#eeeef5",
+        fontSize: 16,
+        padding: "2px",
+        fontFamily: "'Bebas Neue',sans-serif"
+      }
+    })) : /*#__PURE__*/React.createElement(React.Fragment, null, validA.map(v => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      onClick: () => setBracketScoreA(String(v)),
+      style: {
+        width: 24,
+        height: 24,
+        borderRadius: 5,
+        border: `1px solid ${String(bracketScoreA) === String(v) ? ac : "#404058"}`,
+        background: String(bracketScoreA) === String(v) ? ac : "#0d0d1c",
+        color: String(bracketScoreA) === String(v) ? "#080810" : "#eeeef5",
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        cursor: "pointer"
+      }
+    }, v)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#404058"
+      }
+    }, "\u2014"), validA.map(v => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      onClick: () => setBracketScoreB(String(v)),
+      style: {
+        width: 24,
+        height: 24,
+        borderRadius: 5,
+        border: `1px solid ${String(bracketScoreB) === String(v) ? ac : "#404058"}`,
+        background: String(bracketScoreB) === String(v) ? ac : "#0d0d1c",
+        color: String(bracketScoreB) === String(v) ? "#080810" : "#eeeef5",
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        cursor: "pointer"
+      }
+    }, v))), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: teamB?.color,
+        fontWeight: 600,
+        flex: 1,
+        textAlign: "right"
+      }
+    }, teamB?.name || phB || "TBD"), /*#__PURE__*/React.createElement("button", {
+      onClick: saveBracketScore,
+      style: {
+        ...BTN(),
+        padding: "3px 8px",
+        fontSize: 10
+      }
+    }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditBracket(null),
+      style: {
+        ...BTN("#404058"),
+        padding: "3px 8px",
+        fontSize: 10
+      }
+    }, "\u2717")));
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        if (isAdmin && (tA || phA) && (tB || phB)) {
+          setEditBracket(slot);
+          setBracketScoreA(res ? String(res[0]) : "");
+          setBracketScoreB(res ? String(res[1]) : "");
+        }
+      },
+      style: {
+        background: "#13131f",
+        borderRadius: 8,
+        padding: "8px 10px",
+        border: `1px solid ${res ? ac + "55" : "#1e1e30"}`,
+        marginBottom: 5,
+        cursor: isAdmin && tA && tB ? "pointer" : "default"
+      },
+      onMouseEnter: e => {
+        if (isAdmin && tA && tB) e.currentTarget.style.background = "#1e1e30";
+      },
+      onMouseLeave: e => e.currentTarget.style.background = "#13131f"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: res ? ac : "#404058",
+        marginBottom: 3,
+        fontWeight: 700,
+        textTransform: "uppercase"
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wA ? "#eeeef5" : teamA?.color || "#2a2a40",
+        fontWeight: wA ? 700 : 400,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamA?.name || phA || "—"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: res ? "#eeeef5" : "#2a2a40",
+        minWidth: 28,
+        textAlign: "center"
+      }
+    }, res ? `${res[0]}—${res[1]}` : "vs"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wB ? "#eeeef5" : teamB?.color || "#2a2a40",
+        fontWeight: wB ? 700 : 400,
+        textAlign: "right",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamB?.name || phB || "—"), isAdmin && tA && tB && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: "#404058",
+        flexShrink: 0
+      }
+    }, "\u270E")));
+  }
+
+  // ── Mini-bracket match (BP groups) ────────────────────────────
+  function MiniMatch({
+    gid,
+    slot,
+    tA,
+    tB,
+    label,
+    isAdmin
+  }) {
+    const res = miniRes[getMiniKey(gid, slot)];
+    const teamA = getO2026Team(tA),
+      teamB = getO2026Team(tB);
+    const isEditing = editMini && editMini.gid === gid && editMini.slot === slot;
+    const wA = res && res[0] > res[1],
+      wB = res && res[1] > res[0];
+    if (isEditing && isAdmin) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#13131f",
+        borderRadius: 7,
+        padding: "7px 9px",
+        border: `1px solid ${ac}44`,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: "#60607a",
+        marginBottom: 3
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: teamA?.color,
+        fontWeight: 600,
+        flex: 1
+      }
+    }, teamA?.name || "TBD"), [[2, 0], [2, 1], [1, 2], [0, 2]].map(([a, b]) => /*#__PURE__*/React.createElement("button", {
+      key: `${a}-${b}`,
+      onClick: () => {
+        setMiniScoreA(String(a));
+        setMiniScoreB(String(b));
+      },
+      style: {
+        padding: "2px 5px",
+        borderRadius: 4,
+        border: `1px solid ${String(miniScoreA) === String(a) && String(miniScoreB) === String(b) ? ac : "#404058"}`,
+        background: String(miniScoreA) === String(a) && String(miniScoreB) === String(b) ? ac : "#0d0d1c",
+        color: String(miniScoreA) === String(a) && String(miniScoreB) === String(b) ? "#080810" : "#eeeef5",
+        fontSize: 9,
+        cursor: "pointer"
+      }
+    }, a, "-", b)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: teamB?.color,
+        fontWeight: 600,
+        flex: 1,
+        textAlign: "right"
+      }
+    }, teamB?.name || "TBD"), /*#__PURE__*/React.createElement("button", {
+      onClick: saveMiniScore,
+      style: {
+        ...BTN(),
+        padding: "2px 7px",
+        fontSize: 9
+      }
+    }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditMini(null),
+      style: {
+        ...BTN("#404058"),
+        padding: "2px 7px",
+        fontSize: 9
+      }
+    }, "\u2717")));
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        if (isAdmin && tA && tB) {
+          setEditMini({
+            gid,
+            slot
+          });
+          setMiniScoreA(res ? String(res[0]) : "");
+          setMiniScoreB(res ? String(res[1]) : "");
+        }
+      },
+      style: {
+        background: "#0d0d1c",
+        borderRadius: 7,
+        padding: "6px 8px",
+        border: `1px solid ${res ? ac + "44" : "#1e1e30"}`,
+        marginBottom: 4,
+        cursor: isAdmin && tA && tB ? "pointer" : "default"
+      },
+      onMouseEnter: e => {
+        if (isAdmin && tA && tB) e.currentTarget.style.background = "#13131f";
+      },
+      onMouseLeave: e => e.currentTarget.style.background = "#0d0d1c"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: res ? ac : "#2a2a40",
+        marginBottom: 2
+      }
+    }, label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wA ? "#eeeef5" : teamA?.color || "#2a2a40",
+        fontWeight: wA ? 700 : 400,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamA?.name || (tA ? "?" : "TBD")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 12,
+        color: res ? "#eeeef5" : "#2a2a40",
+        minWidth: 28,
+        textAlign: "center"
+      }
+    }, res ? `${res[0]}—${res[1]}` : "vs"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wB ? "#eeeef5" : teamB?.color || "#2a2a40",
+        fontWeight: wB ? 700 : 400,
+        textAlign: "right",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamB?.name || (tB ? "?" : "TBD")), isAdmin && tA && tB && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: "#404058"
+      }
+    }, "\u270E")));
+  }
+
+  // Bracket placeholders
+  const PH = {
+    wsf1: ["1er A", "1er D"],
+    wsf2: ["1er B", "1er C"],
+    wf: ["V.SF1", "V.SF2"],
+    lsf1: ["2ème A", "2ème D"],
+    lsf2: ["2ème B", "2ème C"],
+    lf: ["V.LSF1", "V.LSF2"],
+    t3sf1: ["3ème A", "3ème D"],
+    t3sf2: ["3ème B", "3ème C"],
+    t3f: ["V.T3SF1", "V.T3SF2"],
+    t4sf1: ["4ème A", "4ème D"],
+    t4sf2: ["4ème B", "4ème C"],
+    t4f: ["V.T4SF1", "V.T4SF2"]
+  };
+  const hasBracketPhase = hasMiniGroupes || hasGroupes;
+  const br = phase !== "groupes" && hasBracketPhase ? getBracketTeams() : null;
+  function gT(slot, side) {
+    if (br) return side === "A" ? br[slot]?.tA : br[slot]?.tB;
+    return null;
+  }
+  function gP(slot, side) {
+    if (br) return null;
+    return PH[slot]?.[side === "A" ? 0 : 1];
+  }
+
+  // Final ranking
+  // Returns [{teamId, rank, pts}] with proper ties
+  // isMiniB = has petite finale (no tie in top2 of each bracket)
+  // hasGroupFormat = no petite finale (SF losers tied)
+  function getFinalRanking() {
+    if (!br) return [];
+    const r = slot => bracketResultats[`b_${slot}`];
+    const w = (slot, a, b) => {
+      const res = r(slot);
+      return res ? res[0] > res[1] ? a : b : null;
+    };
+    const lo = (slot, a, b) => {
+      const res = r(slot);
+      return res ? res[0] > res[1] ? b : a : null;
+    };
+    const avgPts = (p1, p2) => Math.round((O2026_POINTS[p1 - 1] || 0) + (O2026_POINTS[p2 - 1] || 0)) / 2;
+
+    // Build groups of 4: [winner,loser,3rd,4th] or [winner,loser,SF1loser,SF2loser(tied)]
+    // Group W: places 1-4, L: 5-8, T3: 9-12, T4: 13-16
+    const groups = [{
+      prefix: "w",
+      sf1: "wsf1",
+      sf2: "wsf2",
+      fin: "wf",
+      offset: 0
+    }, {
+      prefix: "l",
+      sf1: "lsf1",
+      sf2: "lsf2",
+      fin: "lf",
+      offset: 4
+    }, {
+      prefix: "t3",
+      sf1: "t3sf1",
+      sf2: "t3sf2",
+      fin: "t3f",
+      offset: 8
+    }, {
+      prefix: "t4",
+      sf1: "t4sf1",
+      sf2: "t4sf2",
+      fin: "t4f",
+      offset: 12
+    }];
+    const result = [];
+    groups.forEach(({
+      sf1,
+      sf2,
+      fin,
+      offset
+    }) => {
+      const finW = w(fin, br[fin]?.tA, br[fin]?.tB);
+      const finL = lo(fin, br[fin]?.tA, br[fin]?.tB);
+      const sf1L = lo(sf1, br[sf1]?.tA, br[sf1]?.tB);
+      const sf2L = lo(sf2, br[sf2]?.tA, br[sf2]?.tB);
+      if (finW) result.push({
+        teamId: finW,
+        rank: offset + 1,
+        pts: O2026_POINTS[offset] || 0
+      });
+      if (finL) result.push({
+        teamId: finL,
+        rank: offset + 2,
+        pts: O2026_POINTS[offset + 1] || 0
+      });
+      // Bracket never has petite finale → SF losers always tied at 3rd of their group
+      const sharedPts = Math.round(((O2026_POINTS[offset + 2] || 0) + (O2026_POINTS[offset + 3] || 0)) / 2);
+      if (sf1L) result.push({
+        teamId: sf1L,
+        rank: offset + 3,
+        pts: sharedPts,
+        tied: true
+      });
+      if (sf2L) result.push({
+        teamId: sf2L,
+        rank: offset + 3,
+        pts: sharedPts,
+        tied: true
+      });
+    });
+    return result.sort((a, b) => a.rank - b.rank);
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: m ? "14px 14px 76px" : "40px 32px",
+      maxWidth: 900,
+      margin: "0 auto"
+    },
+    className: "fade"
+  }, /*#__PURE__*/React.createElement(BackBtn, {
+    onClick: navBack,
+    label: "Retour"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 4,
+      background: `linear-gradient(90deg,${ac},${ac}44)`,
+      borderRadius: 2,
+      marginBottom: 18
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: ac,
+      fontWeight: 700,
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      marginBottom: 4
+    }
+  }, "Phase ", ep.phase), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: m ? 36 : 52,
+      lineHeight: 1,
+      marginBottom: 10
+    }
+  }, ep.nom), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: ac + "22",
+      border: `1px solid ${ac}44`,
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 11,
+      color: ac
+    }
+  }, "\u23F0 ", ep.horaire), /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "\uD83D\uDC65 ", ep.format), ep.lieu && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "\uD83D\uDCCD ", ep.lieu))), isLouis && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, [{
+    id: "view",
+    l: "👁 Public"
+  }, {
+    id: "admin",
+    l: "🦺 Arbitre"
+  }].map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    onClick: () => setTab(t.id),
+    style: {
+      padding: "6px 16px",
+      borderRadius: 8,
+      cursor: "pointer",
+      border: tab === t.id ? "none" : "1px solid #1e1e30",
+      background: tab === t.id ? ac : "#13131f",
+      color: tab === t.id ? "#080810" : "#60607a",
+      fontFamily: "'Outfit',sans-serif",
+      fontSize: 12,
+      fontWeight: 600
+    }
+  }, t.l))), tab === "admin" && isLouis && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac,
+      marginBottom: 12
+    }
+  }, "PANEL ARBITRE"), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: tirageSortGroups,
+    style: BTN(ac)
+  }, "\uD83C\uDFB2 ", hasGroupes || hasMiniGroupes ? "Nouveau tirage" : "Tirage au sort"), (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, [1, 2, 3, 4].map(gid => /*#__PURE__*/React.createElement("button", {
+    key: gid,
+    onClick: () => setFinalizedGroupes(f => ({
+      ...f,
+      [gid]: !f[gid]
+    })),
+    style: BTN(finalizedGroupes[gid] ? "#34d399" : "#404058", "8px 12px")
+  }, finalizedGroupes[gid] ? "✅" : "⬜", " Poule ", gid)), [1, 2, 3, 4].every(g => finalizedGroupes[g]) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPhase("bracket"),
+    style: BTN("#34d399")
+  }, "\uD83C\uDFC6 Lancer le bracket")), phase === "bracket" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPhase("done"),
+    style: BTN("#E8B84B")
+  }, "\u2705 Finaliser \u2192 Points"), /*#__PURE__*/React.createElement("button", {
+    onClick: simulateGroupes,
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler groupes"), phase === "bracket" && /*#__PURE__*/React.createElement("button", {
+    onClick: simulateBracket,
+    style: BTN("#404058")
+  }, "\uD83C\uDFB0 Simuler bracket")), isMiniB && (hasGroupes || hasMiniGroupes) && phase === "groupes" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10
+    }
+  }, [1, 2, 3, 4].map(gid => {
+    const teams = groupes[gid] || [];
+    if (teams.length < 4) return null;
+    const sf1r = miniRes[getMiniKey(gid, "sf1")];
+    const sf2r = miniRes[getMiniKey(gid, "sf2")];
+    const sf1w = sf1r ? sf1r[0] > sf1r[1] ? teams[0] : teams[3] : null;
+    const sf1l = sf1r ? sf1r[0] > sf1r[1] ? teams[3] : teams[0] : null;
+    const sf2w = sf2r ? sf2r[0] > sf2r[1] ? teams[1] : teams[2] : null;
+    const sf2l = sf2r ? sf2r[0] > sf2r[1] ? teams[2] : teams[1] : null;
+    const isAdmin = true;
+    return /*#__PURE__*/React.createElement("div", {
+      key: gid,
+      style: {
+        background: "#080810",
+        borderRadius: 10,
+        padding: 10,
+        border: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 12,
+        color: ac,
+        marginBottom: 8
+      }
+    }, "GROUPE ", gid), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "sf1",
+      tA: teams[0],
+      tB: teams[3],
+      label: "1/2 Finale",
+      isAdmin: isAdmin
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "sf2",
+      tA: teams[1],
+      tB: teams[2],
+      label: "1/2 Finale",
+      isAdmin: isAdmin
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "3rd",
+      tA: sf1l,
+      tB: sf2l,
+      label: "Petite Finale (3\xE8me/4\xE8me)",
+      isAdmin: isAdmin
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "fin",
+      tA: sf1w,
+      tB: sf2w,
+      label: "\uD83C\uDFC6 Finale",
+      isAdmin: isAdmin
+    }));
+  })), hasGroupFormat && !isMiniB && phase === "groupes" && hasGroupes && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      marginTop: 12
+    }
+  }, [1, 2, 3, 4].map(gid => {
+    const teams = groupes[gid] || [];
+    if (!teams.length) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: gid,
+      style: {
+        background: "#080810",
+        borderRadius: 10,
+        padding: 12,
+        border: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: ac,
+        marginBottom: 8
+      }
+    }, "GROUPE ", gid), buildGroupSchedule(teams, GROUP_TERRAINS[gid]).map((round, ri) => /*#__PURE__*/React.createElement("div", {
+      key: ri,
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#404058",
+        marginBottom: 4,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em"
+      }
+    }, "Round ", ri + 1), round.map(({
+      tA,
+      tB,
+      terrain
+    }) => {
+      const key = getMatchKey(gid, tA, tB);
+      const res = resultats[key];
+      const teamA = getO2026Team(tA),
+        teamB = getO2026Team(tB);
+      const isEditing = editMatch && editMatch.groupId === gid && editMatch.teamA === tA && editMatch.teamB === tB;
+      return isEditing ? /*#__PURE__*/React.createElement("div", {
+        key: key,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "6px 8px",
+          borderRadius: 7,
+          marginBottom: 4,
+          background: "#13131f",
+          border: `1px solid ${ac}44`,
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          color: ac,
+          flexShrink: 0,
+          fontWeight: 700
+        }
+      }, "T", terrain), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: teamA?.color,
+          fontWeight: 600
+        }
+      }, teamA?.name), scoreType === "buts" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        min: "0",
+        value: scoreA,
+        onChange: e => setScoreA(e.target.value),
+        style: {
+          width: 40,
+          textAlign: "center",
+          background: "#0d0d1c",
+          border: `1px solid ${ac}`,
+          borderRadius: 5,
+          color: "#eeeef5",
+          fontSize: 18,
+          padding: "3px",
+          fontFamily: "'Bebas Neue',sans-serif"
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#404058"
+        }
+      }, "\u2014"), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        min: "0",
+        value: scoreB,
+        onChange: e => setScoreB(e.target.value),
+        style: {
+          width: 40,
+          textAlign: "center",
+          background: "#0d0d1c",
+          border: `1px solid ${ac}`,
+          borderRadius: 5,
+          color: "#eeeef5",
+          fontSize: 18,
+          padding: "3px",
+          fontFamily: "'Bebas Neue',sans-serif"
+        }
+      })) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 3
+        }
+      }, (scoreType === "victoire" ? [0, 1] : [0, 1, 2]).map(v => /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: () => setScoreA(String(v)),
+        style: {
+          width: 27,
+          height: 27,
+          borderRadius: 6,
+          border: `1px solid ${String(scoreA) === String(v) ? ac : "#404058"}`,
+          background: String(scoreA) === String(v) ? ac : "#0d0d1c",
+          color: String(scoreA) === String(v) ? "#080810" : "#eeeef5",
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 15,
+          cursor: "pointer"
+        }
+      }, v))), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#404058"
+        }
+      }, "\u2014"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 3
+        }
+      }, (scoreType === "victoire" ? [0, 1] : [0, 1, 2]).map(v => /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: () => setScoreB(String(v)),
+        style: {
+          width: 27,
+          height: 27,
+          borderRadius: 6,
+          border: `1px solid ${String(scoreB) === String(v) ? ac : "#404058"}`,
+          background: String(scoreB) === String(v) ? ac : "#0d0d1c",
+          color: String(scoreB) === String(v) ? "#080810" : "#eeeef5",
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 15,
+          cursor: "pointer"
+        }
+      }, v)))), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: teamB?.color,
+          fontWeight: 600
+        }
+      }, teamB?.name), /*#__PURE__*/React.createElement("button", {
+        onClick: saveGroupScore,
+        style: {
+          ...BTN(),
+          padding: "3px 8px",
+          fontSize: 10
+        }
+      }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => setEditMatch(null),
+        style: {
+          ...BTN("#404058"),
+          padding: "3px 8px",
+          fontSize: 10
+        }
+      }, "\u2717")) : /*#__PURE__*/React.createElement("div", {
+        key: key,
+        onClick: () => {
+          setEditMatch({
+            groupId: gid,
+            teamA: tA,
+            teamB: tB
+          });
+          setScoreA(res ? String(res[0]) : "");
+          setScoreB(res ? String(res[1]) : "");
+        },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "5px 8px",
+          borderRadius: 7,
+          cursor: "pointer",
+          marginBottom: 4,
+          background: "#0d0d1c",
+          transition: "background .15s"
+        },
+        onMouseEnter: e => e.currentTarget.style.background = "#13131f",
+        onMouseLeave: e => e.currentTarget.style.background = "#0d0d1c"
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          color: ac,
+          flexShrink: 0,
+          fontWeight: 700
+        }
+      }, "T", terrain), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 10,
+          color: teamA?.color,
+          fontWeight: 600,
+          textAlign: "right"
+        }
+      }, teamA?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 15,
+          color: res ? "#eeeef5" : "#2a2a40",
+          minWidth: 36,
+          textAlign: "center"
+        }
+      }, res ? `${res[0]}—${res[1]}` : "vs"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 10,
+          color: teamB?.color,
+          fontWeight: 600
+        }
+      }, teamB?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "#404058"
+        }
+      }, "\u270E"));
+    }))));
+  }))), scoreType === "drag_rank" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: simulateDragRank,
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler le classement"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankLocked(true),
+    disabled: dragRankLocked || dragRank.length === 0,
+    style: BTN(dragRankLocked ? "#404058" : "#34d399")
+  }, dragRankLocked ? "✅ Classement officiel" : "📋 Valider le classement officiel")), /*#__PURE__*/React.createElement(DragRankList, {
+    items: dragRank,
+    onReorder: setDragRank,
+    locked: dragRankLocked,
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  })), scoreType === "drag_rank_2" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: simulateDragRank2,
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler les 2 manches")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginBottom: 8,
+      fontWeight: 600
+    }
+  }, "Manche 1"), /*#__PURE__*/React.createElement(DragRankList, {
+    items: dragRank,
+    onReorder: setDragRank,
+    locked: dragRankLocked,
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankLocked(l => !l),
+    style: BTN(dragRankLocked ? "#34d399" : "#404058", "6px 12px")
+  }, dragRankLocked ? "🔒 Manche 1 validée" : "⬜ Valider manche 1")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginBottom: 8,
+      fontWeight: 600
+    }
+  }, "Manche 2"), /*#__PURE__*/React.createElement(DragRankList, {
+    items: dragRank2,
+    onReorder: setDragRank2,
+    locked: dragRank2Locked,
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRank2Locked(l => !l),
+    style: BTN(dragRank2Locked ? "#34d399" : "#404058", "6px 12px")
+  }, dragRank2Locked ? "🔒 Manche 2 validée" : "⬜ Valider manche 2")), dragRank.length > 0 && dragRank2.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #1e1e30",
+      paddingTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 13,
+      color: "#E8B84B",
+      marginBottom: 8
+    }
+  }, "CLASSEMENT FINAL (MOYENNE)"), getMathFinal().map((tid, i) => {
+    const t = getO2026Team(tid);
+    const p1 = dragRank.indexOf(tid) + 1,
+      p2 = dragRank2.indexOf(tid) + 1;
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 0",
+        borderBottom: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 15,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 20
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t?.color
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 11,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#404058"
+      }
+    }, "(", p1, "+", p2, ")\xF72=", ((p1 + p2) / 2).toFixed(1)));
+  }))), scoreType === "drag_rank_coef" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: simulateCercles,
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler le classement"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankCoefLocked(true),
+    disabled: dragRankCoefLocked || dragRankCoef.length === 0,
+    style: BTN(dragRankCoefLocked ? "#404058" : "#34d399")
+  }, dragRankCoefLocked ? "✅ Validé" : "📋 Valider & calculer classement")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      marginBottom: 8
+    }
+  }, "32 participants (2 par \xE9quipe)"), /*#__PURE__*/React.createElement(DragRankList, {
+    compact: true,
+    items: dragRankCoef,
+    onReorder: setDragRankCoef,
+    locked: dragRankCoefLocked,
+    getKey: s => `${s.teamId}-${s.slot}`,
+    getLabel: s => {
+      const t = getO2026Team(s.teamId);
+      const ps = PLAYERS.filter(p => p.t26 === s.teamId);
+      const p = ps[s.slot] || ps[0];
+      return `${p?.name || "Joueur"} (${t?.name || "?"})`;
+    },
+    getColor: s => getO2026Team(s.teamId)?.color || "#60607a"
+  }), dragRankCoef.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      borderTop: "1px solid #1e1e30",
+      paddingTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 13,
+      color: "#E8B84B",
+      marginBottom: 8
+    }
+  }, "CLASSEMENT \xC9QUIPES (COEF 2/1)"), getCerclesFinal().map((t, i) => /*#__PURE__*/React.createElement("div", {
+    key: t.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "5px 0",
+      borderBottom: "1px solid #1e1e30"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 15,
+      color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+      width: 20
+    }
+  }, i + 1), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 7,
+      height: 7,
+      borderRadius: "50%",
+      background: t.color
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 11,
+      color: t.color
+    }
+  }, t.name))))), scoreType === "drag_rank_group" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: tirageMolky,
+    style: BTN(ac)
+  }, "\uD83C\uDFB2 ", dragRankGroups[1].length ? "Nouveau tirage" : "Tirage au sort"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const t = getO2026ActiveTeams().map(t => t.id);
+      const sh = [...t].sort(() => Math.random() - 0.5);
+      const g = {
+        1: sh.slice(0, 4),
+        2: sh.slice(4, 8),
+        3: sh.slice(8, 12),
+        4: sh.slice(12, 16)
+      };
+      setDragRankGroups(g);
+      setDragRankGroupLocked({
+        1: false,
+        2: false,
+        3: false,
+        4: false
+      });
+      setDragRankFinal({
+        1: [],
+        2: [],
+        3: [],
+        4: []
+      });
+      setDragRankGroups(g2 => {
+        const sim = {};
+        [1, 2, 3, 4].forEach(gi => {
+          const tms = g[gi];
+          const sh2 = [...tms].sort(() => Math.random() - 0.5);
+          sim[gi] = sh2;
+        });
+        return sim;
+      });
+    },
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler groupes")), dragRankGroups[1].length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, [1, 2, 3, 4].map(gid => /*#__PURE__*/React.createElement("div", {
+    key: gid
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 5
+    }
+  }, "GROUPE ", gid), /*#__PURE__*/React.createElement(DragRankList, {
+    compact: true,
+    items: dragRankGroups[gid] || [],
+    locked: dragRankGroupLocked[gid],
+    onReorder: items => setDragRankGroups(g => ({
+      ...g,
+      [gid]: items
+    })),
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankGroupLocked(l => ({
+      ...l,
+      [gid]: !l[gid]
+    })),
+    style: {
+      ...BTN(dragRankGroupLocked[gid] ? "#34d399" : "#404058", "5px 10px"),
+      marginTop: 5,
+      width: "100%",
+      fontSize: 10
+    }
+  }, dragRankGroupLocked[gid] ? "✅ Validé" : "⬜ Valider")))), [1, 2, 3, 4].every(g => dragRankGroupLocked[g]) && dragRankFinal[1].length === 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: launchMolkyFinal,
+    style: BTN("#34d399")
+  }, "\uD83C\uDFC6 Lancer la phase finale"), dragRankFinal[1].length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 13,
+      color: "#E8B84B",
+      marginBottom: 10,
+      marginTop: 12
+    }
+  }, "PHASE FINALE"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, [1, 2, 3, 4].map(gid => /*#__PURE__*/React.createElement("div", {
+    key: gid
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 11,
+      color: ac,
+      marginBottom: 5
+    }
+  }, "FINALE ", gid, "\xC8ME"), /*#__PURE__*/React.createElement(DragRankList, {
+    compact: true,
+    items: dragRankFinal[gid] || [],
+    locked: dragRankFinalLocked[gid],
+    onReorder: items => setDragRankFinal(f => ({
+      ...f,
+      [gid]: items
+    })),
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankFinalLocked(l => ({
+      ...l,
+      [gid]: !l[gid]
+    })),
+    style: {
+      ...BTN(dragRankFinalLocked[gid] ? "#34d399" : "#404058", "5px 10px"),
+      marginTop: 5,
+      width: "100%",
+      fontSize: 10
+    }
+  }, dragRankFinalLocked[gid] ? "✅ Validé" : "⬜ Valider")))), [1, 2, 3, 4].every(g => dragRankFinalLocked[g]) && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDragRankFinalDone(true),
+    disabled: dragRankFinalDone,
+    style: BTN(dragRankFinalDone ? "#404058" : "#34d399")
+  }, dragRankFinalDone ? "✅ Classement officiel publié" : "📋 Valider et publier le classement final")))), scoreType === "flechette" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      opacity: flechettePhase === "finales" ? 0.5 : 1,
+      pointerEvents: flechettePhase === "finales" ? "none" : "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const tIds = getO2026ActiveTeams().map(t => t.id);
+      const sh = [...tIds].sort(() => Math.random() - 0.5);
+      setFlechetteGroup1(sh.slice(0, 8).map(id => ({
+        id,
+        score: ""
+      })));
+      setFlechetteGroup2(sh.slice(8, 16).map(id => ({
+        id,
+        score: ""
+      })));
+      setFlechettePhase("poules");
+      setFlechetteWin([]);
+      setFlechetteLose([]);
+    },
+    style: BTN(ac)
+  }, "\uD83C\uDFB2 Tirage au sort"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const rnd = () => Math.floor(Math.random() * 60) + 20;
+      setFlechetteGroup1(g => g.map(p => ({
+        ...p,
+        score: String(rnd())
+      })));
+      setFlechetteGroup2(g => g.map(p => ({
+        ...p,
+        score: String(rnd())
+      })));
+    },
+    style: BTN("#404058")
+  }, "\uD83C\uDFB0 Simuler poules")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14,
+      marginBottom: 12
+    }
+  }, [{
+    label: "Groupe A",
+    data: flechetteGroup1,
+    set: setFlechetteGroup1
+  }, {
+    label: "Groupe B",
+    data: flechetteGroup2,
+    set: setFlechetteGroup2
+  }].map(({
+    label,
+    data,
+    set
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 8
+    }
+  }, label), data.map((player, i) => {
+    const t = getO2026Team(player.id) || {};
+    return /*#__PURE__*/React.createElement("div", {
+      key: player.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: t.color
+      }
+    }, t.name || "?"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      value: player.score,
+      onChange: e => set(d => d.map((pl, j) => j === i ? {
+        ...pl,
+        score: e.target.value
+      } : pl)),
+      style: {
+        width: 56,
+        textAlign: "center",
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 5,
+        color: "#eeeef5",
+        fontSize: 14,
+        padding: "3px",
+        fontFamily: "'Bebas Neue',sans-serif"
+      },
+      placeholder: "pts"
+    }));
+  })))), flechettePhase === "poules" && /*#__PURE__*/React.createElement("button", {
+    onClick: launchFlechetteFinales,
+    style: BTN("#34d399")
+  }, "\uD83C\uDFC6 Lancer les finales")), flechettePhase === "finales" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const rnd = () => Math.floor(Math.random() * 60) + 20;
+      setFlechetteWin(g => g.map(p => ({
+        ...p,
+        score: String(rnd())
+      })));
+      setFlechetteLose(g => g.map(p => ({
+        ...p,
+        score: String(rnd())
+      })));
+    },
+    style: BTN("#404058")
+  }, "\uD83C\uDFB0 Simuler finales")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14
+    }
+  }, [{
+    label: "🏆 Finale Gagnants",
+    data: flechetteWin,
+    set: setFlechetteWin
+  }, {
+    label: "🥉 Finale Perdants",
+    data: flechetteLose,
+    set: setFlechetteLose
+  }].map(({
+    label,
+    data,
+    set
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 8
+    }
+  }, label), data.map((player, i) => {
+    const t = getO2026Team(player.id) || {};
+    return /*#__PURE__*/React.createElement("div", {
+      key: player.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: t.color
+      }
+    }, t.name || "?"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      value: player.score,
+      onChange: e => set(d => d.map((pl, j) => j === i ? {
+        ...pl,
+        score: e.target.value
+      } : pl)),
+      style: {
+        width: 56,
+        textAlign: "center",
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 5,
+        color: "#eeeef5",
+        fontSize: 14,
+        padding: "3px",
+        fontFamily: "'Bebas Neue',sans-serif"
+      },
+      placeholder: "pts"
+    }));
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setFlechetteDone(true),
+    disabled: flechetteDone || flechetteWin.length === 0,
+    style: BTN(flechetteDone ? "#404058" : "#34d399")
+  }, flechetteDone ? "✅ Classement officiel" : "📋 Clore le jeu et afficher les points")))), scoreType === "bracket_direct" && (() => {
+    const tc = getTCBracket();
+    const isAdmin = true;
+    // Simulate TC bracket
+    const simulateTC = () => {
+      const nb = {};
+      const teams = getO2026ActiveTeams().map(t => t.id);
+      const rnd = () => Math.random() > .5 ? [1, 0] : [0, 1];
+      const gW = (slot, a, b) => {
+        const res = nb[slot];
+        return res ? res[0] > res[1] ? a : b : null;
+      };
+      // R1
+      for (let i = 0; i < 8; i++) nb[`r1_${i}`] = rnd();
+      // R2
+      for (let i = 0; i < 4; i++) {
+        const tA = gW(`r1_${i * 2}`, teams[i * 4], teams[i * 4 + 1]);
+        const tB = gW(`r1_${i * 2 + 1}`, teams[i * 4 + 2], teams[i * 4 + 3]);
+        if (tA && tB) nb[`r2_${i}`] = rnd();
+      }
+      // SF
+      const r2w = i => gW(`r2_${i}`, gW(`r1_${i * 2}`, teams[i * 4], teams[i * 4 + 1]), gW(`r1_${i * 2 + 1}`, teams[i * 4 + 2], teams[i * 4 + 3]));
+      if (r2w(0) && r2w(1)) nb["sf_0"] = rnd();
+      if (r2w(2) && r2w(3)) nb["sf_1"] = rnd();
+      // Final
+      const sf0w = gW("sf_0", r2w(0), r2w(1));
+      const sf1w = gW("sf_1", r2w(2), r2w(3));
+      if (sf0w && sf1w) nb["fin"] = rnd();
+      setTcResultats(nb);
+    };
+    const tirageTc = () => {
+      const sh = getO2026ActiveTeams().map(t => t.id).sort(() => Math.random() - 0.5);
+      setTcTeams(sh);
+      setTcResultats({});
+      setTcDone(false);
+    };
+    const TCMatch = ({
+      slot,
+      tA,
+      tB,
+      label
+    }) => {
+      const res = tcResultats[slot];
+      const teamA = getO2026Team(tA),
+        teamB = getO2026Team(tB);
+      const isEditing = editTC === slot;
+      const wA = res && res[0] > res[1],
+        wB = res && res[1] > res[0];
+      if (isEditing) return /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: "#13131f",
+          borderRadius: 7,
+          padding: "7px 9px",
+          border: `1px solid ${ac}44`,
+          marginBottom: 4
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 8,
+          color: "#60607a",
+          marginBottom: 3
+        }
+      }, label), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          color: teamA?.color,
+          fontWeight: 600,
+          flex: 1
+        }
+      }, teamA?.name || "TBD"), [0, 1].map(v => /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: () => setTcScoreA(String(v)),
+        style: {
+          width: 22,
+          height: 22,
+          borderRadius: 4,
+          border: `1px solid ${String(tcScoreA) === String(v) ? ac : "#404058"}`,
+          background: String(tcScoreA) === String(v) ? ac : "#0d0d1c",
+          color: String(tcScoreA) === String(v) ? "#080810" : "#eeeef5",
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 12,
+          cursor: "pointer"
+        }
+      }, v)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#404058"
+        }
+      }, "\u2014"), [0, 1].map(v => /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: () => setTcScoreB(String(v)),
+        style: {
+          width: 22,
+          height: 22,
+          borderRadius: 4,
+          border: `1px solid ${String(tcScoreB) === String(v) ? ac : "#404058"}`,
+          background: String(tcScoreB) === String(v) ? ac : "#0d0d1c",
+          color: String(tcScoreB) === String(v) ? "#080810" : "#eeeef5",
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 12,
+          cursor: "pointer"
+        }
+      }, v)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 9,
+          color: teamB?.color,
+          fontWeight: 600,
+          flex: 1,
+          textAlign: "right"
+        }
+      }, teamB?.name || "TBD"), /*#__PURE__*/React.createElement("button", {
+        onClick: saveTCScore,
+        style: {
+          ...BTN(),
+          padding: "2px 7px",
+          fontSize: 9
+        }
+      }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => setEditTC(null),
+        style: {
+          ...BTN("#404058"),
+          padding: "2px 7px",
+          fontSize: 9
+        }
+      }, "\u2717")));
+      return /*#__PURE__*/React.createElement("div", {
+        onClick: () => {
+          if (tA && tB) {
+            setEditTC(slot);
+            setTcScoreA(res ? String(res[0]) : "");
+            setTcScoreB(res ? String(res[1]) : "");
+          }
+        },
+        style: {
+          background: "#0d0d1c",
+          borderRadius: 7,
+          padding: "6px 8px",
+          border: `1px solid ${res ? ac + "44" : "#1e1e30"}`,
+          marginBottom: 3,
+          cursor: tA && tB ? "pointer" : "default"
+        },
+        onMouseEnter: e => {
+          if (tA && tB) e.currentTarget.style.background = "#13131f";
+        },
+        onMouseLeave: e => e.currentTarget.style.background = "#0d0d1c"
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 8,
+          color: res ? ac : "#2a2a40",
+          marginBottom: 2
+        }
+      }, label), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 5
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 9,
+          color: wA ? "#eeeef5" : teamA?.color || "#2a2a40",
+          fontWeight: wA ? 700 : 400,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, teamA?.name || "TBD"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 11,
+          color: res ? "#eeeef5" : "#2a2a40",
+          minWidth: 24,
+          textAlign: "center"
+        }
+      }, res ? `${res[0]}-${res[1]}` : "vs"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 9,
+          color: wB ? "#eeeef5" : teamB?.color || "#2a2a40",
+          fontWeight: wB ? 700 : 400,
+          textAlign: "right",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, teamB?.name || "TBD"), tA && tB && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 8,
+          color: "#404058"
+        }
+      }, "\u270E")));
+    };
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: tirageTc,
+      style: BTN(ac)
+    }, "\uD83C\uDFB2 Tirage au sort"), /*#__PURE__*/React.createElement("button", {
+      onClick: simulateTC,
+      style: BTN("#404058")
+    }, "\uD83C\uDFB0 Simuler le bracket"), tc.fin.tA && tc.fin.tB && !!tcResultats["fin"] && /*#__PURE__*/React.createElement("button", {
+      onClick: () => setTcDone(true),
+      disabled: tcDone,
+      style: BTN(tcDone ? "#404058" : "#34d399")
+    }, tcDone ? "✅ Classement officiel" : "📋 Valider et publier")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+        gap: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#60607a",
+        marginBottom: 6
+      }
+    }, "ROUND 1"), tc.r1.slice(0, 4).map(({
+      slot,
+      tA,
+      tB
+    }) => /*#__PURE__*/React.createElement(TCMatch, {
+      key: slot,
+      slot: slot,
+      tA: tA,
+      tB: tB,
+      label: `Match ${slot.split("_")[1] * 1 + 1}`
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#60607a",
+        marginBottom: 6
+      }
+    }, "ROUND 1"), tc.r1.slice(4).map(({
+      slot,
+      tA,
+      tB
+    }) => /*#__PURE__*/React.createElement(TCMatch, {
+      key: slot,
+      slot: slot,
+      tA: tA,
+      tB: tB,
+      label: `Match ${slot.split("_")[1] * 1 + 1}`
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "QUARTS"), tc.r2.map(({
+      slot,
+      tA,
+      tB
+    }, i) => /*#__PURE__*/React.createElement(TCMatch, {
+      key: slot,
+      slot: slot,
+      tA: tA,
+      tB: tB,
+      label: `QF ${i + 1}`
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "DEMIES + FINALE"), tc.sf.map(({
+      slot,
+      tA,
+      tB
+    }, i) => /*#__PURE__*/React.createElement(TCMatch, {
+      key: slot,
+      slot: slot,
+      tA: tA,
+      tB: tB,
+      label: `Demi-finale ${i + 1}`
+    })), /*#__PURE__*/React.createElement(TCMatch, {
+      slot: tc.fin.slot,
+      tA: tc.fin.tA,
+      tB: tc.fin.tB,
+      label: "\uD83C\uDFC6 Finale"
+    }))));
+  })(), scoreType === "biathlon" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14,
+      marginBottom: 14
+    }
+  }, [{
+    label: "Course 1",
+    items: biathlonRace1,
+    set: setBiathlonRace1,
+    locked: biathlonRace1Locked
+  }, {
+    label: "Course 2",
+    items: biathlonRace2,
+    set: setBiathlonRace2,
+    locked: biathlonRace2Locked
+  }].map(({
+    label,
+    items,
+    set,
+    locked
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: locked ? ac + "88" : ac,
+      marginBottom: 6
+    }
+  }, label, " ", locked && "🔒"), /*#__PURE__*/React.createElement(DragRankList, {
+    compact: true,
+    items: items,
+    onReorder: set,
+    locked: locked,
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const tIds = getO2026ActiveTeams().map(t => t.id);
+      const sh = [...tIds].sort(() => Math.random() - 0.5);
+      setBiathlonRace1(sh.slice(0, 8));
+      setBiathlonRace2(sh.slice(8, 16));
+      setBiathlonRace1Locked(false);
+      setBiathlonRace2Locked(false);
+      setBiathlonPhase("courses");
+      setBiathlonFinalLocked(false);
+      setBiathlonWin([]);
+      setBiathlonLose([]);
+    },
+    style: BTN(ac)
+  }, "\uD83C\uDFB2 Tirage au sort"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const tIds = getO2026ActiveTeams().map(t => t.id);
+      const sh = [...tIds].sort(() => Math.random() - 0.5);
+      // Exactly 8 per race, no duplicates
+      setBiathlonRace1(sh.slice(0, 8));
+      setBiathlonRace2(sh.slice(8, 16));
+    },
+    style: BTN("#404058")
+  }, "\uD83C\uDFB2 Simuler les courses"), biathlonPhase === "courses" && /*#__PURE__*/React.createElement("button", {
+    onClick: launchBiathlonFinals,
+    style: BTN("#34d399")
+  }, "\uD83C\uDFC6 Lancer les finales")), biathlonPhase === "finales" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      borderTop: "1px solid #1e1e30",
+      paddingTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 13,
+      color: "#E8B84B",
+      marginBottom: 10
+    }
+  }, "PHASE FINALE"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14,
+      marginBottom: 12
+    }
+  }, [{
+    label: "🏆 Finale Gagnants",
+    items: biathlonWin,
+    set: setBiathlonWin
+  }, {
+    label: "🥉 Finale Perdants",
+    items: biathlonLose,
+    set: setBiathlonLose
+  }].map(({
+    label,
+    items,
+    set
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 6
+    }
+  }, label), /*#__PURE__*/React.createElement(DragRankList, {
+    compact: true,
+    items: items,
+    onReorder: set,
+    locked: biathlonFinalLocked,
+    getKey: id => id,
+    getLabel: id => {
+      const t = getO2026Team(id);
+      return t?.name || "?";
+    },
+    getColor: id => getO2026Team(id)?.color || "#60607a"
+  })))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setBiathlonFinalLocked(true),
+    disabled: biathlonFinalLocked || biathlonWin.length === 0,
+    style: BTN(biathlonFinalLocked ? "#404058" : "#34d399")
+  }, biathlonFinalLocked ? "✅ Classement officiel" : "📋 Valider le classement final")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#60607a",
+      marginBottom: 12
+    }
+  }, "R\xC8GLES"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, ep.regles.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      gap: 10,
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: ac + "22",
+      border: `1px solid ${ac}44`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 11,
+      color: ac,
+      marginTop: 1
+    }
+  }, i + 1), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#cccce0",
+      lineHeight: 1.5
+    }
+  }, r)))), ep.notesSpeciales.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, ep.notesSpeciales.map((n, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      background: "#13131f",
+      borderRadius: 8,
+      padding: "10px 14px",
+      borderLeft: `3px solid ${ac}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: ac,
+      marginBottom: 3
+    }
+  }, n.titre), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, n.texte))))), scoreType === "drag_rank" && dragRankLocked && dragRank.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
+    }
+  }, "CLASSEMENT OFFICIEL"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "\u2705 Valid\xE9")), dragRank.map((tid, i) => {
+    const t = getO2026Team(tid);
+    const pts = O2026_POINTS[i] || 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: i < dragRank.length - 1 ? "1px solid #1e1e30" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: i < 3 ? 22 : 15,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 30,
+        textAlign: "center"
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 14 : 17,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#E8B84B"
+      }
+    }, pts, " pts"));
+  })), scoreType === "drag_rank_2" && (dragRankLocked || dragRank2Locked) && dragRank.length > 0 && dragRank2.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac,
+      marginBottom: 14
+    }
+  }, "CLASSEMENT FINAL (MOYENNE)"), getMathFinal().map((tid, i) => {
+    const t = getO2026Team(tid);
+    const p1 = dragRank.indexOf(tid) + 1,
+      p2 = dragRank2.indexOf(tid) + 1;
+    const pts = O2026_POINTS[i] || 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: i < 15 ? "1px solid #1e1e30" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: i < 3 ? 22 : 15,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 30,
+        textAlign: "center"
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 14 : 17,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#404058",
+        marginRight: 8
+      }
+    }, "(", p1, "+", p2, ")\xF72=", ((p1 + p2) / 2).toFixed(1)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#E8B84B"
+      }
+    }, pts, " pts"));
+  })), scoreType === "drag_rank_coef" && dragRankCoefLocked && dragRankCoef.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
+    }
+  }, "CLASSEMENT OFFICIEL (COEF)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "\u2705 Valid\xE9")), getCerclesFinal().map((t, i) => {
+    const pts = O2026_POINTS[i] || 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: t.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: i < 15 ? "1px solid #1e1e30" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: i < 3 ? 22 : 15,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 30,
+        textAlign: "center"
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: t.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 14 : 17,
+        color: t.color
+      }
+    }, t.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#E8B84B"
+      }
+    }, pts, " pts"));
+  })), scoreType === "drag_rank_group" && dragRankFinalDone && (() => {
+    // Finale 1 = places 1-4, Finale 2 = 5-8, Finale 3 = 9-12, Finale 4 = 13-16
+    const ranking = [];
+    [1, 2, 3, 4].forEach(gid => {
+      (dragRankFinal[gid] || []).forEach(tid => {
+        if (tid) ranking.push(tid);
+      });
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: ac
+      }
+    }, "CLASSEMENT OFFICIEL"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "\u2705 Valid\xE9")), ranking.map((tid, i) => {
+      const t = getO2026Team(tid);
+      const pts = O2026_POINTS[i] || 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: tid,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "7px 0",
+          borderBottom: i < ranking.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: i < 3 ? 22 : 15,
+          color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+          width: 30,
+          textAlign: "center"
+        }
+      }, i + 1), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: t?.color || "#60607a",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: m ? 14 : 17,
+          color: t?.color
+        }
+      }, t?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 14,
+          color: "#E8B84B"
+        }
+      }, pts, " pts"));
+    }));
+  })(), scoreType === "flechette" && flechetteDone && (() => {
+    const buildRanked = (group, offset) => {
+      const sorted = [...group].map(p => ({
+        ...p,
+        score: parseInt(p.score) || 0
+      })).sort((a, b) => b.score - a.score);
+      const result = [];
+      let rank = offset + 1;
+      let i = 0;
+      while (i < sorted.length) {
+        const score = sorted[i].score;
+        const tied = [];
+        while (i < sorted.length && sorted[i].score === score) {
+          tied.push(sorted[i]);
+          i++;
+        }
+        const lastRank = rank + tied.length - 1;
+        const sharedPts = tied.length > 1 ? Math.round(tied.reduce((s, _, j) => (O2026_POINTS[rank - 1 + j] || 0) + s, 0) / tied.length) : O2026_POINTS[rank - 1] || 0;
+        tied.forEach(p => result.push({
+          ...p,
+          rank,
+          pts: sharedPts,
+          tied: tied.length > 1
+        }));
+        rank = lastRank + 1;
+      }
+      return result;
+    };
+    const all = [...buildRanked(flechetteWin, 0), ...buildRanked(flechetteLose, 8)];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: ac
+      }
+    }, "CLASSEMENT OFFICIEL"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "\u2705 Valid\xE9")), all.map((player, i) => {
+      const t = getO2026Team(player.id);
+      return /*#__PURE__*/React.createElement("div", {
+        key: player.id,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "7px 0",
+          borderBottom: i < all.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: player.rank <= 3 ? 22 : 15,
+          color: player.rank === 1 ? "#E8B84B" : player.rank === 2 ? "#aaa" : player.rank === 3 ? "#c87533" : "#404058",
+          width: 36,
+          textAlign: "center"
+        }
+      }, player.tied ? "=" : "", player.rank), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: t?.color || "#60607a",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: m ? 14 : 17,
+          color: t?.color
+        }
+      }, t?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "#404058",
+          marginRight: 8
+        }
+      }, player.score, " pts fl\xE9chette"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 14,
+          color: "#E8B84B"
+        }
+      }, player.pts, " pts"));
+    }));
+  })(), scoreType === "bracket_direct" && tcDone && (() => {
+    const tc = getTCBracket();
+    const gW = (slot, a, b) => {
+      const r = tcResultats[slot];
+      return r ? r[0] > r[1] ? a : b : null;
+    };
+    const gL = (slot, a, b) => {
+      const r = tcResultats[slot];
+      return r ? r[0] > r[1] ? b : a : null;
+    };
+    // Build ranking with ties at same stage
+    const result = [];
+    const avgP = (p1, p2) => Math.round(((O2026_POINTS[p1 - 1] || 0) + (O2026_POINTS[p2 - 1] || 0)) / 2);
+    const finW = gW("fin", tc.fin.tA, tc.fin.tB),
+      finL = gL("fin", tc.fin.tA, tc.fin.tB);
+    const sf0L = gL("sf_0", tc.sf[0].tA, tc.sf[0].tB),
+      sf1L = gL("sf_1", tc.sf[1].tA, tc.sf[1].tB);
+    const r2Ls = [0, 1, 2, 3].map(i => gL(`r2_${i}`, tc.r2[i]?.tA, tc.r2[i]?.tB));
+    const r1Ls = [0, 1, 2, 3, 4, 5, 6, 7].map(i => gL(`r1_${i}`, tc.r1[i]?.tA, tc.r1[i]?.tB));
+    if (finW) result.push({
+      teamId: finW,
+      rank: 1,
+      pts: O2026_POINTS[0] || 0
+    });
+    if (finL) result.push({
+      teamId: finL,
+      rank: 2,
+      pts: O2026_POINTS[1] || 0
+    });
+    const sf_sharedPts = avgP(3, 4);
+    [sf0L, sf1L].filter(Boolean).forEach(t => result.push({
+      teamId: t,
+      rank: 3,
+      pts: sf_sharedPts,
+      tied: true
+    }));
+    const qf_sharedPts = avgP(5, 8);
+    r2Ls.filter(Boolean).forEach(t => result.push({
+      teamId: t,
+      rank: 5,
+      pts: qf_sharedPts,
+      tied: true
+    }));
+    const r1_sharedPts = avgP(9, 16);
+    r1Ls.filter(Boolean).forEach(t => result.push({
+      teamId: t,
+      rank: 9,
+      pts: r1_sharedPts,
+      tied: true
+    }));
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: ac
+      }
+    }, "CLASSEMENT OFFICIEL"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "\u2705 Valid\xE9")), result.sort((a, b) => a.rank - b.rank).map((entry, i) => {
+      const t = getO2026Team(entry.teamId);
+      return /*#__PURE__*/React.createElement("div", {
+        key: entry.teamId,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "7px 0",
+          borderBottom: i < result.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: entry.rank <= 3 ? 22 : 15,
+          color: entry.rank === 1 ? "#E8B84B" : entry.rank === 2 ? "#aaa" : entry.rank === 3 ? "#c87533" : "#404058",
+          width: 30,
+          textAlign: "center"
+        }
+      }, entry.tied ? "=" : "", entry.rank), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: t?.color || "#60607a",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: m ? 14 : 17,
+          color: t?.color
+        }
+      }, t?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 14,
+          color: "#E8B84B"
+        }
+      }, entry.pts, " pts"));
+    }));
+  })(), scoreType === "biathlon" && biathlonFinalLocked && (biathlonWin.length > 0 || biathlonLose.length > 0) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
+    }
+  }, "CLASSEMENT OFFICIEL"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "\u2705 Valid\xE9")), [...biathlonWin, ...biathlonLose].map((tid, i) => {
+    const t = getO2026Team(tid);
+    const pts = O2026_POINTS[i] || 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: i < 15 ? "1px solid #1e1e30" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: i < 3 ? 22 : 15,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 30,
+        textAlign: "center"
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: m ? 14 : 17,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#E8B84B"
+      }
+    }, pts, " pts"));
+  })), (hasGroupFormat || isMiniB) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#60607a"
+    }
+  }, "GROUPES"), (hasGroupes || hasMiniGroupes) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 6,
+      height: 6,
+      borderRadius: "50%",
+      background: "#34d399",
+      boxShadow: "0 0 6px #34d399"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "En direct"))), !(hasGroupes || hasMiniGroupes) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "24px 0",
+      color: "#2a2a40",
+      fontSize: 12
+    }
+  }, "\uD83C\uDFB2 Le tirage au sort n'a pas encore eu lieu") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr 1fr" : "repeat(4,1fr)",
+      gap: 10,
+      marginBottom: activeGroup ? 10 : 0
+    }
+  }, [1, 2, 3, 4].map(gid => {
+    const teams = groupes[gid] || [];
+    const isActive = activeGroup === gid;
+    let standings = [];
+    if (isMiniB) {
+      standings = getMiniTop4(gid).sort((a, b) => a.rank - b.rank);
+    } else {
+      standings = getStandings(gid);
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      key: gid,
+      onClick: () => setActiveGroup(isActive ? null : gid),
+      style: {
+        background: "#13131f",
+        borderRadius: 10,
+        padding: "12px",
+        cursor: "pointer",
+        border: `1px solid ${isActive ? ac + "88" : "#1e1e30"}`,
+        transition: "all .15s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: ac,
+        marginBottom: 8,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, "GROUPE ", gid, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#404058"
+      }
+    }, isActive ? "▼" : "›")), (isMiniB ? getMiniTop4(gid).sort((a, b) => a.rank - b.rank).map(s => s.teamId) : standings.map(s => s.teamId)).map((tid, i) => {
+      const s = isMiniB ? {
+        teamId: tid,
+        rank: i + 1
+      } : standings[i];
+      const t = getO2026Team(s.teamId || tid);
+      const pts = isMiniB ? getMiniTop4(gid).find(x => x.teamId === tid)?.rank ?? "-" : s.pts;
+      const players = getTeamPlayers(s.teamId || tid);
+      return /*#__PURE__*/React.createElement("div", {
+        key: tid,
+        style: {
+          marginBottom: 5
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          marginBottom: 2
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "#404058",
+          width: 12
+        }
+      }, i + 1), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: t?.color || "#60607a",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 10,
+          fontWeight: 600,
+          color: t?.color,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, t?.name), !isMiniB && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 11,
+          color: "#E8B84B"
+        }
+      }, s.pts, "pts")), players.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 2,
+          paddingLeft: 17
+        }
+      }, players.map(p => /*#__PURE__*/React.createElement("span", {
+        key: p.id,
+        style: {
+          fontSize: 8,
+          color: t?.color,
+          background: t?.color + "15",
+          borderRadius: 3,
+          padding: "1px 4px"
+        }
+      }, p.name))));
+    }));
+  })), activeGroup && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#080810",
+      borderRadius: 10,
+      border: `1px solid ${ac}44`,
+      padding: "12px 14px"
+    }
+  }, isMiniB ? (() => {
+    const gid = activeGroup;
+    const teams = groupes[gid] || [];
+    if (teams.length < 4) return null;
+    const sf1r = miniRes[getMiniKey(gid, "sf1")];
+    const sf2r = miniRes[getMiniKey(gid, "sf2")];
+    const sf1w = sf1r ? sf1r[0] > sf1r[1] ? teams[0] : teams[3] : null;
+    const sf1l = sf1r ? sf1r[0] > sf1r[1] ? teams[3] : teams[0] : null;
+    const sf2w = sf2r ? sf2r[0] > sf2r[1] ? teams[1] : teams[2] : null;
+    const sf2l = sf2r ? sf2r[0] > sf2r[1] ? teams[2] : teams[1] : null;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: ac,
+        marginBottom: 10
+      }
+    }, "GROUPE ", gid, " \u2014 MATCHS"), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "sf1",
+      tA: teams[0],
+      tB: teams[3],
+      label: "1/2 Finale",
+      isAdmin: false
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "sf2",
+      tA: teams[1],
+      tB: teams[2],
+      label: "1/2 Finale",
+      isAdmin: false
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "3rd",
+      tA: sf1l,
+      tB: sf2l,
+      label: "Petite Finale (3\xE8me/4\xE8me)",
+      isAdmin: false
+    }), /*#__PURE__*/React.createElement(MiniMatch, {
+      gid: gid,
+      slot: "fin",
+      tA: sf1w,
+      tB: sf2w,
+      label: "\uD83C\uDFC6 Finale",
+      isAdmin: false
+    }));
+  })() : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 13,
+      color: ac,
+      marginBottom: 10
+    }
+  }, "GROUPE ", activeGroup, " \u2014 MATCHS"), buildGroupSchedule(groupes[activeGroup] || [], GROUP_TERRAINS[activeGroup]).map((round, ri) => /*#__PURE__*/React.createElement("div", {
+    key: ri,
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "#404058",
+      marginBottom: 4,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em"
+    }
+  }, "Round ", ri + 1), round.map(({
+    tA,
+    tB,
+    terrain
+  }) => {
+    const key = getMatchKey(activeGroup, tA, tB);
+    const res = resultats[key];
+    const teamA = getO2026Team(tA),
+      teamB = getO2026Team(tB);
+    const wA = res && res[0] > res[1],
+      wB = res && res[1] > res[0];
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 0",
+        borderBottom: "1px solid #0d0d1c"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: ac,
+        flexShrink: 0,
+        fontWeight: 700,
+        width: 18
+      }
+    }, "T", terrain), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wA ? "#eeeef5" : teamA?.color,
+        fontWeight: wA ? 700 : 400,
+        textAlign: "right",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamA?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: res ? "#eeeef5" : "#2a2a40",
+        minWidth: 30,
+        textAlign: "center"
+      }
+    }, res ? `${res[0]}—${res[1]}` : "·"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 10,
+        color: wB ? "#eeeef5" : teamB?.color,
+        fontWeight: wB ? 700 : 400,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, teamB?.name));
+  }))))))), hasBracketPhase && (() => {
+    const isAdmin = tab === "admin" && isLouis;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #1e1e30",
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#60607a"
+      }
+    }, "BRACKET"), phase !== "groupes" ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: "#34d399",
+        boxShadow: "0 0 6px #34d399"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "En direct")) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#404058"
+      }
+    }, "Aper\xE7u \u2014 en attente des poules")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+        gap: m ? 10 : 14
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "\uD83E\uDD47 GAGNANTS"), /*#__PURE__*/React.createElement(BM, {
+      slot: "wsf1",
+      tA: gT("wsf1", "A"),
+      tB: gT("wsf1", "B"),
+      phA: gP("wsf1", "A"),
+      phB: gP("wsf1", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "wsf2",
+      tA: gT("wsf2", "A"),
+      tB: gT("wsf2", "B"),
+      phA: gP("wsf2", "A"),
+      phB: gP("wsf2", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "wf",
+      tA: gT("wf", "A"),
+      tB: gT("wf", "B"),
+      phA: gP("wf", "A"),
+      phB: gP("wf", "B"),
+      label: "\uD83C\uDFC6 Finale",
+      isAdmin: isAdmin && !!(bracketResultats["b_wsf1"] && bracketResultats["b_wsf2"])
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#c87533",
+        marginBottom: 6
+      }
+    }, "\uD83E\uDD48 PERDANTS"), /*#__PURE__*/React.createElement(BM, {
+      slot: "lsf1",
+      tA: gT("lsf1", "A"),
+      tB: gT("lsf1", "B"),
+      phA: gP("lsf1", "A"),
+      phB: gP("lsf1", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "lsf2",
+      tA: gT("lsf2", "A"),
+      tB: gT("lsf2", "B"),
+      phA: gP("lsf2", "A"),
+      phB: gP("lsf2", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "lf",
+      tA: gT("lf", "A"),
+      tB: gT("lf", "B"),
+      phA: gP("lf", "A"),
+      phB: gP("lf", "B"),
+      label: "\uD83E\uDD49 Finale",
+      isAdmin: isAdmin && !!(bracketResultats["b_lsf1"] && bracketResultats["b_lsf2"])
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#60a5fa",
+        marginBottom: 6
+      }
+    }, "\uD83C\uDF96 3\xC8MES"), /*#__PURE__*/React.createElement(BM, {
+      slot: "t3sf1",
+      tA: gT("t3sf1", "A"),
+      tB: gT("t3sf1", "B"),
+      phA: gP("t3sf1", "A"),
+      phB: gP("t3sf1", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "t3sf2",
+      tA: gT("t3sf2", "A"),
+      tB: gT("t3sf2", "B"),
+      phA: gP("t3sf2", "A"),
+      phB: gP("t3sf2", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "t3f",
+      tA: gT("t3f", "A"),
+      tB: gT("t3f", "B"),
+      phA: gP("t3f", "A"),
+      phB: gP("t3f", "B"),
+      label: "Finale",
+      isAdmin: isAdmin && !!(bracketResultats["b_t3sf1"] && bracketResultats["b_t3sf2"])
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 11,
+        color: "#404058",
+        marginBottom: 6
+      }
+    }, "\uD83D\uDCAA 4\xC8MES"), /*#__PURE__*/React.createElement(BM, {
+      slot: "t4sf1",
+      tA: gT("t4sf1", "A"),
+      tB: gT("t4sf1", "B"),
+      phA: gP("t4sf1", "A"),
+      phB: gP("t4sf1", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "t4sf2",
+      tA: gT("t4sf2", "A"),
+      tB: gT("t4sf2", "B"),
+      phA: gP("t4sf2", "A"),
+      phB: gP("t4sf2", "B"),
+      label: "1/2 Finale",
+      isAdmin: isAdmin && phase !== "groupes"
+    }), /*#__PURE__*/React.createElement(BM, {
+      slot: "t4f",
+      tA: gT("t4f", "A"),
+      tB: gT("t4f", "B"),
+      phA: gP("t4f", "A"),
+      phB: gP("t4f", "B"),
+      label: "Finale",
+      isAdmin: isAdmin && !!(bracketResultats["b_t4sf1"] && bracketResultats["b_t4sf2"])
+    }))));
+  })(), phase === "done" && (() => {
+    const ranking = getFinalRanking();
+    if (!ranking.length) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: "1px solid #E8B84B33",
+        borderRadius: 12,
+        padding: m ? 14 : 20
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: "#E8B84B",
+        marginBottom: 14
+      }
+    }, "\uD83C\uDFC6 CLASSEMENT FINAL"), ranking.map((entry, i) => {
+      const tid = entry.teamId || entry;
+      const pts = entry.pts !== undefined ? entry.pts : O2026_POINTS[i] || 0;
+      const rank = entry.rank || i + 1;
+      const tied = entry.tied;
+      const t = getO2026Team(tid);
+      return /*#__PURE__*/React.createElement("div", {
+        key: tid,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "7px 0",
+          borderBottom: i < ranking.length - 1 ? "1px solid #1e1e30" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: rank <= 3 ? 22 : 15,
+          color: rank === 1 ? "#E8B84B" : rank === 2 ? "#aaaaaa" : rank === 3 ? "#c87533" : "#404058",
+          width: 30,
+          textAlign: "center"
+        }
+      }, tied ? "=" : "", rank), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: 9,
+          height: 9,
+          borderRadius: "50%",
+          background: t?.color || "#60607a",
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: m ? 15 : 18,
+          color: t?.color
+        }
+      }, t?.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 15,
+          color: "#E8B84B"
+        }
+      }, pts, " pts"));
+    }));
+  })()));
 }
 function TeamsPage({
   nav
@@ -11640,8 +16173,23 @@ function DataPage() {
 // ─── APP ─────────────────────────────────────────────
 const ADMIN_UID = "louis";
 function App() {
-  const [page, setPage] = useState("home");
-  const [sub, setSub] = useState({});
+  // Read initial page from URL hash
+  const [page, setPage] = useState(() => {
+    try {
+      const h = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+      return h.page || "home";
+    } catch {
+      return "home";
+    }
+  });
+  const [sub, setSub] = useState(() => {
+    try {
+      const h = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+      return h.sub || {};
+    } catch {
+      return {};
+    }
+  });
   const [history, setHistory] = useState([]);
   const [dbLoaded, setDbLoaded] = useState(false);
   const [dbError, setDbError] = useState(null);
@@ -11728,6 +16276,14 @@ function App() {
       setDbLoaded(true); // fallback to hardcoded data
     }
   }
+  function writeHash(p, s) {
+    try {
+      window.location.hash = encodeURIComponent(JSON.stringify({
+        page: p,
+        sub: s
+      }));
+    } catch (e) {}
+  }
   function nav(p, s = {}) {
     setHistory(h => [...h, {
       page,
@@ -11735,6 +16291,7 @@ function App() {
     }]);
     setPage(p);
     setSub(s);
+    writeHash(p, s);
     try {
       window.scrollTo(0, 0);
     } catch (e) {}
@@ -11745,6 +16302,7 @@ function App() {
       const prev = h[h.length - 1];
       setPage(prev.page);
       setSub(prev.sub);
+      writeHash(prev.page, prev.sub);
       try {
         window.scrollTo(0, 0);
       } catch (e) {}
@@ -11817,6 +16375,14 @@ function App() {
     playerId: sub.playerId,
     nav: nav,
     navBack: navBack
+  }), page === "o2026" && /*#__PURE__*/React.createElement(O2026Page, {
+    nav: nav,
+    navBack: navBack
+  }), page === "epreuveO2026" && /*#__PURE__*/React.createElement(EpreuveO2026Page, {
+    epreuveId: sub.epreuveId,
+    nav: nav,
+    navBack: navBack,
+    currentPlayer: currentPlayer
   }), page === "teams" && /*#__PURE__*/React.createElement(TeamsPage, {
     nav: nav,
     navBack: navBack
