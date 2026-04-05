@@ -17438,7 +17438,7 @@ function ProfilBL({
     cursor: "pointer",
     width: "100%"
   });
-  const mt = currentPlayer?.member_type || "non-membre";
+  const mt = (PLAYERS.find(p => p.id === currentPlayer?.id) || currentPlayer)?.member_type || "non-membre";
   const memberColors = {
     "club": "#86c99e",
     "events": "#E8B84B",

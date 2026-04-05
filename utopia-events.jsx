@@ -4746,7 +4746,7 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
   const [saving,setSaving]=React.useState(false);
   const S={background:"#1f4d36",border:"1px solid #2d6a4f",borderRadius:8,padding:"10px 14px",color:BL_WHITE,fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",width:"100%",boxSizing:"border-box"};
   const BTN=(c=BL_GREEN_LIGHT)=>({background:c,color:BL_WHITE,border:"none",borderRadius:10,padding:12,fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",width:"100%"});
-  const mt=currentPlayer?.member_type||"non-membre";
+  const mt=(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)?.member_type||"non-membre";
   const memberColors={"club":"#86c99e","events":"#E8B84B","non-membre":"#60607a"};
   const memberLabels={"club":"Membre Club","events":"Membre Events","non-membre":"Non-membre"};
   const memberDesc={"club":"Accès Club + Events","events":"Accès Events","non-membre":"Aucun accès"};
