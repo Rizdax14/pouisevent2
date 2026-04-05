@@ -4968,7 +4968,16 @@ function PlappyPirdPage({currentPlayer,onBack}){
   const [leaderboard,setLeaderboard]=React.useState([]);
   const [imgLoaded,setImgLoaded]=React.useState(false);
   const birdImg=React.useRef(null);
-  const W=360,H=480,GRAVITY=0.45,FLAP=-8,GAP=155,PIPE_W=52,SPEED=2.2;
+  const GRAVITY=0.38,FLAP=-7.5,PIPE_W=52,SPEED=1.9;
+  const GAP=180; // wider gap = easier
+  // Full screen dimensions
+  const [dims,setDims]=React.useState({W:Math.min(window.innerWidth,500),H:window.innerHeight-56});
+  const W=dims.W,H=dims.H;
+  React.useEffect(()=>{
+    const onResize=()=>setDims({W:Math.min(window.innerWidth,500),H:window.innerHeight-56});
+    window.addEventListener('resize',onResize);
+    return()=>window.removeEventListener('resize',onResize);
+  },[]);
 
   // Load leaderboard
   React.useEffect(()=>{
@@ -4997,8 +5006,10 @@ function PlappyPirdPage({currentPlayer,onBack}){
 
   React.useEffect(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
+    if(W<=0||H<=0)return;
     const ctx=canvas.getContext("2d");
     canvas.width=W;canvas.height=H;
+    canvas.style.width=W+"px";canvas.style.height=H+"px";
     let raf;
     const g=gameRef.current;
     // Game state
@@ -5140,7 +5151,7 @@ function PlappyPirdPage({currentPlayer,onBack}){
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown",onKey);
     };
-  },[imgLoaded]);
+  },[imgLoaded,W,H]);
 
   return(
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",display:"flex",flexDirection:"column"}}>
@@ -5152,24 +5163,26 @@ function PlappyPirdPage({currentPlayer,onBack}){
           <div style={{fontSize:7,color:"#60607a"}}>BEST: <span style={{color:"#f59e0b"}}>{bestScore}</span></div>
         </div>
       </div>
-      <div style={{display:"flex",flexDirection:m?"column":"row",flex:1,gap:0}}>
-        {/* Game canvas */}
-        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",padding:m?"16px":"32px 20px 32px 40px"}}>
-          <div style={{position:"relative",border:"2px solid #22c55e33",borderRadius:4,overflow:"hidden",boxShadow:"0 0 20px #22c55e22"}}>
-            <canvas ref={canvasRef} style={{display:"block",imageRendering:"pixelated"}}/>
-          </div>
-        </div>
-        {/* Leaderboard */}
-        <div style={{flex:1,padding:m?"0 16px 80px":"32px 40px 32px 20px",maxWidth:m?"100%":320}}>
-          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:16}}>🏆 HIGH SCORES</div>
-          {leaderboard.length===0?(
-            <div style={{fontSize:7,color:"#404058"}}>AUCUN SCORE ENCORE</div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {leaderboard.map((row,i)=>{
+      {/* Full screen canvas */}
+      <div style={{position:"relative",flex:1,display:"flex",justifyContent:"center",background:"#0a0a0f",overflow:"hidden"}}>
+        <canvas ref={canvasRef} style={{display:"block",imageRendering:"pixelated",maxWidth:"100%"}}/>
+      </div>
+
+      {/* Leaderboard — only visible when dead */}
+      {gameState==="dead"&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:100,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?10:14,color:"#ef4444",marginBottom:6,textAlign:"center"}}>GAME OVER</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?8:11,color:"#f59e0b",marginBottom:4}}>SCORE: {score}</div>
+          <div style={{fontSize:7,color:"#22c55e",marginBottom:20,fontFamily:"'Press Start 2P',monospace"}}>BEST: {bestScore}</div>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:12}}>🏆 HIGH SCORES</div>
+          <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:6,maxHeight:"40vh",overflowY:"auto",marginBottom:20}}>
+            {leaderboard.length===0?(
+              <div style={{fontSize:7,color:"#404058",textAlign:"center"}}>AUCUN SCORE ENCORE</div>
+            ):(
+              leaderboard.map((row,i)=>{
                 const isMe=row.player_id===currentPlayer?.id;
                 return(
-                  <div key={row.player_id} style={{background:isMe?"#22c55e11":"#12121f",border:`1px solid ${isMe?"#22c55e44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
+                  <div key={row.player_id} style={{background:isMe?"#22c55e22":"#12121f",border:`1px solid ${isMe?"#22c55e":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:20}}>{i+1}</span>
                     <div style={{width:24,height:24,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
                       <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
@@ -5178,11 +5191,12 @@ function PlappyPirdPage({currentPlayer,onBack}){
                     <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#f59e0b"}}>{row.score}</span>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
+          <button onClick={()=>setGameState("idle")} style={{background:"#22c55e",color:"#0a0a0f",border:"none",borderRadius:4,padding:"12px 20px",fontFamily:"'Press Start 2P',monospace",fontSize:9,cursor:"pointer"}}>▶ REJOUER</button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
