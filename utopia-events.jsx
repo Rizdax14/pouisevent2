@@ -748,7 +748,7 @@ function LoginBL({onLogin,dbLoaded}){
       <div style={{width:"100%",maxWidth:360}}>
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:40}}>
-          <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{width:200,height:"auto",marginBottom:16}}/>
+          <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{width:200,height:"auto",marginBottom:16,mixBlendMode:"screen"}}/>
           <div style={{fontSize:13,color:"#86c99e"}}>Connecte-toi pour accéder au club</div>
         </div>
 
@@ -4460,7 +4460,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
 function DataPage(){
   const m=useIsMobile();
   const PIN="2606";
-  const [unlocked,setUnlocked]=useState(()=>sessionStorage.getItem("pouis_pin")==="ok");
+  const [unlocked,setUnlocked]=useState(true); // PIN removed - access controlled by isAdmin in nav
   // If accessing data and we're not admin, redirect
   const [input,setInput]=useState("");
   const [err,setErr]=useState(false);
@@ -4544,19 +4544,7 @@ function DataPage(){
     setSaving(false);
   }
 
-  if(!unlocked) return(
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"80vh"}}>
-      <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:16,padding:"40px 48px",textAlign:"center",maxWidth:340,width:"100%"}}>
-        <div style={{fontSize:32,marginBottom:12}}>🔒</div>
-        <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,marginBottom:6}}>ACCÈS ADMIN</h2>
-        <p style={{color:"#60607a",fontSize:12,marginBottom:24}}>Zone protégée.</p>
-        <input type="password" maxLength={4} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryPin()} placeholder="• • • •" autoFocus
-          style={{width:"100%",background:"#13131f",border:`1px solid ${err?"#ef4444":"#1e1e30"}`,borderRadius:10,padding:"12px 16px",color:"#eeeef5",fontFamily:"'Bebas Neue',sans-serif",fontSize:28,letterSpacing:"0.3em",textAlign:"center",outline:"none",marginBottom:8,boxSizing:"border-box"}}/>
-        {err&&<p style={{color:"#ef4444",fontSize:12,marginBottom:8}}>Code incorrect.</p>}
-        <button onClick={tryPin} style={{width:"100%",background:"#E8B84B",color:"#080810",border:"none",borderRadius:10,padding:"12px",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:8}}>Entrer</button>
-      </div>
-    </div>
-  );
+
 
   const G={background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:18};
   const INPUT={background:"#13131f",border:"1px solid #1e1e30",borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:13,outline:"none",boxSizing:"border-box"};
@@ -4566,7 +4554,7 @@ function DataPage(){
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1000,margin:"0 auto"}} className="fade">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:20}}>
         <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?36:50}}>ADMIN <span style={{color:"#E8B84B"}}>PANEL</span></h1>
-        <button onClick={()=>{sessionStorage.removeItem("pouis_pin");setUnlocked(false);}} style={{background:"none",border:"none",color:"#404058",fontSize:12,cursor:"pointer"}}>🔒 Verrouiller</button>
+
       </div>
 
       {msg&&<div style={{marginBottom:16,padding:"10px 14px",background:msg.type==="error"?"#1a0a0a":"#0a1a0a",border:`1px solid ${msg.type==="error"?"#ef444433":"#34d39933"}`,borderRadius:8,fontSize:12,color:msg.type==="error"?"#ef4444":"#34d399",display:"flex",justifyContent:"space-between"}}>
@@ -4713,7 +4701,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     <div style={{minHeight:"100vh",background:BL_GREEN,color:BL_WHITE,fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header */}
       <div style={{background:BL_GREEN,borderBottom:`1px solid ${BL_GREEN_LIGHT}`,padding:m?"18px 20px":"24px 40px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto"}}/>
+        <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto",mixBlendMode:"screen"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           {isLouis&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
           <div style={{textAlign:"right"}}>

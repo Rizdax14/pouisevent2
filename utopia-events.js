@@ -6040,7 +6040,8 @@ function LoginBL({
     style: {
       width: 200,
       height: "auto",
-      marginBottom: 16
+      marginBottom: 16,
+      mixBlendMode: "screen"
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -16529,7 +16530,7 @@ function ProfilePage({
 function DataPage() {
   const m = useIsMobile();
   const PIN = "2606";
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("pouis_pin") === "ok");
+  const [unlocked, setUnlocked] = useState(true); // PIN removed - access controlled by isAdmin in nav
   // If accessing data and we're not admin, redirect
   const [input, setInput] = useState("");
   const [err, setErr] = useState(false);
@@ -16705,85 +16706,6 @@ function DataPage() {
     }
     setSaving(false);
   }
-  if (!unlocked) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "80vh"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 16,
-      padding: "40px 48px",
-      textAlign: "center",
-      maxWidth: 340,
-      width: "100%"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 32,
-      marginBottom: 12
-    }
-  }, "\uD83D\uDD12"), /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 28,
-      marginBottom: 6
-    }
-  }, "ACC\xC8S ADMIN"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: "#60607a",
-      fontSize: 12,
-      marginBottom: 24
-    }
-  }, "Zone prot\xE9g\xE9e."), /*#__PURE__*/React.createElement("input", {
-    type: "password",
-    maxLength: 4,
-    value: input,
-    onChange: e => setInput(e.target.value),
-    onKeyDown: e => e.key === "Enter" && tryPin(),
-    placeholder: "\u2022 \u2022 \u2022 \u2022",
-    autoFocus: true,
-    style: {
-      width: "100%",
-      background: "#13131f",
-      border: `1px solid ${err ? "#ef4444" : "#1e1e30"}`,
-      borderRadius: 10,
-      padding: "12px 16px",
-      color: "#eeeef5",
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 28,
-      letterSpacing: "0.3em",
-      textAlign: "center",
-      outline: "none",
-      marginBottom: 8,
-      boxSizing: "border-box"
-    }
-  }), err && /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginBottom: 8
-    }
-  }, "Code incorrect."), /*#__PURE__*/React.createElement("button", {
-    onClick: tryPin,
-    style: {
-      width: "100%",
-      background: "#E8B84B",
-      color: "#080810",
-      border: "none",
-      borderRadius: 10,
-      padding: "12px",
-      fontFamily: "'Outfit',sans-serif",
-      fontWeight: 700,
-      fontSize: 14,
-      cursor: "pointer",
-      marginTop: 8
-    }
-  }, "Entrer")));
   const G = {
     background: "#0d0d1c",
     border: "1px solid #1e1e30",
@@ -16835,19 +16757,7 @@ function DataPage() {
     style: {
       color: "#E8B84B"
     }
-  }, "PANEL")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      sessionStorage.removeItem("pouis_pin");
-      setUnlocked(false);
-    },
-    style: {
-      background: "none",
-      border: "none",
-      color: "#404058",
-      fontSize: 12,
-      cursor: "pointer"
-    }
-  }, "\uD83D\uDD12 Verrouiller")), msg && /*#__PURE__*/React.createElement("div", {
+  }, "PANEL"))), msg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16,
       padding: "10px 14px",
@@ -17369,7 +17279,8 @@ function MenuBL({
     alt: "Bi\xE8re LeverCulSec",
     style: {
       height: m ? 48 : 60,
-      width: "auto"
+      width: "auto",
+      mixBlendMode: "screen"
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
