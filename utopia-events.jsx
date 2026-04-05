@@ -4717,8 +4717,6 @@ function GamesHomePage({currentPlayer,onBack,nav}){
   const m=useIsMobile();
   const games=[
     {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Concours de popularité",color:"#f59e0b",active:true},
-    {id:"plappy",label:"PLAPPY PIRD",icon:"🐦",desc:"Bats ton high score",color:"#22c55e",active:true},
-    {id:"panini",label:"PANINI",icon:"📷",desc:"Coming soon...",color:"#60607a",active:false},
   ];
   return(
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",position:"relative",overflow:"hidden"}}>
@@ -4896,9 +4894,9 @@ function TournoiPage({currentPlayer,onBack}){
                     <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
                   </div>
                   <div style={{flex:1,overflow:"hidden"}}>
-                    <div style={{fontSize:7,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.toUpperCase()}</div>
-                    {p.last_name&&<div style={{fontSize:6,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
-                    {p.tournoi_count>0&&<div style={{fontSize:6,color:"#f59e0b44",marginTop:2}}>×{p.tournoi_count}</div>}
+                    <div style={{fontSize:9,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.toUpperCase()}</div>
+                    {p.last_name&&<div style={{fontSize:7,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
+                    {p.tournoi_count>0&&<div style={{fontSize:8,color:"#f59e0b",marginTop:3,fontWeight:700}}>×{p.tournoi_count}</div>}
                   </div>
                 </div>
               );
@@ -4956,261 +4954,6 @@ function TournoiPage({currentPlayer,onBack}){
     </div>
   );
 }
-
-// ─── PLAPPY PIRD ─────────────────────────────────────
-function PlappyPirdPage({currentPlayer,onBack}){
-  const m=useIsMobile();
-  const canvasRef=React.useRef(null);
-  const stateRef=React.useRef("idle"); // idle|playing|dead|leaderboard
-  const [view,setView]=React.useState("game"); // game|leaderboard
-  const [leaderboard,setLeaderboard]=React.useState([]);
-  const [myBest,setMyBest]=React.useState(0);
-  const W=360,H=520;
-  const GRAVITY=0.42,FLAP=-8.5,GAP=190,PIPE_W=52,SPEED=2.0;
-  const birdImg=React.useRef(null);
-  const imgLoadedRef=React.useRef(false);
-  const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:0});
-
-  async function loadLeaderboard(){
-    try{
-      const data=await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
-      if(data){
-        const rows=data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
-        setLeaderboard(rows);
-        const mine=data.find(r=>r.player_id===currentPlayer?.id);
-        if(mine){setMyBest(mine.score);gameVars.current.bestScore=mine.score;}
-      }
-    }catch(e){}
-  }
-
-  async function saveScore(s){
-    if(!currentPlayer||s<=0)return;
-    if(s<=gameVars.current.bestScore)return;
-    try{
-      // Try update first, then insert
-      const res=await sbUpdate("players_scores_view",{player_id:currentPlayer.id,game:"plappy"},{score:s});
-      // Actually use raw fetch with ON CONFLICT
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
-        method:"POST",
-        headers:{
-          "apikey":SUPABASE_KEY,
-          "Authorization":`Bearer ${SUPABASE_KEY}`,
-          "Content-Type":"application/json",
-          "Prefer":"resolution=merge-duplicates,return=representation"
-        },
-        body:JSON.stringify({player_id:currentPlayer.id,game:"plappy",score:s,updated_at:new Date().toISOString()})
-      });
-      if(r.ok){
-        gameVars.current.bestScore=s;
-        setMyBest(s);
-        loadLeaderboard();
-      }
-    }catch(e){console.error("save score",e);}
-  }
-
-  React.useEffect(()=>{
-    const img=new Image();
-    img.onload=()=>{birdImg.current=img;imgLoadedRef.current=true;};
-    img.src=currentPlayer?.photoUrl||"";
-  },[currentPlayer]);
-
-  React.useEffect(()=>{
-    loadLeaderboard();
-  },[]);
-
-  React.useEffect(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;
-    const ctx=canvas.getContext("2d",{alpha:false});
-    canvas.width=W;canvas.height=H;
-    ctx.imageSmoothingEnabled=false;
-    let raf;
-    const gv=gameVars.current;
-
-    function resetGame(){
-      gv.bird={x:80,y:H/2,vy:0,r:22};
-      gv.pipes=[];gv.score=0;gv.frame=0;gv.alive=false;gv.started=false;
-      stateRef.current="idle";
-      setView("game");
-    }
-
-    function flap(){
-      if(stateRef.current==="dead"||stateRef.current==="leaderboard")return;
-      if(!gv.started){gv.started=true;gv.alive=true;stateRef.current="playing";}
-      gv.bird.vy=FLAP;
-    }
-
-    // Input handlers
-    const onKey=e=>{if(e.code==="Space"||e.code==="ArrowUp"){e.preventDefault();flap();}};
-    window.addEventListener("keydown",onKey);
-
-    // Canvas click: detect button areas
-    let btnAreas=[]; // [{x,y,w,h,action}]
-    const onTap=e=>{
-      e.preventDefault();
-      const rect=canvas.getBoundingClientRect();
-      const scaleX=W/rect.width,scaleY=H/rect.height;
-      const cx=(e.changedTouches?e.changedTouches[0].clientX:e.clientX)-rect.left;
-      const cy=(e.changedTouches?e.changedTouches[0].clientY:e.clientY)-rect.top;
-      const mx=cx*scaleX,my=cy*scaleY;
-      // Check buttons
-      for(const btn of btnAreas){
-        if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){
-          btn.action();return;
-        }
-      }
-      // Otherwise flap
-      flap();
-    };
-    canvas.addEventListener("touchstart",onTap,{passive:false});
-    canvas.addEventListener("click",onTap);
-
-    function drawBtn(ctx,x,y,w,h,label,color="#22c55e"){
-      ctx.fillStyle=color+"33";ctx.fillRect(x,y,w,h);
-      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
-      ctx.fillStyle=color;ctx.font=`8px 'Press Start 2P',monospace`;ctx.textAlign="center";
-      ctx.fillText(label,x+w/2,y+h/2+3);
-    }
-
-    function draw(){
-      // BG
-      ctx.fillStyle="#0a0a0f";ctx.fillRect(0,0,W,H);
-      // Scanlines (every 4px, very light)
-      ctx.fillStyle="rgba(0,0,0,0.08)";
-      for(let y=0;y<H;y+=4)ctx.fillRect(0,y,W,2);
-      // Ground
-      ctx.fillStyle="#1a3d2b";ctx.fillRect(0,H-40,W,40);
-      ctx.fillStyle="#2d6a4f";ctx.fillRect(0,H-42,W,4);
-      // Pipes
-      gv.pipes.forEach(p=>{
-        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,0,PIPE_W,p.topH);
-        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,p.topH-18,PIPE_W+8,18);
-        const botY=p.topH+GAP;
-        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,botY,PIPE_W,H);
-        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,botY,PIPE_W+8,18);
-      });
-      // Bird
-      ctx.save();ctx.translate(gv.bird.x,gv.bird.y);
-      ctx.rotate(Math.min(Math.max(gv.bird.vy*0.05,-0.5),0.8));
-      ctx.beginPath();ctx.arc(0,0,gv.bird.r,0,Math.PI*2);ctx.clip();
-      if(imgLoadedRef.current&&birdImg.current){
-        ctx.drawImage(birdImg.current,-gv.bird.r,-gv.bird.r,gv.bird.r*2,gv.bird.r*2);
-      } else {
-        ctx.fillStyle="#f59e0b";ctx.fill();
-      }
-      ctx.restore();
-      // Bird border
-      ctx.beginPath();ctx.arc(gv.bird.x,gv.bird.y,gv.bird.r,0,Math.PI*2);
-      ctx.strokeStyle="#f59e0b44";ctx.lineWidth=2;ctx.stroke();
-      // Score
-      ctx.font=`bold 20px 'Press Start 2P',monospace`;
-      ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.textBaseline="top";
-      ctx.fillText(String(gv.score),W/2,16);
-
-      btnAreas=[];
-
-      if(stateRef.current==="idle"){
-        ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillRect(0,0,W,H);
-        ctx.font=`10px 'Press Start 2P',monospace`;ctx.fillStyle="#f59e0b";ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.fillText("APPUIE POUR JOUER",W/2,H/2-10);
-        ctx.font=`7px 'Press Start 2P',monospace`;ctx.fillStyle="#60607a";
-        ctx.fillText("ESPACE / TAP",W/2,H/2+18);
-      }
-
-      if(stateRef.current==="dead"){
-        ctx.fillStyle="rgba(0,0,0,0.72)";ctx.fillRect(0,0,W,H);
-        ctx.font=`14px 'Press Start 2P',monospace`;ctx.fillStyle="#ef4444";ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.fillText("GAME OVER",W/2,H/2-70);
-        ctx.font=`9px 'Press Start 2P',monospace`;ctx.fillStyle="#f59e0b";
-        ctx.fillText(`SCORE: ${gv.score}`,W/2,H/2-40);
-        ctx.font=`7px 'Press Start 2P',monospace`;ctx.fillStyle="#22c55e";
-        ctx.fillText(`BEST: ${gv.bestScore}`,W/2,H/2-18);
-        // Buttons
-        const bw=140,bh=36,gap=12;
-        const totalW=bw*2+gap;const startX=(W-totalW)/2;const by=H/2+10;
-        drawBtn(ctx,startX,by,bw,bh,"REJOUER","#22c55e");
-        drawBtn(ctx,startX+bw+gap,by,bw,bh,"CLASSEMENT","#a855f7");
-        btnAreas=[
-          {x:startX,y:by,w:bw,h:bh,action:()=>resetGame()},
-          {x:startX+bw+gap,y:by,w:bw,h:bh,action:()=>{stateRef.current="leaderboard";setView("leaderboard");}},
-        ];
-      }
-
-      if(stateRef.current==="leaderboard"){
-        // Drawn by React overlay
-      }
-    }
-
-    function update(){
-      if(stateRef.current!=="playing")return;
-      gv.frame++;
-      gv.bird.vy+=GRAVITY;gv.bird.y+=gv.bird.vy;
-      if(gv.frame%95===0){
-        const topH=70+Math.random()*(H-GAP-110);
-        gv.pipes.push({x:W,topH,scored:false});
-      }
-      gv.pipes=gv.pipes.filter(p=>p.x>-PIPE_W-10);
-      for(const p of gv.pipes){
-        p.x-=SPEED;
-        if(!p.scored&&p.x+PIPE_W<gv.bird.x){p.scored=true;gv.score++;}
-        const inX=gv.bird.x+gv.bird.r>p.x&&gv.bird.x-gv.bird.r<p.x+PIPE_W;
-        const inY=gv.bird.y-gv.bird.r<p.topH||gv.bird.y+gv.bird.r>p.topH+GAP;
-        if(inX&&inY){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
-      }
-      if(gv.bird.y+gv.bird.r>H-40||gv.bird.y-gv.bird.r<0){
-        stateRef.current="dead";gv.alive=false;saveScore(gv.score);
-      }
-    }
-
-    function loop(){
-      update();
-      draw();
-      raf=requestAnimationFrame(loop);
-    }
-    loop();
-    return()=>{cancelAnimationFrame(raf);window.removeEventListener("keydown",onKey);};
-  },[]);
-
-  return(
-    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",display:"flex",flexDirection:"column"}}>
-      <style>{RETRO_CSS}</style>
-      <div style={{borderBottom:"2px solid #22c55e44",padding:m?"10px 14px":"14px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-        <button onClick={onBack} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
-        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?9:12,color:"#22c55e"}}>PLAPPY PIRD</div>
-        <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
-      </div>
-      <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
-        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",padding:m?"12px":"24px 20px 24px 40px",flexShrink:0}}>
-          <div style={{border:"2px solid #22c55e33",borderRadius:4,overflow:"hidden",boxShadow:"0 0 20px #22c55e22",width:W,height:H,position:"relative"}}>
-            <canvas ref={canvasRef} style={{display:"block",width:W,height:H}}/>
-          </div>
-        </div>
-        {/* Classement panel — desktop always visible, mobile only on leaderboard view */}
-        {(!m||view==="leaderboard")&&(
-          <div style={m?{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",padding:20,overflowY:"auto"}:{flex:1,padding:"24px 40px 24px 20px"}}>
-            {m&&<button onClick={()=>{stateRef.current="dead";setView("game");}} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"6px 12px",fontFamily:"'Press Start 2P',monospace",fontSize:7,marginBottom:16,alignSelf:"flex-start"}}>← RETOUR</button>}
-            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:14}}>🏆 HIGH SCORES</div>
-            <div style={{display:"flex",flexDirection:"column",gap:7}}>
-              {leaderboard.length===0?(
-                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace"}}>AUCUN SCORE</div>
-              ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
-                <div key={row.player_id} style={{background:isMe?"#22c55e11":"#12121f",border:`1px solid ${isMe?"#22c55e44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:20,flexShrink:0}}>{i+1}</span>
-                  <div style={{width:26,height:26,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
-                    <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                  </div>
-                  <span style={{flex:1,fontSize:7,color:isMe?"#22c55e":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Press Start 2P',monospace"}}>{getDisplayName(row.player,PLAYERS)}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#f59e0b",flexShrink:0}}>{row.score}</span>
-                </div>
-              );})}
-            </div>
-            {m&&<button onClick={()=>{stateRef.current="idle";gameVars.current={bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:gameVars.current.bestScore};setView("game");}} style={{background:"#22c55e",color:"#0a0a0f",border:"none",borderRadius:4,padding:"12px 20px",fontFamily:"'Press Start 2P',monospace",fontSize:9,cursor:"pointer",marginTop:16}}>▶ REJOUER</button>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 
 // ─── MENU BIÈRE LEVERCULSEC ─────────────────────────
 const BL_GREEN = "#1a3d2b";
@@ -5638,10 +5381,6 @@ export default function App(){
 
   if(section==="tournoi") return(
     <TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  );
-
-  if(section==="plappy") return(
-    <PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
   );
 
   // Events section
