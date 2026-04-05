@@ -4990,7 +4990,7 @@ export default function App(){
     loadFromSupabase();
   },[]);
 
-  // Auto-login: restore session from localStorage
+  // Auto-login: restore session from localStorage only
   useEffect(()=>{
     if(!dbLoaded)return;
     const tryAutoLogin=async()=>{
@@ -5001,11 +5001,6 @@ export default function App(){
           const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));
           if(p){setCurrentPlayer(p);setSection(savedSection==="dataBL"&&p.uid!==ADMIN_UID?"menu":savedSection);return;}
         }
-        // Fallback: IP auto-login
-        const ipRes=await fetch("https://api.ipify.org?format=json");
-        const {ip}=await ipRes.json();
-        const rows=await sbFetch("players",`?last_ip=eq.${encodeURIComponent(ip)}&pin=not.is.null&limit=1`);
-        if(rows&&rows.length>0){const p=PLAYERS.find(pl=>pl.id===rows[0].id);if(p){setCurrentPlayer(p);setSection("menu");}}
       }catch(e){}
     };
     tryAutoLogin();
@@ -5092,7 +5087,7 @@ export default function App(){
       if(s==="profil") setSection("profil-bl");
       else if(s==="dataBL") setSection("dataBL");
       else if(s==="events"){setSection("events");}
-    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");}}/>
+    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
   // Profil BL
