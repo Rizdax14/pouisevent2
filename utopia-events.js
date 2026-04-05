@@ -17832,11 +17832,10 @@ function DataBL({
   }
   async function changeMemberType(player, mt) {
     try {
-      await sbFetch("players", `?id=eq.${player.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          member_type: mt
-        })
+      await sbUpdate("players", {
+        id: player.id
+      }, {
+        member_type: mt
       });
       const idx = PLAYERS.findIndex(p => p.id === player.id);
       if (idx >= 0) PLAYERS[idx].member_type = mt;
@@ -17854,11 +17853,10 @@ function DataBL({
   async function renamePlayer(player, newName) {
     if (!newName.trim()) return;
     try {
-      await sbFetch("players", `?id=eq.${player.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: newName.trim()
-        })
+      await sbUpdate("players", {
+        id: player.id
+      }, {
+        name: newName.trim()
       });
       const idx = PLAYERS.findIndex(p => p.id === player.id);
       if (idx >= 0) PLAYERS[idx].name = newName.trim();
