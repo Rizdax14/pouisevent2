@@ -6040,8 +6040,7 @@ function LoginBL({
     style: {
       width: 200,
       height: "auto",
-      marginBottom: 16,
-      mixBlendMode: "screen"
+      marginBottom: 16
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -17279,8 +17278,7 @@ function MenuBL({
     alt: "Bi\xE8re LeverCulSec",
     style: {
       height: m ? 48 : 60,
-      width: "auto",
-      mixBlendMode: "screen"
+      width: "auto"
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {

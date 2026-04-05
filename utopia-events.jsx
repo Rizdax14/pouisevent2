@@ -748,7 +748,7 @@ function LoginBL({onLogin,dbLoaded}){
       <div style={{width:"100%",maxWidth:360}}>
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:40}}>
-          <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{width:200,height:"auto",marginBottom:16,mixBlendMode:"screen"}}/>
+          <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{width:200,height:"auto",marginBottom:16}}/>
           <div style={{fontSize:13,color:"#86c99e"}}>Connecte-toi pour accéder au club</div>
         </div>
 
@@ -4701,7 +4701,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     <div style={{minHeight:"100vh",background:BL_GREEN,color:BL_WHITE,fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header */}
       <div style={{background:BL_GREEN,borderBottom:`1px solid ${BL_GREEN_LIGHT}`,padding:m?"18px 20px":"24px 40px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto",mixBlendMode:"screen"}}/>
+        <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           {isLouis&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
           <div style={{textAlign:"right"}}>
