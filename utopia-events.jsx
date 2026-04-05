@@ -731,10 +731,20 @@ function NavBar({page,setPage,currentPlayer,isAdmin}){
             </button>
           );
         })}
-        <button onClick={()=>window.location.reload()} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
-          <span style={{fontSize:18}}>↺</span>
-          <span style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Reload</span>
+        <button onClick={()=>window.location.reload()} style={{width:44,background:"#E8B84B22",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#E8B84B",fontFamily:"'Outfit',sans-serif",flexShrink:0}}>
+          <span style={{fontSize:16}}>↺</span>
+          <span style={{fontSize:8,fontWeight:700}}>sync</span>
         </button>
+        {isAdmin&&<button onClick={async()=>{
+          const regs=await navigator.serviceWorker?.getRegistrations();
+          if(regs)await Promise.all(regs.map(r=>r.unregister()));
+          const keys=await caches?.keys();
+          if(keys)await Promise.all(keys.map(k=>caches.delete(k)));
+          window.location.reload();
+        }} style={{width:44,background:"#ef444422",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#ef4444",fontFamily:"'Outfit',sans-serif",flexShrink:0}}>
+          <span style={{fontSize:14}}>🗑</span>
+          <span style={{fontSize:8,fontWeight:700}}>cache</span>
+        </button>}
       </nav>
     );
   }
@@ -748,10 +758,16 @@ function NavBar({page,setPage,currentPlayer,isAdmin}){
         );
       })}
       <button onClick={()=>window.location.reload()}
-        style={{marginLeft:"auto",background:"none",border:"1px solid #1e1e30",borderRadius:8,cursor:"pointer",padding:"6px 12px",color:"#60607a",fontSize:13,fontFamily:"'Outfit',sans-serif",transition:"color .15s"}}
-        onMouseEnter={e=>e.currentTarget.style.color="#cccce0"}
-        onMouseLeave={e=>e.currentTarget.style.color="#60607a"}
+        style={{marginLeft:"auto",background:"#E8B84B22",border:"1px solid #E8B84B44",borderRadius:8,cursor:"pointer",padding:"6px 14px",color:"#E8B84B",fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:700}}
         title="Recharger la page">↺</button>
+      {isAdmin&&<button onClick={async()=>{
+        const regs=await navigator.serviceWorker?.getRegistrations();
+        if(regs)await Promise.all(regs.map(r=>r.unregister()));
+        const keys=await caches?.keys();
+        if(keys)await Promise.all(keys.map(k=>caches.delete(k)));
+        window.location.reload();
+      }} style={{marginLeft:8,background:"#ef444422",border:"1px solid #ef444444",borderRadius:8,cursor:"pointer",padding:"6px 12px",color:"#ef4444",fontSize:11,fontFamily:"'Outfit',sans-serif",fontWeight:700}}
+        title="Vider le cache et recharger">🗑↺</button>}
     </nav>
   );
 }
@@ -1632,7 +1648,7 @@ const O2026_EPREUVES = [
     notesSpeciales:[{titre:"⏱ Interdit",texte:"NE PAS GAGNER DU TEMPS !"},{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"victoire"},
   {id:"football",phase:2,nom:"Football",emoji:"⚽",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",color:"#3b82f6",lieu:null,
-    lieuImg:null,
+    lieuImg:"/lieux/football.png",
     regles:["Match de 4 minutes."],
     notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
     groupes:4,scoreType:"buts"},
@@ -2628,7 +2644,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>PANEL ARBITRE</div>
             {isLouis&&(
               <button onClick={async()=>{
-                if(!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?"))return;
                 setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});
                 setPhase("groupes");setFinalizedGroupes({1:false,2:false,3:false,4:false});
                 setDragRank([]);setDragRank2([]);setDragRankLocked(false);setDragRank2Locked(false);
@@ -3225,6 +3240,48 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
+      {scoreType==="flechette"&&(flechetteGroup1.length>0||flechettePhase==="finales")&&!flechetteDone&&(
+        <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>{flechettePhase==="finales"?"FINALES":"POULES"}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/><span style={{fontSize:10,color:"#34d399"}}>En direct</span></div>
+          </div>
+          {flechettePhase==="poules"&&(
+            <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14}}>
+              {[{label:"Groupe A",data:flechetteGroup1},{label:"Groupe B",data:flechetteGroup2}].map(({label,data})=>(
+                <div key={label}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:ac,marginBottom:8}}>{label}</div>
+                  {[...data].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0)).map((player,i)=>{const t=getO2026Team(player.id);return(
+                    <div key={player.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #1e1e30"}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:i<4?"#E8B84B":"#404058",width:18}}>{i+1}</span>
+                      <div style={{width:7,height:7,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
+                      <span style={{flex:1,fontSize:11,color:t?.color}}>{t?.name}</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:parseInt(player.score)>0?"#eeeef5":"#2a2a40"}}>{player.score||"—"}</span>
+                    </div>
+                  );})}
+                </div>
+              ))}
+            </div>
+          )}
+          {flechettePhase==="finales"&&(
+            <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14}}>
+              {[{label:"🏆 Gagnants",data:flechetteWin},{label:"🥉 Perdants",data:flechetteLose}].map(({label,data})=>(
+                <div key={label}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:ac,marginBottom:8}}>{label}</div>
+                  {[...data].sort((a,b)=>(parseInt(b.score)||0)-(parseInt(a.score)||0)).map((player,i)=>{const t=getO2026Team(player.id);return(
+                    <div key={player.id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #1e1e30"}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:i===0?"#E8B84B":i===1?"#aaa":i===2?"#c87533":"#404058",width:18}}>{i+1}</span>
+                      <div style={{width:7,height:7,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
+                      <span style={{flex:1,fontSize:11,color:t?.color}}>{t?.name}</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:parseInt(player.score)>0?"#eeeef5":"#2a2a40"}}>{player.score||"—"}</span>
+                    </div>
+                  );})}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {scoreType==="flechette"&&flechetteDone&&(()=>{
         const buildRanked=(group,offset)=>{
           const sorted=[...group].map(p=>({...p,score:parseInt(p.score)||0})).sort((a,b)=>b.score-a.score);
@@ -3259,6 +3316,36 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
+      {scoreType==="bracket_direct"&&Object.keys(tcResultats).length>0&&!tcDone&&(()=>{
+        const tc=getTCBracket();
+        const TeamRow=({slot,tA,tB})=>{
+          const res=tcResultats[slot];const teamA=getO2026Team(tA),teamB=getO2026Team(tB);
+          const wA=res&&res[0]>res[1],wB=res&&res[1]>res[0];
+          return(
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderBottom:"1px solid #1e1e30"}}>
+              <span style={{flex:1,fontSize:10,color:wA?"#eeeef5":teamA?.color,fontWeight:wA?700:400,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{teamA?.name||"TBD"}</span>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:res?"#eeeef5":"#2a2a40",minWidth:28,textAlign:"center"}}>{res?`${res[0]}-${res[1]}`:"vs"}</span>
+              <span style={{flex:1,fontSize:10,color:wB?"#eeeef5":teamB?.color,fontWeight:wB?700:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{teamB?.name||"TBD"}</span>
+            </div>
+          );
+        };
+        return(
+          <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>BRACKET EN DIRECT</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/><span style={{fontSize:10,color:"#34d399"}}>En direct</span></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14}}>
+              <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:10,color:"#60607a",marginBottom:6}}>ROUND 1</div>{tc.r1.map(m=><TeamRow key={m.slot} {...m}/>)}</div>
+              <div>
+                <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:10,color:"#E8B84B",marginBottom:6}}>QUARTS</div>{tc.r2.map(m=><TeamRow key={m.slot} {...m}/>)}</div>
+                <div style={{marginTop:8}}><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:10,color:"#E8B84B",marginBottom:6}}>DEMIES</div>{tc.sf.map(m=><TeamRow key={m.slot} {...m}/>)}</div>
+                <div style={{marginTop:8}}><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:10,color:"#E8B84B",marginBottom:6}}>FINALE</div><TeamRow {...tc.fin}/></div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {scoreType==="bracket_direct"&&tcDone&&(()=>{
         const tc=getTCBracket();
         const gW=(slot,a,b)=>{const r=tcResultats[slot];return r?(r[0]>r[1]?a:b):null;};
@@ -3296,6 +3383,31 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
+      {scoreType==="biathlon"&&(biathlonRace1.length>0||biathlonRace2.length>0)&&!biathlonFinalLocked&&(
+        <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>COURSES</div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/><span style={{fontSize:10,color:"#34d399"}}>En direct</span></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14}}>
+            {[{label:"Course 1",items:biathlonRace1},{label:"Course 2",items:biathlonRace2}].map(({label,items})=>(
+              <div key={label}>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:ac,marginBottom:8}}>{label}</div>
+                {items.map((tid,i)=>{const t=getO2026Team(tid);const players=getTeamPlayers(tid);return(
+                  <div key={tid} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #1e1e30"}}>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:i<3?"#E8B84B":"#404058",width:20}}>{i+1}</span>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,color:t?.color,fontWeight:600}}>{t?.name}</div>
+                      {players.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:2}}>{players.map(p=><span key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}} style={{fontSize:9,color:t?.color,background:t?.color+"15",borderRadius:3,padding:"1px 5px",cursor:"pointer"}}>{p.name}</span>)}</div>}
+                    </div>
+                  </div>
+                );})}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {scoreType==="biathlon"&&biathlonFinalLocked&&(biathlonWin.length>0||biathlonLose.length>0)&&(
         <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
@@ -3336,8 +3448,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                     <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:team.color}}>{team.name}</span>
                   </div>
                   {players.length>0?(
-                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                      {players.map(p=><span key={p.id} style={{fontSize:11,color:"#cccce0"}}>{p.name}</span>)}
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {players.map(p=>(
+                        <span key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}}
+                          style={{fontSize:10,color:team.color,background:team.color+"15",borderRadius:10,padding:"2px 8px",cursor:"pointer",border:`1px solid ${team.color}22`}}>
+                          {p.name}
+                        </span>
+                      ))}
                     </div>
                   ):(
                     <span style={{fontSize:10,color:"#2a2a40"}}>Non assigné</span>

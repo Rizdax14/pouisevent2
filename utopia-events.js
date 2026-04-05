@@ -1,3 +1,4 @@
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 // VERSION: 2.0
 const { useState, useEffect } = React;
 // ─── SUPABASE ────────────────────────────────────────
@@ -6060,8 +6061,8 @@ function NavBar({
     }), /*#__PURE__*/React.createElement("button", {
       onClick: () => window.location.reload(),
       style: {
-        flex: 1,
-        background: "none",
+        width: 44,
+        background: "#E8B84B22",
         border: "none",
         cursor: "pointer",
         padding: "10px 4px 8px",
@@ -6069,21 +6070,51 @@ function NavBar({
         flexDirection: "column",
         alignItems: "center",
         gap: 3,
-        color: "#404058",
-        fontFamily: "'Outfit',sans-serif"
+        color: "#E8B84B",
+        fontFamily: "'Outfit',sans-serif",
+        flexShrink: 0
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 18
+        fontSize: 16
       }
     }, "\u21BA"), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: 9,
-        fontWeight: 600,
-        textTransform: "uppercase",
-        letterSpacing: "0.05em"
+        fontSize: 8,
+        fontWeight: 700
       }
-    }, "Reload")));
+    }, "sync")), isAdmin && /*#__PURE__*/React.createElement("button", {
+      onClick: async () => {
+        const regs = await navigator.serviceWorker?.getRegistrations();
+        if (regs) await Promise.all(regs.map(r => r.unregister()));
+        const keys = await caches?.keys();
+        if (keys) await Promise.all(keys.map(k => caches.delete(k)));
+        window.location.reload();
+      },
+      style: {
+        width: 44,
+        background: "#ef444422",
+        border: "none",
+        cursor: "pointer",
+        padding: "10px 4px 8px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3,
+        color: "#ef4444",
+        fontFamily: "'Outfit',sans-serif",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14
+      }
+    }, "\uD83D\uDDD1"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        fontWeight: 700
+      }
+    }, "cache")));
   }
   return /*#__PURE__*/React.createElement("nav", {
     style: {
@@ -6137,20 +6168,39 @@ function NavBar({
     onClick: () => window.location.reload(),
     style: {
       marginLeft: "auto",
-      background: "none",
-      border: "1px solid #1e1e30",
+      background: "#E8B84B22",
+      border: "1px solid #E8B84B44",
+      borderRadius: 8,
+      cursor: "pointer",
+      padding: "6px 14px",
+      color: "#E8B84B",
+      fontSize: 13,
+      fontFamily: "'Outfit',sans-serif",
+      fontWeight: 700
+    },
+    title: "Recharger la page"
+  }, "\u21BA"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    onClick: async () => {
+      const regs = await navigator.serviceWorker?.getRegistrations();
+      if (regs) await Promise.all(regs.map(r => r.unregister()));
+      const keys = await caches?.keys();
+      if (keys) await Promise.all(keys.map(k => caches.delete(k)));
+      window.location.reload();
+    },
+    style: {
+      marginLeft: 8,
+      background: "#ef444422",
+      border: "1px solid #ef444444",
       borderRadius: 8,
       cursor: "pointer",
       padding: "6px 12px",
-      color: "#60607a",
-      fontSize: 13,
+      color: "#ef4444",
+      fontSize: 11,
       fontFamily: "'Outfit',sans-serif",
-      transition: "color .15s"
+      fontWeight: 700
     },
-    onMouseEnter: e => e.currentTarget.style.color = "#cccce0",
-    onMouseLeave: e => e.currentTarget.style.color = "#60607a",
-    title: "Recharger la page"
-  }, "\u21BA"));
+    title: "Vider le cache et recharger"
+  }, "\uD83D\uDDD1\u21BA"));
 }
 
 // ─── COUNTDOWN ───────────────────────────────────────
@@ -8803,7 +8853,7 @@ const O2026_EPREUVES = [{
   format: "3V3 — Groupe + Arbre",
   color: "#3b82f6",
   lieu: null,
-  lieuImg: null,
+  lieuImg: "/lieux/football.png",
   regles: ["Match de 4 minutes."],
   notesSpeciales: [{
     titre: "🏅 Départage",
@@ -11097,7 +11147,6 @@ function EpreuveO2026Page({
     }
   }, "PANEL ARBITRE"), isLouis && /*#__PURE__*/React.createElement("button", {
     onClick: async () => {
-      if (!window.confirm("Supprimer toutes les données de cette épreuve et recommencer à zéro ?")) return;
       setGroupes({
         1: [],
         2: [],
@@ -12888,7 +12937,173 @@ function EpreuveO2026Page({
         }
       }, pts, " pts"));
     }));
-  })(), scoreType === "flechette" && flechetteDone && (() => {
+  })(), scoreType === "flechette" && (flechetteGroup1.length > 0 || flechettePhase === "finales") && !flechetteDone && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
+    }
+  }, flechettePhase === "finales" ? "FINALES" : "POULES"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 6,
+      height: 6,
+      borderRadius: "50%",
+      background: "#34d399",
+      boxShadow: "0 0 6px #34d399"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "En direct"))), flechettePhase === "poules" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14
+    }
+  }, [{
+    label: "Groupe A",
+    data: flechetteGroup1
+  }, {
+    label: "Groupe B",
+    data: flechetteGroup2
+  }].map(({
+    label,
+    data
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 8
+    }
+  }, label), [...data].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0)).map((player, i) => {
+    const t = getO2026Team(player.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: player.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "4px 0",
+        borderBottom: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: i < 4 ? "#E8B84B" : "#404058",
+        width: 18
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 11,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: parseInt(player.score) > 0 ? "#eeeef5" : "#2a2a40"
+      }
+    }, player.score || "—"));
+  })))), flechettePhase === "finales" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14
+    }
+  }, [{
+    label: "🏆 Gagnants",
+    data: flechetteWin
+  }, {
+    label: "🥉 Perdants",
+    data: flechetteLose
+  }].map(({
+    label,
+    data
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 8
+    }
+  }, label), [...data].sort((a, b) => (parseInt(b.score) || 0) - (parseInt(a.score) || 0)).map((player, i) => {
+    const t = getO2026Team(player.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: player.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "4px 0",
+        borderBottom: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: i === 0 ? "#E8B84B" : i === 1 ? "#aaa" : i === 2 ? "#c87533" : "#404058",
+        width: 18
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 11,
+        color: t?.color
+      }
+    }, t?.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 13,
+        color: parseInt(player.score) > 0 ? "#eeeef5" : "#2a2a40"
+      }
+    }, player.score || "—"));
+  }))))), scoreType === "flechette" && flechetteDone && (() => {
     const buildRanked = (group, offset) => {
       const sorted = [...group].map(p => ({
         ...p,
@@ -12991,6 +13206,146 @@ function EpreuveO2026Page({
         }
       }, player.pts, " pts"));
     }));
+  })(), scoreType === "bracket_direct" && Object.keys(tcResultats).length > 0 && !tcDone && (() => {
+    const tc = getTCBracket();
+    const TeamRow = ({
+      slot,
+      tA,
+      tB
+    }) => {
+      const res = tcResultats[slot];
+      const teamA = getO2026Team(tA),
+        teamB = getO2026Team(tB);
+      const wA = res && res[0] > res[1],
+        wB = res && res[1] > res[0];
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 0",
+          borderBottom: "1px solid #1e1e30"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 10,
+          color: wA ? "#eeeef5" : teamA?.color,
+          fontWeight: wA ? 700 : 400,
+          textAlign: "right",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, teamA?.name || "TBD"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontFamily: "'Bebas Neue',sans-serif",
+          fontSize: 13,
+          color: res ? "#eeeef5" : "#2a2a40",
+          minWidth: 28,
+          textAlign: "center"
+        }
+      }, res ? `${res[0]}-${res[1]}` : "vs"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 10,
+          color: wB ? "#eeeef5" : teamB?.color,
+          fontWeight: wB ? 700 : 400,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, teamB?.name || "TBD"));
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#0d0d1c",
+        border: `1px solid ${ac}44`,
+        borderRadius: 12,
+        padding: m ? 14 : 20,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 14,
+        color: ac
+      }
+    }, "BRACKET EN DIRECT"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: "#34d399",
+        boxShadow: "0 0 6px #34d399"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#34d399"
+      }
+    }, "En direct"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+        gap: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 10,
+        color: "#60607a",
+        marginBottom: 6
+      }
+    }, "ROUND 1"), tc.r1.map(m => /*#__PURE__*/React.createElement(TeamRow, _extends({
+      key: m.slot
+    }, m)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 10,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "QUARTS"), tc.r2.map(m => /*#__PURE__*/React.createElement(TeamRow, _extends({
+      key: m.slot
+    }, m)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 10,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "DEMIES"), tc.sf.map(m => /*#__PURE__*/React.createElement(TeamRow, _extends({
+      key: m.slot
+    }, m)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 10,
+        color: "#E8B84B",
+        marginBottom: 6
+      }
+    }, "FINALE"), /*#__PURE__*/React.createElement(TeamRow, tc.fin)))));
   })(), scoreType === "bracket_direct" && tcDone && (() => {
     const tc = getTCBracket();
     const gW = (slot, a, b) => {
@@ -13109,7 +13464,132 @@ function EpreuveO2026Page({
         }
       }, entry.pts, " pts"));
     }));
-  })(), scoreType === "biathlon" && biathlonFinalLocked && (biathlonWin.length > 0 || biathlonLose.length > 0) && /*#__PURE__*/React.createElement("div", {
+  })(), scoreType === "biathlon" && (biathlonRace1.length > 0 || biathlonRace2.length > 0) && !biathlonFinalLocked && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: `1px solid ${ac}44`,
+      borderRadius: 12,
+      padding: m ? 14 : 20,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: ac
+    }
+  }, "COURSES"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 6,
+      height: 6,
+      borderRadius: "50%",
+      background: "#34d399",
+      boxShadow: "0 0 6px #34d399"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#34d399"
+    }
+  }, "En direct"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: m ? "1fr" : "1fr 1fr",
+      gap: 14
+    }
+  }, [{
+    label: "Course 1",
+    items: biathlonRace1
+  }, {
+    label: "Course 2",
+    items: biathlonRace2
+  }].map(({
+    label,
+    items
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: label
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 12,
+      color: ac,
+      marginBottom: 8
+    }
+  }, label), items.map((tid, i) => {
+    const t = getO2026Team(tid);
+    const players = getTeamPlayers(tid);
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 0",
+        borderBottom: "1px solid #1e1e30"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',sans-serif",
+        fontSize: 15,
+        color: i < 3 ? "#E8B84B" : "#404058",
+        width: 20
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: t?.color || "#60607a",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t?.color,
+        fontWeight: 600
+      }
+    }, t?.name), players.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 3,
+        marginTop: 2
+      }
+    }, players.map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      onClick: e => {
+        e.stopPropagation();
+        nav("playerDetail", {
+          playerId: p.id
+        });
+      },
+      style: {
+        fontSize: 9,
+        color: t?.color,
+        background: t?.color + "15",
+        borderRadius: 3,
+        padding: "1px 5px",
+        cursor: "pointer"
+      }
+    }, p.name)))));
+  }))))), scoreType === "biathlon" && biathlonFinalLocked && (biathlonWin.length > 0 || biathlonLose.length > 0) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
       border: `1px solid ${ac}44`,
@@ -13256,14 +13736,25 @@ function EpreuveO2026Page({
     }, team.name)), players.length > 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
-        flexDirection: "column",
-        gap: 2
+        flexWrap: "wrap",
+        gap: 4
       }
     }, players.map(p => /*#__PURE__*/React.createElement("span", {
       key: p.id,
+      onClick: e => {
+        e.stopPropagation();
+        nav("playerDetail", {
+          playerId: p.id
+        });
+      },
       style: {
-        fontSize: 11,
-        color: "#cccce0"
+        fontSize: 10,
+        color: team.color,
+        background: team.color + "15",
+        borderRadius: 10,
+        padding: "2px 8px",
+        cursor: "pointer",
+        border: `1px solid ${team.color}22`
       }
     }, p.name))) : /*#__PURE__*/React.createElement("span", {
       style: {
