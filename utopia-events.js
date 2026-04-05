@@ -5971,13 +5971,29 @@ function LoginBL({
   function handleLetter(l) {
     setInitial(l);
     const found = PLAYERS.filter(p => p.name.toUpperCase().startsWith(l) && p.uid).sort((a, b) => a.name.localeCompare(b.name));
-    if (found.length === 1) {
-      setSelected(found[0]);
-      setStep("pin");
-    } else if (found.length > 1) {
-      setCandidates(found);
-      setStep("select");
+    setCandidates(found);
+    setStep("pin"); // Go straight to PIN, no player selection
+  }
+  async function handlePinDirect() {
+    // Try PIN against all players with this initial
+    for (const candidate of candidates) {
+      const rows = await sbFetch("players", `?id=eq.${candidate.id}&pin=eq.${pin}&limit=1`);
+      if (rows && rows.length > 0) {
+        try {
+          await sbFetch("players", `?id=eq.${candidate.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              last_ip: "logged"
+            })
+          });
+        } catch (e) {}
+        localStorage.setItem("bl_player_id", String(candidate.id));
+        onLogin(candidate);
+        return;
+      }
     }
+    setErr(true);
+    setPin("");
   }
   async function handlePin() {
     const rows = await sbFetch("players", `?id=eq.${selected.id}&pin=eq.${pin}&limit=1`);
@@ -6018,27 +6034,13 @@ function LoginBL({
       textAlign: "center",
       marginBottom: 40
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "/logo-bl.png",
+    alt: "Bi\xE8re LeverCulSec",
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 48,
-      color: BL_WHITE,
-      letterSpacing: "0.1em",
-      lineHeight: 1
-    }
-  }, "BI\xC8RE"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 20,
-      color: "#86c99e",
-      letterSpacing: "0.2em"
-    }
-  }, "LEVERCULSEC"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 60,
-      height: 2,
-      background: BL_GREEN_LIGHT,
-      margin: "16px auto"
+      width: 200,
+      height: "auto",
+      marginBottom: 16
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6082,82 +6084,12 @@ function LoginBL({
       e.currentTarget.style.background = "#ffffff11";
       e.currentTarget.style.borderColor = "#ffffff22";
     }
-  }, l)))), step === "select" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  }, l)))), step === "pin" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setStep("initial");
-      setInitial("");
-    },
-    style: {
-      background: "none",
-      border: "none",
-      color: "#86c99e",
-      cursor: "pointer",
-      marginBottom: 16,
-      fontSize: 13
-    }
-  }, "\u2190 Retour"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#86c99e",
-      marginBottom: 14,
-      fontWeight: 600,
-      letterSpacing: "0.1em"
-    }
-  }, "QUI ES-TU ?"), candidates.map(p => /*#__PURE__*/React.createElement("button", {
-    key: p.id,
-    onClick: () => {
-      setSelected(p);
-      setStep("pin");
-    },
-    style: {
-      width: "100%",
-      background: "#ffffff0a",
-      border: "1px solid #2d6a4f",
-      borderRadius: 10,
-      padding: "12px 16px",
-      color: BL_WHITE,
-      fontFamily: "'Outfit',sans-serif",
-      fontSize: 15,
-      fontWeight: 600,
-      cursor: "pointer",
-      marginBottom: 8,
-      textAlign: "left",
-      display: "flex",
-      alignItems: "center",
-      gap: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 32,
-      height: 32,
-      borderRadius: "50%",
-      background: "#86c99e22",
-      border: "2px solid #86c99e44",
-      overflow: "hidden",
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("img", {
-    src: p.photoUrl,
-    style: {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover"
-    },
-    onError: e => e.target.style.display = "none"
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 14,
-      color: "#86c99e"
-    }
-  }, p.name.charAt(0))), p.name))), step === "pin" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setStep(candidates.length > 1 ? "select" : "initial");
       setErr(false);
       setPin("");
+      setCandidates([]);
     },
     style: {
       background: "none",
@@ -6175,20 +6107,22 @@ function LoginBL({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 32,
-      color: BL_WHITE
+      fontSize: 64,
+      color: BL_WHITE,
+      lineHeight: 1
     }
-  }, selected?.name), /*#__PURE__*/React.createElement("div", {
+  }, initial), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#86c99e"
+      color: "#86c99e",
+      marginTop: 8
     }
   }, "Entre ton code PIN")), /*#__PURE__*/React.createElement("input", {
     type: "password",
     placeholder: "PIN",
     value: pin,
     onChange: e => setPin(e.target.value),
-    onKeyDown: e => e.key === "Enter" && handlePin(),
+    onKeyDown: e => e.key === "Enter" && handlePinDirect(),
     style: {
       background: "#1f4d36",
       border: `1px solid ${err ? "#ef4444" : "#2d6a4f"}`,
@@ -6213,7 +6147,7 @@ function LoginBL({
       marginBottom: 8
     }
   }, "PIN incorrect"), /*#__PURE__*/React.createElement("button", {
-    onClick: handlePin,
+    onClick: handlePinDirect,
     style: {
       width: "100%",
       background: BL_GREEN_LIGHT,
@@ -17430,22 +17364,14 @@ function MenuBL({
       alignItems: "center",
       justifyContent: "space-between"
     }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "/logo-bl.png",
+    alt: "Bi\xE8re LeverCulSec",
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: m ? 28 : 36,
-      color: BL_WHITE,
-      letterSpacing: "0.08em",
-      lineHeight: 1
+      height: m ? 48 : 60,
+      width: "auto"
     }
-  }, "BI\xC8RE"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: m ? 14 : 18,
-      color: "#86c99e",
-      letterSpacing: "0.12em"
-    }
-  }, "LEVERCULSEC")), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -17614,6 +17540,11 @@ function ProfilBL({
     "events": "Membre Events",
     "non-membre": "Non-membre"
   };
+  const memberDesc = {
+    "club": "Accès Club + Events",
+    "events": "Accès Events",
+    "non-membre": "Aucun accès"
+  };
   async function handleChangePin() {
     if (newPin.length < 4) {
       setPinMsg({
@@ -17757,15 +17688,15 @@ function ProfilBL({
       borderRadius: "50%",
       background: "#ffffff05"
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("img", {
+    src: "/logo-bl.png",
+    alt: "Bi\xE8re LeverCulSec",
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 11,
-      color: "#86c99e",
-      letterSpacing: "0.2em",
+      height: 28,
+      width: "auto",
       marginBottom: 16
     }
-  }, "BI\xC8RE LEVERCULSEC"), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -17815,52 +17746,20 @@ function ProfilBL({
       textTransform: "uppercase",
       letterSpacing: "0.1em"
     }
-  }, memberLabels[mt] || "Non-membre"))), /*#__PURE__*/React.createElement("div", {
+  }, memberLabels[mt] || "Non-membre"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#86c99e66",
+      marginTop: 2
+    }
+  }, memberDesc?.[mt] || ""))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "#ffffff44",
       fontFamily: "'Bebas Neue',sans-serif",
       letterSpacing: "0.15em"
     }
-  }, "ID #", String(currentPlayer?.id).padStart(4, "0"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => alert("Apple Wallet — fonctionnalité à venir"),
-    style: {
-      background: "#000",
-      color: "#fff",
-      border: "none",
-      borderRadius: 12,
-      padding: "14px",
-      fontSize: 14,
-      fontWeight: 700,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, "\uD83C\uDF4E Ajouter \xE0 l'Apple Wallet"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => alert("Google Wallet — fonctionnalité à venir"),
-    style: {
-      background: "#4285f4",
-      color: "#fff",
-      border: "none",
-      borderRadius: 12,
-      padding: "14px",
-      fontSize: 14,
-      fontWeight: 700,
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8
-    }
-  }, "\uD83D\uDFE2 Ajouter au Google Wallet"))), tab === "compte" && /*#__PURE__*/React.createElement("div", {
+  }, "ID #", String(currentPlayer?.id).padStart(4, "0")))), tab === "compte" && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#ffffff0a",
       border: `1px solid ${BL_GREEN_LIGHT}`,
@@ -17920,9 +17819,10 @@ function DataBL({
   const [newP, setNewP] = React.useState({
     name: "",
     uid: "",
-    sex: "m",
-    team_id: ""
+    sex: "m"
   });
+  const [editingName, setEditingName] = React.useState(null);
+  const [editNameVal, setEditNameVal] = React.useState("");
   const [msg, setMsg] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const MEMBER_TYPES = ["club", "events", "non-membre"];
@@ -17977,8 +17877,6 @@ function DataBL({
         id: maxId + 1,
         uid,
         name: newP.name,
-        team_id: newP.team_id || null,
-        t26: newP.team_id || null,
         sex: newP.sex || "m",
         member_type: "non-membre"
       });
@@ -18041,6 +17939,29 @@ function DataBL({
       setMsg({
         t: "error",
         m: "Erreur changement type"
+      });
+    }
+  }
+  async function renamePlayer(player, newName) {
+    if (!newName.trim()) return;
+    try {
+      await sbFetch("players", `?id=eq.${player.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: newName.trim()
+        })
+      });
+      const idx = PLAYERS.findIndex(p => p.id === player.id);
+      if (idx >= 0) PLAYERS[idx].name = newName.trim();
+      setPlayers(prev => prev.map(p => p.id === player.id ? {
+        ...p,
+        name: newName.trim()
+      } : p));
+      setEditingName(null);
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Erreur renommage"
       });
     }
   }
@@ -18165,19 +18086,7 @@ function DataBL({
     value: "m"
   }, "\uD83D\uDC66 Homme"), /*#__PURE__*/React.createElement("option", {
     value: "f"
-  }, "\uD83D\uDC67 Femme")), /*#__PURE__*/React.createElement("select", {
-    value: newP.team_id,
-    onChange: e => setNewP({
-      ...newP,
-      team_id: e.target.value
-    }),
-    style: S
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Pas d'\xE9quipe O2026"), TEAMS.filter(t => t.active).map(t => /*#__PURE__*/React.createElement("option", {
-    key: t.id,
-    value: t.id
-  }, t.name)))), /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDC67 Femme"))), /*#__PURE__*/React.createElement("button", {
     onClick: createPlayer,
     disabled: saving,
     style: BTN()
@@ -18211,13 +18120,79 @@ function DataBL({
     style: {
       flex: 1
     }
+  }, editingName === player.id ? /*#__PURE__*/React.createElement("form", {
+    onSubmit: async e => {
+      e.preventDefault();
+      await renamePlayer(player, editNameVal);
+    },
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: editNameVal,
+    onChange: e => setEditNameVal(e.target.value),
+    autoFocus: true,
+    style: {
+      background: "#1f4d36",
+      border: "1px solid #2d6a4f",
+      borderRadius: 6,
+      padding: "4px 8px",
+      color: BL_WHITE,
+      fontSize: 13,
+      flex: 1,
+      outline: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    style: {
+      background: "#86c99e",
+      border: "none",
+      borderRadius: 6,
+      padding: "4px 10px",
+      color: BL_GREEN,
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "\u2713"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setEditingName(null),
+    style: {
+      background: "#ffffff22",
+      border: "none",
+      borderRadius: 6,
+      padding: "4px 8px",
+      color: BL_WHITE,
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "\u2717")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 600,
       fontSize: 14,
       color: BL_WHITE
     }
-  }, player.name), /*#__PURE__*/React.createElement("div", {
+  }, player.name), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setEditingName(player.id);
+      setEditNameVal(player.name);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: "#86c99e66",
+      cursor: "pointer",
+      fontSize: 11,
+      padding: "0 2px"
+    }
+  }, "\u270E")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "#86c99e"
@@ -18327,11 +18302,22 @@ function App() {
     loadFromSupabase();
   }, []);
 
-  // Auto-login by IP → go straight to menu
+  // Auto-login: restore session from localStorage
   useEffect(() => {
     if (!dbLoaded) return;
     const tryAutoLogin = async () => {
       try {
+        const savedId = localStorage.getItem("bl_player_id");
+        const savedSection = localStorage.getItem("bl_section") || "menu";
+        if (savedId) {
+          const p = PLAYERS.find(pl => pl.id === parseInt(savedId));
+          if (p) {
+            setCurrentPlayer(p);
+            setSection(savedSection === "dataBL" && p.uid !== ADMIN_UID ? "menu" : savedSection);
+            return;
+          }
+        }
+        // Fallback: IP auto-login
         const ipRes = await fetch("https://api.ipify.org?format=json");
         const {
           ip
@@ -18348,6 +18334,14 @@ function App() {
     };
     tryAutoLogin();
   }, [dbLoaded]);
+
+  // Persist section to localStorage when it changes
+  useEffect(() => {
+    if (section !== "login" && currentPlayer) {
+      localStorage.setItem("bl_section", section);
+      localStorage.setItem("bl_player_id", String(currentPlayer.id));
+    }
+  }, [section, currentPlayer]);
   async function loadFromSupabase() {
     const timeout = setTimeout(() => setDbLoaded(true), 2000);
     try {
@@ -18485,6 +18479,8 @@ function App() {
     onLogout: () => {
       setCurrentPlayer(null);
       setSection("login");
+      localStorage.removeItem("bl_player_id");
+      localStorage.removeItem("bl_section");
     }
   });
 

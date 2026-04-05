@@ -717,8 +717,22 @@ function LoginBL({onLogin,dbLoaded}){
   function handleLetter(l){
     setInitial(l);
     const found=PLAYERS.filter(p=>p.name.toUpperCase().startsWith(l)&&p.uid).sort((a,b)=>a.name.localeCompare(b.name));
-    if(found.length===1){setSelected(found[0]);setStep("pin");}
-    else if(found.length>1){setCandidates(found);setStep("select");}
+    setCandidates(found);
+    setStep("pin"); // Go straight to PIN, no player selection
+  }
+
+  async function handlePinDirect(){
+    // Try PIN against all players with this initial
+    for(const candidate of candidates){
+      const rows=await sbFetch("players",`?id=eq.${candidate.id}&pin=eq.${pin}&limit=1`);
+      if(rows&&rows.length>0){
+        try{await sbFetch("players",`?id=eq.${candidate.id}`,{method:"PATCH",body:JSON.stringify({last_ip:"logged"})});}catch(e){}
+        localStorage.setItem("bl_player_id",String(candidate.id));
+        onLogin(candidate);
+        return;
+      }
+    }
+    setErr(true);setPin("");
   }
 
   async function handlePin(){
@@ -734,9 +748,7 @@ function LoginBL({onLogin,dbLoaded}){
       <div style={{width:"100%",maxWidth:360}}>
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:40}}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:48,color:BL_WHITE,letterSpacing:"0.1em",lineHeight:1}}>BIÈRE</div>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#86c99e",letterSpacing:"0.2em"}}>LEVERCULSEC</div>
-          <div style={{width:60,height:2,background:BL_GREEN_LIGHT,margin:"16px auto"}}/>
+          <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{width:200,height:"auto",marginBottom:16}}/>
           <div style={{fontSize:13,color:"#86c99e"}}>Connecte-toi pour accéder au club</div>
         </div>
 
@@ -756,36 +768,21 @@ function LoginBL({onLogin,dbLoaded}){
           </>
         )}
 
-        {step==="select"&&(
-          <>
-            <button onClick={()=>{setStep("initial");setInitial("");}} style={{background:"none",border:"none",color:"#86c99e",cursor:"pointer",marginBottom:16,fontSize:13}}>← Retour</button>
-            <div style={{fontSize:12,color:"#86c99e",marginBottom:14,fontWeight:600,letterSpacing:"0.1em"}}>QUI ES-TU ?</div>
-            {candidates.map(p=>(
-              <button key={p.id} onClick={()=>{setSelected(p);setStep("pin");}}
-                style={{width:"100%",background:"#ffffff0a",border:"1px solid #2d6a4f",borderRadius:10,padding:"12px 16px",color:BL_WHITE,fontFamily:"'Outfit',sans-serif",fontSize:15,fontWeight:600,cursor:"pointer",marginBottom:8,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:"#86c99e22",border:"2px solid #86c99e44",overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#86c99e"}}>{p.name.charAt(0)}</span>
-                </div>
-                {p.name}
-              </button>
-            ))}
-          </>
-        )}
+
 
         {step==="pin"&&(
           <>
-            <button onClick={()=>{setStep(candidates.length>1?"select":"initial");setErr(false);setPin("");}} style={{background:"none",border:"none",color:"#86c99e",cursor:"pointer",marginBottom:16,fontSize:13}}>← Retour</button>
+            <button onClick={()=>{setStep("initial");setErr(false);setPin("");setCandidates([]);}} style={{background:"none",border:"none",color:"#86c99e",cursor:"pointer",marginBottom:16,fontSize:13}}>← Retour</button>
             <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:BL_WHITE}}>{selected?.name}</div>
-              <div style={{fontSize:12,color:"#86c99e"}}>Entre ton code PIN</div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:64,color:BL_WHITE,lineHeight:1}}>{initial}</div>
+              <div style={{fontSize:12,color:"#86c99e",marginTop:8}}>Entre ton code PIN</div>
             </div>
             <input type="password" placeholder="PIN" value={pin} onChange={e=>setPin(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handlePin()}
+              onKeyDown={e=>e.key==="Enter"&&handlePinDirect()}
               style={{background:"#1f4d36",border:`1px solid ${err?"#ef4444":"#2d6a4f"}`,borderRadius:10,padding:"14px",color:BL_WHITE,fontFamily:"'Bebas Neue',sans-serif",fontSize:28,letterSpacing:"0.3em",outline:"none",width:"100%",boxSizing:"border-box",textAlign:"center",marginBottom:8}}
               autoFocus/>
             {err&&<div style={{color:"#ef4444",fontSize:12,textAlign:"center",marginBottom:8}}>PIN incorrect</div>}
-            <button onClick={handlePin}
+            <button onClick={handlePinDirect}
               style={{width:"100%",background:BL_GREEN_LIGHT,color:BL_WHITE,border:"none",borderRadius:10,padding:14,fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:15,cursor:"pointer"}}>
               Connexion
             </button>
@@ -4716,10 +4713,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     <div style={{minHeight:"100vh",background:BL_GREEN,color:BL_WHITE,fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header */}
       <div style={{background:BL_GREEN,borderBottom:`1px solid ${BL_GREEN_LIGHT}`,padding:m?"18px 20px":"24px 40px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,color:BL_WHITE,letterSpacing:"0.08em",lineHeight:1}}>BIÈRE</div>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?14:18,color:"#86c99e",letterSpacing:"0.12em"}}>LEVERCULSEC</div>
-        </div>
+        <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           {isLouis&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
           <div style={{textAlign:"right"}}>
@@ -4767,6 +4761,7 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
   const mt=currentPlayer?.member_type||"non-membre";
   const memberColors={"club":"#86c99e","events":"#E8B84B","non-membre":"#60607a"};
   const memberLabels={"club":"Membre Club","events":"Membre Events","non-membre":"Non-membre"};
+  const memberDesc={"club":"Accès Club + Events","events":"Accès Events","non-membre":"Aucun accès"};
 
   async function handleChangePin(){
     if(newPin.length<4){setPinMsg({t:"error",m:"PIN trop court"});return;}
@@ -4807,7 +4802,7 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
             <div style={{background:`linear-gradient(135deg,${BL_GREEN_LIGHT},${BL_GREEN})`,border:`2px solid ${memberColors[mt]||"#60607a"}`,borderRadius:20,padding:m?24:32,marginBottom:20,position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:"#ffffff08"}}/>
               <div style={{position:"absolute",bottom:-20,left:-20,width:80,height:80,borderRadius:"50%",background:"#ffffff05"}}/>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#86c99e",letterSpacing:"0.2em",marginBottom:16}}>BIÈRE LEVERCULSEC</div>
+              <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:28,width:"auto",marginBottom:16}}/>
               <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
                 <div style={{width:56,height:56,borderRadius:"50%",border:`3px solid ${memberColors[mt]||"#60607a"}`,overflow:"hidden",background:"#ffffff11",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                   {currentPlayer?.photoUrl
@@ -4817,21 +4812,12 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
                 <div>
                   <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:BL_WHITE,lineHeight:1}}>{currentPlayer?.name}</div>
                   <div style={{fontSize:11,color:memberColors[mt]||"#60607a",marginTop:4,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em"}}>{memberLabels[mt]||"Non-membre"}</div>
+                  <div style={{fontSize:10,color:"#86c99e66",marginTop:2}}>{memberDesc?.[mt]||""}</div>
                 </div>
               </div>
               <div style={{fontSize:10,color:"#ffffff44",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.15em"}}>ID #{String(currentPlayer?.id).padStart(4,"0")}</div>
             </div>
-            {/* Wallet buttons */}
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <button onClick={()=>alert("Apple Wallet — fonctionnalité à venir")}
-                style={{background:"#000",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                🍎 Ajouter à l'Apple Wallet
-              </button>
-              <button onClick={()=>alert("Google Wallet — fonctionnalité à venir")}
-                style={{background:"#4285f4",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                🟢 Ajouter au Google Wallet
-              </button>
-            </div>
+
           </>
         )}
 
@@ -4854,7 +4840,9 @@ function DataBL({onBack}){
   const m=useIsMobile();
   const [players,setPlayers]=React.useState([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));
   const [search,setSearch]=React.useState("");
-  const [newP,setNewP]=React.useState({name:"",uid:"",sex:"m",team_id:""});
+  const [newP,setNewP]=React.useState({name:"",uid:"",sex:"m"});
+  const [editingName,setEditingName]=React.useState(null);
+  const [editNameVal,setEditNameVal]=React.useState("");
   const [msg,setMsg]=React.useState(null);
   const [saving,setSaving]=React.useState(false);
   const MEMBER_TYPES=["club","events","non-membre"];
@@ -4871,7 +4859,7 @@ function DataBL({onBack}){
     try{
       const maxId=Math.max(...PLAYERS.map(p=>p.id),0);
       const uid=newP.uid||newP.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
-      await sbInsert("players",{id:maxId+1,uid,name:newP.name,team_id:newP.team_id||null,t26:newP.team_id||null,sex:newP.sex||"m",member_type:"non-membre"});
+      await sbInsert("players",{id:maxId+1,uid,name:newP.name,sex:newP.sex||"m",member_type:"non-membre"});
       setMsg({t:"success",m:`${newP.name} ajouté !`});
       setNewP({name:"",uid:"",sex:"m",team_id:""});
       // Reload
@@ -4888,6 +4876,17 @@ function DataBL({onBack}){
       if(idx>=0)PLAYERS[idx].member_type=mt;
       setPlayers(prev=>prev.map(p=>p.id===player.id?{...p,member_type:mt}:p));
     }catch(e){setMsg({t:"error",m:"Erreur changement type"});}
+  }
+
+  async function renamePlayer(player, newName){
+    if(!newName.trim())return;
+    try{
+      await sbFetch("players",`?id=eq.${player.id}`,{method:"PATCH",body:JSON.stringify({name:newName.trim()})});
+      const idx=PLAYERS.findIndex(p=>p.id===player.id);
+      if(idx>=0)PLAYERS[idx].name=newName.trim();
+      setPlayers(prev=>prev.map(p=>p.id===player.id?{...p,name:newName.trim()}:p));
+      setEditingName(null);
+    }catch(e){setMsg({t:"error",m:"Erreur renommage"});}
   }
 
   async function deletePlayer(player){
@@ -4921,10 +4920,7 @@ function DataBL({onBack}){
               <option value="m">👦 Homme</option>
               <option value="f">👧 Femme</option>
             </select>
-            <select value={newP.team_id} onChange={e=>setNewP({...newP,team_id:e.target.value})} style={S}>
-              <option value="">Pas d'équipe O2026</option>
-              {TEAMS.filter(t=>t.active).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+
           </div>
           <button onClick={createPlayer} disabled={saving} style={BTN()}>{saving?"...":"➕ Ajouter"}</button>
         </div>
@@ -4935,7 +4931,19 @@ function DataBL({onBack}){
           {filtered.map(player=>(
             <div key={player.id} style={{background:"#ffffff0a",border:`1px solid ${BL_GREEN_LIGHT}`,borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
               <div style={{flex:1}}>
-                <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.name}</div>
+                {editingName===player.id?(
+                  <form onSubmit={async(e)=>{e.preventDefault();await renamePlayer(player,editNameVal);}} style={{display:"flex",gap:6}}>
+                    <input value={editNameVal} onChange={e=>setEditNameVal(e.target.value)} autoFocus
+                      style={{background:"#1f4d36",border:"1px solid #2d6a4f",borderRadius:6,padding:"4px 8px",color:BL_WHITE,fontSize:13,flex:1,outline:"none"}}/>
+                    <button type="submit" style={{background:"#86c99e",border:"none",borderRadius:6,padding:"4px 10px",color:BL_GREEN,fontWeight:700,fontSize:12,cursor:"pointer"}}>✓</button>
+                    <button type="button" onClick={()=>setEditingName(null)} style={{background:"#ffffff22",border:"none",borderRadius:6,padding:"4px 8px",color:BL_WHITE,fontSize:12,cursor:"pointer"}}>✗</button>
+                  </form>
+                ):(
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.name}</div>
+                    <button onClick={()=>{setEditingName(player.id);setEditNameVal(player.name);}} style={{background:"none",border:"none",color:"#86c99e66",cursor:"pointer",fontSize:11,padding:"0 2px"}}>✎</button>
+                  </div>
+                )}
                 <div style={{fontSize:11,color:"#86c99e"}}>{player.sex==="f"?"👧":"👦"} {player.uid}</div>
               </div>
               {/* Member type buttons */}
@@ -4994,11 +5002,18 @@ export default function App(){
     loadFromSupabase();
   },[]);
 
-  // Auto-login by IP → go straight to menu
+  // Auto-login: restore session from localStorage
   useEffect(()=>{
     if(!dbLoaded)return;
     const tryAutoLogin=async()=>{
       try{
+        const savedId=localStorage.getItem("bl_player_id");
+        const savedSection=localStorage.getItem("bl_section")||"menu";
+        if(savedId){
+          const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));
+          if(p){setCurrentPlayer(p);setSection(savedSection==="dataBL"&&p.uid!==ADMIN_UID?"menu":savedSection);return;}
+        }
+        // Fallback: IP auto-login
         const ipRes=await fetch("https://api.ipify.org?format=json");
         const {ip}=await ipRes.json();
         const rows=await sbFetch("players",`?last_ip=eq.${encodeURIComponent(ip)}&pin=not.is.null&limit=1`);
@@ -5007,6 +5022,14 @@ export default function App(){
     };
     tryAutoLogin();
   },[dbLoaded]);
+
+  // Persist section to localStorage when it changes
+  useEffect(()=>{
+    if(section!=="login"&&currentPlayer){
+      localStorage.setItem("bl_section",section);
+      localStorage.setItem("bl_player_id",String(currentPlayer.id));
+    }
+  },[section,currentPlayer]);
 
   async function loadFromSupabase(){
     const timeout=setTimeout(()=>setDbLoaded(true), 2000);
@@ -5081,7 +5104,7 @@ export default function App(){
       if(s==="profil") setSection("profil-bl");
       else if(s==="dataBL") setSection("dataBL");
       else if(s==="events"){setSection("events");}
-    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");}}/>
+    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");}}/>
   );
 
   // Profil BL
