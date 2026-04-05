@@ -794,6 +794,27 @@ function LoginBL({onLogin,dbLoaded}){
 }
 
 
+// ─── SMART DISPLAY NAME ──────────────────────────────
+// Returns "Prénom" if unique, "Prénom X" or "Prénom Xy" if duplicate first name
+function getDisplayName(player, allPlayers){
+  if(!player)return"?";
+  const fname=player.name;
+  const duplicates=(allPlayers||PLAYERS).filter(p=>p.name===fname&&p.uid);
+  if(duplicates.length<=1)return fname;
+  if(!player.last_name)return fname;
+  // Find minimum letters needed to differentiate
+  const others=duplicates.filter(p=>p.id!==player.id);
+  let letters=1;
+  while(letters<=player.last_name.length){
+    const prefix=player.last_name.slice(0,letters).toLowerCase();
+    const conflict=others.some(p=>(p.last_name||"").slice(0,letters).toLowerCase()===prefix);
+    if(!conflict)break;
+    letters++;
+  }
+  return `${fname} ${player.last_name.slice(0,letters)}`;
+}
+
+
 // ─── NAVBAR ──────────────────────────────────────────
 function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
   const m=useIsMobile();
@@ -1591,7 +1612,7 @@ function RankingsPage({nav}){
                         {submode==="ratings"?r.avg.toFixed(2):submode==="medals"?"":r.pct+"%"}
                       </span>
                     </div>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22}}>{r.player.name}</div>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22}}>{getDisplayName(r.player,allPlayerRanks.map(x=>x.player))}</div>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
                       <ColorDot teamId={r.team?.id} size={7}/>
                       <span style={{color:"#60607a",fontSize:12}}>{r.team?.name||"Libre"}</span>
@@ -1633,7 +1654,7 @@ function RankingsPage({nav}){
                 <div key={r.player.id} onClick={()=>nav("playerDetail",{playerId:r.player.id})} style={{display:"grid",gridTemplateColumns:m?colMobile:colDesktop,gap:6,padding:"9px 14px",alignItems:"center",borderBottom:i<playerRanks.length-1?"1px solid #1e1e30":"none",cursor:"pointer",transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <span style={{color:r.rank<=3?"#E8B84B":"#60607a",fontWeight:700,fontSize:13}}>{r.rank}</span>
                   <div style={{display:"flex",flexDirection:"column",gap:1}}>
-                    <span style={{fontWeight:500,fontSize:13}}>{r.player.name}</span>
+                    <span style={{fontWeight:500,fontSize:13}}>{getDisplayName(r.player,allPlayerRanks.map(x=>x.player))}</span>
                     {m&&<span style={{fontSize:10,color:r.team?.color||"#404058"}}>{r.team?.name||"Libre"}</span>}
                   </div>
                   {submode==="ratings"&&!isSquidFilter&&visibleEvs.map(ev=>{const ro=RATINGS.find(rt=>rt.p===r.player.id&&rt.e===ev.id);const v=ro?.r;const c=!v?"#404058":v>=1.8?"#E8B84B":v>=1.6?"#34d399":"#60a5fa";return(<span key={ev.id} style={{textAlign:"center",fontWeight:600,fontSize:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})}
@@ -4227,7 +4248,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                 :<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:tc}}>{player.name.charAt(0)}</span>}
             </div>
             <div>
-              <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,color:tc,lineHeight:1}}>{player.name}</h2>
+              <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,color:tc,lineHeight:1}}>{player.name}{player.last_name&&<span style={{fontSize:m?18:22,color:tc+"aa"}}> {player.last_name}</span>}</h2>
               {team&&<div style={{fontSize:12,color:tc,marginTop:2}}>● {team.dissolvedName||team.name}</div>}
               <div style={{fontSize:11,color:"#404058",marginTop:4}}>Voir ma fiche joueur →</div>
             </div>
@@ -4683,6 +4704,490 @@ function DataPage(){
 // ─── APP ─────────────────────────────────────────────
 const ADMIN_UID = "louis";
 
+// ─── GAMES HOME ──────────────────────────────────────
+const RETRO_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  .retro { font-family: 'Press Start 2P', monospace; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
+  @keyframes glow { 0%,100%{text-shadow:0 0 8px #a855f7,0 0 20px #a855f7} 50%{text-shadow:0 0 20px #a855f7,0 0 40px #a855f7,0 0 60px #a855f7} }
+`;
+
+function GamesHomePage({currentPlayer,onBack,nav}){
+  const m=useIsMobile();
+  const games=[
+    {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Concours de popularité",color:"#f59e0b",active:true},
+    {id:"plappy",label:"PLAPPY PIRD",icon:"🐦",desc:"Bats ton high score",color:"#22c55e",active:true},
+    {id:"panini",label:"PANINI",icon:"📷",desc:"Coming soon...",color:"#60607a",active:false},
+  ];
+  return(
+    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",position:"relative",overflow:"hidden"}}>
+      <style>{RETRO_CSS}</style>
+      {/* Scanline effect */}
+      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px)",pointerEvents:"none",zIndex:0}}/>
+      {/* Header */}
+      <div style={{position:"relative",zIndex:1,borderBottom:"2px solid #a855f744",padding:m?"14px 16px":"20px 40px",display:"flex",alignItems:"center",gap:16,background:"#0a0a0fdd"}}>
+        <button onClick={onBack} style={{background:"none",border:"2px solid #a855f7",borderRadius:4,color:"#a855f7",cursor:"pointer",padding:"6px 12px",fontFamily:"'Press Start 2P',monospace",fontSize:8}}>← MENU</button>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?12:18,color:"#a855f7",animation:"glow 2s ease-in-out infinite"}}>GAMES</div>
+        {currentPlayer&&<div style={{marginLeft:"auto",fontSize:7,color:"#60607a"}}>{currentPlayer.name.toUpperCase()}</div>}
+      </div>
+      {/* Game cards */}
+      <div style={{position:"relative",zIndex:1,padding:m?"20px 16px":"40px",display:"flex",flexDirection:"column",gap:m?16:20,maxWidth:600,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:m?10:20}}>
+          <div style={{fontSize:m?8:10,color:"#60607a",animation:"blink 1.5s infinite"}}>INSERT COIN TO PLAY</div>
+        </div>
+        {games.map(g=>(
+          <div key={g.id} onClick={()=>g.active&&currentPlayer&&nav(g.id)}
+            style={{background:"#12121f",border:`2px solid ${g.active&&currentPlayer?g.color+"66":"#1e1e30"}`,borderRadius:8,padding:m?"18px 16px":"24px 20px",cursor:g.active&&currentPlayer?"pointer":"not-allowed",opacity:g.active&&currentPlayer?1:0.4,transition:"all .15s",position:"relative",overflow:"hidden"}}
+            onMouseEnter={e=>{if(g.active&&currentPlayer)e.currentTarget.style.borderColor=g.color;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=g.active&&currentPlayer?g.color+"66":"#1e1e30";}}>
+            {/* Pixel corner decorations */}
+            <div style={{position:"absolute",top:4,left:4,width:8,height:8,border:`2px solid ${g.color}`,borderRight:"none",borderBottom:"none",opacity:0.5}}/>
+            <div style={{position:"absolute",top:4,right:4,width:8,height:8,border:`2px solid ${g.color}`,borderLeft:"none",borderBottom:"none",opacity:0.5}}/>
+            <div style={{display:"flex",alignItems:"center",gap:16}}>
+              <div style={{fontSize:m?28:36,flexShrink:0}}>{g.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?10:13,color:g.active?g.color:"#60607a",marginBottom:8}}>{g.label}</div>
+                <div style={{fontSize:7,color:"#60607a"}}>{g.desc}</div>
+              </div>
+              {g.active&&currentPlayer&&<div style={{fontSize:14,color:g.color}}>▶</div>}
+              {!g.active&&<div style={{fontSize:7,color:"#404058"}}>🔒</div>}
+              {g.active&&!currentPlayer&&<div style={{fontSize:7,color:"#404058"}}>CONNECTE-TOI</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── TOURNOI ─────────────────────────────────────────
+function TournoiPage({currentPlayer,onBack}){
+  const m=useIsMobile();
+  const [step,setStep]=React.useState("select"); // select | bracket
+  const [search,setSearch]=React.useState("");
+  const [selected,setSelected]=React.useState([]);
+  const [bracket,setBracket]=React.useState(null);
+  const [round,setRound]=React.useState(0);
+  const [winner,setWinner]=React.useState(null);
+
+  const allPlayers=[...PLAYERS].filter(p=>p.uid).sort((a,b)=>(b.tournoi_count||0)-(a.tournoi_count||0));
+  const filtered=allPlayers.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())||((p.last_name||"").toLowerCase().includes(search.toLowerCase())));
+
+  function buildBracket(players){
+    // Find next power of 2
+    let size=1;while(size<players.length)size*=2;
+    // Shuffle
+    const shuffled=[...players].sort(()=>Math.random()-0.5);
+    // Fill with byes
+    const seeded=[...shuffled,...Array(size-shuffled.length).fill(null)];
+    return{rounds:[seeded],currentRound:0,matches:[]};
+  }
+
+  async function launchTournoi(){
+    if(selected.length<2)return;
+    // Increment tournoi_count for all selected players
+    try{
+      await Promise.all(selected.map(p=>
+        sbUpdate("players",{id:p.id},{tournoi_count:(p.tournoi_count||0)+1})
+      ));
+      selected.forEach(p=>{const idx=PLAYERS.findIndex(pl=>pl.id===p.id);if(idx>=0)PLAYERS[idx].tournoi_count=(PLAYERS[idx].tournoi_count||0)+1;});
+    }catch(e){}
+    const br=buildBracket(selected);
+    setBracket(br);
+    setStep("bracket");
+  }
+
+  function getCurrentMatches(){
+    if(!bracket)return[];
+    const currentPlayers=bracket.rounds[bracket.currentRound];
+    const matches=[];
+    for(let i=0;i<currentPlayers.length;i+=2){
+      matches.push({a:currentPlayers[i],b:currentPlayers[i+1],index:i});
+    }
+    return matches;
+  }
+
+  function choose(match,chosen){
+    const matches=getCurrentMatches();
+    // Record choice
+    const newMatches=[...bracket.matches,{round:bracket.currentRound,winner:chosen?.id}];
+    // Build next round winners
+    const updatedMatches=getCurrentMatches().map((m,i)=>i===getCurrentMatches().indexOf(match)?chosen:null);
+
+    // Check if all matches in this round are done - we need to track per-match
+    // Use a state array for current round results
+    setMatchResults(prev=>{
+      const newRes={...prev,[`${bracket.currentRound}_${match.index}`]:chosen};
+      const allDone=getCurrentMatches().every(m=>newRes[`${bracket.currentRound}_${m.index}`]!==undefined);
+      if(allDone){
+        const nextRoundPlayers=getCurrentMatches().map(m=>newRes[`${bracket.currentRound}_${m.index}`]).filter(Boolean);
+        if(nextRoundPlayers.length===1){
+          setWinner(nextRoundPlayers[0]);setStep("winner");
+        } else {
+          setBracket(b=>({...b,rounds:[...b.rounds,nextRoundPlayers],currentRound:b.currentRound+1}));
+          // Clear results for next round
+          return {};
+        }
+      }
+      return newRes;
+    });
+  }
+
+  const [matchResults,setMatchResults]=React.useState({});
+
+  const totalRounds=bracket?Math.log2(bracket.rounds[0].length):0;
+  const currentMatches=getCurrentMatches();
+  const roundNames=["1er tour","2ème tour","Quarts de finale","Demi-finales","Finale","Grande Finale"];
+  const roundLabel=bracket?roundNames[bracket.currentRound]||`Tour ${bracket.currentRound+1}`:"";
+
+  if(step==="winner"&&winner) return(
+    <div style={{minHeight:"100vh",background:"#0a0a0f",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+      <style>{RETRO_CSS}</style>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?10:14,color:"#f59e0b",marginBottom:24,animation:"glow 1s infinite",textAlign:"center"}}>🏆 WINNER 🏆</div>
+      <div style={{width:m?100:140,height:m?100:140,borderRadius:"50%",border:"4px solid #f59e0b",overflow:"hidden",background:"#1e1e30",marginBottom:20,boxShadow:"0 0 30px #f59e0b"}}>
+        <img src={winner.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+      </div>
+      <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?12:18,color:"#eeeef5",marginBottom:8,textAlign:"center"}}>{winner.name.toUpperCase()}</div>
+      {winner.last_name&&<div style={{fontSize:9,color:"#f59e0b",marginBottom:32}}>{winner.last_name.toUpperCase()}</div>}
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",justifyContent:"center"}}>
+        <button onClick={()=>{setStep("select");setSelected([]);setBracket(null);setWinner(null);setMatchResults({});}} style={{background:"#f59e0b",color:"#0a0a0f",border:"none",borderRadius:4,padding:"12px 20px",fontFamily:"'Press Start 2P',monospace",fontSize:8,cursor:"pointer"}}>REJOUER</button>
+        <button onClick={onBack} style={{background:"none",border:"2px solid #60607a",borderRadius:4,color:"#60607a",padding:"12px 20px",fontFamily:"'Press Start 2P',monospace",fontSize:8,cursor:"pointer"}}>QUITTER</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",position:"relative"}}>
+      <style>{RETRO_CSS}</style>
+      <div style={{borderBottom:"2px solid #f59e0b44",padding:m?"12px 16px":"16px 40px",display:"flex",alignItems:"center",gap:12,background:"#0a0a0fdd"}}>
+        <button onClick={step==="bracket"?()=>{setStep("select");setBracket(null);setMatchResults({});}:onBack} style={{background:"none",border:"2px solid #f59e0b",borderRadius:4,color:"#f59e0b",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?9:12,color:"#f59e0b"}}>TOURNOI</div>
+        {step==="bracket"&&<div style={{marginLeft:"auto",fontSize:7,color:"#60607a"}}>{roundLabel.toUpperCase()}</div>}
+        {step==="select"&&<div style={{marginLeft:"auto",fontSize:7,color:"#f59e0b"}}>{selected.length} JOUEURS</div>}
+      </div>
+
+      {step==="select"&&(
+        <div style={{padding:m?"16px":"32px 40px",maxWidth:700,margin:"0 auto"}}>
+          <div style={{marginBottom:16}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="RECHERCHER..."
+              style={{background:"#12121f",border:"2px solid #f59e0b44",borderRadius:4,padding:"10px 14px",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",fontSize:8,width:"100%",boxSizing:"border-box",outline:"none"}}/>
+          </div>
+          {/* Selected preview */}
+          {selected.length>0&&(
+            <div style={{background:"#12121f",border:"2px solid #f59e0b33",borderRadius:4,padding:"10px 14px",marginBottom:16,display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:7,color:"#f59e0b",marginRight:4}}>SÉLECTION:</span>
+              {selected.map(p=>(
+                <span key={p.id} onClick={()=>setSelected(s=>s.filter(x=>x.id!==p.id))}
+                  style={{background:"#f59e0b22",border:"1px solid #f59e0b",borderRadius:3,padding:"3px 8px",fontSize:7,color:"#f59e0b",cursor:"pointer"}}>
+                  {p.name} ✕
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Player grid */}
+          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(3,1fr)",gap:8,marginBottom:16,maxHeight:"50vh",overflowY:"auto"}}>
+            {filtered.map(p=>{
+              const isSelected=selected.some(s=>s.id===p.id);
+              return(
+                <div key={p.id} onClick={()=>setSelected(s=>isSelected?s.filter(x=>x.id!==p.id):[...s,p])}
+                  style={{background:isSelected?"#f59e0b22":"#12121f",border:`2px solid ${isSelected?"#f59e0b":"#1e1e30"}`,borderRadius:4,padding:"10px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"all .1s"}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0,border:`2px solid ${isSelected?"#f59e0b":"#2a2a40"}`}}>
+                    <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                  </div>
+                  <div style={{flex:1,overflow:"hidden"}}>
+                    <div style={{fontSize:7,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.toUpperCase()}</div>
+                    {p.last_name&&<div style={{fontSize:6,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
+                    {p.tournoi_count>0&&<div style={{fontSize:6,color:"#f59e0b44",marginTop:2}}>×{p.tournoi_count}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={launchTournoi} disabled={selected.length<2}
+            style={{width:"100%",background:selected.length>=2?"#f59e0b":"#1e1e30",color:selected.length>=2?"#0a0a0f":"#404058",border:"none",borderRadius:4,padding:"14px",fontFamily:"'Press Start 2P',monospace",fontSize:10,cursor:selected.length>=2?"pointer":"not-allowed"}}>
+            {selected.length<2?"SÉLECTIONNE AU MOINS 2":`▶ LANCER (${selected.length})`}
+          </button>
+        </div>
+      )}
+
+      {step==="bracket"&&bracket&&(
+        <div style={{padding:m?"16px":"32px 40px",maxWidth:700,margin:"0 auto"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:m?12:16}}>
+            {currentMatches.map((match,mi)=>{
+              const isDone=matchResults[`${bracket.currentRound}_${match.index}`]!==undefined;
+              const matchWinner=matchResults[`${bracket.currentRound}_${match.index}`];
+              // Handle bye
+              if(!match.b){
+                if(!isDone){
+                  setMatchResults(prev=>({...prev,[`${bracket.currentRound}_${match.index}`]:match.a}));
+                }
+                return null;
+              }
+              return(
+                <div key={mi} style={{background:"#12121f",border:`2px solid ${isDone?"#f59e0b22":"#f59e0b55"}`,borderRadius:8,padding:m?12:16,opacity:isDone?0.5:1}}>
+                  {isDone?(
+                    <div style={{textAlign:"center",fontSize:7,color:"#f59e0b"}}>{matchWinner?.name?.toUpperCase()} AVANCE ✓</div>
+                  ):(
+                    <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:m?8:16,alignItems:"center"}}>
+                      {[match.a,match.b].map((player,pi)=>(
+                        <React.Fragment key={pi}>
+                          {pi===1&&<div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?8:10,color:"#60607a",textAlign:"center"}}>VS</div>}
+                          <div onClick={()=>choose(match,player)}
+                            style={{background:"#1a1a2e",border:"2px solid #2a2a40",borderRadius:6,padding:m?"12px 8px":"16px",cursor:"pointer",textAlign:"center",transition:"all .15s"}}
+                            onMouseEnter={e=>{e.currentTarget.style.borderColor="#f59e0b";e.currentTarget.style.background="#f59e0b11";}}
+                            onMouseLeave={e=>{e.currentTarget.style.borderColor="#2a2a40";e.currentTarget.style.background="#1a1a2e";}}>
+                            <div style={{width:m?56:72,height:m?56:72,borderRadius:"50%",overflow:"hidden",background:"#0a0a0f",margin:"0 auto 10px",border:"2px solid #404058"}}>
+                              <img src={player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                            </div>
+                            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?6:8,color:"#eeeef5"}}>{player?.name?.toUpperCase()}</div>
+                            {player?.last_name&&<div style={{fontSize:6,color:"#60607a",marginTop:3}}>{player.last_name.toUpperCase()}</div>}
+                          </div>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PLAPPY PIRD ─────────────────────────────────────
+function PlappyPirdPage({currentPlayer,onBack}){
+  const m=useIsMobile();
+  const canvasRef=React.useRef(null);
+  const gameRef=React.useRef({running:false,started:false});
+  const [gameState,setGameState]=React.useState("idle"); // idle | playing | dead
+  const [score,setScore]=React.useState(0);
+  const [bestScore,setBestScore]=React.useState(0);
+  const [leaderboard,setLeaderboard]=React.useState([]);
+  const [imgLoaded,setImgLoaded]=React.useState(false);
+  const birdImg=React.useRef(null);
+  const W=360,H=480,GRAVITY=0.45,FLAP=-8,GAP=155,PIPE_W=52,SPEED=2.2;
+
+  // Load leaderboard
+  React.useEffect(()=>{
+    const load=async()=>{
+      try{
+        const data=await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
+        if(data){
+          const rows=data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
+          setLeaderboard(rows);
+          const mine=data.find(r=>r.player_id===currentPlayer?.id);
+          if(mine)setBestScore(mine.score);
+        }
+      }catch(e){}
+    };
+    load();
+  },[]);
+
+  // Load bird image
+  React.useEffect(()=>{
+    if(!currentPlayer?.photoUrl)return;
+    const img=new Image();
+    img.onload=()=>{birdImg.current=img;setImgLoaded(true);};
+    img.onerror=()=>setImgLoaded(false);
+    img.src=currentPlayer.photoUrl;
+  },[currentPlayer]);
+
+  React.useEffect(()=>{
+    const canvas=canvasRef.current;if(!canvas)return;
+    const ctx=canvas.getContext("2d");
+    canvas.width=W;canvas.height=H;
+    let raf;
+    const g=gameRef.current;
+    // Game state
+    let bird={x:80,y:H/2,vy:0,r:22};
+    let pipes=[];let sc=0;let frame=0;let alive=true;
+
+    function reset(){
+      bird={x:80,y:H/2,vy:0,r:22};
+      pipes=[];sc=0;frame=0;alive=true;
+      setScore(0);
+    }
+
+    function addPipe(){
+      const minY=80,maxY=H-GAP-80;
+      const topH=Math.random()*(maxY-minY)+minY;
+      pipes.push({x:W,topH,scored:false});
+    }
+
+    function flap(){
+      if(!g.started){g.started=true;g.running=true;}
+      if(!alive)return;
+      bird.vy=FLAP;
+    }
+
+    // Input
+    const onKey=e=>{if(e.code==="Space"||e.code==="ArrowUp")flap();};
+    const onTap=()=>flap();
+    window.addEventListener("keydown",onKey);
+    canvas.addEventListener("click",onTap);
+    canvas.addEventListener("touchstart",e=>{e.preventDefault();flap();},{passive:false});
+
+    function draw(){
+      // BG
+      ctx.fillStyle="#0a0a0f";ctx.fillRect(0,0,W,H);
+      // Scanlines
+      for(let y=0;y<H;y+=4){ctx.fillStyle="rgba(0,0,0,0.15)";ctx.fillRect(0,y,W,2);}
+      // Ground
+      ctx.fillStyle="#1a3d2b";ctx.fillRect(0,H-40,W,40);
+      ctx.fillStyle="#2d6a4f";ctx.fillRect(0,H-42,W,4);
+      // Pipes
+      pipes.forEach(p=>{
+        ctx.fillStyle="#22c55e";
+        // Top pipe
+        ctx.fillRect(p.x,0,PIPE_W,p.topH);
+        ctx.fillStyle="#16a34a";
+        ctx.fillRect(p.x-4,p.topH-20,PIPE_W+8,20);
+        // Bottom pipe
+        const botY=p.topH+GAP;
+        ctx.fillRect(p.x,botY,PIPE_W,H);
+        ctx.fillStyle="#16a34a";
+        ctx.fillRect(p.x-4,botY,PIPE_W+8,20);
+      });
+      // Bird
+      ctx.save();
+      ctx.translate(bird.x,bird.y);
+      ctx.rotate(Math.min(Math.max(bird.vy*0.05,-0.5),0.8));
+      if(birdImg.current&&imgLoaded){
+        ctx.beginPath();ctx.arc(0,0,bird.r,0,Math.PI*2);ctx.clip();
+        ctx.drawImage(birdImg.current,-bird.r,-bird.r,bird.r*2,bird.r*2);
+        ctx.restore();
+        ctx.save();ctx.translate(bird.x,bird.y);
+        ctx.beginPath();ctx.arc(0,0,bird.r,0,Math.PI*2);
+        ctx.strokeStyle="#f59e0b";ctx.lineWidth=2;ctx.stroke();
+      } else {
+        ctx.beginPath();ctx.arc(0,0,bird.r,0,Math.PI*2);
+        ctx.fillStyle="#f59e0b";ctx.fill();
+        ctx.restore();ctx.save();ctx.translate(bird.x,bird.y);
+      }
+      ctx.restore();
+      // Score
+      ctx.font="bold 18px 'Press Start 2P',monospace";
+      ctx.fillStyle="#eeeef5";ctx.textAlign="center";
+      ctx.fillText(String(sc),W/2,40);
+      // Start message
+      if(!g.started){
+        ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(0,0,W,H);
+        ctx.font="12px 'Press Start 2P',monospace";
+        ctx.fillStyle="#f59e0b";ctx.fillText("APPUIE POUR",W/2,H/2-20);
+        ctx.fillText("COMMENCER",W/2,H/2+8);
+        ctx.font="8px 'Press Start 2P',monospace";
+        ctx.fillStyle="#60607a";ctx.fillText("ESPACE / TAP",W/2,H/2+40);
+      }
+      // Dead
+      if(!alive){
+        ctx.fillStyle="rgba(0,0,0,0.7)";ctx.fillRect(0,0,W,H);
+        ctx.font="14px 'Press Start 2P',monospace";
+        ctx.fillStyle="#ef4444";ctx.textAlign="center";ctx.fillText("GAME OVER",W/2,H/2-30);
+        ctx.font="10px 'Press Start 2P',monospace";
+        ctx.fillStyle="#f59e0b";ctx.fillText("SCORE: "+sc,W/2,H/2);
+        ctx.font="8px 'Press Start 2P',monospace";
+        ctx.fillStyle="#60607a";ctx.fillText("TAP POUR REJOUER",W/2,H/2+30);
+      }
+    }
+
+    async function saveScore(s){
+      if(!currentPlayer)return;
+      try{
+        // Upsert: only update if better
+        const existing=await sbFetch("games_scores",`?game=eq.plappy&player_id=eq.${currentPlayer.id}&limit=1`);
+        if(!existing||existing.length===0||existing[0].score<s){
+          await sbInsert("games_scores",{player_id:currentPlayer.id,game:"plappy",score:s});
+          setBestScore(s);
+        }
+      }catch(e){}
+    }
+
+    function loop(){
+      if(g.running&&alive){
+        frame++;
+        // Gravity
+        bird.vy+=GRAVITY;bird.y+=bird.vy;
+        // Add pipes
+        if(frame%90===0)addPipe();
+        // Move pipes
+        pipes=pipes.filter(p=>p.x>-PIPE_W-10);
+        pipes.forEach(p=>{
+          p.x-=SPEED;
+          // Score
+          if(!p.scored&&p.x+PIPE_W<bird.x){p.scored=true;sc++;setScore(sc);}
+          // Collision
+          const inX=bird.x+bird.r>p.x&&bird.x-bird.r<p.x+PIPE_W;
+          const inY=bird.y-bird.r<p.topH||bird.y+bird.r>p.topH+GAP;
+          if(inX&&inY){alive=false;saveScore(sc);setGameState("dead");}
+        });
+        // Ground/ceiling
+        if(bird.y+bird.r>H-40||bird.y-bird.r<0){alive=false;saveScore(sc);setGameState("dead");}
+      }
+      draw();
+      raf=requestAnimationFrame(loop);
+    }
+
+    // Click when dead → restart
+    canvas.addEventListener("click",()=>{
+      if(!alive){reset();g.running=false;g.started=false;setGameState("idle");}
+    });
+
+    loop();
+    return()=>{
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown",onKey);
+    };
+  },[imgLoaded]);
+
+  return(
+    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",display:"flex",flexDirection:"column"}}>
+      <style>{RETRO_CSS}</style>
+      <div style={{borderBottom:"2px solid #22c55e44",padding:m?"12px 16px":"16px 40px",display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?9:12,color:"#22c55e"}}>PLAPPY PIRD</div>
+        <div style={{marginLeft:"auto",display:"flex",gap:16}}>
+          <div style={{fontSize:7,color:"#60607a"}}>BEST: <span style={{color:"#f59e0b"}}>{bestScore}</span></div>
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:m?"column":"row",flex:1,gap:0}}>
+        {/* Game canvas */}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",padding:m?"16px":"32px 20px 32px 40px"}}>
+          <div style={{position:"relative",border:"2px solid #22c55e33",borderRadius:4,overflow:"hidden",boxShadow:"0 0 20px #22c55e22"}}>
+            <canvas ref={canvasRef} style={{display:"block",imageRendering:"pixelated"}}/>
+          </div>
+        </div>
+        {/* Leaderboard */}
+        <div style={{flex:1,padding:m?"0 16px 80px":"32px 40px 32px 20px",maxWidth:m?"100%":320}}>
+          <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:16}}>🏆 HIGH SCORES</div>
+          {leaderboard.length===0?(
+            <div style={{fontSize:7,color:"#404058"}}>AUCUN SCORE ENCORE</div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {leaderboard.map((row,i)=>{
+                const isMe=row.player_id===currentPlayer?.id;
+                return(
+                  <div key={row.player_id} style={{background:isMe?"#22c55e11":"#12121f",border:`1px solid ${isMe?"#22c55e44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:20}}>{i+1}</span>
+                    <div style={{width:24,height:24,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
+                      <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                    </div>
+                    <span style={{flex:1,fontSize:7,color:isMe?"#22c55e":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(row.player,PLAYERS)}</span>
+                    <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:"#f59e0b"}}>{row.score}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ─── MENU BIÈRE LEVERCULSEC ─────────────────────────
 const BL_GREEN = "#1a3d2b";
 const BL_GREEN_LIGHT = "#2d6a4f";
@@ -4694,7 +5199,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
-    {id:"games",label:"Games",icon:"🎮",desc:"Bientôt disponible",color:"#60607a",active:false},
+    {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy Pird",color:"#a855f7",active:true},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
   return(
@@ -4798,7 +5303,7 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
                     :<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:BL_WHITE}}>{currentPlayer?.name?.charAt(0)}</span>}
                 </div>
                 <div>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:BL_WHITE,lineHeight:1}}>{currentPlayer?.name}</div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:BL_WHITE,lineHeight:1}}>{currentPlayer?.name}{(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)?.last_name&&<span style={{fontSize:m?16:20,color:"#ffffff99"}}> {(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer).last_name}</span>}</div>
                   <div style={{fontSize:11,color:memberColors[mt]||"#60607a",marginTop:4,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em"}}>{memberLabels[mt]||"Non-membre"}</div>
                   <div style={{fontSize:10,color:"#86c99e66",marginTop:2}}>{memberDesc?.[mt]||""}</div>
                 </div>
@@ -4852,7 +5357,7 @@ function DataBL({onBack}){
       setNewP({name:"",uid:"",sex:"m",team_id:""});
       // Reload
       const fresh=await sbFetch("players","?select=*&order=name");
-      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",photoUrl:`/photos/${p.uid}.jpg`}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
+      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",last_name:p.last_name||null,photoUrl:`/photos/${p.uid}.jpg`}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
     }catch(e){setMsg({t:"error",m:e.message});}
     setSaving(false);
   }
@@ -5028,7 +5533,8 @@ export default function App(){
         teamId:p.team_id||null,
         t24:p.t24||null, t25:p.t25||null, teo:p.teo||null, t26:p.t26||null,
         t24cap:p.t24cap||false, t25cap:p.t25cap||false, teocap:p.teocap||false, t26cap:p.t26cap||false,
-        sex:p.sex||"m", member_type:p.member_type||"non-membre",
+        sex:p.sex||"m", member_type:p.member_type||"non-membre", last_name:p.last_name||null,
+        tournoi_count:p.tournoi_count||0,
         photoUrl:`/photos/${p.uid}.jpg`,
       }));
       const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
@@ -5087,6 +5593,7 @@ export default function App(){
       if(s==="profil") setSection("profil-bl");
       else if(s==="dataBL") setSection("dataBL");
       else if(s==="events"){setSection("events");}
+      else if(s==="games"){setSection("games");}
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
@@ -5098,6 +5605,19 @@ export default function App(){
   // Data BL (Louis only)
   if(section==="dataBL"&&isAdmin) return(
     <DataBL onBack={()=>setSection("menu")}/>
+  );
+
+  // Games section
+  if(section==="games") return(
+    <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
+  );
+
+  if(section==="tournoi") return(
+    <TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
+  );
+
+  if(section==="plappy") return(
+    <PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
   );
 
   // Events section
