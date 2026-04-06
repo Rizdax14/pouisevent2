@@ -4725,18 +4725,18 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
   async function saveScore(s){
     if(!currentPlayer||s<=0)return;
-    const prev = parseInt(localStorage.getItem('plappy_best')||'0');
-    if(s<=prev)return;
-    localStorage.setItem('plappy_best',String(s));
-    setMyBest(s);
     try{
-      await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
         method:'POST',
         headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
         body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,updated_at:new Date().toISOString()})
       });
-      loadLeaderboard();
-    }catch(e){}
+      if(r.ok){
+        setMyBest(prev=>Math.max(prev,s));
+        localStorage.setItem('plappy_best',String(Math.max(parseInt(localStorage.getItem('plappy_best')||'0'),s)));
+        loadLeaderboard();
+      }
+    }catch(e){console.error('saveScore',e);}
   }
 
   React.useEffect(()=>{
