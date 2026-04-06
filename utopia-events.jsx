@@ -2099,7 +2099,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const ep=O2026_EPREUVES.find(e=>e.id===epreuveId);
   if(!ep)return null;
   const ac=ep.color;
-  const isLouis=currentPlayer?.uid==="louis";
+  const isLouis=currentPlayer?.uid===ADMIN_UID;
   const scoreType=ep.scoreType||"manche";
   const isDragRank=["drag_rank","drag_rank_2","drag_rank_coef","drag_rank_group"].includes(scoreType);
   const hasGroupFormat=ep.groupes>0; // round-robin groups (beerpong, football, puissance4, overcooked)
@@ -4702,7 +4702,7 @@ function DataPage(){
 
 
 // ─── APP ─────────────────────────────────────────────
-const ADMIN_UID = "louis";
+const ADMIN_UID = "louis-mar";
 
 // ─── PLAPPY PIRD ─────────────────────────────────────────
 function PlappyPirdPage({currentPlayer, onBack}){
