@@ -2094,7 +2094,7 @@ function DragRankList({items,onReorder,getLabel,getColor,getKey,compact,locked})
 }
 
 // ─── EPREUVE O2026 PAGE ───────────────────────────────
-function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments}){
+function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,setO2026Scores}){
   const m=useIsMobile();
   const ep=O2026_EPREUVES.find(e=>e.id===epreuveId);
   if(!ep)return null;
@@ -4726,14 +4726,19 @@ function PlappyPirdPage({currentPlayer, onBack}){
   async function saveScore(s){
     if(!currentPlayer||s<=0)return;
     try{
+      // First check existing score
+      const existing=await sbFetch("games_scores",`?game=eq.plappy&player_id=eq.${currentPlayer.id}&limit=1`);
+      const prevScore=existing&&existing.length>0?existing[0].score:0;
+      if(s<=prevScore)return; // Don't save if not a new best
+      // Upsert the new best score
       const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
         method:'POST',
         headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
         body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,updated_at:new Date().toISOString()})
       });
       if(r.ok){
-        setMyBest(prev=>Math.max(prev,s));
-        localStorage.setItem('plappy_best',String(Math.max(parseInt(localStorage.getItem('plappy_best')||'0'),s)));
+        setMyBest(s);
+        localStorage.setItem('plappy_best',String(s));
         loadLeaderboard();
       }
     }catch(e){console.error('saveScore',e);}
@@ -5592,6 +5597,12 @@ export default function App(){
     }
   }
 
+  // Redirect unknown pages to o2026
+  React.useEffect(()=>{
+    const known=["events","eventDetail","rankings","playerDetail","epreuveO2026","teams","teamDetail","profile","admin","o2026"];
+    if(!known.includes(page))nav("o2026");
+  },[page]);
+
   function writeHash(p,s){
     try{window.location.hash=encodeURIComponent(JSON.stringify({page:p,sub:s}));}catch(e){}
   }
@@ -5674,7 +5685,7 @@ export default function App(){
         {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
         {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
         {page==="admin"         &&<DataPage/>}
-        {(page==="o2026"||!["events","eventDetail","rankings","playerDetail","epreuveO2026","teams","teamDetail","profile","admin"].includes(page))&&page!=="o2026"&&nav("o2026")}
+
       </div>
     </div>
   );
