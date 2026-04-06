@@ -4704,6 +4704,275 @@ function DataPage(){
 // ─── APP ─────────────────────────────────────────────
 const ADMIN_UID = "louis";
 
+// ─── PLAPPY PIRD ─────────────────────────────────────────
+function PlappyPirdPage({currentPlayer, onBack}){
+  const m = useIsMobile();
+  const mountRef = React.useRef(null);
+  const gameRef  = React.useRef(null);
+  const [myBest, setMyBest] = React.useState(parseInt(localStorage.getItem('plappy_best')||'0'));
+  const [leaderboard, setLeaderboard] = React.useState([]);
+  const [showLB, setShowLB] = React.useState(false);
+
+  async function loadLeaderboard(){
+    try{
+      const data = await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
+      if(data){
+        const rows = data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
+        setLeaderboard(rows);
+      }
+    }catch(e){}
+  }
+
+  async function saveScore(s){
+    if(!currentPlayer||s<=0)return;
+    const prev = parseInt(localStorage.getItem('plappy_best')||'0');
+    if(s<=prev)return;
+    localStorage.setItem('plappy_best',String(s));
+    setMyBest(s);
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
+        method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
+        body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,updated_at:new Date().toISOString()})
+      });
+      loadLeaderboard();
+    }catch(e){}
+  }
+
+  React.useEffect(()=>{
+    loadLeaderboard();
+    const el = mountRef.current;
+    if(!el||!window.Phaser) return;
+
+    const W   = Math.min(el.clientWidth||360, 430);
+    const H   = window.innerHeight - (m?56:0) - 56; // minus headers
+    const GAP = Math.round(H * 0.37);
+    const PW  = Math.round(W * 0.15);
+    const BR  = Math.round(W * 0.065);
+    const GH  = 44;
+    const BIRD_URL = currentPlayer?.photoUrl||null;
+
+    function addRect(scene,x,y,w,h,color){
+      const r=scene.add.rectangle(x,y,w,h,color).setDepth(1);
+      scene.physics.add.existing(r);
+      r.body.allowGravity=false;
+      r.body.setImmovable(true);
+      return r;
+    }
+
+    class MenuScene extends Phaser.Scene{
+      constructor(){super('Menu');}
+      preload(){if(BIRD_URL)this.load.image('bird',BIRD_URL);}
+      create(){
+        const cx=W/2;
+        this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
+        this.add.text(cx,H*.18,'PLAPPY',{fontFamily:'monospace',fontSize:Math.round(W*.11),fontStyle:'bold',color:'#22c55e',stroke:'#000',strokeThickness:6}).setOrigin(.5);
+        this.add.text(cx,H*.3,'PIRD',{fontFamily:'monospace',fontSize:Math.round(W*.11),fontStyle:'bold',color:'#f59e0b',stroke:'#000',strokeThickness:6}).setOrigin(.5);
+        const b=this.add.circle(cx,H*.48,BR,0xf59e0b);
+        this.tweens.add({targets:b,y:H*.48-12,duration:600,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+        const t=this.add.text(cx,H*.68,'→  APPUIE POUR JOUER  ←',{fontFamily:'monospace',fontSize:Math.round(W*.033),color:'#f59e0b'}).setOrigin(.5);
+        this.tweens.add({targets:t,alpha:.1,duration:700,yoyo:true,repeat:-1});
+        this.add.text(cx,H*.78,'BEST: '+localStorage.getItem('plappy_best')||'0',{fontFamily:'monospace',fontSize:Math.round(W*.036),fontStyle:'bold',color:'#22c55e'}).setOrigin(.5);
+        this.input.once('pointerdown',()=>this.scene.start('Game'));
+        this.input.keyboard?.once('keydown-SPACE',()=>this.scene.start('Game'));
+      }
+    }
+
+    class GameScene extends Phaser.Scene{
+      constructor(){super('Game');}
+      preload(){if(BIRD_URL)this.load.image('bird',BIRD_URL);}
+      init(){this.score=0;this.alive=true;this.started=false;this.speed=160;this.currentGap=GAP;this.nextPipe=2200;this.pipeList=[];}
+      create(){
+        const cx=W/2,gY=H-GH;
+        this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
+        this.add.rectangle(cx,gY+GH/2,W,GH,0x1a3d2b).setDepth(2);
+        this.add.rectangle(cx,gY-2,W,4,0x2d6a4f).setDepth(3);
+        const gnd=this.add.rectangle(cx,gY+GH/2,W,GH,0x000000).setAlpha(0);
+        this.physics.add.existing(gnd,true);
+        this.birdPhys=this.physics.add.image(Math.round(W*.25),Math.round(H*.44),'__DEFAULT').setDisplaySize(BR*2,BR*2).setAlpha(0);
+        this.birdPhys.body.setCircle(BR);
+        this.birdPhys.body.setGravityY(0);
+        this.bVis=this.add.container(this.birdPhys.x,this.birdPhys.y).setDepth(5);
+        if(BIRD_URL&&this.textures.exists('bird')){
+          const mask=this.add.graphics();mask.fillStyle(0xffffff);mask.fillCircle(0,0,BR);
+          const img=this.add.image(0,0,'bird').setDisplaySize(BR*2,BR*2);
+          img.setMask(mask.createGeometryMask());
+          const ring=this.add.circle(0,0,BR,0x000000,0);this.add.graphics().lineStyle(3,0xf59e0b).strokeCircle(0,0,BR);
+          this.bVis.add([mask,img]);
+        } else {
+          this.bVis.add([
+            this.add.circle(0,0,BR,0xf59e0b),
+            this.add.circle(BR*.35,-BR*.25,BR*.22,0xffffff),
+            this.add.circle(BR*.43,-BR*.25,BR*.12,0x111111),
+            this.add.triangle(BR*.88,0,0,-BR*.18,0,BR*.18,BR*.44,0,0xff8800)
+          ]);
+        }
+        this.physics.add.overlap(this.birdPhys,gnd,()=>this.die(),null,this);
+        this.sTxt=this.add.text(cx,32,'0',{fontFamily:'monospace',fontSize:Math.round(W*.09),fontStyle:'bold',color:'#fff',stroke:'#000',strokeThickness:5}).setOrigin(.5).setDepth(10);
+        this.hint=this.add.text(cx,H*.36,'↑  APPUIE !',{fontFamily:'monospace',fontSize:Math.round(W*.042),color:'#f59e0b'}).setOrigin(.5).setDepth(10);
+        this.tweens.add({targets:this.hint,alpha:.1,duration:500,yoyo:true,repeat:-1});
+        this.input.on('pointerdown',()=>this.flap());
+        this.input.keyboard?.on('keydown-SPACE',()=>this.flap());
+        this.input.keyboard?.on('keydown-UP',()=>this.flap());
+      }
+      flap(){
+        if(!this.alive)return;
+        if(!this.started){this.started=true;this.birdPhys.body.setGravityY(1100);this.hint.setVisible(false);}
+        this.birdPhys.body.setVelocityY(-450);
+      }
+      spawnPipe(){
+        const gY=H-GH;
+        const topH=Phaser.Math.Between(Math.round(H*.1),Math.round(gY-this.currentGap-H*.1));
+        const botY=topH+this.currentGap;const botH=gY-botY;const sx=W+PW/2+4;const vx=-this.speed;
+        const top=addRect(this,sx,topH/2,PW,topH,0x22c55e);top.body.setVelocityX(vx);
+        const capT=addRect(this,sx,topH-11,PW+12,22,0x16a34a);capT.body.setVelocityX(vx);
+        const bot=addRect(this,sx,botY+botH/2,PW,botH,0x22c55e);bot.body.setVelocityX(vx);
+        const capB=addRect(this,sx,botY+11,PW+12,22,0x16a34a);capB.body.setVelocityX(vx);
+        this.physics.add.overlap(this.birdPhys,[top,bot],()=>this.die(),null,this);
+        this.pipeList.push({top,capT,bot,capB,scored:false});
+      }
+      die(){
+        if(!this.alive)return;this.alive=false;
+        this.cameras.main.flash(150,255,60,60);this.cameras.main.shake(180,.013);
+        this.birdPhys.body.setGravityY(1500);this.birdPhys.body.setVelocityY(300);
+        this.time.delayedCall(650,()=>this.scene.start('GameOver',{score:this.score}));
+      }
+      update(_t,delta){
+        this.bVis.x=this.birdPhys.x;this.bVis.y=this.birdPhys.y;
+        if(!this.alive){this.bVis.angle=Math.min(this.bVis.angle+7,90);return;}
+        const vy=this.birdPhys.body.velocity.y;
+        this.bVis.angle=Phaser.Math.Linear(this.bVis.angle,Phaser.Math.Clamp(vy*.085,-28,62),.18);
+        if(this.birdPhys.y-BR<0){this.die();return;}
+        if(!this.started)return;
+        this.nextPipe-=delta;
+        if(this.nextPipe<=0){this.spawnPipe();this.nextPipe=Phaser.Math.Between(1800,2200);}
+        this.speed=160+Math.floor(this.score/2)*15;
+        this.currentGap=Math.max(Math.round(H*.21),GAP-Math.floor(this.score/3)*8);
+        const bx=this.birdPhys.x;
+        this.pipeList=this.pipeList.filter(p=>{
+          if(!p.scored&&p.top.x<bx-PW/2){
+            p.scored=true;this.score++;
+            this.sTxt.setText(String(this.score));
+            this.tweens.add({targets:this.sTxt,scaleX:1.5,scaleY:1.5,duration:70,yoyo:true});
+          }
+          if(p.top.x<-PW*2){p.top.destroy();p.capT.destroy();p.bot.destroy();p.capB.destroy();return false;}
+          return true;
+        });
+      }
+    }
+
+    class GameOverScene extends Phaser.Scene{
+      constructor(){super('GameOver');}
+      init(data){
+        this.score=data.score||0;
+        const prev=parseInt(localStorage.getItem('plappy_best')||'0');
+        this.isNew=this.score>prev;this.best=Math.max(prev,this.score);
+        localStorage.setItem('plappy_best',String(this.best));
+        saveScore(this.score);
+      }
+      create(){
+        const cx=W/2;
+        this.add.rectangle(cx,H/2,W,H,0x0a0a0f,.95);
+        this.add.text(cx,H*.12,'GAME OVER',{fontFamily:'monospace',fontSize:Math.round(W*.08),fontStyle:'bold',color:'#ef4444',stroke:'#000',strokeThickness:5}).setOrigin(.5);
+        const bw=W*.76,bh=H*.22,bx=cx-bw/2,by=H*.26;
+        const g=this.add.graphics();
+        g.fillStyle(0x12121f);g.fillRoundedRect(bx,by,bw,bh,12);
+        g.lineStyle(2,0x22c55e,.4);g.strokeRoundedRect(bx,by,bw,bh,12);
+        const fs=Math.round(W*.03),fs2=Math.round(W*.06);
+        this.add.text(cx-bw*.32,by+bh*.08,'SCORE',{fontFamily:'monospace',fontSize:fs,color:'#60607a'});
+        this.add.text(cx+bw*.32,by+bh*.08,String(this.score),{fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#f59e0b'}).setOrigin(1,0);
+        this.add.text(cx-bw*.32,by+bh*.52,'BEST', {fontFamily:'monospace',fontSize:fs,color:'#60607a'});
+        this.add.text(cx+bw*.32,by+bh*.52,String(this.best), {fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#22c55e'}).setOrigin(1,0);
+        if(this.isNew&&this.score>0){
+          const t=this.add.text(cx,H*.56,'★ NOUVEAU RECORD! ★',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#f59e0b'}).setOrigin(.5);
+          this.tweens.add({targets:t,scaleX:1.15,scaleY:1.15,duration:400,yoyo:true,repeat:-1});
+        }
+        this.btn(cx,H*.66,'▶  REJOUER',0x22c55e,()=>this.scene.start('Game'));
+        this.btn(cx,H*.78,'🏆 CLASSEMENT',0xa855f7,()=>{if(window.__plappyShowLB)window.__plappyShowLB(true);});
+        this.btn(cx,H*.90,'⇐  MENU',0x404058,()=>this.scene.start('Menu'));
+      }
+      btn(x,y,label,col,cb){
+        const bw=W*.68,bh=Math.round(H*.072);
+        const g=this.add.graphics();
+        g.fillStyle(col,.18);g.fillRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
+        g.lineStyle(2,col);g.strokeRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
+        this.add.text(x,y,label,{fontFamily:'monospace',fontSize:Math.round(W*.042),fontStyle:'bold',color:'#'+col.toString(16).padStart(6,'0')}).setOrigin(.5);
+        this.add.zone(x,y,bw,bh).setInteractive().on('pointerdown',cb);
+      }
+    }
+
+    window.__plappyShowLB = setShowLB;
+    const phaserGame = new Phaser.Game({
+      type:Phaser.AUTO, width:W, height:H, parent:el,
+      backgroundColor:'#0a0a0f',
+      physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
+      scene:[MenuScene,GameScene,GameOverScene],
+      scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+      input:{touch:{capture:true}}
+    });
+
+    gameRef.current = phaserGame;
+    return ()=>{ try{phaserGame.destroy(true);}catch(e){} delete window.__plappyShowLB; };
+  },[currentPlayer]);
+
+  return(
+    <div style={{minHeight:"100vh",background:"#0a0a0f",display:"flex",flexDirection:"column"}}>
+      <style>{RETRO_CSS}</style>
+      <div style={{borderBottom:"2px solid #22c55e44",padding:m?"10px 14px":"14px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+        <button onClick={onBack} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?9:12,color:"#22c55e"}}>PLAPPY PIRD</div>
+        <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
+      </div>
+      <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
+        <div ref={mountRef} style={{flexShrink:0}}/>
+        {/* Mobile leaderboard overlay */}
+        {m&&showLB&&(
+          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",overflowY:"auto"}}>
+            <div style={{borderBottom:"2px solid #a855f744",padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+              <button onClick={()=>setShowLB(false)} style={{background:"none",border:"2px solid #a855f7",borderRadius:4,color:"#a855f7",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
+              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:"#a855f7"}}>HIGH SCORES</div>
+            </div>
+            <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:8}}>
+              {leaderboard.length===0?(
+                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace",textAlign:"center",marginTop:40}}>AUCUN SCORE ENCORE</div>
+              ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
+                <div key={row.player_id} style={{background:isMe?"#a855f711":"#12121f",border:`1px solid ${isMe?"#a855f7":"#1e1e30"}`,borderRadius:6,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:24,flexShrink:0}}>{i+1}</span>
+                  <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
+                    <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                  </div>
+                  <span style={{flex:1,fontSize:8,color:isMe?"#a855f7":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Press Start 2P',monospace"}}>{getDisplayName(row.player,PLAYERS)}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:"#f59e0b",flexShrink:0}}>{row.score}</span>
+                </div>
+              );})}
+            </div>
+          </div>
+        )}
+        {!m&&(
+          <div style={{flex:1,padding:"24px 40px 24px 20px",overflowY:"auto"}}>
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:14}}>🏆 HIGH SCORES</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {leaderboard.length===0?(
+                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace"}}>AUCUN SCORE ENCORE</div>
+              ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
+                <div key={row.player_id} style={{background:isMe?"#22c55e11":"#12121f",border:`1px solid ${isMe?"#22c55e44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:20,flexShrink:0}}>{i+1}</span>
+                  <div style={{width:26,height:26,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
+                    <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                  </div>
+                  <span style={{flex:1,fontSize:7,color:isMe?"#22c55e":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Press Start 2P',monospace"}}>{getDisplayName(row.player,PLAYERS)}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#f59e0b",flexShrink:0}}>{row.score}</span>
+                </div>
+              );})}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ─── GAMES HOME ──────────────────────────────────────
 const RETRO_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -4716,7 +4985,7 @@ const RETRO_CSS = `
 function GamesHomePage({currentPlayer,onBack,nav}){
   const m=useIsMobile();
   const games=[
-    {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Concours de popularité",color:"#f59e0b",active:true},
+    {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Le retour de l'illustre jeu des cartes Pokemon",color:"#f59e0b",active:true},
   ];
   return(
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",position:"relative",overflow:"hidden"}}>
@@ -5377,6 +5646,10 @@ export default function App(){
   // Games section
   if(section==="games") return(
     <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
+  );
+
+  if(section==="plappy") return(
+    <PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
   );
 
   if(section==="tournoi") return(
