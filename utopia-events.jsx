@@ -5407,7 +5407,7 @@ function DataBL({onBack}){
   const [saving,setSaving]=React.useState(false);
   const MEMBER_TYPES=["club","events","non-membre"];
   const MEMBER_LABELS={"club":"Membre Club","events":"Membre Events","non-membre":"Non-membre"};
-  const MEMBER_COLORS={"club":"#86c99e","events":"#E8B84B","non-membre":"#404058"};
+  const MEMBER_COLORS={"club":"#86c99e","events":"#E8B84B","non-membre":"#9ca3af"};
   const S={background:"#1f4d36",border:"1px solid #2d6a4f",borderRadius:8,padding:"10px 14px",color:BL_WHITE,fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",width:"100%",boxSizing:"border-box"};
   const BTN=(c=BL_GREEN_LIGHT)=>({background:c,color:BL_WHITE,border:"none",borderRadius:10,padding:"10px 14px",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",width:"100%"});
 
@@ -5505,7 +5505,7 @@ function DataBL({onBack}){
                     <button onClick={()=>{setEditingName(player.id);setEditNameVal(player.name);}} style={{background:"none",border:"none",color:"#86c99e66",cursor:"pointer",fontSize:11,padding:"0 2px"}}>✎</button>
                   </div>
                 )}
-                <div style={{fontSize:11,color:"#86c99e"}}>{player.sex==="f"?"👧":"👦"} <span style={{color:"#404058"}}>{player.uid}</span></div>
+                <div style={{fontSize:11,color:"#86c99e"}}>{player.sex==="f"?"👧":"👦"} <span style={{color:"#eeeef5"}}>{player.uid}</span></div>
               </div>
               {/* Member type buttons */}
               <div style={{display:"flex",gap:5}}>
