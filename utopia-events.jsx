@@ -381,7 +381,7 @@ const EVENTS = [
   {id:3,name:"Squid Game",edition:"Hiver 2025",date:"Décembre 2025",type:"squidgame",typeLabel:"Squid Game",participants:60,description:"60 joueurs en individuel. Élimination directe.",
    vlogUrl:"",winnerPlayer:117,epreuves:[
      {id:301,name:"Mingle",type:"squid",rounds:[
-       {l:"Tour 1",e:[78,72,148]},
+       {l:"Tour 1",e:[78,72,143]},
        {l:"Tour 2",e:[71,43]},
        {l:"Tour 3",e:[80,99]},
        {l:"Tour 4",e:[52,50,56]},
@@ -406,7 +406,7 @@ const EVENTS = [
        {l:"Partie 2",e:[37,66]}
      ]},
      {id:306,name:"Shi Fu Mi",type:"squid",rounds:[
-       {l:"Éliminés",e:[138,63,154,121,28,25,65,64,94]}
+       {l:"Éliminés",e:[138,63,157,121,28,25,65,64,94]}
      ]},
      {id:307,name:"Dés",type:"squid",rounds:[
        {l:"Éliminés",e:[38,77]}
@@ -1362,8 +1362,7 @@ function SquidGameDetailPage({ev,nav,navBack}){
                 <div key={r.p} onClick={()=>nav("playerDetail",{playerId:r.p})} style={{display:"grid",gridTemplateColumns:"32px 1fr 55px",gap:6,padding:"7px 12px",alignItems:"center",borderBottom:i<sqRatings.length-1?"1px solid #1e1e30":"none",cursor:"pointer",transition:"background .12s"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:i===0?"#E8B84B":i<3?"#60607a":"#2a2a40"}}>{i+1}</span>
                   <div>
-                    <div style={{fontSize:12,fontWeight:500}}>{p?.name||"?"}</div>
-                    {ct&&<div style={{fontSize:9,color:ct.color,marginTop:1}}>{ct.name}</div>}
+                    <div style={{fontSize:12,fontWeight:500}}>{p?getDisplayName(p,PLAYERS):"?"}</div>
                   </div>
                   <span style={{textAlign:"right",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:c}}>{r.r.toFixed(2)}</span>
                 </div>
@@ -1610,7 +1609,7 @@ function RankingsPage({nav}){
                         {submode==="ratings"?r.avg.toFixed(2):submode==="medals"?"":r.pct+"%"}
                       </span>
                     </div>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22}}>{getDisplayName(r.player,allPlayerRanks.map(x=>x.player))}</div>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22}}>{getDisplayName(r.player,PLAYERS)}</div>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
                       <ColorDot teamId={r.team?.id} size={7}/>
                       <span style={{color:"#60607a",fontSize:12}}>{r.team?.name||"Libre"}</span>
@@ -1652,7 +1651,7 @@ function RankingsPage({nav}){
                 <div key={r.player.id} onClick={()=>nav("playerDetail",{playerId:r.player.id})} style={{display:"grid",gridTemplateColumns:m?colMobile:colDesktop,gap:6,padding:"9px 14px",alignItems:"center",borderBottom:i<playerRanks.length-1?"1px solid #1e1e30":"none",cursor:"pointer",transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <span style={{color:r.rank<=3?"#E8B84B":"#60607a",fontWeight:700,fontSize:13}}>{r.rank}</span>
                   <div style={{display:"flex",flexDirection:"column",gap:1}}>
-                    <span style={{fontWeight:500,fontSize:13}}>{getDisplayName(r.player,allPlayerRanks.map(x=>x.player))}</span>
+                    <span style={{fontWeight:500,fontSize:13}}>{getDisplayName(r.player,PLAYERS)}</span>
                     {m&&<span style={{fontSize:10,color:r.team?.color||"#404058"}}>{r.team?.name||"Libre"}</span>}
                   </div>
                   {submode==="ratings"&&!isSquidFilter&&visibleEvs.map(ev=>{const ro=RATINGS.find(rt=>rt.p===r.player.id&&rt.e===ev.id);const v=ro?.r;const c=!v?"#404058":v>=1.8?"#E8B84B":v>=1.6?"#34d399":"#60a5fa";return(<span key={ev.id} style={{textAlign:"center",fontWeight:600,fontSize:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})}
@@ -4307,7 +4306,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                   return(
                     <div key={p.id} style={{background:"#13131f",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
                       <div style={{width:6,height:6,borderRadius:"50%",background:tc,flexShrink:0}}/>
-                      <span style={{fontSize:11,color:"#cccce0"}}>{p.name}</span>
+                      <span style={{fontSize:11,color:"#cccce0"}}>{getDisplayName(p,PLAYERS)}</span>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:count>=3?"#34d399":count>=1?"#E8B84B":"#404058"}}>{count} épr.</span>
                       {!isInTcBio&&<span style={{fontSize:8,color:"#ef4444"}}>⚠️TC/Bio</span>}
                     </div>
@@ -4402,7 +4401,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                                     border:`1px solid ${disabled?"#1e1e30":"#2a2a40"}`,
                                     textDecoration:disabled?"line-through":"none",opacity:disabled?0.5:1}}
                                   title={isUsedPhase?`${p.name} joue déjà dans cette phase`:genderFull?`Places ${pSex==="m"?"hommes":"femmes"} complètes`:""}>
-                                  {disabled?"":"+ "}{p.name}
+                                  {disabled?"":"+ "}{getDisplayName(p,PLAYERS)}
                                   {isUsedPhase&&<span style={{fontSize:8,marginLeft:3}}>Ph.{ep.phase}</span>}
                                 </div>
                               );
@@ -4617,7 +4616,7 @@ function DataPage(){
                     </>
                   ):(
                     <>
-                      <span style={{fontSize:12,flex:1}}>{p.name}</span>
+                      <span style={{fontSize:12,flex:1}}>{p.name}{p.last_name?" "+p.last_name:""}</span>
                       {t&&<span style={{fontSize:10,color:t.color,flexShrink:0}}>{t.name}</span>}
                       <button onClick={()=>setEditPlayer({...p})} style={{background:"none",border:"1px solid #1e1e30",borderRadius:4,color:"#60607a",cursor:"pointer",padding:"2px 6px",fontSize:10}}>✎</button>
                     </>
@@ -5502,7 +5501,7 @@ function DataBL({onBack}){
                   </form>
                 ):(
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.name}</div>
+                    <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.name}{player.last_name?" "+player.last_name:""}</div>
                     <button onClick={()=>{setEditingName(player.id);setEditNameVal(player.name);}} style={{background:"none",border:"none",color:"#86c99e66",cursor:"pointer",fontSize:11,padding:"0 2px"}}>✎</button>
                   </div>
                 )}
