@@ -78,6 +78,8 @@ const TEAMS = [
   {id:17,name:"UNITED",color:"#E8000E",color2:"#FFFFFF",active:true,logoUrl:null,logoFile:"UNITED.svg",oldName:"Expatrié"},
   {id:19,name:"ILIAN",color:"#2DBD6E",color2:"#FFFFFF",active:true,logoUrl:null},
   {id:21,name:"RICARD OG",color:"#F5FC00",color2:"#132FA8",active:true,logoUrl:null,logoFile:"RICARD OG.svg"},
+  {id:23,name:"D.E.O",color:"#1d1d1b",color2:"#FFFFFF",active:true,logoUrl:null,logoFile:"DEO.svg"},
+  {id:24,name:"BLACKFIRE",color:"#FF4500",color2:"#1a1a1a",active:true,logoUrl:null,logoFile:"BLACKFIRE.svg"},
 ];
 
 const PLAYERS = [
