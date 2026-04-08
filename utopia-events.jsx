@@ -4501,7 +4501,7 @@ function DataPage(){
     setLoading(true);
     try{
       const [players,teams]=await Promise.all([
-        sbFetch("players","?select=id,name,uid,team_id,t26&order=name"),
+        sbFetch("players","?select=id,name,uid,team_id,t26,last_name,display_name&order=name"),
         sbFetch("teams","?select=id,name,color,color2,active,logo_color2&order=name")
       ]);
       setData({players,teams});
@@ -4616,7 +4616,7 @@ function DataPage(){
                     </>
                   ):(
                     <>
-                      <span style={{fontSize:12,flex:1}}>{p.name}{p.last_name?" "+p.last_name:""}</span>
+                      <span style={{fontSize:12,flex:1}}>{p.display_name||p.name+(p.last_name?" "+p.last_name:"")}</span>
                       {t&&<span style={{fontSize:10,color:t.color,flexShrink:0}}>{t.name}</span>}
                       <button onClick={()=>setEditPlayer({...p})} style={{background:"none",border:"1px solid #1e1e30",borderRadius:4,color:"#60607a",cursor:"pointer",padding:"2px 6px",fontSize:10}}>✎</button>
                     </>
@@ -5411,7 +5411,7 @@ function DataBL({onBack}){
   const S={background:"#1f4d36",border:"1px solid #2d6a4f",borderRadius:8,padding:"10px 14px",color:BL_WHITE,fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",width:"100%",boxSizing:"border-box"};
   const BTN=(c=BL_GREEN_LIGHT)=>({background:c,color:BL_WHITE,border:"none",borderRadius:10,padding:"10px 14px",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",width:"100%"});
 
-  const filtered=players.filter(p=>p.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered=players.filter(p=>(p.name+" "+(p.last_name||"")).toLowerCase().includes(search.toLowerCase()));
 
   async function createPlayer(){
     if(!newP.name.trim()){setMsg({t:"error",m:"Prénom requis"});return;}
@@ -5501,11 +5501,11 @@ function DataBL({onBack}){
                   </form>
                 ):(
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.name}{player.last_name?" "+player.last_name:""}</div>
+                    <div style={{fontWeight:600,fontSize:14,color:BL_WHITE}}>{player.display_name||player.name+(player.last_name?" "+player.last_name:"")}</div>
                     <button onClick={()=>{setEditingName(player.id);setEditNameVal(player.name);}} style={{background:"none",border:"none",color:"#86c99e66",cursor:"pointer",fontSize:11,padding:"0 2px"}}>✎</button>
                   </div>
                 )}
-                <div style={{fontSize:11,color:"#86c99e"}}>{player.sex==="f"?"👧":"👦"} {player.uid}</div>
+                <div style={{fontSize:11,color:"#86c99e"}}>{player.sex==="f"?"👧":"👦"} <span style={{color:"#404058"}}>{player.uid}</span></div>
               </div>
               {/* Member type buttons */}
               <div style={{display:"flex",gap:5}}>
@@ -5602,7 +5602,7 @@ export default function App(){
         t24:p.t24||null, t25:p.t25||null, teo:p.teo||null, t26:p.t26||null,
         t24cap:p.t24cap||false, t25cap:p.t25cap||false, teocap:p.teocap||false, t26cap:p.t26cap||false,
         sex:p.sex||"m", member_type:p.member_type||"non-membre", last_name:p.last_name||null,
-        tournoi_count:p.tournoi_count||0,
+        display_name:p.display_name||null, tournoi_count:p.tournoi_count||0,
         photoUrl:`/photos/${p.uid}.jpg`,
       }));
       const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
