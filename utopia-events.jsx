@@ -935,7 +935,7 @@ function HomePage({nav}){
             <div key={r.player.id} onClick={()=>nav("playerDetail",{playerId:r.player.id})} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<4?"1px solid #1e1e30":"none",cursor:"pointer",transition:"padding-left .12s"}} onMouseEnter={e=>e.currentTarget.style.paddingLeft="5px"} onMouseLeave={e=>e.currentTarget.style.paddingLeft="0"}>
               <span style={{color:i<3?"#E8B84B":"#60607a",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,width:18}}>{i+1}</span>
               <ColorDot teamId={r.player.teamId} size={7}/>
-              <span style={{flex:1,fontWeight:500,fontSize:13}}>{r.player.name}</span>
+              <span style={{flex:1,fontWeight:500,fontSize:13}}>{getDisplayName(r.player,PLAYERS)}</span>
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:r.avg>=1.8?"#E8B84B":r.avg>=1.6?"#34d399":"#60a5fa"}}>{r.avg.toFixed(2)}</span>
             </div>
           ))}
@@ -971,12 +971,12 @@ function HomePage({nav}){
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
                 <div style={{width:50,height:50,borderRadius:"50%",border:`3px solid ${jc}`,flexShrink:0,overflow:"hidden",background:jc+"22",display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {jdd.player.photoUrl
-                  ?<img src={jdd.player.photoUrl} alt={jdd.player.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>
+                  ?<img src={jdd.player.photoUrl} alt={getDisplayName(jdd.player,PLAYERS)} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>
                   :null}
                 <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:jc,display:jdd.player.photoUrl?"none":"flex"}}>{jdd.player.name.charAt(0)}</span>
               </div>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,lineHeight:1}}>{jdd.player.name}</div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,lineHeight:1}}>{getDisplayName(jdd.player,PLAYERS)}</div>
                   <div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}>
                     <div style={{width:6,height:6,borderRadius:"50%",background:jdd.team?.color||"#404058"}}/>
                     <span style={{fontSize:11,color:jdd.team?.color||"#60607a"}}>{jdd.team?.name||"Libre"}</span>
@@ -1043,7 +1043,7 @@ function HomePage({nav}){
               </div>
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                 {roster.slice(0,6).map(p=>(
-                  <span key={p.id} style={{background:ec+"18",border:`1px solid ${p.t26cap?"#E8B84B":ec}33`,borderRadius:5,padding:"2px 7px",fontSize:10,color:p.t26cap?"#E8B84B":ec}}>{p.name}</span>
+                  <span key={p.id} style={{background:ec+"18",border:`1px solid ${p.t26cap?"#E8B84B":ec}33`,borderRadius:5,padding:"2px 7px",fontSize:10,color:p.t26cap?"#E8B84B":ec}}>{getDisplayName(p,PLAYERS)}</span>
                 ))}
                 {roster.length>6&&<span style={{fontSize:10,color:"#404058",padding:"2px 4px"}}>+{roster.length-6}</span>}
               </div>
@@ -1073,7 +1073,7 @@ function HomePage({nav}){
                   <div key={r.p} onClick={()=>nav("playerDetail",{playerId:r.p})} style={{display:"flex",alignItems:"center",gap:7,padding:"6px 0",borderBottom:i<2?"1px solid #1e1e30":"none",cursor:"pointer"}}>
                     <span style={{fontSize:16}}>{MEDALS[i]}</span>
                     <ColorDot teamId={ct?.id} size={6}/>
-                    <span style={{flex:1,fontSize:13,fontWeight:500}}>{p?.name}</span>
+                    <span style={{flex:1,fontSize:13,fontWeight:500}}>{getDisplayName(p,PLAYERS)}</span>
                     <span style={{fontSize:13,fontWeight:700,color:r.r>=1.8?"#E8B84B":r.r>=1.6?"#34d399":"#60a5fa"}}>{r.r.toFixed(2)}</span>
                   </div>
                 );
@@ -1212,7 +1212,7 @@ function EpreuveCard({ep,ac,nav}){
                     const p=getPlayer(pid);
                     return(
                       <span key={pid} onClick={()=>nav("playerDetail",{playerId:pid})} style={{background:"#13131f",border:`1px solid ${t?.color||"#888"}33`,borderRadius:5,padding:"2px 7px",fontSize:11,cursor:"pointer",color:"#cccce0"}} onMouseEnter={e=>{e.currentTarget.style.color=t?.color||"#fff";}} onMouseLeave={e=>{e.currentTarget.style.color="#cccce0";}}>
-                        {p?.name||"?"}
+                        {getDisplayName(p,PLAYERS)||"?"}
                       </span>
                     );
                   })}
@@ -1255,7 +1255,7 @@ function RankRow({t,i,r,ac,ev,nav}){
             <span style={{fontSize:11,color:"#404058"}}>Roster non disponible pour cette édition.</span>
           ):roster.map(p=>(
             <span key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}} style={{background:t.color+"18",border:`1px solid ${t.color}44`,borderRadius:6,padding:"3px 9px",fontSize:11,color:"#eeeef5",cursor:"pointer",transition:"background .12s"}} onMouseEnter={e=>e.currentTarget.style.background=t.color+"33"} onMouseLeave={e=>e.currentTarget.style.background=t.color+"18"}>
-              {p.name}
+              {getDisplayName(p,PLAYERS)}
             </span>
           ))}
         </div>
@@ -1297,7 +1297,7 @@ function SquidGameDetailPage({ev,nav,navBack}){
           <span style={{fontSize:32}}>👑</span>
           <div>
             <div style={{fontSize:10,color:"#E8B84B",textTransform:"uppercase",letterSpacing:"0.1em"}}>Vainqueur</div>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,lineHeight:1}}>{winner.name}</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,lineHeight:1}}>{getDisplayName(winner,PLAYERS)}</div>
           </div>
           <div style={{marginLeft:"auto",fontFamily:"'Bebas Neue',sans-serif",fontSize:36,color:"#E8B84B"}}>1.99</div>
         </div>
@@ -1336,7 +1336,7 @@ function SquidGameDetailPage({ev,nav,navBack}){
                       <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                         {round.e.map(pid=>{
                           const p=getPlayer(pid);
-                          return(<span key={pid} onClick={()=>nav("playerDetail",{playerId:pid})} style={{background:"#1a0a0a",border:"1px solid #ef444433",borderRadius:5,padding:"2px 7px",fontSize:11,color:"#ef4444",cursor:"pointer"}}>✕ {p?.name||"?"}</span>);
+                          return(<span key={pid} onClick={()=>nav("playerDetail",{playerId:pid})} style={{background:"#1a0a0a",border:"1px solid #ef444433",borderRadius:5,padding:"2px 7px",fontSize:11,color:"#ef4444",cursor:"pointer"}}>✕ {getDisplayName(p,PLAYERS)||"?"}</span>);
                         })}
                       </div>
                     </div>
@@ -1428,7 +1428,7 @@ function EventDetailPage({eventId,nav,navBack}){
             <div key={r.p} style={{display:"grid",gridTemplateColumns:"22px 1fr 80px 46px",alignItems:"center",gap:6,padding:"7px 0",borderBottom:i<evRatings.length-1?"1px solid #1e1e30":"none",cursor:"pointer"}} onClick={()=>nav("playerDetail",{playerId:r.p})}>
               <span style={{fontSize:11,color:i<3?"#E8B84B":"#60607a",fontWeight:600}}>{i+1}</span>
               <div>
-                <div style={{fontSize:12,fontWeight:600}}>{p?.name}</div>
+                <div style={{fontSize:12,fontWeight:600}}>{getDisplayName(p,PLAYERS)}</div>
                 {ct&&<div style={{display:"flex",alignItems:"center",gap:4,marginTop:1}}><div style={{width:5,height:5,borderRadius:"50%",background:ct.color}}/><span style={{fontSize:10,color:ct.color}}>{ct.name}</span></div>}
               </div>
               <div style={{fontSize:10,color:"#60607a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}></div>
@@ -2841,7 +2841,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <div style={{fontSize:11,color:"#60607a",marginBottom:8}}>32 participants (2 par équipe)</div>
               <DragRankList compact items={dragRankCoef} onReorder={setDragRankCoef} locked={dragRankCoefLocked}
                 getKey={s=>`${s.teamId}-${s.slot}`}
-                getLabel={s=>{const t=getO2026Team(s.teamId);const ps=PLAYERS.filter(p=>p.t26===s.teamId);const p=ps[s.slot]||ps[0];return`${p?.name||"Joueur"} (${t?.name||"?"})`;}}
+                getLabel={s=>{const t=getO2026Team(s.teamId);const ps=PLAYERS.filter(p=>p.t26===s.teamId);const p=ps[s.slot]||ps[0];return`${getDisplayName(p,PLAYERS)||"Joueur"} (${t?.name||"?"})`;}}
                 getColor={s=>getO2026Team(s.teamId)?.color||"#60607a"}/>
               {dragRankCoef.length>0&&(
                 <div style={{marginTop:12,borderTop:"1px solid #1e1e30",paddingTop:12}}>
@@ -3206,7 +3206,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                       {players.map(p=>(
                         <span key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}}
                           style={{fontSize:10,color:team.color,background:team.color+"15",borderRadius:10,padding:"2px 8px",cursor:"pointer",border:`1px solid ${team.color}22`}}>
-                          {p.name}
+                          {getDisplayName(p,PLAYERS)}
                         </span>
                       ))}
                     </div>
@@ -3503,7 +3503,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                           <span style={{flex:1,fontSize:10,fontWeight:600,color:t?.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?.name}</span>
                           {!isMiniB&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#E8B84B"}}>{s.pts}pts</span>}
                         </div>
-                        {players.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:2,paddingLeft:17}}>{players.map(p=><span key={p.id} style={{fontSize:8,color:t?.color,background:t?.color+"15",borderRadius:3,padding:"1px 4px"}}>{p.name}</span>)}</div>}
+                        {players.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:2,paddingLeft:17}}>{players.map(p=><span key={p.id} style={{fontSize:8,color:t?.color,background:t?.color+"15",borderRadius:3,padding:"1px 4px"}}>{getDisplayName(p,PLAYERS)}</span>)}</div>}
                       </div>
                     );
                   })}
@@ -3649,7 +3649,7 @@ function TeamsPage({nav}){
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {players.map(p=>(
-                    <div key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}} style={{background:team.color+"22",border:`1px solid ${p.t26cap?"#E8B84B":team.color}33`,borderRadius:4,padding:"2px 6px",fontSize:10,color:p.t26cap?"#E8B84B":(parseInt(team.color.slice(1),16)<0x404040?team.color2||"#FFFFFF":team.color),cursor:"pointer"}}>{p.name}</div>
+                    <div key={p.id} onClick={e=>{e.stopPropagation();nav("playerDetail",{playerId:p.id});}} style={{background:team.color+"22",border:`1px solid ${p.t26cap?"#E8B84B":team.color}33`,borderRadius:4,padding:"2px 6px",fontSize:10,color:p.t26cap?"#E8B84B":(parseInt(team.color.slice(1),16)<0x404040?team.color2||"#FFFFFF":team.color),cursor:"pointer"}}>{getDisplayName(p,PLAYERS)}</div>
                   ))}
                 </div>
               </div>
@@ -3733,10 +3733,10 @@ function HistoricRosters({teamId,allTeamIds,c1,nav}){
             return(
               <div key={p.id} onClick={()=>nav("playerDetail",{playerId:p.id})} style={{background:"#13131f",borderRadius:8,padding:"9px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:9,transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"} onMouseLeave={e=>e.currentTarget.style.background="#13131f"}>
                 <div style={{width:30,height:30,borderRadius:"50%",background:(p[active.capKey]?"#E8B84B22":c1+"22"),border:`2px solid ${p[active.capKey]?"#E8B84B":c1}`,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {p.photoUrl?<img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>:<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:p[active.capKey]?"#E8B84B":c1}}>{p.name.charAt(0)}</span>}
+                      {p.photoUrl?<img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>:<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:p[active.capKey]?"#E8B84B":c1}}>{getDisplayName(p,PLAYERS).charAt(0)}</span>}
                     </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:500,fontSize:12}}>{p.name}</div>
+                  <div style={{fontWeight:500,fontSize:12}}>{getDisplayName(p,PLAYERS)}</div>
                   {rating&&<div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:rating>=1.8?"#E8B84B":rating>=1.6?"#34d399":"#60a5fa",lineHeight:1.2}}>{rating.toFixed(2)}</div>}
                 
                 </div>
@@ -3861,10 +3861,10 @@ function TeamDetailPage({teamId,nav,navBack}){
             return(
               <div key={p.id} onClick={()=>nav("playerDetail",{playerId:p.id})} style={{background:"#13131f",borderRadius:8,padding:"9px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:9,transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"} onMouseLeave={e=>e.currentTarget.style.background="#13131f"}>
                 <div style={{width:30,height:30,borderRadius:"50%",background:(p.t26cap?"#E8B84B22":c1+"22"),border:`2px solid ${p.t26cap?"#E8B84B":c1}`,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {p.photoUrl?<img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>:<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:p.t26cap?"#E8B84B":c1}}>{p.name.charAt(0)}</span>}
+                      {p.photoUrl?<img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>:<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:p.t26cap?"#E8B84B":c1}}>{getDisplayName(p,PLAYERS).charAt(0)}</span>}
                     </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:500,fontSize:12}}>{p.name}</div>
+                  <div style={{fontWeight:500,fontSize:12}}>{getDisplayName(p,PLAYERS)}</div>
                   {avg?<div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:avg>=1.8?"#E8B84B":avg>=1.6?"#34d399":"#60a5fa",lineHeight:1.2}}>{avg.toFixed(2)}</div>:<div style={{fontSize:10,color:"#404058"}}>nouveau</div>}
                 </div>
               </div>
@@ -4000,12 +4000,12 @@ function PlayerDetailPage({playerId,nav,navBack}){
         <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
           <div style={{width:m?56:70,height:m?56:70,borderRadius:"50%",border:`3px solid ${tc}`,flexShrink:0,overflow:"hidden",background:`linear-gradient(135deg,${tc}33,${tc}11)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
             {player.photoUrl
-              ?<img src={player.photoUrl} alt={player.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>
+              ?<img src={player.photoUrl} alt={getDisplayName(player,PLAYERS)} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex";}}/>
               :null}
             <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:tc,display:player.photoUrl?"none":"flex"}}>{player.name.charAt(0)}</span>
           </div>
           <div style={{flex:1}}>
-            <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?32:44,lineHeight:1}}>{player.name}{player.last_name&&<span style={{fontSize:m?18:24,color:"#60607a",marginLeft:8}}>{player.last_name}</span>}</h1>
+            <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?32:44,lineHeight:1}}>{getDisplayName(player,PLAYERS)}{player.last_name&&<span style={{fontSize:m?18:24,color:"#60607a",marginLeft:8}}>{player.last_name}</span>}</h1>
             {getOfficerRole(player)&&<div style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginTop:4,textTransform:"uppercase",letterSpacing:"0.08em"}}>⭐ {getOfficerRole(player)}</div>}
             <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}>
               {team&&(<><ColorDot teamId={team.id} size={8}/><span style={{color:tc,fontWeight:600,fontSize:13}}>{team.dissolvedName||team.name}</span></>)}
@@ -4246,7 +4246,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                 :<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:tc}}>{player.name.charAt(0)}</span>}
             </div>
             <div>
-              <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,color:tc,lineHeight:1}}>{player.name}{player.last_name&&<span style={{fontSize:m?18:22,color:tc+"aa"}}> {player.last_name}</span>}</h2>
+              <h2 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,color:tc,lineHeight:1}}>{getDisplayName(player,PLAYERS)}{player.last_name&&<span style={{fontSize:m?18:22,color:tc+"aa"}}> {player.last_name}</span>}</h2>
               {team&&<div style={{fontSize:12,color:tc,marginTop:2}}>● {team.dissolvedName||team.name}</div>}
               <div style={{fontSize:11,color:"#404058",marginTop:4}}>Voir ma fiche joueur →</div>
             </div>
@@ -4378,7 +4378,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                               return(
                                 <div key={pid} onClick={()=>saveAssignment(ep.id,assigned.filter(id=>id!==pid))}
                                   style={{background:tc+"22",border:`1px solid ${tc}55`,borderRadius:20,padding:"4px 10px",fontSize:11,color:tc,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-                                  {p?.name} <span style={{fontSize:9,color:tc+"88"}}>✕</span>
+                                  {getDisplayName(p,PLAYERS)} <span style={{fontSize:9,color:tc+"88"}}>✕</span>
                                 </div>
                               );
                             })}
@@ -4400,7 +4400,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                                     color:disabled?"#2a2a40":"#60607a",cursor:disabled?"not-allowed":"pointer",
                                     border:`1px solid ${disabled?"#1e1e30":"#2a2a40"}`,
                                     textDecoration:disabled?"line-through":"none",opacity:disabled?0.5:1}}
-                                  title={isUsedPhase?`${p.name} joue déjà dans cette phase`:genderFull?`Places ${pSex==="m"?"hommes":"femmes"} complètes`:""}>
+                                  title={isUsedPhase?`${getDisplayName(p,PLAYERS)} joue déjà dans cette phase`:genderFull?`Places ${pSex==="m"?"hommes":"femmes"} complètes`:""}>
                                   {disabled?"":"+ "}{getDisplayName(p,PLAYERS)}
                                   {isUsedPhase&&<span style={{fontSize:8,marginLeft:3}}>Ph.{ep.phase}</span>}
                                 </div>
@@ -5151,7 +5151,7 @@ function TournoiPage({currentPlayer,onBack}){
               {selected.map(p=>(
                 <span key={p.id} onClick={()=>setSelected(s=>s.filter(x=>x.id!==p.id))}
                   style={{background:"#f59e0b22",border:"1px solid #f59e0b",borderRadius:3,padding:"3px 8px",fontSize:7,color:"#f59e0b",cursor:"pointer"}}>
-                  {p.name} ✕
+                  {getDisplayName(p,PLAYERS)} ✕
                 </span>
               ))}
             </div>
@@ -5167,7 +5167,7 @@ function TournoiPage({currentPlayer,onBack}){
                     <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
                   </div>
                   <div style={{flex:1,overflow:"hidden"}}>
-                    <div style={{fontSize:9,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name.toUpperCase()}</div>
+                    <div style={{fontSize:9,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(p,PLAYERS).toUpperCase()}</div>
                     {p.last_name&&<div style={{fontSize:7,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
                     {p.tournoi_count>0&&<div style={{fontSize:8,color:"#f59e0b",marginTop:3,fontWeight:700}}>×{p.tournoi_count}</div>}
                   </div>
@@ -5454,7 +5454,7 @@ function DataBL({onBack}){
       await sbFetch("players",`?id=eq.${player.id}`,{method:"DELETE"});
       PLAYERS.splice(PLAYERS.findIndex(p=>p.id===player.id),1);
       setPlayers(prev=>prev.filter(p=>p.id!==player.id));
-      setMsg({t:"success",m:`${player.name} supprimé`});
+      setMsg({t:"success",m:`${getDisplayName(player,PLAYERS)} supprimé`});
     }catch(e){setMsg({t:"error",m:e.message});}
   }
 
