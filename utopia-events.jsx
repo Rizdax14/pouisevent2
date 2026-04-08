@@ -795,14 +795,14 @@ function LoginBL({onLogin,dbLoaded}){
 
 
 // ─── SMART DISPLAY NAME ──────────────────────────────
-// Returns "Prénom" if unique, "Prénom X" or "Prénom Xy" if duplicate first name
 function getDisplayName(player, allPlayers){
   if(!player)return"?";
+  // Prefer display_name computed by Supabase trigger
+  if(player.display_name)return player.display_name;
   const fname=player.name;
   const duplicates=(allPlayers||PLAYERS).filter(p=>p.name===fname&&p.uid);
   if(duplicates.length<=1)return fname;
   if(!player.last_name)return fname;
-  // Find minimum letters needed to differentiate
   const others=duplicates.filter(p=>p.id!==player.id);
   let letters=1;
   while(letters<=player.last_name.length){
@@ -1276,8 +1276,6 @@ function SquidGameDetailPage({ev,nav,navBack}){
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1200,margin:"0 auto"}} className="fade">
       <BackBtn onClick={navBack} label="Retour"/>
       <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`,borderRadius:2,marginBottom:18}}/>
-      {supaLoading&&<div style={{background:"#13131f",borderRadius:8,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#60607a"}}><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span> Chargement des données...</div>}
-      {!supaLoading&&isLouis&&lastSaveTs>0&&<div style={{background:"#13131f",borderRadius:8,padding:"6px 12px",marginBottom:12,display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#34d399"}}>✓ Sauvegardé</div>}
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:22}}>
         <div>
@@ -4008,7 +4006,8 @@ function PlayerDetailPage({playerId,nav,navBack}){
             <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:tc,display:player.photoUrl?"none":"flex"}}>{player.name.charAt(0)}</span>
           </div>
           <div style={{flex:1}}>
-            <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?32:44,lineHeight:1}}>{player.name}</h1>
+            <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?32:44,lineHeight:1}}>{player.name}{player.last_name&&<span style={{fontSize:m?18:24,color:"#60607a",marginLeft:8}}>{player.last_name}</span>}</h1>
+            {getOfficerRole(player)&&<div style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginTop:4,textTransform:"uppercase",letterSpacing:"0.08em"}}>⭐ {getOfficerRole(player)}</div>}
             <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}>
               {team&&(<><ColorDot teamId={team.id} size={8}/><span style={{color:tc,fontWeight:600,fontSize:13}}>{team.dissolvedName||team.name}</span></>)}
               {avg&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#E8B84B",marginLeft:8}}>{avg.toFixed(2)}</span>}
@@ -5230,6 +5229,28 @@ function TournoiPage({currentPlayer,onBack}){
   );
 }
 
+// ─── BUREAU BL ───────────────────────────────────────────
+const OFFICERS_BY_UID = {
+  "louis-mar":  "Vice Secrétaire",
+  "maxime-m":   "Président",
+  "thisma":     "Vice Présidente",
+  "samuel-oll": "Secrétaire",
+  "thomas-pey": "Trésorier",
+};
+const OFFICERS_BY_NAME = {
+  "Louis":   "Vice Secrétaire",
+  "Maxime M":"Président",
+  "Thisma":  "Vice Présidente",
+  "Samuel":  "Secrétaire",
+  "Thomas":  "Trésorier",
+};
+function getOfficerRole(player){
+  if(!player)return null;
+  return OFFICERS_BY_UID[player.uid]||OFFICERS_BY_NAME[player.name]||null;
+}
+function isOfficer(uid){ return !!OFFICERS_BY_UID[uid]; }
+
+
 // ─── MENU BIÈRE LEVERCULSEC ─────────────────────────
 const BL_GREEN = "#1a3d2b";
 const BL_GREEN_LIGHT = "#2d6a4f";
@@ -5250,7 +5271,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
       <div style={{background:BL_GREEN,borderBottom:`1px solid ${BL_GREEN_LIGHT}`,padding:m?"18px 20px":"24px 40px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          {isLouis&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
+          {(isLouis||getOfficerRole(currentPlayer))&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:12,color:"#86c99e"}}>{currentPlayer?.name}</div>
             <button onClick={onLogout} style={{background:"none",border:"none",color:"#86c99e66",fontSize:10,cursor:"pointer",padding:0}}>Se déconnecter</button>
@@ -5347,7 +5368,12 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
                 <div>
                   <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?24:30,color:BL_WHITE,lineHeight:1}}>{currentPlayer?.name}{(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)?.last_name&&<span style={{fontSize:m?16:20,color:"#ffffff99"}}> {(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer).last_name}</span>}</div>
                   <div style={{fontSize:11,color:memberColors[mt]||"#60607a",marginTop:4,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em"}}>{memberLabels[mt]||"Non-membre"}</div>
-                  <div style={{fontSize:10,color:"#86c99e66",marginTop:2}}>{memberDesc?.[mt]||""}</div>
+                  {getOfficerRole(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)&&(
+                    <div style={{fontSize:10,color:"#f59e0b",marginTop:4,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",background:"#f59e0b15",borderRadius:4,padding:"2px 6px",display:"inline-block"}}>
+                      ⭐ {getOfficerRole(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)}
+                    </div>
+                  )}
+                  {!getOfficerRole(PLAYERS.find(p=>p.id===currentPlayer?.id)||currentPlayer)&&<div style={{fontSize:10,color:"#86c99e66",marginTop:2}}>{memberDesc?.[mt]||""}</div>}
                 </div>
               </div>
               <div style={{fontSize:10,color:"#ffffff44",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:"0.15em"}}>ID #{String(currentPlayer?.id).padStart(4,"0")}</div>
@@ -5375,7 +5401,7 @@ function DataBL({onBack}){
   const m=useIsMobile();
   const [players,setPlayers]=React.useState([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));
   const [search,setSearch]=React.useState("");
-  const [newP,setNewP]=React.useState({name:"",uid:"",sex:"m"});
+  const [newP,setNewP]=React.useState({name:"",uid:"",sex:"m",last_name:""});
   const [editingName,setEditingName]=React.useState(null);
   const [editNameVal,setEditNameVal]=React.useState("");
   const [msg,setMsg]=React.useState(null);
@@ -5394,12 +5420,12 @@ function DataBL({onBack}){
     try{
       const maxId=Math.max(...PLAYERS.map(p=>p.id),0);
       const uid=newP.uid||newP.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
-      await sbInsert("players",{id:maxId+1,uid,name:newP.name,sex:newP.sex||"m",member_type:"non-membre"});
+      await sbInsert("players",{id:maxId+1,uid,name:newP.name,last_name:newP.last_name||null,sex:newP.sex||"m",member_type:"non-membre"});
       setMsg({t:"success",m:`${newP.name} ajouté !`});
       setNewP({name:"",uid:"",sex:"m",team_id:""});
       // Reload
       const fresh=await sbFetch("players","?select=*&order=name");
-      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",last_name:p.last_name||null,photoUrl:`/photos/${p.uid}.jpg`}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
+      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",last_name:p.last_name||null,display_name:p.display_name||null,photoUrl:`/photos/${p.uid}.jpg`}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
     }catch(e){setMsg({t:"error",m:e.message});}
     setSaving(false);
   }
@@ -5450,6 +5476,7 @@ function DataBL({onBack}){
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#86c99e",marginBottom:12}}>AJOUTER UN MEMBRE</div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:10,marginBottom:10}}>
             <input placeholder="Prénom *" value={newP.name} onChange={e=>setNewP({...newP,name:e.target.value})} style={S}/>
+            <input placeholder="Nom de famille" value={newP.last_name||""} onChange={e=>setNewP({...newP,last_name:e.target.value})} style={S}/>
             <input placeholder="UID (optionnel)" value={newP.uid} onChange={e=>setNewP({...newP,uid:e.target.value})} style={S}/>
             <select value={newP.sex} onChange={e=>setNewP({...newP,sex:e.target.value})} style={S}>
               <option value="m">👦 Homme</option>
@@ -5651,7 +5678,7 @@ export default function App(){
   );
 
   // Data BL (Louis only)
-  if(section==="dataBL"&&isAdmin) return(
+  if(section==="dataBL"&&(isAdmin||getOfficerRole(currentPlayer))) return(
     <DataBL onBack={()=>setSection("menu")}/>
   );
 
