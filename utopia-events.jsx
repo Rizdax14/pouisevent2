@@ -4721,21 +4721,37 @@ function DataPage(){
 // ─── APP ─────────────────────────────────────────────
 const ADMIN_UID = "louis-mar";
 
-// ─── PLAPPY PIRD ─────────────────────────────────────────
+// ─── PLAPPY PIRD ─────────────────────────────────────
 function PlappyPirdPage({currentPlayer, onBack}){
-  const m = useIsMobile();
-  const mountRef = React.useRef(null);
-  const gameRef  = React.useRef(null);
-  const [myBest, setMyBest] = React.useState(parseInt(localStorage.getItem('plappy_best')||'0'));
-  const [leaderboard, setLeaderboard] = React.useState([]);
-  const [showLB, setShowLB] = React.useState(false);
+  const m=useIsMobile();
+  const canvasRef=React.useRef(null);
+  const stateRef=React.useRef("idle");
+  const [view,setView]=React.useState("game");
+  const [leaderboard,setLeaderboard]=React.useState([]);
+  const [myBest,setMyBest]=React.useState(parseInt(localStorage.getItem('plappy_best')||'0'));
+
+  // Bird color = team color from current olympiade (t26)
+  const birdColor=React.useMemo(()=>{
+    if(!currentPlayer)return"#f59e0b";
+    const p=PLAYERS.find(pl=>pl.id===currentPlayer.id)||currentPlayer;
+    const teamId=p.t26||p.teamId;
+    const team=TEAMS.find(t=>t.id===teamId);
+    return team?.color||"#f59e0b";
+  },[currentPlayer]);
+
+  const W=360,H=520;
+  const GRAVITY=0.42,FLAP=-8.5,PIPE_W=52,SPEED=2.0;
+  const GAP=190;
+  const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:parseInt(localStorage.getItem('plappy_best')||'0')});
 
   async function loadLeaderboard(){
     try{
-      const data = await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
+      const data=await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
       if(data){
-        const rows = data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
+        const rows=data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
         setLeaderboard(rows);
+        const mine=data.find(r=>r.player_id===currentPlayer?.id);
+        if(mine){setMyBest(mine.score);gameVars.current.bestScore=mine.score;}
       }
     }catch(e){}
   }
@@ -4743,254 +4759,151 @@ function PlappyPirdPage({currentPlayer, onBack}){
   async function saveScore(s){
     if(!currentPlayer||s<=0)return;
     try{
-      // First check existing score
       const existing=await sbFetch("games_scores",`?game=eq.plappy&player_id=eq.${currentPlayer.id}&limit=1`);
       const prevScore=existing&&existing.length>0?existing[0].score:0;
-      if(s<=prevScore)return; // Don't save if not a new best
-      // Upsert the new best score
+      if(s<=prevScore)return;
       const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
         method:'POST',
         headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
         body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,updated_at:new Date().toISOString()})
       });
-      if(r.ok){
-        setMyBest(s);
-        localStorage.setItem('plappy_best',String(s));
-        loadLeaderboard();
-      }
+      if(r.ok){setMyBest(s);localStorage.setItem('plappy_best',String(s));loadLeaderboard();}
     }catch(e){console.error('saveScore',e);}
   }
 
+  React.useEffect(()=>{ loadLeaderboard(); },[]);
+
   React.useEffect(()=>{
-    loadLeaderboard();
-    // Small delay to ensure DOM is painted before Phaser reads dimensions
-    const timer = setTimeout(()=>{
-      const el = mountRef.current;
-      if(!el||!window.Phaser) return;
+    const canvas=canvasRef.current;if(!canvas)return;
+    const ctx=canvas.getContext("2d",{alpha:false});
+    canvas.width=W;canvas.height=H;
+    let raf;
+    const gv=gameVars.current;
+    const bc=birdColor;
 
-      const W   = 360;
-      const H   = Math.max(500, window.innerHeight - 120);
-    const GAP = Math.round(H * 0.37);
-    const PW  = Math.round(W * 0.15);
-    const BR  = Math.round(W * 0.065);
-    const GH  = 44;
-
-    function addRect(scene, x, y, w, h, color){
-      const r = scene.add.rectangle(x, y, w, h, color).setDepth(1);
-      scene.physics.add.existing(r);
-      r.body.allowGravity = false;
-      r.body.setImmovable(true);
-      return r;
+    function resetGame(){
+      gv.bird={x:80,y:H/2,vy:0,r:22};
+      gv.pipes=[];gv.score=0;gv.frame=0;gv.alive=false;gv.started=false;
+      stateRef.current="idle";setView("game");
     }
 
-    class MenuScene extends Phaser.Scene{
-      constructor(){super('Menu');}
-      preload(){
-        if(BIRD_URL){
-          this.load.crossOrigin='anonymous';
-          this.load.image('birdPhoto', BIRD_URL);
-        }
-      }
-      create(){
-        const cx=W/2;
-        this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
-        this.add.text(cx,H*.18,'PLAPPY',{fontFamily:'monospace',fontSize:Math.round(W*.11),fontStyle:'bold',color:'#22c55e',stroke:'#000',strokeThickness:6}).setOrigin(.5);
-        this.add.text(cx,H*.3,'PIRD',{fontFamily:'monospace',fontSize:Math.round(W*.11),fontStyle:'bold',color:'#f59e0b',stroke:'#000',strokeThickness:6}).setOrigin(.5);
-        const b=this.add.circle(cx,H*.48,BR,0xf59e0b);
-        this.tweens.add({targets:b,y:H*.48-12,duration:600,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
-        const t=this.add.text(cx,H*.68,'→  APPUIE POUR JOUER  ←',{fontFamily:'monospace',fontSize:Math.round(W*.033),color:'#f59e0b'}).setOrigin(.5);
-        this.tweens.add({targets:t,alpha:.1,duration:700,yoyo:true,repeat:-1});
-        this.add.text(cx,H*.78,'BEST: '+(localStorage.getItem('plappy_best')||'0'),{fontFamily:'monospace',fontSize:Math.round(W*.036),fontStyle:'bold',color:'#22c55e'}).setOrigin(.5);
-        this.input.once('pointerdown',()=>this.scene.start('Game'));
-        this.input.keyboard?.once('keydown-SPACE',()=>this.scene.start('Game'));
-      }
+    function flap(){
+      if(stateRef.current==="dead"||stateRef.current==="leaderboard")return;
+      if(!gv.started){gv.started=true;gv.alive=true;stateRef.current="playing";}
+      gv.bird.vy=FLAP;
     }
 
-    class GameScene extends Phaser.Scene{
-      constructor(){super('Game');}
-      preload(){
-        if(BIRD_URL&&!this.textures.exists('birdPhoto')){
-          this.load.crossOrigin='anonymous';
-          this.load.image('birdPhoto', BIRD_URL);
-        }
+    let btnAreas=[];
+    const onTap=e=>{
+      e.preventDefault();
+      const rect=canvas.getBoundingClientRect();
+      const scaleX=W/rect.width,scaleY=H/rect.height;
+      const cx=(e.changedTouches?e.changedTouches[0].clientX:e.clientX)-rect.left;
+      const cy=(e.changedTouches?e.changedTouches[0].clientY:e.clientY)-rect.top;
+      const mx=cx*scaleX,my=cy*scaleY;
+      for(const btn of btnAreas){if(mx>=btn.x&&mx<=btn.x+btn.w&&my>=btn.y&&my<=btn.y+btn.h){btn.action();return;}}
+      flap();
+    };
+    const onKey=e=>{if(e.code==="Space"||e.code==="ArrowUp"){e.preventDefault();flap();}};
+    canvas.addEventListener("touchstart",onTap,{passive:false});
+    canvas.addEventListener("click",onTap);
+    window.addEventListener("keydown",onKey);
+
+    function drawBtn(x,y,w,h,label,color){
+      ctx.fillStyle=color+"33";ctx.fillRect(x,y,w,h);
+      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
+      ctx.fillStyle=color;ctx.font=`8px monospace`;ctx.textAlign="center";
+      ctx.fillText(label,x+w/2,y+h/2+3);
+    }
+
+    function draw(){
+      ctx.fillStyle="#0a0a0f";ctx.fillRect(0,0,W,H);
+      ctx.fillStyle="rgba(0,0,0,0.08)";
+      for(let y=0;y<H;y+=4)ctx.fillRect(0,y,W,2);
+      ctx.fillStyle="#1a3d2b";ctx.fillRect(0,H-40,W,40);
+      ctx.fillStyle="#2d6a4f";ctx.fillRect(0,H-42,W,4);
+      gv.pipes.forEach(p=>{
+        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,0,PIPE_W,p.topH);
+        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,p.topH-18,PIPE_W+8,18);
+        const botY=p.topH+GAP;
+        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,botY,PIPE_W,H);
+        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,botY,PIPE_W+8,18);
+      });
+      // Bird
+      ctx.save();ctx.translate(gv.bird.x,gv.bird.y);
+      ctx.rotate(Math.min(Math.max(gv.bird.vy*0.05,-0.5),0.8));
+      ctx.beginPath();ctx.arc(0,0,gv.bird.r,0,Math.PI*2);
+      ctx.fillStyle=bc;ctx.fill();
+      ctx.strokeStyle=bc+"aa";ctx.lineWidth=3;ctx.stroke();
+      // Eye + beak
+      ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(gv.bird.r*.35,-gv.bird.r*.25,gv.bird.r*.22,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#111111";ctx.beginPath();ctx.arc(gv.bird.r*.43,-gv.bird.r*.25,gv.bird.r*.12,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#ff8800";ctx.beginPath();ctx.moveTo(gv.bird.r*.88,-gv.bird.r*.18);ctx.lineTo(gv.bird.r*.88,gv.bird.r*.18);ctx.lineTo(gv.bird.r*1.35,0);ctx.fill();
+      ctx.restore();
+      // Score
+      ctx.font=`bold 20px monospace`;ctx.fillStyle="#ffffff";ctx.textAlign="center";ctx.textBaseline="top";
+      ctx.fillText(String(gv.score),W/2,16);
+      btnAreas=[];
+      if(stateRef.current==="idle"){
+        ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillRect(0,0,W,H);
+        ctx.font=`10px monospace`;ctx.fillStyle="#f59e0b";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText("APPUIE POUR JOUER",W/2,H/2-10);
+        ctx.font=`7px monospace`;ctx.fillStyle="#60607a";ctx.fillText("ESPACE / TAP",W/2,H/2+18);
       }
-      init(){this.score=0;this.alive=true;this.started=false;this.speed=160;this.currentGap=GAP;this.nextPipe=2200;this.pipeList=[];}
-      create(){
-        const cx=W/2, gY=H-GH;
-        this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
-        this.add.rectangle(cx,gY+GH/2,W,GH,0x1a3d2b).setDepth(2);
-        this.add.rectangle(cx,gY-2,W,4,0x2d6a4f).setDepth(3);
-
-        // Physics ground (invisible)
-        const gnd=this.add.rectangle(cx,gY+GH/2,W,GH,0x000000).setAlpha(0);
-        this.physics.add.existing(gnd,true);
-
-        // Bird physics body (invisible circle)
-        this.birdPhys=this.physics.add.image(Math.round(W*.25),Math.round(H*.44),'__DEFAULT')
-          .setDisplaySize(BR*2,BR*2).setAlpha(0);
-        this.birdPhys.body.setCircle(BR);
-        this.birdPhys.body.setGravityY(0);
-
-        // Bird visual
-        this.bVis=this.add.container(this.birdPhys.x,this.birdPhys.y).setDepth(5);
-        if(BIRD_URL&&this.textures.exists('birdPhoto')){
-          // Crop photo to circle via RenderTexture
-          const rt=this.add.renderTexture(0,0,BR*2,BR*2).setOrigin(.5,.5);
-          rt.draw('birdPhoto',0,0);
-          const maskGfx=this.make.graphics({add:false});
-          maskGfx.fillStyle(0xffffff);
-          maskGfx.fillCircle(BR,BR,BR);
-          rt.setMask(maskGfx.createBitmapMask());
-          const ring=this.add.graphics();ring.lineStyle(3,0xf59e0b,1);ring.strokeCircle(0,0,BR);
-          this.bVis.add([rt,ring]);
-        } else {
-          this.bVis.add([
-            this.add.circle(0,0,BR,0xf59e0b),
-            this.add.circle(BR*.35,-BR*.25,BR*.22,0xffffff),
-            this.add.circle(BR*.43,-BR*.25,BR*.12,0x111111),
-            this.add.triangle(BR*.88,0,0,-BR*.18,0,BR*.18,BR*.44,0,0xff8800)
-          ]);
-        }
-
-        // Ground overlap
-        this.physics.add.overlap(this.birdPhys,gnd,()=>this.die(),null,this);
-
-        this.sTxt=this.add.text(cx,32,'0',{fontFamily:'monospace',fontSize:Math.round(W*.09),fontStyle:'bold',color:'#fff',stroke:'#000',strokeThickness:5}).setOrigin(.5).setDepth(10);
-        this.hint=this.add.text(cx,H*.36,'↑  APPUIE !',{fontFamily:'monospace',fontSize:Math.round(W*.042),color:'#f59e0b'}).setOrigin(.5).setDepth(10);
-        this.tweens.add({targets:this.hint,alpha:.1,duration:500,yoyo:true,repeat:-1});
-
-        this.input.on('pointerdown',()=>this.flap());
-        this.input.keyboard?.on('keydown-SPACE',()=>this.flap());
-        this.input.keyboard?.on('keydown-UP',()=>this.flap());
-      }
-      flap(){
-        if(!this.alive)return;
-        if(!this.started){this.started=true;this.birdPhys.body.setGravityY(1100);this.hint.setVisible(false);}
-        this.birdPhys.body.setVelocityY(-450);
-      }
-      spawnPipe(){
-        const gY=H-GH;
-        const topH=Phaser.Math.Between(Math.round(H*.12),Math.round(gY-this.currentGap-H*.12));
-        const botY=topH+this.currentGap;
-        const botH=gY-botY;
-        const sx=W+PW/2+4;
-        const vx=-this.speed;
-
-        // Top pipe — physics rect
-        const top=addRect(this,sx,topH/2,PW,topH,0x22c55e);
-        top.body.setVelocityX(vx);
-
-        // Bottom pipe — physics rect, starts exactly at botY
-        const bot=addRect(this,sx,botY+botH/2,PW,botH,0x22c55e);
-        bot.body.setVelocityX(vx);
-
-        // Caps — visual only, NO physics
-        const capT=this.add.rectangle(sx,topH-11,PW+12,22,0x16a34a).setDepth(1);
-        const capB=this.add.rectangle(sx,botY+11,PW+12,22,0x16a34a).setDepth(1);
-
-        // Overlap only on the main pipe bodies (not caps)
-        this.physics.add.overlap(this.birdPhys,[top,bot],()=>this.die(),null,this);
-
-        this.pipeList.push({top,capT,bot,capB,scored:false,vx});
-      }
-      die(){
-        if(!this.alive)return;this.alive=false;
-        this.cameras.main.flash(150,255,60,60);
-        this.cameras.main.shake(180,.013);
-        this.birdPhys.body.setGravityY(1500);
-        this.birdPhys.body.setVelocityY(300);
-        this.time.delayedCall(650,()=>this.scene.start('GameOver',{score:this.score}));
-      }
-      update(_t,delta){
-        this.bVis.x=this.birdPhys.x;
-        this.bVis.y=this.birdPhys.y;
-        if(!this.alive){this.bVis.angle=Math.min(this.bVis.angle+7,90);return;}
-        const vy=this.birdPhys.body.velocity.y;
-        this.bVis.angle=Phaser.Math.Linear(this.bVis.angle,Phaser.Math.Clamp(vy*.085,-28,62),.18);
-        if(this.birdPhys.y-BR<0){this.die();return;}
-        if(!this.started)return;
-        this.nextPipe-=delta;
-        if(this.nextPipe<=0){
-          this.spawnPipe();
-          this.nextPipe=Phaser.Math.Between(1800,2200);
-        }
-        this.speed=160+Math.floor(this.score/2)*15;
-        this.currentGap=Math.max(Math.round(H*.21),GAP-Math.floor(this.score/3)*8);
-        const bx=this.birdPhys.x;
-        this.pipeList=this.pipeList.filter(p=>{
-          // Sync visual caps with physics pipes
-          p.capT.x=p.top.x;
-          p.capB.x=p.bot.x;
-          if(!p.scored&&p.top.x+PW/2<bx){
-            p.scored=true;this.score++;
-            this.sTxt.setText(String(this.score));
-            this.tweens.add({targets:this.sTxt,scaleX:1.5,scaleY:1.5,duration:70,yoyo:true});
-          }
-          if(p.top.x<-PW*2){
-            p.top.destroy();p.capT.destroy();p.bot.destroy();p.capB.destroy();
-            return false;
-          }
-          return true;
-        });
+      if(stateRef.current==="dead"){
+        ctx.fillStyle="rgba(0,0,0,0.72)";ctx.fillRect(0,0,W,H);
+        ctx.font=`14px monospace`;ctx.fillStyle="#ef4444";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText("GAME OVER",W/2,H/2-70);
+        ctx.font=`9px monospace`;ctx.fillStyle="#f59e0b";ctx.fillText(`SCORE: ${gv.score}`,W/2,H/2-40);
+        ctx.font=`7px monospace`;ctx.fillStyle="#22c55e";ctx.fillText(`BEST: ${gv.bestScore}`,W/2,H/2-18);
+        const bw=140,bh=36,gap=12;
+        const totalW=bw*2+gap;const startX=(W-totalW)/2;const by=H/2+10;
+        drawBtn(startX,by,bw,bh,"REJOUER","#22c55e");
+        drawBtn(startX+bw+gap,by,bw,bh,"CLASSEMENT","#a855f7");
+        btnAreas=[
+          {x:startX,y:by,w:bw,h:bh,action:()=>resetGame()},
+          {x:startX+bw+gap,y:by,w:bw,h:bh,action:()=>{stateRef.current="leaderboard";setView("leaderboard");}},
+        ];
       }
     }
 
-    class GameOverScene extends Phaser.Scene{
-      constructor(){super('GameOver');}
-      init(data){
-        this.score=data.score||0;
-        const prev=parseInt(localStorage.getItem('plappy_best')||'0');
-        this.isNew=this.score>prev;this.best=Math.max(prev,this.score);
-        localStorage.setItem('plappy_best',String(this.best));
-        saveScore(this.score);
+    function update(delta){
+      if(stateRef.current!=="playing")return;
+      gv.frame++;
+      gv.bird.vy+=GRAVITY;gv.bird.y+=gv.bird.vy;
+      const speed=SPEED+Math.floor(gv.score/2)*0.15;
+      const gap=Math.max(GAP-Math.floor(gv.score/3)*8,130);
+      if(gv.frame%95===0){
+        const topH=70+Math.random()*(H-gap-110);
+        gv.pipes.push({x:W,topH,scored:false});
       }
-      create(){
-        const cx=W/2;
-        this.add.rectangle(cx,H/2,W,H,0x0a0a0f,.95);
-        this.add.text(cx,H*.12,'GAME OVER',{fontFamily:'monospace',fontSize:Math.round(W*.08),fontStyle:'bold',color:'#ef4444',stroke:'#000',strokeThickness:5}).setOrigin(.5);
-        const bw=W*.76,bh=H*.22,bx=cx-bw/2,by=H*.26;
-        const g=this.add.graphics();
-        g.fillStyle(0x12121f);g.fillRoundedRect(bx,by,bw,bh,12);
-        g.lineStyle(2,0x22c55e,.4);g.strokeRoundedRect(bx,by,bw,bh,12);
-        const fs=Math.round(W*.03),fs2=Math.round(W*.06);
-        this.add.text(cx-bw*.32,by+bh*.08,'SCORE',{fontFamily:'monospace',fontSize:fs,color:'#60607a'});
-        this.add.text(cx+bw*.32,by+bh*.08,String(this.score),{fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#f59e0b'}).setOrigin(1,0);
-        this.add.text(cx-bw*.32,by+bh*.52,'BEST',{fontFamily:'monospace',fontSize:fs,color:'#60607a'});
-        this.add.text(cx+bw*.32,by+bh*.52,String(this.best),{fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#22c55e'}).setOrigin(1,0);
-        if(this.isNew&&this.score>0){
-          const t=this.add.text(cx,H*.56,'★ NOUVEAU RECORD! ★',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#f59e0b'}).setOrigin(.5);
-          this.tweens.add({targets:t,scaleX:1.15,scaleY:1.15,duration:400,yoyo:true,repeat:-1});
-        }
-        this.btn(cx,H*.69,'▶  REJOUER',0x22c55e,()=>this.scene.start('Game'));
-        this.btn(cx,H*.78,'🏆 CLASSEMENT',0xa855f7,()=>{if(window.__plappyShowLB)window.__plappyShowLB(true);});
-        this.btn(cx,H*.87,'⇐  MENU',0x404058,()=>this.scene.start('Menu'));
+      gv.pipes=gv.pipes.filter(p=>p.x>-PIPE_W-10);
+      for(const p of gv.pipes){
+        p.x-=speed;
+        if(!p.scored&&p.x+PIPE_W<gv.bird.x){p.scored=true;gv.score++;}
+        // Collision with top pipe
+        const inX=gv.bird.x+gv.bird.r>p.x&&gv.bird.x-gv.bird.r<p.x+PIPE_W;
+        if(inX&&gv.bird.y-gv.bird.r<p.topH){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
+        // Collision with bottom pipe — only if bird is below the gap
+        if(inX&&gv.bird.y+gv.bird.r>p.topH+gap){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
       }
-      btn(x,y,label,col,cb){
-        const bw=W*.68,bh=Math.round(H*.072);
-        const g=this.add.graphics();
-        g.fillStyle(col,.18);g.fillRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
-        g.lineStyle(2,col);g.strokeRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
-        this.add.text(x,y,label,{fontFamily:'monospace',fontSize:Math.round(W*.038),fontStyle:'bold',color:'#'+col.toString(16).padStart(6,'0')}).setOrigin(.5);
-        this.add.zone(x,y,bw,bh).setInteractive().on('pointerdown',cb);
+      if(gv.bird.y+gv.bird.r>H-40||gv.bird.y-gv.bird.r<0){
+        stateRef.current="dead";gv.alive=false;saveScore(gv.score);
       }
     }
 
-    const phaserGame = new Phaser.Game({
-      type:Phaser.AUTO, width:W, height:H, parent:el,
-      backgroundColor:'#0a0a0f',
-      physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
-      scene:[MenuScene,GameScene,GameOverScene],
-      scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
-      input:{touch:{capture:true}}
-    });
-    gameRef.current = phaserGame;
-    return ()=>{ try{phaserGame.destroy(true);}catch(e){} delete window.__plappyShowLB; };
-    }, 100); // end setTimeout
-    return ()=>{ clearTimeout(timer); try{if(gameRef.current)gameRef.current.destroy(true);}catch(e){} delete window.__plappyShowLB; };
-  },[currentPlayer]);
+    let lastTime=0;
+    function loop(ts){
+      const delta=ts-lastTime;lastTime=ts;
+      update(delta);draw();
+      raf=requestAnimationFrame(loop);
+    }
+    raf=requestAnimationFrame(loop);
+    return()=>{cancelAnimationFrame(raf);canvas.removeEventListener("touchstart",onTap);canvas.removeEventListener("click",onTap);window.removeEventListener("keydown",onKey);};
+  },[birdColor]);
 
   return(
-    <div style={{minHeight:"100vh",background:"#0a0a0f",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",display:"flex",flexDirection:"column"}}>
       <style>{RETRO_CSS}</style>
       <div style={{borderBottom:"2px solid #22c55e44",padding:m?"10px 14px":"14px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
         <button onClick={onBack} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
@@ -4998,36 +4911,19 @@ function PlappyPirdPage({currentPlayer, onBack}){
         <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
       </div>
       <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
-        <div ref={mountRef} style={{width:360,height:Math.max(500,window.innerHeight-120),flexShrink:0,position:"relative"}}/>
-        {/* Mobile leaderboard overlay */}
-        {m&&showLB&&(
-          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",overflowY:"auto"}}>
-            <div style={{borderBottom:"2px solid #a855f744",padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-              <button onClick={()=>setShowLB(false)} style={{background:"none",border:"2px solid #a855f7",borderRadius:4,color:"#a855f7",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
-              <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:"#a855f7"}}>HIGH SCORES</div>
-            </div>
-            <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:8}}>
-              {leaderboard.length===0?(
-                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace",textAlign:"center",marginTop:40}}>AUCUN SCORE ENCORE</div>
-              ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
-                <div key={row.player_id} style={{background:isMe?"#a855f711":"#12121f",border:`1px solid ${isMe?"#a855f7":"#1e1e30"}`,borderRadius:6,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:10,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:24,flexShrink:0}}>{i+1}</span>
-                  <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
-                    <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                  </div>
-                  <span style={{flex:1,fontSize:8,color:isMe?"#a855f7":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Press Start 2P',monospace"}}>{getDisplayName(row.player,PLAYERS)}</span>
-                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:11,color:"#f59e0b",flexShrink:0}}>{row.score}</span>
-                </div>
-              );})}
-            </div>
+        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",padding:m?"12px":"24px 20px 24px 40px",flexShrink:0}}>
+          <div style={{border:`2px solid ${birdColor}33`,borderRadius:4,overflow:"hidden",boxShadow:`0 0 20px ${birdColor}22`}}>
+            <canvas ref={canvasRef} style={{display:"block",width:W,height:H}}/>
           </div>
-        )}
-        {!m&&(
-          <div style={{flex:1,padding:"24px 40px 24px 20px",overflowY:"auto"}}>
+        </div>
+        {/* Leaderboard panel */}
+        {(!m||view==="leaderboard")&&(
+          <div style={m?{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",padding:20,overflowY:"auto"}:{flex:1,padding:"24px 40px 24px 20px"}}>
+            {m&&<button onClick={()=>{stateRef.current="dead";setView("game");}} style={{background:"none",border:"2px solid #22c55e",borderRadius:4,color:"#22c55e",cursor:"pointer",padding:"6px 12px",fontFamily:"'Press Start 2P',monospace",fontSize:7,marginBottom:16,alignSelf:"flex-start"}}>← RETOUR</button>}
             <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#22c55e",marginBottom:14}}>🏆 HIGH SCORES</div>
             <div style={{display:"flex",flexDirection:"column",gap:7}}>
               {leaderboard.length===0?(
-                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace"}}>AUCUN SCORE ENCORE</div>
+                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace"}}>AUCUN SCORE</div>
               ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
                 <div key={row.player_id} style={{background:isMe?"#22c55e11":"#12121f",border:`1px solid ${isMe?"#22c55e44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
                   <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#f59e0b":i===1?"#aaa":i===2?"#c87533":"#404058",width:20,flexShrink:0}}>{i+1}</span>
