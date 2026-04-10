@@ -4742,7 +4742,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
   const W=Math.min(window.innerWidth,420);
   const H=window.innerHeight-56; // minus header
   const GRAVITY=0.42,FLAP=-8.5,PIPE_W=Math.round(W*0.14),SPEED=2.0;
-  const GAP=Math.round(H*0.38);
+  const GAP=Math.round(H*0.30);
   const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:parseInt(localStorage.getItem('plappy_best')||'0')});
 
   async function loadLeaderboard(){
@@ -4758,7 +4758,16 @@ function PlappyPirdPage({currentPlayer, onBack}){
   }
 
   async function saveScore(s){
-    if(!currentPlayer||s<=0)return;
+    if(!currentPlayer)return;
+    try{
+      // Increment games played
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_plappy_games`,{
+        method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+        body:JSON.stringify({p_player_id:currentPlayer.id})
+      });
+    }catch(e){}
+    if(s<=0)return;
     try{
       const existing=await sbFetch("games_scores",`?game=eq.plappy&player_id=eq.${currentPlayer.id}&limit=1`);
       const prevScore=existing&&existing.length>0?existing[0].score:0;
@@ -4874,8 +4883,8 @@ function PlappyPirdPage({currentPlayer, onBack}){
       const dt=Math.min(delta,50)/16.667;
       gv.frame++;
       gv.bird.vy+=GRAVITY*dt;gv.bird.y+=gv.bird.vy*dt;
-      const speed=(SPEED+Math.floor(gv.score/2)*0.15)*dt;
-      const gap=Math.max(GAP-Math.floor(gv.score/3)*8,130);
+      const speed=(SPEED+gv.score*0.08)*dt;
+      const gap=Math.max(GAP-gv.score*5,Math.round(H*0.18));
       // Spawn pipe every ~1900ms
       if(!gv.nextPipe)gv.nextPipe=0;
       gv.nextPipe-=delta;
