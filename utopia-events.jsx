@@ -4767,24 +4767,43 @@ function PlappyPirdPage({currentPlayer, onBack}){
     if(!el||!window.Phaser) return;
 
     const W   = Math.min(el.clientWidth||360, 430);
-    const H   = window.innerHeight - (m?56:0) - 56; // minus headers
+    const H   = window.innerHeight - 56 - 56;
     const GAP = Math.round(H * 0.37);
     const PW  = Math.round(W * 0.15);
     const BR  = Math.round(W * 0.065);
     const GH  = 44;
-    const BIRD_URL = currentPlayer?.photoUrl||null;
 
-    function addRect(scene,x,y,w,h,color){
-      const r=scene.add.rectangle(x,y,w,h,color).setDepth(1);
+    // Pre-render bird photo onto an offscreen canvas for use as Phaser texture
+    function makeBirdTexture(game, url, cb){
+      if(!url){ cb(false); return; }
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const size = BR * 2;
+        const oc = document.createElement('canvas');
+        oc.width = oc.height = size;
+        const ctx = oc.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, BR, 0, Math.PI*2);
+        ctx.clip();
+        ctx.drawImage(img, 0, 0, size, size);
+        game.textures.addCanvas('birdPhoto', oc);
+        cb(true);
+      };
+      img.onerror = () => cb(false);
+      img.src = url;
+    }
+
+    function addRect(scene, x, y, w, h, color){
+      const r = scene.add.rectangle(x, y, w, h, color).setDepth(1);
       scene.physics.add.existing(r);
-      r.body.allowGravity=false;
+      r.body.allowGravity = false;
       r.body.setImmovable(true);
       return r;
     }
 
     class MenuScene extends Phaser.Scene{
       constructor(){super('Menu');}
-      preload(){if(BIRD_URL)this.load.image('bird',BIRD_URL);}
       create(){
         const cx=W/2;
         this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
@@ -4794,7 +4813,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
         this.tweens.add({targets:b,y:H*.48-12,duration:600,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
         const t=this.add.text(cx,H*.68,'→  APPUIE POUR JOUER  ←',{fontFamily:'monospace',fontSize:Math.round(W*.033),color:'#f59e0b'}).setOrigin(.5);
         this.tweens.add({targets:t,alpha:.1,duration:700,yoyo:true,repeat:-1});
-        this.add.text(cx,H*.78,'BEST: '+localStorage.getItem('plappy_best')||'0',{fontFamily:'monospace',fontSize:Math.round(W*.036),fontStyle:'bold',color:'#22c55e'}).setOrigin(.5);
+        this.add.text(cx,H*.78,'BEST: '+(localStorage.getItem('plappy_best')||'0'),{fontFamily:'monospace',fontSize:Math.round(W*.036),fontStyle:'bold',color:'#22c55e'}).setOrigin(.5);
         this.input.once('pointerdown',()=>this.scene.start('Game'));
         this.input.keyboard?.once('keydown-SPACE',()=>this.scene.start('Game'));
       }
@@ -4802,30 +4821,30 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
     class GameScene extends Phaser.Scene{
       constructor(){super('Game');}
-      preload(){if(BIRD_URL)this.load.image('bird',BIRD_URL);}
       init(){this.score=0;this.alive=true;this.started=false;this.speed=160;this.currentGap=GAP;this.nextPipe=2200;this.pipeList=[];}
       create(){
-        const cx=W/2,gY=H-GH;
+        const cx=W/2, gY=H-GH;
         this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
         this.add.rectangle(cx,gY+GH/2,W,GH,0x1a3d2b).setDepth(2);
         this.add.rectangle(cx,gY-2,W,4,0x2d6a4f).setDepth(3);
+
+        // Physics ground (invisible)
         const gnd=this.add.rectangle(cx,gY+GH/2,W,GH,0x000000).setAlpha(0);
         this.physics.add.existing(gnd,true);
-        this.birdPhys=this.physics.add.image(Math.round(W*.25),Math.round(H*.44),'__DEFAULT').setDisplaySize(BR*2,BR*2).setAlpha(0);
+
+        // Bird physics body (invisible circle)
+        this.birdPhys=this.physics.add.image(Math.round(W*.25),Math.round(H*.44),'__DEFAULT')
+          .setDisplaySize(BR*2,BR*2).setAlpha(0);
         this.birdPhys.body.setCircle(BR);
         this.birdPhys.body.setGravityY(0);
+
+        // Bird visual
         this.bVis=this.add.container(this.birdPhys.x,this.birdPhys.y).setDepth(5);
-        if(BIRD_URL&&this.textures.exists('bird')){
-          // Draw photo into a RenderTexture clipped to circle
-          const rt=this.add.renderTexture(0,0,BR*2,BR*2).setOrigin(0.5,0.5);
-          const mask=this.make.graphics({x:0,y:0,add:false});
-          mask.fillStyle(0xffffff);mask.fillCircle(BR,BR,BR);
-          const bmp=mask.generateTexture('birdmask',BR*2,BR*2);
-          rt.draw('bird',0,0,1);
-          rt.setMask(mask.createBitmapMask());
-          // Gold ring
+        if(this.textures.exists('birdPhoto')){
+          // Use pre-rendered circular photo texture
+          const img=this.add.image(0,0,'birdPhoto').setDisplaySize(BR*2,BR*2);
           const ring=this.add.graphics();ring.lineStyle(3,0xf59e0b,1);ring.strokeCircle(0,0,BR);
-          this.bVis.add([rt,ring]);
+          this.bVis.add([img,ring]);
         } else {
           this.bVis.add([
             this.add.circle(0,0,BR,0xf59e0b),
@@ -4834,10 +4853,14 @@ function PlappyPirdPage({currentPlayer, onBack}){
             this.add.triangle(BR*.88,0,0,-BR*.18,0,BR*.18,BR*.44,0,0xff8800)
           ]);
         }
+
+        // Ground overlap
         this.physics.add.overlap(this.birdPhys,gnd,()=>this.die(),null,this);
+
         this.sTxt=this.add.text(cx,32,'0',{fontFamily:'monospace',fontSize:Math.round(W*.09),fontStyle:'bold',color:'#fff',stroke:'#000',strokeThickness:5}).setOrigin(.5).setDepth(10);
         this.hint=this.add.text(cx,H*.36,'↑  APPUIE !',{fontFamily:'monospace',fontSize:Math.round(W*.042),color:'#f59e0b'}).setOrigin(.5).setDepth(10);
         this.tweens.add({targets:this.hint,alpha:.1,duration:500,yoyo:true,repeat:-1});
+
         this.input.on('pointerdown',()=>this.flap());
         this.input.keyboard?.on('keydown-SPACE',()=>this.flap());
         this.input.keyboard?.on('keydown-UP',()=>this.flap());
@@ -4849,44 +4872,66 @@ function PlappyPirdPage({currentPlayer, onBack}){
       }
       spawnPipe(){
         const gY=H-GH;
-        const topH=Phaser.Math.Between(Math.round(H*.1),Math.round(gY-this.currentGap-H*.1));
-        const botY=topH+this.currentGap;const botH=gY-botY;const sx=W+PW/2+4;const vx=-this.speed;
-        const top=addRect(this,sx,topH/2,PW,topH,0x22c55e);top.body.setVelocityX(vx);
-        const bot=addRect(this,sx,botY+botH/2,PW,botH,0x22c55e);bot.body.setVelocityX(vx);
-        // Caps are visual-only (no physics body) to avoid false collisions in the gap
+        const topH=Phaser.Math.Between(Math.round(H*.12),Math.round(gY-this.currentGap-H*.12));
+        const botY=topH+this.currentGap;
+        const botH=gY-botY;
+        const sx=W+PW/2+4;
+        const vx=-this.speed;
+
+        // Top pipe — physics rect
+        const top=addRect(this,sx,topH/2,PW,topH,0x22c55e);
+        top.body.setVelocityX(vx);
+
+        // Bottom pipe — physics rect, starts exactly at botY
+        const bot=addRect(this,sx,botY+botH/2,PW,botH,0x22c55e);
+        bot.body.setVelocityX(vx);
+
+        // Caps — visual only, NO physics
         const capT=this.add.rectangle(sx,topH-11,PW+12,22,0x16a34a).setDepth(1);
         const capB=this.add.rectangle(sx,botY+11,PW+12,22,0x16a34a).setDepth(1);
-        // Sync caps visually with pipe movement each frame via pipeList
+
+        // Overlap only on the main pipe bodies (not caps)
         this.physics.add.overlap(this.birdPhys,[top,bot],()=>this.die(),null,this);
-        this.pipeList.push({top,capT,bot,capB,scored:false});
+
+        this.pipeList.push({top,capT,bot,capB,scored:false,vx});
       }
       die(){
         if(!this.alive)return;this.alive=false;
-        this.cameras.main.flash(150,255,60,60);this.cameras.main.shake(180,.013);
-        this.birdPhys.body.setGravityY(1500);this.birdPhys.body.setVelocityY(300);
+        this.cameras.main.flash(150,255,60,60);
+        this.cameras.main.shake(180,.013);
+        this.birdPhys.body.setGravityY(1500);
+        this.birdPhys.body.setVelocityY(300);
         this.time.delayedCall(650,()=>this.scene.start('GameOver',{score:this.score}));
       }
       update(_t,delta){
-        this.bVis.x=this.birdPhys.x;this.bVis.y=this.birdPhys.y;
+        this.bVis.x=this.birdPhys.x;
+        this.bVis.y=this.birdPhys.y;
         if(!this.alive){this.bVis.angle=Math.min(this.bVis.angle+7,90);return;}
         const vy=this.birdPhys.body.velocity.y;
         this.bVis.angle=Phaser.Math.Linear(this.bVis.angle,Phaser.Math.Clamp(vy*.085,-28,62),.18);
         if(this.birdPhys.y-BR<0){this.die();return;}
         if(!this.started)return;
         this.nextPipe-=delta;
-        if(this.nextPipe<=0){this.spawnPipe();this.nextPipe=Phaser.Math.Between(1800,2200);}
+        if(this.nextPipe<=0){
+          this.spawnPipe();
+          this.nextPipe=Phaser.Math.Between(1800,2200);
+        }
         this.speed=160+Math.floor(this.score/2)*15;
         this.currentGap=Math.max(Math.round(H*.21),GAP-Math.floor(this.score/3)*8);
         const bx=this.birdPhys.x;
         this.pipeList=this.pipeList.filter(p=>{
           // Sync visual caps with physics pipes
-          p.capT.x=p.top.x; p.capB.x=p.bot.x;
-          if(!p.scored&&p.top.x<bx-PW/2){
+          p.capT.x=p.top.x;
+          p.capB.x=p.bot.x;
+          if(!p.scored&&p.top.x+PW/2<bx){
             p.scored=true;this.score++;
             this.sTxt.setText(String(this.score));
             this.tweens.add({targets:this.sTxt,scaleX:1.5,scaleY:1.5,duration:70,yoyo:true});
           }
-          if(p.top.x<-PW*2){p.top.destroy();p.capT.destroy();p.bot.destroy();p.capB.destroy();return false;}
+          if(p.top.x<-PW*2){
+            p.top.destroy();p.capT.destroy();p.bot.destroy();p.capB.destroy();
+            return false;
+          }
           return true;
         });
       }
@@ -4912,36 +4957,47 @@ function PlappyPirdPage({currentPlayer, onBack}){
         const fs=Math.round(W*.03),fs2=Math.round(W*.06);
         this.add.text(cx-bw*.32,by+bh*.08,'SCORE',{fontFamily:'monospace',fontSize:fs,color:'#60607a'});
         this.add.text(cx+bw*.32,by+bh*.08,String(this.score),{fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#f59e0b'}).setOrigin(1,0);
-        this.add.text(cx-bw*.32,by+bh*.52,'BEST', {fontFamily:'monospace',fontSize:fs,color:'#60607a'});
-        this.add.text(cx+bw*.32,by+bh*.52,String(this.best), {fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#22c55e'}).setOrigin(1,0);
+        this.add.text(cx-bw*.32,by+bh*.52,'BEST',{fontFamily:'monospace',fontSize:fs,color:'#60607a'});
+        this.add.text(cx+bw*.32,by+bh*.52,String(this.best),{fontFamily:'monospace',fontSize:fs2,fontStyle:'bold',color:'#22c55e'}).setOrigin(1,0);
         if(this.isNew&&this.score>0){
           const t=this.add.text(cx,H*.56,'★ NOUVEAU RECORD! ★',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#f59e0b'}).setOrigin(.5);
           this.tweens.add({targets:t,scaleX:1.15,scaleY:1.15,duration:400,yoyo:true,repeat:-1});
         }
-        this.btn(cx,H*.66,'▶  REJOUER',0x22c55e,()=>this.scene.start('Game'));
+        this.btn(cx,H*.69,'▶  REJOUER',0x22c55e,()=>this.scene.start('Game'));
         this.btn(cx,H*.78,'🏆 CLASSEMENT',0xa855f7,()=>{if(window.__plappyShowLB)window.__plappyShowLB(true);});
-        this.btn(cx,H*.90,'⇐  MENU',0x404058,()=>this.scene.start('Menu'));
+        this.btn(cx,H*.87,'⇐  MENU',0x404058,()=>this.scene.start('Menu'));
       }
       btn(x,y,label,col,cb){
         const bw=W*.68,bh=Math.round(H*.072);
         const g=this.add.graphics();
         g.fillStyle(col,.18);g.fillRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
         g.lineStyle(2,col);g.strokeRoundedRect(x-bw/2,y-bh/2,bw,bh,10);
-        this.add.text(x,y,label,{fontFamily:'monospace',fontSize:Math.round(W*.042),fontStyle:'bold',color:'#'+col.toString(16).padStart(6,'0')}).setOrigin(.5);
+        this.add.text(x,y,label,{fontFamily:'monospace',fontSize:Math.round(W*.038),fontStyle:'bold',color:'#'+col.toString(16).padStart(6,'0')}).setOrigin(.5);
         this.add.zone(x,y,bw,bh).setInteractive().on('pointerdown',cb);
       }
     }
 
-    window.__plappyShowLB = setShowLB;
     const phaserGame = new Phaser.Game({
       type:Phaser.AUTO, width:W, height:H, parent:el,
       backgroundColor:'#0a0a0f',
       physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
       scene:[MenuScene,GameScene,GameOverScene],
       scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
-      input:{touch:{capture:true}}
+      input:{touch:{capture:true}},
+      callbacks:{
+        preBoot: (g) => {
+          // Load bird photo before scenes start
+          makeBirdTexture(g, BIRD_URL, ()=>{});
+        }
+      }
     });
 
+    // Load bird photo after game created
+    if(BIRD_URL){
+      makeBirdTexture(phaserGame, BIRD_URL, (ok)=>{
+        if(ok) console.log('Bird photo loaded');
+      });
+    }
     gameRef.current = phaserGame;
     return ()=>{ try{phaserGame.destroy(true);}catch(e){} delete window.__plappyShowLB; };
   },[currentPlayer]);
