@@ -4740,9 +4740,9 @@ function PlappyPirdPage({currentPlayer, onBack}){
   },[currentPlayer]);
 
   const W=Math.min(window.innerWidth,420);
-  const H=window.innerHeight-56; // minus header
+  const H=window.innerHeight-56;
   const GRAVITY=0.42,FLAP=-8.5,PIPE_W=Math.round(W*0.14),SPEED=2.0;
-  const GAP=Math.round(H*0.30);
+  const BASE_GAP=Math.round(H*0.30),GAP=BASE_GAP;
   const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:parseInt(localStorage.getItem('plappy_best')||'0')});
 
   async function loadLeaderboard(){
@@ -4833,11 +4833,12 @@ function PlappyPirdPage({currentPlayer, onBack}){
       ctx.fillStyle="#1a3d2b";ctx.fillRect(0,H-40,W,40);
       ctx.fillStyle="#2d6a4f";ctx.fillRect(0,H-42,W,4);
       gv.pipes.forEach(p=>{
-        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,0,PIPE_W,p.topH);
-        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,p.topH-18,PIPE_W+8,18);
-        const botY=p.topH+GAP;
-        ctx.fillStyle="#22c55e";ctx.fillRect(p.x,botY,PIPE_W,H);
-        ctx.fillStyle="#16a34a";ctx.fillRect(p.x-4,botY,PIPE_W+8,18);
+        const px=p.x-PIPE_W/2;
+        const botY=p.topH+(Math.max(BASE_GAP-gv.score*5,Math.round(H*0.18)));
+        ctx.fillStyle="#22c55e";ctx.fillRect(px,0,PIPE_W,p.topH);
+        ctx.fillStyle="#16a34a";ctx.fillRect(px-4,p.topH-18,PIPE_W+8,18);
+        ctx.fillStyle="#22c55e";ctx.fillRect(px,botY,PIPE_W,H);
+        ctx.fillStyle="#16a34a";ctx.fillRect(px-4,botY,PIPE_W+8,18);
       });
       // Bird
       ctx.save();ctx.translate(gv.bird.x,gv.bird.y);
@@ -4889,19 +4890,25 @@ function PlappyPirdPage({currentPlayer, onBack}){
       if(!gv.nextPipe)gv.nextPipe=0;
       gv.nextPipe-=delta;
       if(gv.nextPipe<=0){
-        const topH=Math.round(H*.1)+Math.random()*(H-gap-Math.round(H*.2));
-        gv.pipes.push({x:W,topH,scored:false});
+        const minTop=Math.round(H*.12);
+        const maxTop=H-40-gap-Math.round(H*.12);
+        const topH=minTop+Math.random()*Math.max(0,maxTop-minTop);
+        gv.pipes.push({x:W+PIPE_W/2,topH,scored:false});
         gv.nextPipe=1900+Math.random()*400;
       }
       gv.pipes=gv.pipes.filter(p=>p.x>-PIPE_W-10);
       for(const p of gv.pipes){
         p.x-=speed;
-        if(!p.scored&&p.x+PIPE_W<gv.bird.x){p.scored=true;gv.score++;}
-        // Collision with top pipe
-        const inX=gv.bird.x+gv.bird.r>p.x&&gv.bird.x-gv.bird.r<p.x+PIPE_W;
-        if(inX&&gv.bird.y-gv.bird.r<p.topH){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
-        // Collision with bottom pipe — only if bird is below the gap
-        if(inX&&gv.bird.y+gv.bird.r>p.topH+gap){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
+        if(!p.scored&&p.x<gv.bird.x){p.scored=true;gv.score++;}
+        // Circle vs rect collision (proper)
+        const bx=gv.bird.x,by=gv.bird.y,br=gv.bird.r;
+        const px=p.x-PIPE_W/2,botY=p.topH+gap;
+        const nearX=Math.max(px,Math.min(bx,px+PIPE_W));
+        const nearYtop=Math.max(0,Math.min(by,p.topH));
+        const nearYbot=Math.max(botY,Math.min(by,H));
+        const distTop=Math.sqrt((bx-nearX)**2+(by-nearYtop)**2);
+        const distBot=Math.sqrt((bx-nearX)**2+(by-nearYbot)**2);
+        if(distTop<br||distBot<br){stateRef.current="dead";gv.alive=false;saveScore(gv.score);return;}
       }
       if(gv.bird.y+gv.bird.r>H-40||gv.bird.y-gv.bird.r<0){
         stateRef.current="dead";gv.alive=false;saveScore(gv.score);
