@@ -4739,9 +4739,10 @@ function PlappyPirdPage({currentPlayer, onBack}){
     return team?.color||"#f59e0b";
   },[currentPlayer]);
 
-  const W=360,H=520;
-  const GRAVITY=0.42,FLAP=-8.5,PIPE_W=52,SPEED=2.0;
-  const GAP=190;
+  const W=Math.min(window.innerWidth,420);
+  const H=window.innerHeight-56; // minus header
+  const GRAVITY=0.42,FLAP=-8.5,PIPE_W=Math.round(W*0.14),SPEED=2.0;
+  const GAP=Math.round(H*0.38);
   const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:parseInt(localStorage.getItem('plappy_best')||'0')});
 
   async function loadLeaderboard(){
@@ -4869,13 +4870,19 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
     function update(delta){
       if(stateRef.current!=="playing")return;
+      // Normalize delta to 60fps baseline so speed is same on all devices
+      const dt=Math.min(delta,50)/16.667;
       gv.frame++;
-      gv.bird.vy+=GRAVITY;gv.bird.y+=gv.bird.vy;
-      const speed=SPEED+Math.floor(gv.score/2)*0.15;
+      gv.bird.vy+=GRAVITY*dt;gv.bird.y+=gv.bird.vy*dt;
+      const speed=(SPEED+Math.floor(gv.score/2)*0.15)*dt;
       const gap=Math.max(GAP-Math.floor(gv.score/3)*8,130);
-      if(gv.frame%95===0){
-        const topH=70+Math.random()*(H-gap-110);
+      // Spawn pipe every ~1900ms
+      if(!gv.nextPipe)gv.nextPipe=0;
+      gv.nextPipe-=delta;
+      if(gv.nextPipe<=0){
+        const topH=Math.round(H*.1)+Math.random()*(H-gap-Math.round(H*.2));
         gv.pipes.push({x:W,topH,scored:false});
+        gv.nextPipe=1900+Math.random()*400;
       }
       gv.pipes=gv.pipes.filter(p=>p.x>-PIPE_W-10);
       for(const p of gv.pipes){
@@ -4911,9 +4918,9 @@ function PlappyPirdPage({currentPlayer, onBack}){
         <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
       </div>
       <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
-        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",padding:m?"12px":"24px 20px 24px 40px",flexShrink:0}}>
-          <div style={{border:`2px solid ${birdColor}33`,borderRadius:4,overflow:"hidden",boxShadow:`0 0 20px ${birdColor}22`}}>
-            <canvas ref={canvasRef} style={{display:"block",width:W,height:H}}/>
+        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",flexShrink:0}}>
+          <div style={{border:`2px solid ${birdColor}33`,borderRadius:0,overflow:"hidden",boxShadow:`0 0 20px ${birdColor}22`}}>
+            <canvas ref={canvasRef} style={{display:"block",maxWidth:"100%"}}/>
           </div>
         </div>
         {/* Leaderboard panel */}
