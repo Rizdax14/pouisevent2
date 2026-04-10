@@ -4763,11 +4763,13 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
   React.useEffect(()=>{
     loadLeaderboard();
-    const el = mountRef.current;
-    if(!el||!window.Phaser) return;
+    // Small delay to ensure DOM is painted before Phaser reads dimensions
+    const timer = setTimeout(()=>{
+      const el = mountRef.current;
+      if(!el||!window.Phaser) return;
 
-    const W   = Math.min(el.clientWidth||360, 430);
-    const H   = window.innerHeight - 56 - 56;
+      const W   = 360;
+      const H   = Math.max(500, window.innerHeight - 120);
     const GAP = Math.round(H * 0.37);
     const PW  = Math.round(W * 0.15);
     const BR  = Math.round(W * 0.065);
@@ -4983,6 +4985,8 @@ function PlappyPirdPage({currentPlayer, onBack}){
     });
     gameRef.current = phaserGame;
     return ()=>{ try{phaserGame.destroy(true);}catch(e){} delete window.__plappyShowLB; };
+    }, 100); // end setTimeout
+    return ()=>{ clearTimeout(timer); try{if(gameRef.current)gameRef.current.destroy(true);}catch(e){} delete window.__plappyShowLB; };
   },[currentPlayer]);
 
   return(
@@ -4994,7 +4998,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
         <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
       </div>
       <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
-        <div ref={mountRef} style={{width:"100%",flex:1,minHeight:300}}/>
+        <div ref={mountRef} style={{width:360,height:Math.max(500,window.innerHeight-120),flexShrink:0,position:"relative"}}/>
         {/* Mobile leaderboard overlay */}
         {m&&showLB&&(
           <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",overflowY:"auto"}}>
