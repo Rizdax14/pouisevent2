@@ -4816,11 +4816,16 @@ function PlappyPirdPage({currentPlayer, onBack}){
         this.birdPhys.body.setGravityY(0);
         this.bVis=this.add.container(this.birdPhys.x,this.birdPhys.y).setDepth(5);
         if(BIRD_URL&&this.textures.exists('bird')){
-          const mask=this.add.graphics();mask.fillStyle(0xffffff);mask.fillCircle(0,0,BR);
-          const img=this.add.image(0,0,'bird').setDisplaySize(BR*2,BR*2);
-          img.setMask(mask.createGeometryMask());
-          const ring=this.add.circle(0,0,BR,0x000000,0);this.add.graphics().lineStyle(3,0xf59e0b).strokeCircle(0,0,BR);
-          this.bVis.add([mask,img]);
+          // Draw photo into a RenderTexture clipped to circle
+          const rt=this.add.renderTexture(0,0,BR*2,BR*2).setOrigin(0.5,0.5);
+          const mask=this.make.graphics({x:0,y:0,add:false});
+          mask.fillStyle(0xffffff);mask.fillCircle(BR,BR,BR);
+          const bmp=mask.generateTexture('birdmask',BR*2,BR*2);
+          rt.draw('bird',0,0,1);
+          rt.setMask(mask.createBitmapMask());
+          // Gold ring
+          const ring=this.add.graphics();ring.lineStyle(3,0xf59e0b,1);ring.strokeCircle(0,0,BR);
+          this.bVis.add([rt,ring]);
         } else {
           this.bVis.add([
             this.add.circle(0,0,BR,0xf59e0b),
@@ -4847,9 +4852,11 @@ function PlappyPirdPage({currentPlayer, onBack}){
         const topH=Phaser.Math.Between(Math.round(H*.1),Math.round(gY-this.currentGap-H*.1));
         const botY=topH+this.currentGap;const botH=gY-botY;const sx=W+PW/2+4;const vx=-this.speed;
         const top=addRect(this,sx,topH/2,PW,topH,0x22c55e);top.body.setVelocityX(vx);
-        const capT=addRect(this,sx,topH-11,PW+12,22,0x16a34a);capT.body.setVelocityX(vx);
         const bot=addRect(this,sx,botY+botH/2,PW,botH,0x22c55e);bot.body.setVelocityX(vx);
-        const capB=addRect(this,sx,botY+11,PW+12,22,0x16a34a);capB.body.setVelocityX(vx);
+        // Caps are visual-only (no physics body) to avoid false collisions in the gap
+        const capT=this.add.rectangle(sx,topH-11,PW+12,22,0x16a34a).setDepth(1);
+        const capB=this.add.rectangle(sx,botY+11,PW+12,22,0x16a34a).setDepth(1);
+        // Sync caps visually with pipe movement each frame via pipeList
         this.physics.add.overlap(this.birdPhys,[top,bot],()=>this.die(),null,this);
         this.pipeList.push({top,capT,bot,capB,scored:false});
       }
@@ -4872,6 +4879,8 @@ function PlappyPirdPage({currentPlayer, onBack}){
         this.currentGap=Math.max(Math.round(H*.21),GAP-Math.floor(this.score/3)*8);
         const bx=this.birdPhys.x;
         this.pipeList=this.pipeList.filter(p=>{
+          // Sync visual caps with physics pipes
+          p.capT.x=p.top.x; p.capB.x=p.bot.x;
           if(!p.scored&&p.top.x<bx-PW/2){
             p.scored=true;this.score++;
             this.sTxt.setText(String(this.score));
