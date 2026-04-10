@@ -4773,27 +4773,6 @@ function PlappyPirdPage({currentPlayer, onBack}){
     const BR  = Math.round(W * 0.065);
     const GH  = 44;
 
-    // Pre-render bird photo onto an offscreen canvas for use as Phaser texture
-    function makeBirdTexture(game, url, cb){
-      if(!url){ cb(false); return; }
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const size = BR * 2;
-        const oc = document.createElement('canvas');
-        oc.width = oc.height = size;
-        const ctx = oc.getContext('2d');
-        ctx.beginPath();
-        ctx.arc(size/2, size/2, BR, 0, Math.PI*2);
-        ctx.clip();
-        ctx.drawImage(img, 0, 0, size, size);
-        game.textures.addCanvas('birdPhoto', oc);
-        cb(true);
-      };
-      img.onerror = () => cb(false);
-      img.src = url;
-    }
-
     function addRect(scene, x, y, w, h, color){
       const r = scene.add.rectangle(x, y, w, h, color).setDepth(1);
       scene.physics.add.existing(r);
@@ -4804,6 +4783,12 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
     class MenuScene extends Phaser.Scene{
       constructor(){super('Menu');}
+      preload(){
+        if(BIRD_URL){
+          this.load.crossOrigin='anonymous';
+          this.load.image('birdPhoto', BIRD_URL);
+        }
+      }
       create(){
         const cx=W/2;
         this.add.rectangle(cx,H/2,W,H,0x0a0a0f);
@@ -4821,6 +4806,12 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
     class GameScene extends Phaser.Scene{
       constructor(){super('Game');}
+      preload(){
+        if(BIRD_URL&&!this.textures.exists('birdPhoto')){
+          this.load.crossOrigin='anonymous';
+          this.load.image('birdPhoto', BIRD_URL);
+        }
+      }
       init(){this.score=0;this.alive=true;this.started=false;this.speed=160;this.currentGap=GAP;this.nextPipe=2200;this.pipeList=[];}
       create(){
         const cx=W/2, gY=H-GH;
@@ -4840,11 +4831,16 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
         // Bird visual
         this.bVis=this.add.container(this.birdPhys.x,this.birdPhys.y).setDepth(5);
-        if(this.textures.exists('birdPhoto')){
-          // Use pre-rendered circular photo texture
-          const img=this.add.image(0,0,'birdPhoto').setDisplaySize(BR*2,BR*2);
+        if(BIRD_URL&&this.textures.exists('birdPhoto')){
+          // Crop photo to circle via RenderTexture
+          const rt=this.add.renderTexture(0,0,BR*2,BR*2).setOrigin(.5,.5);
+          rt.draw('birdPhoto',0,0);
+          const maskGfx=this.make.graphics({add:false});
+          maskGfx.fillStyle(0xffffff);
+          maskGfx.fillCircle(BR,BR,BR);
+          rt.setMask(maskGfx.createBitmapMask());
           const ring=this.add.graphics();ring.lineStyle(3,0xf59e0b,1);ring.strokeCircle(0,0,BR);
-          this.bVis.add([img,ring]);
+          this.bVis.add([rt,ring]);
         } else {
           this.bVis.add([
             this.add.circle(0,0,BR,0xf59e0b),
@@ -4983,21 +4979,8 @@ function PlappyPirdPage({currentPlayer, onBack}){
       physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
       scene:[MenuScene,GameScene,GameOverScene],
       scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
-      input:{touch:{capture:true}},
-      callbacks:{
-        preBoot: (g) => {
-          // Load bird photo before scenes start
-          makeBirdTexture(g, BIRD_URL, ()=>{});
-        }
-      }
+      input:{touch:{capture:true}}
     });
-
-    // Load bird photo after game created
-    if(BIRD_URL){
-      makeBirdTexture(phaserGame, BIRD_URL, (ok)=>{
-        if(ok) console.log('Bird photo loaded');
-      });
-    }
     gameRef.current = phaserGame;
     return ()=>{ try{phaserGame.destroy(true);}catch(e){} delete window.__plappyShowLB; };
   },[currentPlayer]);
