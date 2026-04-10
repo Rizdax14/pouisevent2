@@ -4994,7 +4994,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
         <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#f59e0b"}}>{myBest}</span></div>
       </div>
       <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
-        <div ref={mountRef} style={{flexShrink:0}}/>
+        <div ref={mountRef} style={{width:"100%",flex:1,minHeight:300}}/>
         {/* Mobile leaderboard overlay */}
         {m&&showLB&&(
           <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0a0a0f",zIndex:200,display:"flex",flexDirection:"column",overflowY:"auto"}}>
