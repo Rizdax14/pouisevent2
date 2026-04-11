@@ -4742,7 +4742,12 @@ function PlappyPirdPage({currentPlayer, onBack}){
   const W=Math.min(window.innerWidth,420);
   const H=window.innerHeight-56;
   const GRAVITY=0.42,FLAP=-8.5,PIPE_W=Math.round(W*0.14),SPEED=2.0;
-  const BASE_GAP=400,GAP=BASE_GAP;
+  const BASE_GAP=300,GAP=BASE_GAP;
+  function calcGap(score){
+    if(score<=10)return 300-score*5;
+    if(score<=20)return 250-(score-10)*5;
+    return Math.max(200-(score-20)*5,150);
+  }
   const gameVars=React.useRef({bird:{x:80,y:H/2,vy:0,r:22},pipes:[],score:0,frame:0,alive:false,started:false,bestScore:parseInt(localStorage.getItem('plappy_best')||'0')});
 
   async function loadLeaderboard(){
@@ -4834,7 +4839,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
       ctx.fillStyle="#2d6a4f";ctx.fillRect(0,H-42,W,4);
       gv.pipes.forEach(p=>{
         const px=p.x-PIPE_W/2;
-        const botY=p.topH+(Math.max(BASE_GAP-gv.score*8,Math.round(H*0.16)));
+        const botY=p.topH+(calcGap(gv.score));
         ctx.fillStyle="#22c55e";ctx.fillRect(px,0,PIPE_W,p.topH);
         ctx.fillStyle="#16a34a";ctx.fillRect(px-4,p.topH-18,PIPE_W+8,18);
         ctx.fillStyle="#22c55e";ctx.fillRect(px,botY,PIPE_W,H);
@@ -4885,7 +4890,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
       gv.frame++;
       gv.bird.vy+=GRAVITY*dt;gv.bird.y+=gv.bird.vy*dt;
       const speed=(SPEED+gv.score*0.08)*dt;
-      const gap=Math.max(GAP-gv.score*5,Math.round(H*0.18));
+      const gap=calcGap(gv.score);
       // Spawn pipe every ~1900ms
       if(!gv.nextPipe)gv.nextPipe=0;
       gv.nextPipe-=delta;
