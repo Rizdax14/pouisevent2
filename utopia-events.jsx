@@ -5263,7 +5263,7 @@ function GamesHomePage({currentPlayer,onBack,nav}){
   const games=[
     {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Le retour de l'illustre jeu des cartes Pokemon",color:"#f59e0b",active:true},
     {id:"plappy",label:"PLAPPY PIRD",icon:"🐦",desc:"Bats le high score",color:"#22c55e",active:true},
-    {id:"crackito",label:"CRACKITO COLORS",icon:"🎨",desc:"Trouve la bonne couleur",color:"#33FFEE",active:true,restricted:["louis-mar","salome-dev"]},
+    {id:"crackito",label:"CRACKITO COLORS",icon:"🎨",desc:"Trouve la bonne couleur",color:"#33FFEE",active:true},
   ];
   return(
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",position:"relative",overflow:"hidden"}}>
