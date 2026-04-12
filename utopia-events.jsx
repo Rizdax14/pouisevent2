@@ -4752,7 +4752,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
 
   async function loadLeaderboard(){
     try{
-      const data=await sbFetch("games_scores","?game=eq.plappy&order=score.desc&limit=20&select=score,player_id");
+      const data=await sbFetch("games_scores","?game=eq.plappy&order=score.desc&select=score,player_id");
       if(data){
         const rows=data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
         setLeaderboard(rows);
@@ -4780,7 +4780,7 @@ function PlappyPirdPage({currentPlayer, onBack}){
       const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
         method:'POST',
         headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
-        body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,updated_at:new Date().toISOString()})
+        body:JSON.stringify({player_id:currentPlayer.id,game:'plappy',score:s,display_name:getDisplayName(PLAYERS.find(p=>p.id===currentPlayer.id)||currentPlayer,PLAYERS),updated_at:new Date().toISOString()})
       });
       if(r.ok){setMyBest(s);localStorage.setItem('plappy_best',String(s));loadLeaderboard();}
     }catch(e){console.error('saveScore',e);}
@@ -4971,6 +4971,284 @@ function PlappyPirdPage({currentPlayer, onBack}){
 }
 
 
+// ─── CRACKITO COLORS ─────────────────────────────────
+function CrackitoColorsPage({currentPlayer, onBack}){
+  const m=useIsMobile();
+  const mountRef=React.useRef(null);
+  const gameRef=React.useRef(null);
+  const [myBest,setMyBest]=React.useState(parseInt(localStorage.getItem('crackito_best')||'0'));
+  const [leaderboard,setLeaderboard]=React.useState([]);
+  const [showLB,setShowLB]=React.useState(false);
+
+  async function loadLeaderboard(){
+    try{
+      const data=await sbFetch("games_scores","?game=eq.crackito&order=score.desc&select=score,player_id");
+      if(data){
+        const rows=data.map(r=>({...r,player:PLAYERS.find(p=>p.id===r.player_id)})).filter(r=>r.player);
+        setLeaderboard(rows);
+        const mine=data.find(r=>r.player_id===currentPlayer?.id);
+        if(mine)setMyBest(mine.score);
+      }
+    }catch(e){}
+  }
+
+  async function saveScore(s){
+    if(!currentPlayer)return;
+    // Increment games played for crackito
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_plappy_games`,{
+        method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+        body:JSON.stringify({p_player_id:currentPlayer.id,p_game:'crackito'})
+      });
+    }catch(e){}
+    try{
+      const existing=await sbFetch("games_scores",`?game=eq.crackito&player_id=eq.${currentPlayer.id}&limit=1`);
+      const prev=existing&&existing.length>0?existing[0].score:0;
+      if(s<=prev)return;
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/games_scores`,{
+        method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=representation"},
+        body:JSON.stringify({player_id:currentPlayer.id,game:'crackito',score:s,display_name:getDisplayName(PLAYERS.find(p=>p.id===currentPlayer.id)||currentPlayer,PLAYERS),updated_at:new Date().toISOString()})
+      });
+      if(r.ok){setMyBest(s);localStorage.setItem('crackito_best',String(s));loadLeaderboard();}
+    }catch(e){}
+  }
+
+  React.useEffect(()=>{loadLeaderboard();},[]);
+
+  React.useEffect(()=>{
+    const timer=setTimeout(()=>{
+      const el=mountRef.current;
+      if(!el||!window.Phaser)return;
+
+      window.__crackitoSave=saveScore;
+      window.__crackitoShowLB=(v)=>setShowLB(v);
+
+      const W2=390,H2=700;
+      const GAME_DURATION=20,SQ=118,CORNER_R=16;
+      const PALETTES=[
+        [0xFF1111,0x1155FF,0x11EE66,0xFFEE00,0xCC11FF,0xFF8800,0xFF0088,0x00FFEE],
+        [0xFF5522,0xFF9933,0xFFCC22,0x77FF33,0x2288FF,0x7744FF,0xFF44AA,0x22FFCC],
+        [0xFF2200,0xFF5500,0xFF8800,0xFFAA00,0x0033FF,0x0066FF,0x0099FF,0x00BBFF],
+        [0xFF1100,0xFF3300,0xFF6600,0xFF8800,0x0022FF,0x0055FF,0x0088FF,0x00AAFF],
+      ];
+      function getTier(t){if(t>15)return 0;if(t>10)return 1;if(t>5)return 2;return 3;}
+      function pickColors(palette){
+        const centerIdx=Phaser.Math.Between(0,palette.length-1);
+        const matchCorner=Phaser.Math.Between(0,3);
+        const pool=[];
+        for(let i=0;i<palette.length;i++){if(i!==centerIdx)pool.push(i);}
+        Phaser.Utils.Array.Shuffle(pool);
+        const others=pool.slice(0,3);
+        const corners=[];let oi=0;
+        for(let i=0;i<4;i++){corners.push(i===matchCorner?centerIdx:others[oi++]);}
+        return{centerIdx,matchCorner,corners,palette};
+      }
+      function drawSq(gfx,colorHex,size,r){
+        gfx.clear();
+        gfx.fillStyle(0x000000,0.4);gfx.fillRoundedRect(-size/2+3,-size/2+5,size,size,r);
+        gfx.fillStyle(colorHex,1);gfx.fillRoundedRect(-size/2,-size/2,size,size,r);
+        gfx.fillStyle(0xFFFFFF,0.13);gfx.fillRoundedRect(-size/2+5,-size/2+5,size-10,size/3.2,{tl:r-2,tr:r-2,bl:0,br:0});
+      }
+
+      class StartScene extends Phaser.Scene{
+        constructor(){super('StartScene');}
+        create(){
+          this.add.rectangle(W2/2,H2/2,W2,H2,0x080810);
+          this.add.text(W2/2,140,'CRACKITO',{fontFamily:'monospace',fontSize:'48px',color:'#FFFFFF',fontStyle:'bold'}).setOrigin(.5);
+          this.add.text(W2/2,200,'COLORS',{fontFamily:'monospace',fontSize:'48px',color:'#33FFEE',fontStyle:'bold'}).setOrigin(.5);
+          const SM=78,r=12;
+          const dc=[0xFF3333,0x3377FF,0x33FF99,0xFFDD22];
+          [[105,370],[285,370],[105,460],[285,460]].forEach(([x,y],i)=>{const g=this.add.graphics();g.x=x;g.y=y;drawSq(g,dc[i],SM,r);});
+          const cg=this.add.graphics();cg.x=W2/2;cg.y=415;drawSq(cg,0xAA33FF,SM,r);
+          ['→  Clique sur le carré identique au centre','→  3 bons d\'affilée = +3 pts','→  Erreur = −1 pt  |  20 secondes'].forEach((txt,i)=>{
+            this.add.text(W2/2,540+i*22,txt,{fontFamily:'monospace',fontSize:'12px',color:'#444466',align:'center'}).setOrigin(.5);
+          });
+          // Best score
+          this.add.text(W2/2,485,'BEST: '+(localStorage.getItem('crackito_best')||'0'),{fontFamily:'monospace',fontSize:'14px',color:'#FFDD22',fontStyle:'bold'}).setOrigin(.5);
+          const t=this.add.text(W2/2,628,'▶  APPUIE POUR JOUER',{fontFamily:'monospace',fontSize:'17px',color:'#33FFEE'}).setOrigin(.5);
+          this.tweens.add({targets:t,alpha:.2,duration:720,yoyo:true,repeat:-1});
+          this.input.once('pointerdown',()=>this.scene.start('GameScene'));
+        }
+      }
+
+      class GameScene extends Phaser.Scene{
+        constructor(){super('GameScene');}
+        create(){
+          this.score=0;this.streak=0;this.timeLeft=GAME_DURATION;this.active=true;this.state=null;
+          this.add.rectangle(W2/2,H2/2,W2,H2,0x080810);
+          this.scoreLbl=this.add.text(W2/2,30,'0',{fontFamily:'monospace',fontSize:'72px',color:'#FFFFFF',fontStyle:'bold'}).setOrigin(.5,0);
+          this.comboDots=[];
+          for(let i=0;i<3;i++){this.comboDots.push(this.add.circle(W2/2-16+i*16,140,5,0x1A1A30));}
+          this.comboLabel=this.add.text(W2/2,155,'',{fontFamily:'monospace',fontSize:'11px',color:'#FFDD22'}).setOrigin(.5);
+          const BAR_W=W2-56;
+          this.add.rectangle(W2/2,172,BAR_W,8,0x0E0E20).setOrigin(.5);
+          this.timerBar=this.add.rectangle(28,172,BAR_W,8,0x33FFEE).setOrigin(0,.5);
+          this.timerTxt=this.add.text(W2-24,163,'20s',{fontFamily:'monospace',fontSize:'13px',color:'#33FFEE'}).setOrigin(1,1);
+          const cx=W2/2,cy=452,off=127;
+          this.cPos=[[cx-off,cy-off],[cx+off,cy-off],[cx-off,cy+off],[cx+off,cy+off]];
+          this.cGfx=[];this.cHits=[];
+          for(let i=0;i<4;i++){
+            const[x,y]=this.cPos[i];
+            const gfx=this.add.graphics();gfx.x=x;gfx.y=y;this.cGfx.push(gfx);
+            const hit=this.add.rectangle(x,y,SQ+10,SQ+10,0x000000,0).setInteractive();
+            hit.on('pointerdown',()=>this.onTap(i));this.cHits.push(hit);
+          }
+          this.cenRing=this.add.graphics();this.cenRing.x=cx;this.cenRing.y=cy;
+          this.cenGfx=this.add.graphics();this.cenGfx.x=cx;this.cenGfx.y=cy;
+          // Leaderboard button
+          const lbGfx=this.add.graphics();
+          lbGfx.lineStyle(1.5,0x2A2A44,1);lbGfx.strokeRoundedRect(W2/2-50,H2-52,100,34,10);
+          this.add.text(W2/2,H2-35,'🏆 scores',{fontFamily:'monospace',fontSize:'12px',color:'#2A2A44'}).setOrigin(.5);
+          const lbBtn=this.add.rectangle(W2/2,H2-35,100,34,0x000000,0).setInteractive();
+          lbBtn.on('pointerdown',()=>{if(window.__crackitoShowLB)window.__crackitoShowLB(true);});
+          this.nextRound();
+          this.active=false;
+          this.startCountdown();
+        }
+        startCountdown(){
+          const steps=['3','2','1','GO !'],colors=['#FFFFFF','#FFFFFF','#FFFFFF','#33FFEE'];
+          let i=0;
+          const overlay=this.add.rectangle(W2/2,H2/2,W2,H2,0x080810,0.55).setDepth(20);
+          const ct=this.add.text(W2/2,H2/2,'',{fontFamily:'monospace',fontSize:'110px',color:'#FFFFFF',fontStyle:'bold'}).setOrigin(.5).setDepth(21);
+          const next=()=>{
+            if(i>=steps.length){
+              this.tweens.add({targets:[overlay,ct],alpha:0,duration:300,onComplete:()=>{overlay.destroy();ct.destroy();}});
+              this.active=true;this.startTimer();return;
+            }
+            ct.setText(steps[i]).setColor(colors[i]).setAlpha(1).setScale(1.4);
+            this.tweens.add({targets:ct,scaleX:.9,scaleY:.9,alpha:i<3?.2:1,duration:i<3?750:500,ease:'Cubic.Out'});
+            i++;this.time.delayedCall(i<4?850:600,next);
+          };
+          next();
+        }
+        startTimer(){
+          this.timerEvent=this.time.addEvent({delay:1000,callback:this.tick,callbackScope:this,repeat:GAME_DURATION-1});
+        }
+        nextRound(){
+          const palette=PALETTES[getTier(this.timeLeft)];
+          this.state=pickColors(palette);
+          const{centerIdx,corners,palette:p}=this.state;
+          const cenSize=SQ-16;
+          drawSq(this.cenGfx,p[centerIdx],cenSize,CORNER_R-2);
+          this.cenRing.clear();this.cenRing.lineStyle(2,p[centerIdx],0.45);
+          this.cenRing.strokeRoundedRect(-(cenSize/2+9),-(cenSize/2+9),cenSize+18,cenSize+18,CORNER_R+5);
+          for(let i=0;i<4;i++){
+            const sz=Phaser.Math.Between(82,142);
+            drawSq(this.cGfx[i],p[corners[i]],sz,CORNER_R);
+            this.cHits[i].setSize(sz+14,sz+14);
+          }
+        }
+        onTap(idx){
+          if(!this.active)return;
+          const correct=idx===this.state.matchCorner;
+          const[x,y]=this.cPos[idx];
+          if(correct){
+            this.streak++;let pts=1;
+            if(this.streak>=3){pts=3;this.streak=0;this.cameras.main.flash(110,255,220,70);this.showCombo(W2/2,210);}
+            this.score+=pts;
+            this.showPopup(x,y-40,`+${pts}`,pts===3?0xFFDD22:0x33FF99);
+            this.tweens.add({targets:this.cGfx[idx],scaleX:1.13,scaleY:1.13,duration:55,yoyo:true,ease:'Quad.Out'});
+          } else {
+            this.score--;this.streak=0;this.cameras.main.shake(55,0.009);
+            this.showPopup(x,y-40,'−1',0xFF3333);
+          }
+          this.scoreLbl.setText(this.score.toString());
+          for(let i=0;i<3;i++){this.comboDots[i].setFillStyle(i<this.streak?0xFFDD22:0x1A1A30);}
+          this.comboLabel.setText(this.streak>0?`🔥 ${this.streak} / 3`:'');
+          this.nextRound();
+        }
+        showPopup(x,y,txt,color){
+          const col='#'+color.toString(16).padStart(6,'0');
+          const t=this.add.text(x,y,txt,{fontFamily:'monospace',fontSize:'30px',color:col,fontStyle:'bold'}).setOrigin(.5);
+          this.tweens.add({targets:t,y:y-65,alpha:0,duration:460,ease:'Cubic.Out',onComplete:()=>t.destroy()});
+        }
+        showCombo(x,y){
+          const t=this.add.text(x,y,'COMBO × 3 !',{fontFamily:'monospace',fontSize:'24px',color:'#FFDD22',fontStyle:'bold'}).setOrigin(.5);
+          this.tweens.add({targets:t,scaleX:1.35,scaleY:1.35,alpha:0,duration:520,ease:'Cubic.Out',onComplete:()=>t.destroy()});
+        }
+        tick(){
+          this.timeLeft--;
+          this.timerTxt.setText(`${this.timeLeft}s`);
+          this.timerBar.scaleX=this.timeLeft/GAME_DURATION;
+          if(this.timeLeft<=5){this.timerBar.setFillStyle(0xFF3333);this.timerTxt.setColor('#FF3333');this.cameras.main.shake(30,0.003);}
+          else if(this.timeLeft<=10){this.timerBar.setFillStyle(0xFFAA22);this.timerTxt.setColor('#FFAA22');}
+          if(this.timeLeft<=0){this.active=false;this.timerEvent.remove(false);this.time.delayedCall(250,()=>this.scene.start('GameOverScene',{score:this.score}));}
+        }
+      }
+
+      class GameOverScene extends Phaser.Scene{
+        constructor(){super('GameOverScene');}
+        init(data){this.finalScore=data.score||0;}
+        create(){
+          this.add.rectangle(W2/2,H2/2,W2,H2,0x080810);
+          if(window.__crackitoSave)window.__crackitoSave(this.finalScore);
+          this.add.text(W2/2,175,'TEMPS ÉCOULÉ',{fontFamily:'monospace',fontSize:'20px',color:'#333355',letterSpacing:5}).setOrigin(.5);
+          this.add.text(W2/2,315,this.finalScore.toString(),{fontFamily:'monospace',fontSize:'108px',color:'#FFFFFF',fontStyle:'bold'}).setOrigin(.5);
+          this.add.text(W2/2,400,'POINTS',{fontFamily:'monospace',fontSize:'18px',color:'#33FFEE',letterSpacing:8}).setOrigin(.5);
+          const best=Math.max(parseInt(localStorage.getItem('crackito_best')||'0'),this.finalScore);
+          this.add.text(W2/2,445,'BEST: '+best,{fontFamily:'monospace',fontSize:'14px',color:'#FFDD22'}).setOrigin(.5);
+          // Rejouer
+          const btnGfx=this.add.graphics();
+          btnGfx.fillStyle(0x33FFEE,1);btnGfx.fillRoundedRect(W2/2-110,500,220,56,16);
+          this.add.text(W2/2,528,'REJOUER',{fontFamily:'monospace',fontSize:'20px',color:'#080810',fontStyle:'bold'}).setOrigin(.5);
+          this.add.rectangle(W2/2,528,220,56,0,0).setInteractive().on('pointerdown',()=>this.scene.start('GameScene'));
+          // Classement
+          const lbGfx=this.add.graphics();
+          lbGfx.lineStyle(2,0x33FFEE,1);lbGfx.strokeRoundedRect(W2/2-80,575,160,44,12);
+          this.add.text(W2/2,597,'🏆 CLASSEMENT',{fontFamily:'monospace',fontSize:'13px',color:'#33FFEE'}).setOrigin(.5);
+          this.add.rectangle(W2/2,597,160,44,0,0).setInteractive().on('pointerdown',()=>{if(window.__crackitoShowLB)window.__crackitoShowLB(true);});
+        }
+      }
+
+      const pg=new Phaser.Game({
+        type:Phaser.AUTO,width:W2,height:H2,backgroundColor:'#080810',
+        scene:[StartScene,GameScene,GameOverScene],
+        scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+        parent:el,input:{activePointers:2}
+      });
+      gameRef.current=pg;
+    },100);
+    return()=>{clearTimeout(timer);try{if(gameRef.current)gameRef.current.destroy(true);}catch(e){}delete window.__crackitoSave;delete window.__crackitoShowLB;};
+  },[currentPlayer]);
+
+  return(
+    <div style={{minHeight:"100vh",background:"#080810",display:"flex",flexDirection:"column"}}>
+      <style>{RETRO_CSS}</style>
+      <div style={{borderBottom:"2px solid #33FFEE44",padding:m?"10px 14px":"14px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+        <button onClick={onBack} style={{background:"none",border:"2px solid #33FFEE",borderRadius:4,color:"#33FFEE",cursor:"pointer",padding:"5px 10px",fontFamily:"'Press Start 2P',monospace",fontSize:7}}>←</button>
+        <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:m?9:12,color:"#33FFEE"}}>CRACKITO COLORS</div>
+        <div style={{marginLeft:"auto",fontSize:7,color:"#60607a",fontFamily:"'Press Start 2P',monospace"}}>BEST: <span style={{color:"#FFDD22"}}>{myBest}</span></div>
+      </div>
+      <div style={{display:"flex",flexDirection:m?"column":"row",flex:1}}>
+        <div ref={mountRef} style={{width:390,height:700,flexShrink:0,margin:m?"0 auto":"0"}}/>
+        {(!m||showLB)&&(
+          <div style={m?{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#080810",zIndex:200,display:"flex",flexDirection:"column",padding:20,overflowY:"auto"}:{flex:1,padding:"24px 40px 24px 20px",overflowY:"auto"}}>
+            {m&&<button onClick={()=>setShowLB(false)} style={{background:"none",border:"2px solid #33FFEE",borderRadius:4,color:"#33FFEE",cursor:"pointer",padding:"6px 12px",fontFamily:"'Press Start 2P',monospace",fontSize:7,marginBottom:16,alignSelf:"flex-start"}}>← RETOUR</button>}
+            <div style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#33FFEE",marginBottom:14}}>🏆 HIGH SCORES</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {leaderboard.length===0?(
+                <div style={{fontSize:7,color:"#404058",fontFamily:"'Press Start 2P',monospace"}}>AUCUN SCORE</div>
+              ):leaderboard.map((row,i)=>{const isMe=row.player_id===currentPlayer?.id;return(
+                <div key={row.player_id} style={{background:isMe?"#33FFEE11":"#12121f",border:`1px solid ${isMe?"#33FFEE44":"#1e1e30"}`,borderRadius:4,padding:"8px 10px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:8,color:i===0?"#FFDD22":i===1?"#aaa":i===2?"#c87533":"#404058",width:20,flexShrink:0}}>{i+1}</span>
+                  <div style={{width:26,height:26,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0}}>
+                    <img src={row.player?.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                  </div>
+                  <span style={{flex:1,fontSize:7,color:isMe?"#33FFEE":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Press Start 2P',monospace"}}>{getDisplayName(row.player,PLAYERS)}</span>
+                  <span style={{fontFamily:"'Press Start 2P',monospace",fontSize:9,color:"#FFDD22",flexShrink:0}}>{row.score}</span>
+                </div>
+              );})}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ─── GAMES HOME ──────────────────────────────────────
 const RETRO_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -4985,6 +5263,7 @@ function GamesHomePage({currentPlayer,onBack,nav}){
   const games=[
     {id:"tournoi",label:"TOURNOI",icon:"🏆",desc:"Le retour de l'illustre jeu des cartes Pokemon",color:"#f59e0b",active:true},
     {id:"plappy",label:"PLAPPY PIRD",icon:"🐦",desc:"Bats le high score",color:"#22c55e",active:true},
+    {id:"crackito",label:"CRACKITO COLORS",icon:"🎨",desc:"Trouve la bonne couleur",color:"#33FFEE",active:true,restricted:["louis-mar","salome-dev"]},
   ];
   return(
     <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#eeeef5",fontFamily:"'Press Start 2P',monospace",position:"relative",overflow:"hidden"}}>
@@ -5003,10 +5282,10 @@ function GamesHomePage({currentPlayer,onBack,nav}){
           <div style={{fontSize:m?8:10,color:"#60607a",animation:"blink 1.5s infinite"}}>INSERT COIN TO PLAY</div>
         </div>
         {games.map(g=>(
-          <div key={g.id} onClick={()=>g.active&&currentPlayer&&nav(g.id)}
-            style={{background:"#12121f",border:`2px solid ${g.active&&currentPlayer?g.color+"66":"#1e1e30"}`,borderRadius:8,padding:m?"18px 16px":"24px 20px",cursor:g.active&&currentPlayer?"pointer":"not-allowed",opacity:g.active&&currentPlayer?1:0.4,transition:"all .15s",position:"relative",overflow:"hidden"}}
-            onMouseEnter={e=>{if(g.active&&currentPlayer)e.currentTarget.style.borderColor=g.color;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=g.active&&currentPlayer?g.color+"66":"#1e1e30";}}>
+          <div key={g.id} onClick={()=>{const ok=g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer.uid));if(ok)nav(g.id);}}
+            style={{background:"#12121f",border:`2px solid ${g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer?.uid))?g.color+"66":"#1e1e30"}`,borderRadius:8,padding:m?"18px 16px":"24px 20px",cursor:g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer?.uid))?"pointer":"not-allowed",opacity:g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer?.uid))?1:0.4,transition:"all .15s",position:"relative",overflow:"hidden"}}
+            onMouseEnter={e=>{if(g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer?.uid)))e.currentTarget.style.borderColor=g.color;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=g.active&&currentPlayer&&(!g.restricted||g.restricted.includes(currentPlayer?.uid))?g.color+"66":"#1e1e30";}}>
             {/* Pixel corner decorations */}
             <div style={{position:"absolute",top:4,left:4,width:8,height:8,border:`2px solid ${g.color}`,borderRight:"none",borderBottom:"none",opacity:0.5}}/>
             <div style={{position:"absolute",top:4,right:4,width:8,height:8,border:`2px solid ${g.color}`,borderLeft:"none",borderBottom:"none",opacity:0.5}}/>
@@ -5256,7 +5535,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
-    {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy Pird",color:"#a855f7",active:true},
+    {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
   return(
@@ -5679,6 +5958,10 @@ export default function App(){
   // Games section
   if(section==="games") return(
     <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
+  );
+
+  if(section==="crackito") return(
+    <CrackitoColorsPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
   );
 
   if(section==="plappy") return(
