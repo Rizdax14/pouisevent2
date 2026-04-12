@@ -6391,6 +6391,7 @@ export default function App(){
       else if(s==="dataBL") setSection("dataBL");
       else if(s==="events"){setSection("events");}
       else if(s==="games"){setSection("games");}
+      else if(s==="collection"){setSection("collection");}
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
