@@ -5249,6 +5249,454 @@ function CrackitoColorsPage({currentPlayer, onBack}){
 }
 
 
+// ─── SUPABASE HELPERS COLLECTION ────────────────────────
+const SUPABASE_URL_C = SUPABASE_URL;
+const SUPABASE_KEY_C = SUPABASE_KEY;
+
+async function sbCollection(table, params=""){
+  const r = await fetch(`${SUPABASE_URL_C}/rest/v1/${table}${params}`,{
+    headers:{"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`}
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function sbCollectionPost(table, data, prefer="return=representation"){
+  const r = await fetch(`${SUPABASE_URL_C}/rest/v1/${table}`,{
+    method:"POST",
+    headers:{"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`,"Content-Type":"application/json","Prefer":prefer},
+    body: JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function sbRpc(fn, params={}){
+  const r = await fetch(`${SUPABASE_URL_C}/rest/v1/rpc/${fn}`,{
+    method:"POST",
+    headers:{"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`,"Content-Type":"application/json"},
+    body: JSON.stringify(params)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ─── COMPOSANT CARTE ────────────────────────────────────
+function CardVisual({card, owned=true, small=false, onClick}){
+  const sz = small ? {w:120,h:170,r:8} : {w:160,h:224,r:12};
+  const c1 = card.color1 || "#1a3d2b";
+  const c2 = card.color2 || "#FFFFFF";
+  const isRare = card.rarity === "rare";
+
+  return(
+    <div onClick={onClick} style={{
+      width:sz.w, height:sz.h, borderRadius:sz.r, cursor:onClick?"pointer":"default",
+      background: owned ? c1 : "#1a1a2e",
+      border: isRare
+        ? `2px solid ${owned?"#f59e0b":"#2a2a40"}`
+        : `1px solid ${owned?c1+"88":"#2a2a40"}`,
+      boxShadow: owned && isRare ? `0 0 12px ${c1}66` : "none",
+      opacity: owned ? 1 : 0.45,
+      position:"relative", overflow:"hidden", flexShrink:0,
+      transition:"transform .15s",
+      display:"flex", flexDirection:"column", alignItems:"center",
+      userSelect:"none",
+    }}
+    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="scale(1.04)";}}
+    onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
+
+      {/* Shine effect on rares */}
+      {owned && isRare && (
+        <div style={{position:"absolute",top:0,left:0,right:0,height:"40%",background:`linear-gradient(180deg,${c2}18 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${sz.r}px ${sz.r}px 0 0`}}/>
+      )}
+
+      {/* Badge RARE */}
+      {isRare && (
+        <div style={{position:"absolute",top:6,right:6,background:owned?"#f59e0b":"#2a2a40",color:owned?"#080810":"#404058",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:4,letterSpacing:"0.05em",fontFamily:"'Outfit',sans-serif"}}>
+          ✦ RARE
+        </div>
+      )}
+
+      {/* Album badge */}
+      <div style={{position:"absolute",top:6,left:6,fontSize:7,color:owned?c2+"99":"#30304a",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+        {card.album==="o2024"?"O'24":card.album==="o2025"?"O'25":card.album==="squid"?"SQ":card.album==="eo2026"?"eO'26":""}
+      </div>
+
+      {/* Photo / Logo zone */}
+      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:"50%",marginTop:sz.h*0.14,background:owned?c2+"22":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"44":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {card.photo_url && owned ? (
+          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}}
+            onError={e=>{e.target.style.display="none";}}/>
+        ) : (
+          <span style={{fontSize:sz.w*0.2,color:owned?c2+"66":"#1e1e30"}}>
+            {card.type==="logo"?"🏆":card.type==="rare"?"⭐":"👤"}
+          </span>
+        )}
+      </div>
+
+      {/* Name */}
+      <div style={{marginTop:6,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
+        <div style={{fontSize:small?9:10,fontWeight:700,color:owned?c2:"#30304a",fontFamily:"'Outfit',sans-serif",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+          {owned ? card.name : "???"}
+        </div>
+        {!small && (
+          <div style={{fontSize:8,color:owned?c2+"99":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {owned ? (card.subtitle||"") : ""}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL CARTE ────────────────────────────────────────
+function CardModal({card, owned, onClose}){
+  if(!card) return null;
+  const c1 = card.color1||"#1a3d2b";
+  const c2 = card.color2||"#FFFFFF";
+  return(
+    <div onClick={onClose} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <CardVisual card={card} owned={owned}/>
+        <div style={{textAlign:"center",color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>
+          <div style={{fontSize:18,fontWeight:700}}>{owned?card.name:"Carte inconnue"}</div>
+          <div style={{fontSize:12,color:"#60607a",marginTop:4}}>{owned?card.subtitle:""}</div>
+          {card.rating && owned && <div style={{fontSize:13,color:"#E8B84B",marginTop:6,fontWeight:600}}>⭐ Rating {card.rating}</div>}
+          <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center"}}>
+            <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:card.rarity==="rare"?"#f59e0b22":"#ffffff11",color:card.rarity==="rare"?"#f59e0b":"#60607a",border:`1px solid ${card.rarity==="rare"?"#f59e0b44":"#ffffff22"}`}}>
+              {card.rarity==="rare"?"✦ Rare":"Commune"}
+            </span>
+            {!owned && <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"#1e1e30",color:"#404058"}}>Non obtenue</span>}
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#60607a",borderRadius:8,padding:"8px 24px",cursor:"pointer",fontSize:13,fontFamily:"'Outfit',sans-serif"}}>Fermer</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PAGE COLLECTION ────────────────────────────────────
+function CollectionPage({currentPlayer, onBack}){
+  const m = useIsMobile();
+  const [tab, setTab] = React.useState("o2024");
+  const [cards, setCards] = React.useState([]);
+  const [inventory, setInventory] = React.useState({}); // {card_id: {collection,duplicates}}
+  const [wallet, setWallet] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [selectedCard, setSelectedCard] = React.useState(null);
+  const [subView, setSubView] = React.useState("albums"); // albums | packs
+  const [packAnim, setPackAnim] = React.useState(null); // null | {cards:[], step:0}
+  const [packMsg, setPackMsg] = React.useState(null);
+
+  const ALBUMS = [
+    {id:"o2024",label:"Olympiade 2024",color:"#E8B84B",icon:"🏅"},
+    {id:"o2025",label:"Olympiade 2025",color:"#2DBD6E",icon:"🧙"},
+    {id:"squid", label:"Squid Game",   color:"#E84D9B",icon:"🦑"},
+    {id:"eo2026",label:"eO 2026",      color:"#E8000E",icon:"🎮"},
+  ];
+
+  const PACKS = [
+    {id:"daily",   label:"Pack Quotidien", cost:0,   cards:8,  rare_chance:0.0375, color:"#22c55e", desc:"Gratuit · 1 fois par jour"},
+    {id:"novice",  label:"Pack Novice",    cost:60,  cards:5,  rare_chance:0.075,  color:"#60a5fa", desc:"60 PO · 5 cartes"},
+    {id:"expert",  label:"Pack Expert",    cost:160, cards:10, rare_chance:0.15,   color:"#a855f7", desc:"160 PO · 10 cartes"},
+    {id:"legend",  label:"Pack Légende",   cost:450, cards:12, rare_chance:0.40,   color:"#f59e0b", desc:"450 PO · 12 cartes"},
+  ];
+
+  React.useEffect(()=>{
+    if(!currentPlayer) return;
+    (async()=>{
+      setLoading(true);
+      try{
+        const [allCards, invData, walletData] = await Promise.all([
+          sbCollection("cards","?select=*&order=id"),
+          sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
+          sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
+        ]);
+        setCards(allCards||[]);
+        const inv={};
+        (invData||[]).forEach(r=>{inv[r.card_id]=r;});
+        setInventory(inv);
+        setWallet(walletData?.[0]||{balance:150});
+      }catch(e){console.error(e);}
+      setLoading(false);
+    })();
+  },[currentPlayer?.id]);
+
+  function isOwned(cardId){ return (inventory[cardId]?.collection||0)>0; }
+  function dupCount(cardId){ return inventory[cardId]?.duplicates||0; }
+
+  const tabCards = cards.filter(c=>c.album===tab);
+  const tabOwned = tabCards.filter(c=>isOwned(c.id)).length;
+  const albumTotal = cards.reduce((acc,c)=>{acc[c.album]=(acc[c.album]||0)+1;return acc;},{});
+  const albumOwned = cards.reduce((acc,c)=>{if(isOwned(c.id))acc[c.album]=(acc[c.album]||0)+1;return acc;},{});
+
+  // Group by team for album display
+  const cardsByTeam = React.useMemo(()=>{
+    const groups={};
+    tabCards.forEach(c=>{
+      const key = c.type==='rare' ? '__rares__' : (c.team_id||'__others__');
+      if(!groups[key]) groups[key]=[];
+      groups[key].push(c);
+    });
+    return groups;
+  },[tab, cards]);
+
+  async function openPack(pack){
+    if(!currentPlayer) return;
+    if(pack.cost > (wallet?.balance||0)){ setPackMsg("Solde insuffisant !"); setTimeout(()=>setPackMsg(null),2000); return; }
+    if(pack.id==="daily"){
+      try{
+        const existing = await sbCollection("daily_pack_claims",`?player_id=eq.${currentPlayer.id}&claimed_date=eq.${new Date().toISOString().slice(0,10)}`);
+        if(existing?.length>0){ setPackMsg("Pack quotidien déjà récupéré aujourd'hui !"); setTimeout(()=>setPackMsg(null),2500); return; }
+      }catch(e){}
+    }
+    try{
+      // Débit PO
+      if(pack.cost>0) await sbRpc("transfer_po",{p_player_id:currentPlayer.id,p_amount:-pack.cost,p_reason:"pack_purchase",p_ref_id:pack.id});
+
+      // Sélectionner les cartes (côté client — en prod ce serait côté serveur)
+      const albumCards = cards.filter(c=>c.album===tab);
+      const commons = albumCards.filter(c=>c.rarity==="common");
+      const rares   = albumCards.filter(c=>c.rarity==="rare");
+
+      const drawn=[];
+      const usedIds=new Set();
+      for(let i=0;i<pack.cards;i++){
+        const isRareDraw = i===0 ? false : Math.random() < pack.rare_chance;
+        const pool = isRareDraw && rares.length>0 ? rares : commons;
+        const available = pool.filter(c=>!usedIds.has(c.id));
+        if(available.length===0) break;
+        // Weighted random by daily_weight
+        const totalW = available.reduce((s,c)=>s+(c.daily_weight||1),0);
+        let r2=Math.random()*totalW, cumul=0;
+        let chosen=available[0];
+        for(const c of available){cumul+=(c.daily_weight||1);if(cumul>=r2){chosen=c;break;}}
+        drawn.push(chosen);
+        usedIds.add(chosen.id);
+      }
+
+      // Add to inventory
+      const results=[];
+      for(const c of drawn){
+        const res = await sbRpc("add_card_to_inventory",{p_player_id:currentPlayer.id,p_card_id:c.id});
+        results.push({card:c, result:res});
+      }
+
+      // Record pack
+      if(pack.id==="daily"){
+        await sbCollectionPost("daily_pack_claims",{player_id:currentPlayer.id,claimed_date:new Date().toISOString().slice(0,10)},"return=minimal");
+      }
+      await sbCollectionPost("pack_history",{player_id:currentPlayer.id,pack_type:pack.id,cost:pack.cost,cards_received:drawn.map(c=>c.id)},"return=minimal");
+
+      // Reload inventory + wallet
+      const [invData2,walletData2]=await Promise.all([
+        sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
+        sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
+      ]);
+      const inv2={};(invData2||[]).forEach(r=>{inv2[r.card_id]=r;});
+      setInventory(inv2);
+      setWallet(walletData2?.[0]||{balance:0});
+
+      // Lancer animation
+      setPackAnim({cards:drawn,results,step:0});
+    }catch(e){setPackMsg("Erreur : "+e.message);setTimeout(()=>setPackMsg(null),3000);}
+  }
+
+  if(packAnim) return <PackReveal items={packAnim} onClose={()=>setPackAnim(null)}/>;
+
+  return(
+    <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
+      {/* Header */}
+      <div style={{background:"#080810",borderBottom:"1px solid #1e1e30",padding:m?"12px 16px":"16px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+        <button onClick={onBack} style={{background:"none",border:"1px solid #1e1e30",borderRadius:8,color:"#60607a",cursor:"pointer",padding:"6px 12px",fontSize:13,fontFamily:"'Outfit',sans-serif"}}>← Retour</button>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#22d3ee"}}>COLLECTION</div>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{background:"#1e1e30",borderRadius:20,padding:"4px 12px",fontSize:13,fontWeight:700,color:"#f59e0b"}}>
+            🪙 {wallet?.balance??150} PO
+          </div>
+        </div>
+      </div>
+
+      {/* Sub-nav */}
+      <div style={{display:"flex",borderBottom:"1px solid #1e1e30",background:"#080810",flexShrink:0}}>
+        {["albums","packs"].map(v=>(
+          <button key={v} onClick={()=>setSubView(v)} style={{flex:1,padding:"12px",background:"none",border:"none",cursor:"pointer",color:subView===v?"#22d3ee":"#60607a",fontSize:14,fontWeight:subView===v?700:400,fontFamily:"'Outfit',sans-serif",borderBottom:subView===v?"2px solid #22d3ee":"2px solid transparent"}}>
+            {v==="albums"?"📚 Albums":"📦 Packs"}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#60607a"}}>Chargement...</div>
+      ) : subView==="albums" ? (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          {/* Album tabs */}
+          <div style={{display:"flex",gap:8,padding:"12px 16px",overflowX:"auto",flexShrink:0,scrollbarWidth:"none"}}>
+            {ALBUMS.map(a=>(
+              <button key={a.id} onClick={()=>setTab(a.id)} style={{
+                flexShrink:0,padding:"8px 14px",borderRadius:20,border:`1px solid ${tab===a.id?a.color:"#1e1e30"}`,
+                background:tab===a.id?a.color+"22":"#12121f",color:tab===a.id?a.color:"#60607a",
+                cursor:"pointer",fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:tab===a.id?700:400,
+                display:"flex",alignItems:"center",gap:6
+              }}>
+                {a.icon} {a.label}
+                <span style={{fontSize:11,opacity:0.8}}>
+                  {albumOwned[a.id]||0}/{albumTotal[a.id]||0}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          {(()=>{const pct=tabCards.length?Math.round(tabOwned/tabCards.length*100):0;const alb=ALBUMS.find(a=>a.id===tab);return(
+            <div style={{padding:"0 16px 12px",flexShrink:0}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#60607a",marginBottom:4}}>
+                <span>{tabOwned} / {tabCards.length} cartes</span>
+                <span style={{color:alb?.color}}>{pct}%</span>
+              </div>
+              <div style={{height:4,background:"#1e1e30",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:alb?.color||"#22d3ee",borderRadius:2,transition:"width .5s"}}/>
+              </div>
+            </div>
+          );})()}
+
+          {/* Cards grid by team */}
+          <div style={{flex:1,overflowY:"auto",padding:"0 16px 80px"}}>
+            {/* Rares first */}
+            {cardsByTeam['__rares__']?.length>0&&(
+              <div style={{marginBottom:24}}>
+                <div style={{fontSize:12,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                  <span>✦</span> Cartes Rares
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+                  {cardsByTeam['__rares__'].map(c=>(
+                    <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Team pages */}
+            {Object.entries(cardsByTeam).filter(([k])=>k!=='__rares__'&&k!=='__others__').map(([teamId, teamCards])=>{
+              const t=(()=>{const found=TEAMS.find(tt=>tt.id===parseInt(teamId));return found?{name:found.name,color:found.color}:{name:"Équipe",color:"#60607a"};})();
+              const ownedCount=teamCards.filter(c=>isOwned(c.id)).length;
+              return(
+                <div key={teamId} style={{marginBottom:20}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#eeeef5"}}>{t.name}</div>
+                    <div style={{fontSize:11,color:"#60607a"}}>{ownedCount}/{teamCards.length}</div>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                    {teamCards.map(c=>(
+                      <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* PACKS */
+        <div style={{flex:1,overflowY:"auto",padding:m?"16px":"24px 40px"}}>
+          {packMsg&&<div style={{background:"#1a0a0a",color:"#ef4444",padding:"10px 16px",borderRadius:8,marginBottom:16,fontSize:13}}>{packMsg}</div>}
+          <div style={{marginBottom:16,fontSize:13,color:"#60607a"}}>
+            Ouvre un pack pour l'album <strong style={{color:"#22d3ee"}}>{ALBUMS.find(a=>a.id===tab)?.label}</strong>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(2,1fr)",gap:12}}>
+            {PACKS.map(pack=>{
+              const canAfford=pack.cost===0||(wallet?.balance||0)>=pack.cost;
+              return(
+                <div key={pack.id} onClick={()=>canAfford&&openPack(pack)}
+                  style={{background:"#12121f",border:`1px solid ${canAfford?pack.color+"44":"#1e1e30"}`,borderRadius:12,padding:16,cursor:canAfford?"pointer":"not-allowed",opacity:canAfford?1:0.5,transition:"all .15s"}}
+                  onMouseEnter={e=>{if(canAfford)e.currentTarget.style.borderColor=pack.color;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=canAfford?pack.color+"44":"#1e1e30";}}>
+                  <div style={{fontSize:22,marginBottom:8}}>📦</div>
+                  <div style={{fontSize:14,fontWeight:700,color:pack.color,marginBottom:4}}>{pack.label}</div>
+                  <div style={{fontSize:11,color:"#60607a",marginBottom:10}}>{pack.desc}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:11,color:"#60607a"}}>Rare: {Math.round(pack.rare_chance*100)}%</div>
+                    <div style={{fontSize:13,fontWeight:700,color:pack.cost===0?"#22c55e":"#f59e0b"}}>
+                      {pack.cost===0?"GRATUIT":`${pack.cost} PO`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {selectedCard&&<CardModal card={selectedCard.card} owned={selectedCard.owned} onClose={()=>setSelectedCard(null)}/>}
+    </div>
+  );
+}
+
+// ─── ANIMATION OUVERTURE PACK ───────────────────────────
+function PackReveal({items, onClose}){
+  const m = useIsMobile();
+  const [step, setStep] = React.useState(-1); // -1 = tap to start, 0..n = révèle carte par carte
+  const [revealed, setRevealed] = React.useState([]);
+  const total = items.cards.length;
+
+  function next(){
+    if(step < total-1){
+      setStep(s=>s+1);
+      setRevealed(r=>[...r, items.cards[step+1]]);
+    } else {
+      onClose();
+    }
+  }
+
+  return(
+    <div onClick={next} style={{minHeight:"100vh",background:"#030310",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:20,userSelect:"none"}}>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#22d3ee",marginBottom:24,letterSpacing:"0.05em"}}>
+        {step<0?"APPUIE POUR OUVRIR":step<total-1?`${step+1} / ${total}`:"FIN !"}
+      </div>
+
+      {step<0 ? (
+        <div style={{display:"flex",gap:-20}}>
+          {Array(Math.min(4,total)).fill(0).map((_,i)=>(
+            <div key={i} style={{width:120,height:168,borderRadius:10,background:"#0a0a1f",border:"1px solid #22d3ee33",marginLeft:i>0?-30:0,transform:`rotate(${(i-1.5)*6}deg)`,boxShadow:"0 4px 20px #000"}}/>
+          ))}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+          {/* Dernière carte révélée */}
+          {revealed.length>0&&(
+            <div style={{animation:"fadeInUp .3s ease"}}>
+              <CardVisual card={revealed[revealed.length-1]} owned={true}/>
+              {items.results[revealed.length-1]?.result==="auto_sold"&&(
+                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#f59e0b"}}>💰 Vendu auto · {items.cards[revealed.length-1]?.rarity==="rare"?40:3} PO</div>
+              )}
+              {items.results[revealed.length-1]?.result==="duplicate"&&(
+                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#60607a"}}>📋 Doublon</div>
+              )}
+              {items.results[revealed.length-1]?.result==="collection"&&(
+                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#22c55e"}}>✨ Nouvelle carte !</div>
+              )}
+            </div>
+          )}
+          {/* Cartes déjà révélées en miniatures */}
+          {revealed.length>1&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",maxWidth:320}}>
+              {revealed.slice(0,-1).map((c,i)=>(
+                <CardVisual key={i} card={c} owned={true} small/>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{marginTop:24,fontSize:12,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
+        {step<total-1?"Appuie pour continuer":"Appuie pour fermer"}
+      </div>
+      <style>{`@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+
+
 // ─── GAMES HOME ──────────────────────────────────────
 const RETRO_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -5536,6 +5984,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
+    {id:"collection",label:"Collection",icon:"🃏",desc:isLouis?"Packs · Albums · Bourse":"Bientôt disponible",color:"#22d3ee",active:isLouis},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
   return(
@@ -5958,6 +6407,10 @@ export default function App(){
   // Games section
   if(section==="games") return(
     <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
+  );
+
+  if(section==="collection") return(
+    <CollectionPage currentPlayer={currentPlayer} onBack={()=>setSection("menu")}/>
   );
 
   if(section==="crackito") return(
