@@ -5386,27 +5386,38 @@ function CardModal({card, owned, onClose}){
 }
 
 // ─── DAILY COUNTDOWN ────────────────────────────────────
-function DailyCountdown(){
+function DailyCountdown({currentPlayerId}){
   const [timeLeft, setTimeLeft] = React.useState("");
+  const [ready, setReady] = React.useState(false);
+
   React.useEffect(()=>{
-    function calc(){
-      const now=new Date();
-      const midnight=new Date();
-      midnight.setHours(24,0,0,0);
-      const diff=midnight-now;
-      const h=Math.floor(diff/3600000);
-      const m=Math.floor((diff%3600000)/60000);
-      const s=Math.floor((diff%60000)/1000);
-      setTimeLeft(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
-    }
-    calc();
-    const t=setInterval(calc,1000);
-    return()=>clearInterval(t);
-  },[]);
+    if(!currentPlayerId)return;
+    (async()=>{
+      try{
+        const fourHoursAgo=new Date(Date.now()-4*60*60*1000).toISOString();
+        const ex=await sbCollection("pack_history",`?player_id=eq.${currentPlayerId}&pack_type=eq.daily&opened_at=gte.${fourHoursAgo}&order=opened_at.desc&limit=1`);
+        if(!ex?.length){setReady(true);return;}
+        const lastOpen=new Date(ex[0].opened_at);
+        const nextOpen=new Date(lastOpen.getTime()+4*60*60*1000);
+        function calc(){
+          const diff=nextOpen-Date.now();
+          if(diff<=0){setReady(true);return;}
+          const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
+          setTimeLeft(`${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`);
+        }
+        calc();
+        const t=setInterval(calc,1000);
+        return()=>clearInterval(t);
+      }catch(e){setReady(true);}
+    })();
+  },[currentPlayerId]);
+
   return(
-    <div style={{background:"#0a1a12",border:"1px solid #22c55e33",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-      <div style={{fontSize:12,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>Prochain pack gratuit</div>
-      <div style={{fontSize:16,fontWeight:700,color:"#22c55e",fontFamily:"'Outfit',sans-serif",letterSpacing:"0.05em"}}>{timeLeft}</div>
+    <div style={{background:ready?"#0a1a12":"#1a0a0a",border:`1px solid ${ready?"#22c55e33":"#ef444433"}`,borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{fontSize:12,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>Pack gratuit</div>
+      <div style={{fontSize:14,fontWeight:700,color:ready?"#22c55e":"#ef4444",fontFamily:"'Outfit',sans-serif"}}>
+        {ready?"✅ Disponible !":timeLeft}
+      </div>
     </div>
   );
 }
@@ -5433,7 +5444,7 @@ function CollectionPage({currentPlayer, onBack}){
   ];
 
   const PACKS = [
-    {id:"daily",   label:"Pack Quotidien", cost:0,   cards:8,  rare_chance:0.0375, color:"#22c55e", desc:"Gratuit · 1 fois par jour"},
+    {id:"daily",   label:"Pack Gratuit",   cost:0,   cards:4,  rare_chance:0.0375, color:"#22c55e", desc:"Gratuit · toutes les 4h"},
     {id:"novice",  label:"Pack Novice",    cost:60,  cards:5,  rare_chance:0.075,  color:"#60a5fa", desc:"60 PO · 5 cartes"},
     {id:"expert",  label:"Pack Expert",    cost:160, cards:10, rare_chance:0.15,   color:"#a855f7", desc:"160 PO · 10 cartes"},
     {id:"legend",  label:"Pack Légende",   cost:450, cards:12, rare_chance:0.40,   color:"#f59e0b", desc:"450 PO · 12 cartes"},
@@ -5482,11 +5493,19 @@ function CollectionPage({currentPlayer, onBack}){
     if(!currentPlayer)return;
     if(!cards.length){setPackMsg("Cartes non chargées, réessaie.");setTimeout(()=>setPackMsg(null),2000);return;}
 
-    // Check daily claim
+    // Check 4h cooldown
     if(pack.id==="daily"){
       try{
-        const ex=await sbCollection("daily_pack_claims",`?player_id=eq.${currentPlayer.id}&claimed_date=eq.${new Date().toISOString().slice(0,10)}`);
-        if(ex?.length>0){setPackMsg("Pack quotidien déjà récupéré !");setTimeout(()=>setPackMsg(null),2500);return;}
+        const fourHoursAgo=new Date(Date.now()-4*60*60*1000).toISOString();
+        const ex=await sbCollection("pack_history",`?player_id=eq.${currentPlayer.id}&pack_type=eq.daily&opened_at=gte.${fourHoursAgo}&limit=1`);
+        if(ex?.length>0){
+          const lastOpen=new Date(ex[0].opened_at);
+          const nextOpen=new Date(lastOpen.getTime()+4*60*60*1000);
+          const diff=nextOpen-Date.now();
+          const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
+          setPackMsg(`Pack gratuit dispo dans ${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s`);
+          setTimeout(()=>setPackMsg(null),3000);return;
+        }
       }catch(e){}
     }
 
@@ -5666,7 +5685,7 @@ function CollectionPage({currentPlayer, onBack}){
         /* PACKS */
         <div style={{flex:1,overflowY:"auto",padding:m?"16px":"24px 40px"}}>
           {packMsg&&<div style={{background:"#1a0a0a",color:"#ef4444",padding:"10px 16px",borderRadius:8,marginBottom:16,fontSize:13}}>{packMsg}</div>}
-          <DailyCountdown/>
+          <DailyCountdown currentPlayerId={currentPlayer?.id}/>
           <div style={{marginBottom:16,fontSize:13,color:"#60607a"}}>
             Chaque pack peut contenir des cartes de <strong style={{color:"#22d3ee"}}>tous les albums</strong>
           </div>
