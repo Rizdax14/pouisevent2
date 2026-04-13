@@ -856,8 +856,8 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
   return(
     <nav style={{background:"#0d0d1c",borderBottom:"1px solid #1e1e30",padding:"0 32px",display:"flex",alignItems:"center",gap:0,position:"sticky",top:0,zIndex:100}}>
       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#E8B84B",marginRight:32,letterSpacing:"0.05em",padding:"14px 0"}}>POUIS</div>
-      {items.map((item)=>{const {id,l}=item;
-        const a=map[page]===id;
+      {items.map((item)=>{
+        const {id,l}=item;const a=map[page]===id;
         return(
           <button key={id} onClick={()=>item.onClick?item.onClick():setPage(id)} style={{background:"none",border:"none",cursor:"pointer",padding:"16px 14px",fontSize:13,fontWeight:500,fontFamily:"'Outfit',sans-serif",color:a?"#E8B84B":"#60607a",borderBottom:a?"2px solid #E8B84B":"2px solid transparent",transition:"all .15s"}} onMouseEnter={e=>{if(!a)e.currentTarget.style.color="#cccce0";}} onMouseLeave={e=>{if(!a)e.currentTarget.style.color="#60607a";}}>{l}</button>
         );
@@ -6566,7 +6566,7 @@ export default function App(){
       <style>{css}</style>
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
-      <div key={page+JSON.stringify(sub)} className="fade" style={{paddingBottom:m?"72px":0}}>
+      <div key={page+JSON.stringify(sub)} className="fade">
         {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
