@@ -5728,121 +5728,244 @@ function CollectionPage({currentPlayer, onBack}){
 }
 
 // ─── ANIMATION OUVERTURE PACK (PHASER) ─────────────────
-const PACK_REVEAL_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#030310;overflow:hidden;touch-action:none;}</style></head><body><div id="g"></div><script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script><script>
-const W=Math.min(window.innerWidth,420),H=window.innerHeight;
-let cards=[],results=[],onDone=null;
-window.init=function(c,r,d){cards=c;results=r;onDone=d;launch();}
-function hexToInt(h){return parseInt((h||'1a3d2b').replace('#',''),16);}
-function launch(){
-  if(window._pg){try{window._pg.destroy(true);}catch(e){}}
-  class S extends Phaser.Scene{
-    constructor(){super('S');}
-    create(){
-      const cx=W/2,cy=H/2;
-      this.step=0;this.add.rectangle(cx,cy,W,H,0x030310);
-      this.ttl=this.add.text(cx,55,'PACK OUVERTURE',{fontFamily:'monospace',fontSize:Math.round(W*.065),fontStyle:'bold',color:'#22d3ee',stroke:'#000',strokeThickness:3}).setOrigin(.5);
-      this.cnt=this.add.text(cx,95,'',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#404058'}).setOrigin(.5);
-      this.tapTxt=this.add.text(cx,H-55,'TAP POUR COMMENCER',{fontFamily:'monospace',fontSize:Math.round(W*.036),color:'#22d3ee'}).setOrigin(.5);
-      this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
-      this.stk=this.add.container(cx,cy);
-      for(let i=0;i<Math.min(5,cards.length);i++){
-        const g=this.add.graphics();
-        g.fillStyle(0x0a0a1f,1);g.fillRoundedRect(-68,-95,136,190,10);
-        g.lineStyle(2,0x22d3ee,.3);g.strokeRoundedRect(-68,-95,136,190,10);
-        g.x=(i-2)*7;g.y=(i-2)*5;g.angle=(i-2)*3;this.stk.add(g);
-      }
-      this.tweens.add({targets:this.stk,scaleX:1.04,scaleY:1.04,duration:900,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
-      this.grid=this.add.container(cx,H*.76);this.bc=null;
-      this.input.on('pointerdown',()=>this.tap2());
-      this.input.keyboard?.on('keydown-SPACE',()=>this.tap2());
-    }
-    tap2(){
-      if(this.step===0){
-        this.tweens.add({targets:[this.stk,this.tapTxt],alpha:0,duration:250,onComplete:()=>{this.stk.setVisible(false);this.tapTxt.setVisible(false);this.next();}});
-      } else if(this.step<=cards.length){this.next();}
-      else{if(onDone)onDone();}
-    }
-    next(){
-      this.step++;
-      if(this.step>cards.length){
-        this.tapTxt.setText('TAP POUR FERMER').setAlpha(1).setVisible(true);
-        this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
-        return;
-      }
-      const c=cards[this.step-1],res=(results[this.step-1]||{}).result||'collection';
-      this.cnt.setText(this.step+' / '+cards.length).setColor('#22d3ee');
-      if(this.bc){this.bc.destroy();this.bc=null;}
-      const c1=hexToInt(c.color1),c2='#'+(hexToInt(c.color2)).toString(16).padStart(6,'0');
-      const isRare=c.rarity==='rare';
-      const bw=148,bh=208,cx=W/2,cy=H/2-15;
-      const ct=this.add.container(cx,cy);
-      const bg=this.add.graphics();
-      bg.fillStyle(c1,1);bg.fillRoundedRect(-bw/2,-bh/2,bw,bh,12);
-      if(isRare){bg.lineStyle(3,0xf59e0b,1);bg.strokeRoundedRect(-bw/2,-bh/2,bw,bh,12);}
-      ct.add(bg);
-      if(isRare){ct.add(this.add.text(bw*.42,-bh*.42,'✦ RARE',{fontFamily:'monospace',fontSize:9,color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      const aLbl=c.album==='o2024'?"O'24":c.album==='o2025'?"O'25":c.album==='squid'?'SQ':"eO'26";
-      ct.add(this.add.text(-bw*.42,-bh*.42,aLbl,{fontFamily:'monospace',fontSize:8,color:c2+'77'}).setOrigin(0,.5));
-      // Photo circle
-      if(c.photo_url){
-        const photoKey='ph_'+this.step;
-        const photoSize=Math.round(bw*.44);
-        this.load.image(photoKey,c.photo_url);
-        this.load.once('complete',()=>{
-          if(!this.bc)return;
-          try{
-            const img=this.add.image(0,-bh*.08,photoKey).setDisplaySize(photoSize,photoSize);
-            const mask=this.make.graphics({add:false});mask.fillStyle(0xffffff);mask.fillCircle(cx,-bh*.08+cy,photoSize/2);
-            img.setMask(mask.createBitmapMask());
-            ct.add(img);
-          }catch(e){}
-        });
-        this.load.start();
-      }
-      if(c.rating){ct.add(this.add.text(0,isRare?bh*.05:-bh*.18,'⭐ '+parseFloat(c.rating).toFixed(2),{fontFamily:'monospace',fontSize:Math.round(bw*.065),color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      const nameY=c.photo_url?bh*.27:(c.rating?bh*.05:-bh*.02);
-      ct.add(this.add.text(0,nameY,c.name||'?',{fontFamily:'monospace',fontSize:Math.round(bw*.07),fontStyle:'bold',color:c2,wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
-      ct.add(this.add.text(0,nameY+bh*.14,c.subtitle||'',{fontFamily:'monospace',fontSize:Math.round(bw*.042),color:c2+'88',wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
-      const rCol=res==='collection'?0x22c55e:res==='duplicate'?0x808080:0xf59e0b;
-      const rLbl=res==='collection'?'✨ NOUVELLE!':res==='duplicate'?'📋 DOUBLON':'💰 VENDU AUTO';
-      const rbg=this.add.graphics();rbg.fillStyle(rCol,.2);rbg.fillRoundedRect(-bw*.42,bh*.36,bw*.84,22,6);ct.add(rbg);
-      ct.add(this.add.text(0,bh*.375,rLbl,{fontFamily:'monospace',fontSize:10,color:'#'+rCol.toString(16).padStart(6,'0'),fontStyle:'bold'}).setOrigin(.5));
-      ct.setAlpha(0).setScale(.5);this.tweens.add({targets:ct,alpha:1,scaleX:1,scaleY:1,duration:320,ease:'Back.Out'});
-      if(isRare)this.cameras.main.flash(150,255,200,0);
-      if(res==='collection')this.cameras.main.shake(60,.004);
-      this.bc=ct;
-      const mw=54,mh=76,cols=5,n=this.step-1,col=n%cols,row=Math.floor(n/cols);
-      const sx=-(mw*Math.min(cards.length,cols)/2)+mw/2;
-      const mg=this.add.container(sx+col*mw,row*(mh+4));
-      const mbg=this.add.graphics();mbg.fillStyle(c1,1);mbg.fillRoundedRect(-mw/2,-mh/2,mw,mh,6);mg.add(mbg);
-      if(isRare){mg.add(this.add.circle(mw*.36,-mh*.4,4,0xf59e0b));}
-      mg.setAlpha(0);this.tweens.add({targets:mg,alpha:1,duration:200});this.grid.add(mg);
-    }
-  }
-  window._pg=new Phaser.Game({type:Phaser.AUTO,width:W,height:H,parent:'g',backgroundColor:'#030310',scene:[S],scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{touch:{capture:true}}});
-}
-<\/script></body></html>`;
-
+// ─── ANIMATION OUVERTURE PACK (canvas pur) ────────────
 function PackReveal({items, onClose}){
-  const iframeRef=React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const stateRef  = React.useRef({step:0, cards:items.cards||[], results:items.results||[]});
+
   React.useEffect(()=>{
-    const iframe=iframeRef.current;
-    if(!iframe)return;
-    const onLoad=()=>{
-      try{iframe.contentWindow.init(items.cards||[],items.results||[],()=>{onClose();});}
-      catch(e){console.error('PackReveal init error',e);}
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    const cards   = items.cards||[];
+    const results = items.results||[];
+    const W = canvas.width  = Math.min(window.innerWidth, 420);
+    const H = canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    let step = 0; // 0=intro, 1..n=cards revealed
+    let raf;
+
+    // Pre-load photos as Images
+    const imgs = {};
+    cards.forEach((c,i)=>{
+      if(c.photo_url){
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = c.photo_url;
+        imgs[i] = img;
+      }
+    });
+
+    function hexToRgb(hex){
+      const h = (hex||'#1a3d2b').replace('#','');
+      const n = parseInt(h,16);
+      return [(n>>16)&255,(n>>8)&255,n&255];
+    }
+
+    function roundRect(ctx,x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+      ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+      ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+      ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+      ctx.closePath();
+    }
+
+    function drawCard(c, i, cx, cy, scale=1, alpha=1){
+      const BW=148*scale, BH=208*scale;
+      const x=cx-BW/2, y=cy-BH/2;
+      const [r1,g1,b1]=hexToRgb(c.color1);
+      const [r2,g2,b2]=hexToRgb(c.color2);
+      const isRare=c.rarity==='rare';
+      const res=(results[i]||{}).result||'collection';
+      ctx.save(); ctx.globalAlpha=alpha;
+
+      // Card bg
+      roundRect(ctx,x,y,BW,BH,12*scale);
+      ctx.fillStyle=c.color1||'#1a3d2b';
+      ctx.fill();
+
+      // Rare glow
+      if(isRare){
+        ctx.strokeStyle='#f59e0b';ctx.lineWidth=2.5*scale;
+        roundRect(ctx,x,y,BW,BH,12*scale);ctx.stroke();
+      }
+
+      // Top gradient
+      const grad=ctx.createLinearGradient(x,y,x,y+BH*0.4);
+      grad.addColorStop(0,`rgba(${r2},${g2},${b2},0.12)`);
+      grad.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grad;roundRect(ctx,x,y,BW,BH*0.4,12*scale);ctx.fill();
+
+      // Album badge
+      const albumColors={o2024:'#E8B84B',o2025:'#22c55e',squid:'#E84D9B',eo2026:'#E8000E'};
+      const albumLabel={o2024:"O'24",o2025:"O'25",squid:'SQ',eo2026:"eO'26"};
+      ctx.fillStyle=albumColors[c.album]||'#ffffff';
+      ctx.font=`bold ${7*scale}px 'Outfit', monospace`;
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(albumLabel[c.album]||'', x+6*scale, y+5*scale);
+
+      // Rare badge
+      if(isRare){
+        ctx.fillStyle='#f59e0b';
+        ctx.font=`bold ${7*scale}px monospace`;
+        ctx.textAlign='right';ctx.textBaseline='top';
+        ctx.fillText('✦ RARE', x+BW-5*scale, y+5*scale);
+      }
+
+      // Photo circle
+      const photoSize=BW*0.44, photoY=y+BH*0.13;
+      const photoX=cx;
+      ctx.save();
+      ctx.beginPath();ctx.arc(photoX,photoY+photoSize/2,photoSize/2,0,Math.PI*2);ctx.clip();
+      if(imgs[i]&&imgs[i].complete&&imgs[i].naturalWidth>0){
+        ctx.drawImage(imgs[i],photoX-photoSize/2,photoY,photoSize,photoSize);
+      } else {
+        ctx.fillStyle=`rgba(${r2},${g2},${b2},0.1)`;ctx.fill();
+        ctx.font=`${BW*0.16}px monospace`;ctx.textAlign='center';ctx.fillStyle=c.color2||'#fff';
+        ctx.fillText(c.type==='logo'?'🏆':c.type==='rare'?'⭐':'👤',photoX,photoY+photoSize*0.65);
+      }
+      ctx.restore();
+
+      // Name
+      const nameY = cy+BH*0.06;
+      ctx.fillStyle=c.color2||'#fff';
+      ctx.font=`bold ${Math.max(9,10.5*scale)}px 'Outfit', monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      const words=(c.name||'').split(' ');
+      let line='',ly=nameY;
+      for(const w of words){
+        const test=line?line+' '+w:w;
+        if(ctx.measureText(test).width>BW*0.85&&line){
+          ctx.fillText(line,cx,ly);line=w;ly+=13*scale;
+        } else line=test;
+      }
+      ctx.fillText(line,cx,ly);
+
+      // Rating
+      if(c.rating){
+        ctx.fillStyle='#f59e0b';
+        ctx.font=`bold ${8.5*scale}px monospace`;
+        ctx.textAlign='center';
+        ctx.fillText('⭐ '+parseFloat(c.rating).toFixed(2),cx,ly+14*scale);
+      }
+
+      // Result badge
+      const rColors={collection:'#22c55e',duplicate:'#808080',auto_sold:'#f59e0b'};
+      const rLabels={collection:'✨ NOUVELLE!',duplicate:'📋 DOUBLON',auto_sold:'💰 VENDU AUTO'};
+      const rCol=rColors[res]||'#22c55e';
+      const rLabel=rLabels[res]||'';
+      const badgeY=y+BH*0.82;
+      ctx.fillStyle=rCol+'33';
+      roundRect(ctx,x+BW*0.1,badgeY,BW*0.8,22*scale,6*scale);ctx.fill();
+      ctx.fillStyle=rCol;ctx.font=`bold ${9*scale}px monospace`;ctx.textAlign='center';
+      ctx.fillText(rLabel,cx,badgeY+5*scale);
+
+      // Bottom bar
+      ctx.fillStyle=isRare?'#f59e0b':(albumColors[c.album]||c.color2||'#fff');
+      roundRect(ctx,x,y+BH-3*scale,BW,3*scale,0);ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawMini(c,i,mx,my,mw,mh){
+      const [r1,g1,b1]=hexToRgb(c.color1);
+      roundRect(ctx,mx,my,mw,mh,6);
+      ctx.fillStyle=c.color1||'#1a3d2b';ctx.fill();
+      if(c.rarity==='rare'){
+        ctx.strokeStyle='#f59e0b';ctx.lineWidth=1.5;
+        roundRect(ctx,mx,my,mw,mh,6);ctx.stroke();
+      }
+    }
+
+    let animT=0, animCard=null, animAlpha=0, animScale=0.5;
+    let blink=0;
+
+    function draw(ts){
+      ctx.fillStyle='#030310';ctx.fillRect(0,0,W,H);
+
+      // Grid of revealed minis
+      const MINI_W=52,MINI_H=72,COLS=5,GAP=4;
+      const gridY=H*0.78;
+      const revealed = step>0?Math.min(step,cards.length):0;
+      for(let i=0;i<revealed;i++){
+        const col=i%COLS,row=Math.floor(i/COLS);
+        const startX=W/2-(MINI_W*Math.min(revealed,COLS))/2;
+        const mx=startX+col*(MINI_W+GAP);
+        const my=gridY+row*(MINI_H+GAP)-MINI_H/2;
+        ctx.save();ctx.globalAlpha=1;drawMini(cards[i],i,mx,my,MINI_W,MINI_H);ctx.restore();
+      }
+
+      if(step===0){
+        // Intro — pack stack
+        for(let i=0;i<Math.min(5,cards.length);i++){
+          const ox=(i-2)*8, oy=(i-2)*6, rot=(i-2)*0.06;
+          ctx.save();ctx.translate(W/2+ox,H/2+oy);ctx.rotate(rot);
+          roundRect(ctx,-68,-95,136,190,10);
+          ctx.fillStyle='#0a0a1f';ctx.fill();
+          ctx.strokeStyle='#22d3ee';ctx.lineWidth=1.5;
+          roundRect(ctx,-68,-95,136,190,10);ctx.stroke();
+          ctx.restore();
+        }
+        // Tap text
+        blink=(blink+0.03)%1;
+        ctx.globalAlpha=0.4+Math.sin(blink*Math.PI*2)*0.4;
+        ctx.fillStyle='#22d3ee';ctx.font=`bold ${Math.round(W*.038)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('TAP POUR COMMENCER',W/2,H-55);
+        ctx.globalAlpha=1;
+      } else if(step<=cards.length){
+        // Current card with animation
+        const c=cards[step-1];
+        animAlpha=Math.min(1,animAlpha+0.07);
+        animScale=Math.min(1,animScale+0.08*(2-animScale));
+        const cy = H/2-25;
+        ctx.save();ctx.globalAlpha=animAlpha;
+        ctx.translate(W/2,cy);ctx.scale(animScale,animScale);ctx.translate(-W/2,-cy);
+        drawCard(c,step-1,W/2,cy,1,1);
+        ctx.restore();
+
+        // Counter
+        ctx.fillStyle='#22d3ee';ctx.font=`bold ${Math.round(W*.038)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='top';ctx.globalAlpha=1;
+        ctx.fillText(`${step} / ${cards.length}`,W/2,55);
+      } else {
+        // Done
+        ctx.fillStyle='#22c55e';ctx.font=`bold ${Math.round(W*.05)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('🎉 PACK OUVERT !',W/2,H*0.35);
+        blink=(blink+0.03)%1;
+        ctx.globalAlpha=0.4+Math.sin(blink*Math.PI*2)*0.4;
+        ctx.fillStyle='#ffffff';ctx.font=`${Math.round(W*.035)}px monospace`;
+        ctx.fillText('TAP POUR FERMER',W/2,H-55);
+        ctx.globalAlpha=1;
+      }
+      raf=requestAnimationFrame(draw);
+    }
+
+    function tap(){
+      if(step===0){step=1;animAlpha=0;animScale=0.5;}
+      else if(step<cards.length){step++;animAlpha=0;animScale=0.5;}
+      else{cancelAnimationFrame(raf);onClose();}
+    }
+
+    canvas.addEventListener('click',tap);
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();tap();},{passive:false});
+    document.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowRight')tap();});
+
+    raf=requestAnimationFrame(draw);
+    return()=>{
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener('click',tap);
     };
-    iframe.addEventListener('load',onLoad);
-    const blob=new Blob([PACK_REVEAL_HTML],{type:'text/html'});
-    iframe.src=URL.createObjectURL(blob);
-    return()=>{iframe.removeEventListener('load',onLoad);};
   },[]);
+
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999,background:"#030310"}}>
-      <iframe ref={iframeRef} style={{width:"100%",height:"100%",border:"none",display:"block"}} sandbox="allow-scripts allow-same-origin"/>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999,background:"#030310",touchAction:"none"}}>
+      <canvas ref={canvasRef} style={{display:"block",width:"100%",height:"100%"}}/>
     </div>
   );
 }
+
 
 
 // ─── GAMES HOME ──────────────────────────────────────
