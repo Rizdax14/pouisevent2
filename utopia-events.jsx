@@ -5287,6 +5287,13 @@ function CardVisual({card, owned=true, small=false, onClick}){
   const c1 = card.color1 || "#1a3d2b";
   const c2 = card.color2 || "#FFFFFF";
   const isRare = card.rarity === "rare";
+  const isLogo = card.type === "logo";
+
+  // Get SVG for logo cards
+  const teamSvg = isLogo && card.team_id && TEAM_SVG_RAW[card.team_id]
+    ? TEAM_SVG_RAW[card.team_id].replace(/LOGO_COLOR/g, c2).replace(/<svg /,
+        `<svg width="${Math.round(sz.w*0.48)}" height="${Math.round(sz.w*0.48)}" style="max-height:${Math.round(sz.w*0.48)}px" `)
+    : null;
 
   return(
     <div onClick={onClick} style={{
@@ -5305,42 +5312,45 @@ function CardVisual({card, owned=true, small=false, onClick}){
     onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="scale(1.04)";}}
     onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
 
-      {/* Shine effect on rares */}
       {owned && isRare && (
         <div style={{position:"absolute",top:0,left:0,right:0,height:"40%",background:`linear-gradient(180deg,${c2}18 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${sz.r}px ${sz.r}px 0 0`}}/>
       )}
 
-      {/* Badge RARE */}
       {isRare && (
         <div style={{position:"absolute",top:6,right:6,background:owned?"#f59e0b":"#2a2a40",color:owned?"#080810":"#404058",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:4,letterSpacing:"0.05em",fontFamily:"'Outfit',sans-serif"}}>
           ✦ RARE
         </div>
       )}
 
-      {/* Album badge */}
       <div style={{position:"absolute",top:6,left:6,fontSize:7,color:owned?c2+"99":"#30304a",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
         {card.album==="o2024"?"O'24":card.album==="o2025"?"O'25":card.album==="squid"?"SQ":card.album==="eo2026"?"eO'26":""}
       </div>
 
       {/* Photo / Logo zone */}
-      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:"50%",marginTop:sz.h*0.14,background:owned?c2+"22":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"44":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {card.photo_url && owned ? (
-          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}}
-            onError={e=>{e.target.style.display="none";}}/>
+      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:isLogo?"12%":"50%",marginTop:sz.h*0.13,background:owned?c2+"15":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"33":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {owned && isLogo && teamSvg ? (
+          <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
+        ) : owned && card.photo_url ? (
+          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
         ) : (
           <span style={{fontSize:sz.w*0.2,color:owned?c2+"66":"#1e1e30"}}>
-            {card.type==="logo"?"🏆":card.type==="rare"?"⭐":"👤"}
+            {isLogo?"🏆":isRare?"⭐":"👤"}
           </span>
         )}
       </div>
 
-      {/* Name */}
-      <div style={{marginTop:6,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
+      {/* Name + rating */}
+      <div style={{marginTop:5,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
         <div style={{fontSize:small?9:10,fontWeight:700,color:owned?c2:"#30304a",fontFamily:"'Outfit',sans-serif",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
           {owned ? card.name : "???"}
         </div>
+        {card.rating && owned && (
+          <div style={{fontSize:8,color:"#f59e0b",fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>
+            ⭐ {Number(card.rating).toFixed(2)}
+          </div>
+        )}
         {!small && (
-          <div style={{fontSize:8,color:owned?c2+"99":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          <div style={{fontSize:7,color:owned?c2+"88":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
             {owned ? (card.subtitle||"") : ""}
           </div>
         )}
@@ -5374,6 +5384,33 @@ function CardModal({card, owned, onClose}){
     </div>
   );
 }
+
+// ─── DAILY COUNTDOWN ────────────────────────────────────
+function DailyCountdown(){
+  const [timeLeft, setTimeLeft] = React.useState("");
+  React.useEffect(()=>{
+    function calc(){
+      const now=new Date();
+      const midnight=new Date();
+      midnight.setHours(24,0,0,0);
+      const diff=midnight-now;
+      const h=Math.floor(diff/3600000);
+      const m=Math.floor((diff%3600000)/60000);
+      const s=Math.floor((diff%60000)/1000);
+      setTimeLeft(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
+    }
+    calc();
+    const t=setInterval(calc,1000);
+    return()=>clearInterval(t);
+  },[]);
+  return(
+    <div style={{background:"#0a1a12",border:"1px solid #22c55e33",borderRadius:8,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{fontSize:12,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>Prochain pack gratuit</div>
+      <div style={{fontSize:16,fontWeight:700,color:"#22c55e",fontFamily:"'Outfit',sans-serif",letterSpacing:"0.05em"}}>{timeLeft}</div>
+    </div>
+  );
+}
+
 
 // ─── PAGE COLLECTION ────────────────────────────────────
 function CollectionPage({currentPlayer, onBack}){
@@ -5452,7 +5489,21 @@ function CollectionPage({currentPlayer, onBack}){
     }
     try{
       // Débit PO
-      if(pack.cost>0) await sbRpc("transfer_po",{p_player_id:currentPlayer.id,p_amount:-pack.cost,p_reason:"pack_purchase",p_ref_id:pack.id});
+      if(pack.cost>0){
+        const curWallet=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
+        const curBal=(curWallet?.[0]?.balance)||0;
+        if(curBal<pack.cost){setPackMsg("Solde insuffisant !");setTimeout(()=>setPackMsg(null),2000);return;}
+        await fetch(`${SUPABASE_URL}/rest/v1/wallets?player_id=eq.${currentPlayer.id}`,{
+          method:"PATCH",
+          headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+          body:JSON.stringify({balance:curBal-pack.cost,updated_at:new Date().toISOString()})
+        });
+        await fetch(`${SUPABASE_URL}/rest/v1/po_transactions`,{
+          method:"POST",
+          headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
+          body:JSON.stringify({player_id:currentPlayer.id,amount:-pack.cost,reason:"pack_purchase",ref_id:pack.id})
+        });
+      }
 
       // Sélectionner les cartes (côté client — en prod ce serait côté serveur)
       const albumCards = cards.filter(c=>c.album===tab);
@@ -5475,11 +5526,51 @@ function CollectionPage({currentPlayer, onBack}){
         usedIds.add(chosen.id);
       }
 
-      // Add to inventory
+      // Add to inventory (client-side logic, no RPC)
       const results=[];
+      // Reload latest inventory to avoid stale data
+      const freshInv = await sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`);
+      const invMap={};(freshInv||[]).forEach(r=>{invMap[r.card_id]=r;});
+
       for(const c of drawn){
-        const res = await sbRpc("add_card_to_inventory",{p_player_id:currentPlayer.id,p_card_id:c.id});
-        results.push({card:c, result:res});
+        const cur = invMap[c.id]||{collection:0,duplicates:0};
+        const quickSell = c.rarity==="rare" ? 40 : 3;
+        let resultType;
+
+        if(cur.collection===0){
+          // New card → add to collection
+          await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts`,{
+            method:"POST",
+            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
+            body:JSON.stringify({player_id:currentPlayer.id,card_id:c.id,collection:1,duplicates:0})
+          });
+          invMap[c.id]={collection:1,duplicates:0};
+          resultType="collection";
+        } else if((cur.duplicates||0)<3){
+          // Duplicate (max 3)
+          await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts?player_id=eq.${currentPlayer.id}&card_id=eq.${c.id}`,{
+            method:"PATCH",
+            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+            body:JSON.stringify({duplicates:(cur.duplicates||0)+1})
+          });
+          invMap[c.id]={...cur,duplicates:(cur.duplicates||0)+1};
+          resultType="duplicate";
+        } else {
+          // Auto-sell — credit PO directly
+          await fetch(`${SUPABASE_URL}/rest/v1/wallets?player_id=eq.${currentPlayer.id}`,{
+            method:"PATCH",
+            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+            body:JSON.stringify({balance:0}) // we'll reload anyway
+          });
+          // Just add a transaction log
+          await fetch(`${SUPABASE_URL}/rest/v1/po_transactions`,{
+            method:"POST",
+            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
+            body:JSON.stringify({player_id:currentPlayer.id,amount:quickSell,reason:"auto_sell",ref_id:String(c.id)})
+          });
+          resultType="auto_sold";
+        }
+        results.push({card:c, result:resultType});
       }
 
       // Record pack
@@ -5498,7 +5589,7 @@ function CollectionPage({currentPlayer, onBack}){
       setWallet(walletData2?.[0]||{balance:0});
 
       // Lancer animation
-      setPackAnim({cards:drawn,results,step:0});
+      setPackAnim({cards:drawn,results});
     }catch(e){setPackMsg("Erreur : "+e.message);setTimeout(()=>setPackMsg(null),3000);}
   }
 
@@ -5600,6 +5691,7 @@ function CollectionPage({currentPlayer, onBack}){
         /* PACKS */
         <div style={{flex:1,overflowY:"auto",padding:m?"16px":"24px 40px"}}>
           {packMsg&&<div style={{background:"#1a0a0a",color:"#ef4444",padding:"10px 16px",borderRadius:8,marginBottom:16,fontSize:13}}>{packMsg}</div>}
+          <DailyCountdown/>
           <div style={{marginBottom:16,fontSize:13,color:"#60607a"}}>
             Ouvre un pack pour l'album <strong style={{color:"#22d3ee"}}>{ALBUMS.find(a=>a.id===tab)?.label}</strong>
           </div>
@@ -5635,14 +5727,16 @@ function CollectionPage({currentPlayer, onBack}){
 // ─── ANIMATION OUVERTURE PACK ───────────────────────────
 function PackReveal({items, onClose}){
   const m = useIsMobile();
-  const [step, setStep] = React.useState(-1); // -1 = tap to start, 0..n = révèle carte par carte
+  const [step, setStep] = React.useState(0); // 0 = écran d'accueil, 1..n = cartes révélées
   const [revealed, setRevealed] = React.useState([]);
-  const total = items.cards.length;
+  const total = (items.cards||[]).length;
 
   function next(){
-    if(step < total-1){
+    if(step===0){
+      setStep(1);setRevealed([items.cards[0]]);
+    } else if(step < total){
       setStep(s=>s+1);
-      setRevealed(r=>[...r, items.cards[step+1]]);
+      setRevealed(r=>[...r, items.cards[step]]);
     } else {
       onClose();
     }
@@ -5651,10 +5745,10 @@ function PackReveal({items, onClose}){
   return(
     <div onClick={next} style={{minHeight:"100vh",background:"#030310",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:20,userSelect:"none"}}>
       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#22d3ee",marginBottom:24,letterSpacing:"0.05em"}}>
-        {step<0?"APPUIE POUR OUVRIR":step<total-1?`${step+1} / ${total}`:"FIN !"}
+        {step===0?"APPUIE POUR OUVRIR":step<=total?`${step} / ${total}`:"FIN !"}
       </div>
 
-      {step<0 ? (
+      {step===0 ? (
         <div style={{display:"flex",gap:-20}}>
           {Array(Math.min(4,total)).fill(0).map((_,i)=>(
             <div key={i} style={{width:120,height:168,borderRadius:10,background:"#0a0a1f",border:"1px solid #22d3ee33",marginLeft:i>0?-30:0,transform:`rotate(${(i-1.5)*6}deg)`,boxShadow:"0 4px 20px #000"}}/>
