@@ -5453,7 +5453,7 @@ function CollectionPage({currentPlayer, onBack}){
         const inv={};
         (invData||[]).forEach(r=>{inv[r.card_id]=r;});
         setInventory(inv);
-        setWallet(walletData?.[0]||{balance:150});
+        setWallet(walletData?.[0]||{balance:999999});
       }catch(e){console.error(e);}
       setLoading(false);
     })();
@@ -5506,9 +5506,9 @@ function CollectionPage({currentPlayer, onBack}){
       }
 
       // Sélectionner les cartes (côté client — en prod ce serait côté serveur)
-      const albumCards = cards.filter(c=>c.album===tab);
-      const commons = albumCards.filter(c=>c.rarity==="common");
-      const rares   = albumCards.filter(c=>c.rarity==="rare");
+      // Draw from ALL albums
+      const commons = cards.filter(c=>c.rarity==="common");
+      const rares   = cards.filter(c=>c.rarity==="rare");
 
       const drawn=[];
       const usedIds=new Set();
@@ -5603,7 +5603,7 @@ function CollectionPage({currentPlayer, onBack}){
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#22d3ee"}}>COLLECTION</div>
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
           <div style={{background:"#1e1e30",borderRadius:20,padding:"4px 12px",fontSize:13,fontWeight:700,color:"#f59e0b"}}>
-            🪙 {wallet?.balance??150} PO
+            🪙 {(wallet?.balance??0)>=999999?"∞":(wallet?.balance??150)} PO
           </div>
         </div>
       </div>
@@ -5724,68 +5724,102 @@ function CollectionPage({currentPlayer, onBack}){
   );
 }
 
-// ─── ANIMATION OUVERTURE PACK ───────────────────────────
-function PackReveal({items, onClose}){
-  const m = useIsMobile();
-  const [step, setStep] = React.useState(0); // 0 = écran d'accueil, 1..n = cartes révélées
-  const [revealed, setRevealed] = React.useState([]);
-  const total = (items.cards||[]).length;
-
-  function next(){
-    if(step===0){
-      setStep(1);setRevealed([items.cards[0]]);
-    } else if(step < total){
-      setStep(s=>s+1);
-      setRevealed(r=>[...r, items.cards[step]]);
-    } else {
-      onClose();
+// ─── ANIMATION OUVERTURE PACK (PHASER) ─────────────────
+const PACK_REVEAL_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#030310;overflow:hidden;touch-action:none;}</style></head><body><div id="g"></div><script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script><script>
+const W=Math.min(window.innerWidth,420),H=window.innerHeight;
+let cards=[],results=[],onDone=null;
+window.init=function(c,r,d){cards=c;results=r;onDone=d;launch();}
+function hexToInt(h){return parseInt((h||'1a3d2b').replace('#',''),16);}
+function launch(){
+  if(window._pg){try{window._pg.destroy(true);}catch(e){}}
+  class S extends Phaser.Scene{
+    constructor(){super('S');}
+    create(){
+      const cx=W/2,cy=H/2;
+      this.step=0;this.add.rectangle(cx,cy,W,H,0x030310);
+      this.ttl=this.add.text(cx,55,'PACK OUVERTURE',{fontFamily:'monospace',fontSize:Math.round(W*.065),fontStyle:'bold',color:'#22d3ee',stroke:'#000',strokeThickness:3}).setOrigin(.5);
+      this.cnt=this.add.text(cx,95,'',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#404058'}).setOrigin(.5);
+      this.tapTxt=this.add.text(cx,H-55,'TAP POUR COMMENCER',{fontFamily:'monospace',fontSize:Math.round(W*.036),color:'#22d3ee'}).setOrigin(.5);
+      this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
+      this.stk=this.add.container(cx,cy);
+      for(let i=0;i<Math.min(5,cards.length);i++){
+        const g=this.add.graphics();
+        g.fillStyle(0x0a0a1f,1);g.fillRoundedRect(-68,-95,136,190,10);
+        g.lineStyle(2,0x22d3ee,.3);g.strokeRoundedRect(-68,-95,136,190,10);
+        g.x=(i-2)*7;g.y=(i-2)*5;g.angle=(i-2)*3;this.stk.add(g);
+      }
+      this.tweens.add({targets:this.stk,scaleX:1.04,scaleY:1.04,duration:900,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+      this.grid=this.add.container(cx,H*.76);this.bc=null;
+      this.input.on('pointerdown',()=>this.tap2());
+      this.input.keyboard?.on('keydown-SPACE',()=>this.tap2());
+    }
+    tap2(){
+      if(this.step===0){
+        this.tweens.add({targets:[this.stk,this.tapTxt],alpha:0,duration:250,onComplete:()=>{this.stk.setVisible(false);this.tapTxt.setVisible(false);this.next();}});
+      } else if(this.step<=cards.length){this.next();}
+      else{if(onDone)onDone();}
+    }
+    next(){
+      this.step++;
+      if(this.step>cards.length){
+        this.tapTxt.setText('TAP POUR FERMER').setAlpha(1).setVisible(true);
+        this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
+        return;
+      }
+      const c=cards[this.step-1],res=(results[this.step-1]||{}).result||'collection';
+      this.cnt.setText(this.step+' / '+cards.length).setColor('#22d3ee');
+      if(this.bc){this.bc.destroy();this.bc=null;}
+      const c1=hexToInt(c.color1),c2='#'+(hexToInt(c.color2)).toString(16).padStart(6,'0');
+      const isRare=c.rarity==='rare';
+      const bw=148,bh=208,cx=W/2,cy=H/2-15;
+      const ct=this.add.container(cx,cy);
+      const bg=this.add.graphics();
+      bg.fillStyle(c1,1);bg.fillRoundedRect(-bw/2,-bh/2,bw,bh,12);
+      if(isRare){bg.lineStyle(3,0xf59e0b,1);bg.strokeRoundedRect(-bw/2,-bh/2,bw,bh,12);}
+      ct.add(bg);
+      if(isRare){ct.add(this.add.text(bw*.42,-bh*.42,'RARE',{fontFamily:'monospace',fontSize:9,color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
+      const aLbl=c.album==='o2024'?"O24":c.album==='o2025'?"O25":c.album==='squid'?'SQ':"eO26";
+      ct.add(this.add.text(-bw*.42,-bh*.42,aLbl,{fontFamily:'monospace',fontSize:8,color:c2+'77'}).setOrigin(0,.5));
+      if(c.rating){ct.add(this.add.text(0,-bh*.15,'* '+parseFloat(c.rating).toFixed(2),{fontFamily:'monospace',fontSize:Math.round(bw*.072),color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
+      ct.add(this.add.text(0,bh*.03,c.name||'?',{fontFamily:'monospace',fontSize:Math.round(bw*.072),fontStyle:'bold',color:c2,wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
+      ct.add(this.add.text(0,bh*.2,c.subtitle||'',{fontFamily:'monospace',fontSize:Math.round(bw*.044),color:c2+'88',wordWrap:{width:bh*.85},align:'center'}).setOrigin(.5));
+      const rCol=res==='collection'?0x22c55e:res==='duplicate'?0x808080:0xf59e0b;
+      const rLbl=res==='collection'?'NOUVELLE!':res==='duplicate'?'DOUBLON':'VENDU AUTO';
+      const rbg=this.add.graphics();rbg.fillStyle(rCol,.2);rbg.fillRoundedRect(-bw*.42,bh*.36,bw*.84,22,6);ct.add(rbg);
+      ct.add(this.add.text(0,bh*.375,rLbl,{fontFamily:'monospace',fontSize:10,color:'#'+rCol.toString(16).padStart(6,'0'),fontStyle:'bold'}).setOrigin(.5));
+      ct.setAlpha(0).setScale(.5);this.tweens.add({targets:ct,alpha:1,scaleX:1,scaleY:1,duration:320,ease:'Back.Out'});
+      if(isRare)this.cameras.main.flash(120,255,180,0);
+      if(res==='collection')this.cameras.main.shake(60,.004);
+      this.bc=ct;
+      const mw=54,mh=76,cols=5,n=this.step-1,col=n%cols,row=Math.floor(n/cols);
+      const sx=-(mw*Math.min(cards.length,cols)/2)+mw/2;
+      const mg=this.add.container(sx+col*mw,row*(mh+4));
+      const mbg=this.add.graphics();mbg.fillStyle(c1,1);mbg.fillRoundedRect(-mw/2,-mh/2,mw,mh,6);mg.add(mbg);
+      if(isRare){mg.add(this.add.circle(mw*.36,-mh*.4,4,0xf59e0b));}
+      mg.setAlpha(0);this.tweens.add({targets:mg,alpha:1,duration:200});this.grid.add(mg);
     }
   }
+  window._pg=new Phaser.Game({type:Phaser.AUTO,width:W,height:H,parent:'g',backgroundColor:'#030310',scene:[S],scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{touch:{capture:true}}});
+}
+<\/script></body></html>`;
 
+function PackReveal({items, onClose}){
+  const iframeRef=React.useRef(null);
+  React.useEffect(()=>{
+    const iframe=iframeRef.current;
+    if(!iframe)return;
+    const onLoad=()=>{
+      try{iframe.contentWindow.init(items.cards||[],items.results||[],()=>{onClose();});}
+      catch(e){console.error('PackReveal init error',e);}
+    };
+    iframe.addEventListener('load',onLoad);
+    const blob=new Blob([PACK_REVEAL_HTML],{type:'text/html'});
+    iframe.src=URL.createObjectURL(blob);
+    return()=>{iframe.removeEventListener('load',onLoad);};
+  },[]);
   return(
-    <div onClick={next} style={{minHeight:"100vh",background:"#030310",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:20,userSelect:"none"}}>
-      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#22d3ee",marginBottom:24,letterSpacing:"0.05em"}}>
-        {step===0?"APPUIE POUR OUVRIR":step<=total?`${step} / ${total}`:"FIN !"}
-      </div>
-
-      {step===0 ? (
-        <div style={{display:"flex",gap:-20}}>
-          {Array(Math.min(4,total)).fill(0).map((_,i)=>(
-            <div key={i} style={{width:120,height:168,borderRadius:10,background:"#0a0a1f",border:"1px solid #22d3ee33",marginLeft:i>0?-30:0,transform:`rotate(${(i-1.5)*6}deg)`,boxShadow:"0 4px 20px #000"}}/>
-          ))}
-        </div>
-      ) : (
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-          {/* Dernière carte révélée */}
-          {revealed.length>0&&(
-            <div style={{animation:"fadeInUp .3s ease"}}>
-              <CardVisual card={revealed[revealed.length-1]} owned={true}/>
-              {items.results[revealed.length-1]?.result==="auto_sold"&&(
-                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#f59e0b"}}>💰 Vendu auto · {items.cards[revealed.length-1]?.rarity==="rare"?40:3} PO</div>
-              )}
-              {items.results[revealed.length-1]?.result==="duplicate"&&(
-                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#60607a"}}>📋 Doublon</div>
-              )}
-              {items.results[revealed.length-1]?.result==="collection"&&(
-                <div style={{textAlign:"center",marginTop:8,fontSize:12,color:"#22c55e"}}>✨ Nouvelle carte !</div>
-              )}
-            </div>
-          )}
-          {/* Cartes déjà révélées en miniatures */}
-          {revealed.length>1&&(
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",maxWidth:320}}>
-              {revealed.slice(0,-1).map((c,i)=>(
-                <CardVisual key={i} card={c} owned={true} small/>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div style={{marginTop:24,fontSize:12,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
-        {step<total-1?"Appuie pour continuer":"Appuie pour fermer"}
-      </div>
-      <style>{`@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999,background:"#030310"}}>
+      <iframe ref={iframeRef} style={{width:"100%",height:"100%",border:"none",display:"block"}} sandbox="allow-scripts allow-same-origin"/>
     </div>
   );
 }
@@ -6526,7 +6560,7 @@ export default function App(){
       <style>{css}</style>
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
-      <div key={page+JSON.stringify(sub)} className="fade">
+      <div key={page+JSON.stringify(sub)} className="fade" style={{paddingBottom:m?"72px":0}}>
         {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
