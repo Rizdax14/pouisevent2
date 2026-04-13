@@ -5479,119 +5479,94 @@ function CollectionPage({currentPlayer, onBack}){
   },[tab, cards]);
 
   async function openPack(pack){
-    if(!currentPlayer) return;
-    if(pack.cost > (wallet?.balance||0)){ setPackMsg("Solde insuffisant !"); setTimeout(()=>setPackMsg(null),2000); return; }
+    if(!currentPlayer)return;
+    if(!cards.length){setPackMsg("Cartes non chargées, réessaie.");setTimeout(()=>setPackMsg(null),2000);return;}
+
+    // Check daily claim
     if(pack.id==="daily"){
       try{
-        const existing = await sbCollection("daily_pack_claims",`?player_id=eq.${currentPlayer.id}&claimed_date=eq.${new Date().toISOString().slice(0,10)}`);
-        if(existing?.length>0){ setPackMsg("Pack quotidien déjà récupéré aujourd'hui !"); setTimeout(()=>setPackMsg(null),2500); return; }
+        const ex=await sbCollection("daily_pack_claims",`?player_id=eq.${currentPlayer.id}&claimed_date=eq.${new Date().toISOString().slice(0,10)}`);
+        if(ex?.length>0){setPackMsg("Pack quotidien déjà récupéré !");setTimeout(()=>setPackMsg(null),2500);return;}
       }catch(e){}
     }
-    try{
-      // Débit PO
-      if(pack.cost>0){
-        const curWallet=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
-        const curBal=(curWallet?.[0]?.balance)||0;
-        if(curBal<pack.cost){setPackMsg("Solde insuffisant !");setTimeout(()=>setPackMsg(null),2000);return;}
-        await fetch(`${SUPABASE_URL}/rest/v1/wallets?player_id=eq.${currentPlayer.id}`,{
-          method:"PATCH",
-          headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-          body:JSON.stringify({balance:curBal-pack.cost,updated_at:new Date().toISOString()})
-        });
-        await fetch(`${SUPABASE_URL}/rest/v1/po_transactions`,{
-          method:"POST",
-          headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
-          body:JSON.stringify({player_id:currentPlayer.id,amount:-pack.cost,reason:"pack_purchase",ref_id:pack.id})
-        });
-      }
 
-      // Sélectionner les cartes (côté client — en prod ce serait côté serveur)
-      // Draw from ALL albums
-      const commons = cards.filter(c=>c.rarity==="common");
-      const rares   = cards.filter(c=>c.rarity==="rare");
+    // Draw cards FIRST — animation must always launch
+    const commons=cards.filter(c=>c.rarity==="common");
+    const rares=cards.filter(c=>c.rarity==="rare");
+    const drawn=[];
+    const usedIds=new Set();
+    for(let i=0;i<pack.cards;i++){
+      const isRareDraw=i>0&&Math.random()<pack.rare_chance;
+      const pool=isRareDraw&&rares.length>0?rares:commons;
+      const available=pool.filter(c=>!usedIds.has(c.id));
+      if(!available.length)break;
+      const totalW=available.reduce((s,c)=>s+(c.daily_weight||1),0);
+      let r2=Math.random()*totalW,cumul=0,chosen=available[0];
+      for(const c of available){cumul+=(c.daily_weight||1);if(cumul>=r2){chosen=c;break;}}
+      drawn.push(chosen);
+      usedIds.add(chosen.id);
+    }
+    if(!drawn.length){setPackMsg("Aucune carte disponible.");setTimeout(()=>setPackMsg(null),2000);return;}
 
-      const drawn=[];
-      const usedIds=new Set();
-      for(let i=0;i<pack.cards;i++){
-        const isRareDraw = i===0 ? false : Math.random() < pack.rare_chance;
-        const pool = isRareDraw && rares.length>0 ? rares : commons;
-        const available = pool.filter(c=>!usedIds.has(c.id));
-        if(available.length===0) break;
-        // Weighted random by daily_weight
-        const totalW = available.reduce((s,c)=>s+(c.daily_weight||1),0);
-        let r2=Math.random()*totalW, cumul=0;
-        let chosen=available[0];
-        for(const c of available){cumul+=(c.daily_weight||1);if(cumul>=r2){chosen=c;break;}}
-        drawn.push(chosen);
-        usedIds.add(chosen.id);
-      }
+    // Launch animation immediately with optimistic results
+    const optimisticResults=drawn.map(()=>({result:"collection"}));
+    setPackAnim({cards:drawn,results:optimisticResults});
 
-      // Add to inventory (client-side logic, no RPC)
-      const results=[];
-      // Reload latest inventory to avoid stale data
-      const freshInv = await sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`);
-      const invMap={};(freshInv||[]).forEach(r=>{invMap[r.card_id]=r;});
-
-      for(const c of drawn){
-        const cur = invMap[c.id]||{collection:0,duplicates:0};
-        const quickSell = c.rarity==="rare" ? 40 : 3;
-        let resultType;
-
-        if(cur.collection===0){
-          // New card → add to collection
-          await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts`,{
-            method:"POST",
-            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
-            body:JSON.stringify({player_id:currentPlayer.id,card_id:c.id,collection:1,duplicates:0})
-          });
-          invMap[c.id]={collection:1,duplicates:0};
-          resultType="collection";
-        } else if((cur.duplicates||0)<3){
-          // Duplicate (max 3)
-          await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts?player_id=eq.${currentPlayer.id}&card_id=eq.${c.id}`,{
-            method:"PATCH",
-            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-            body:JSON.stringify({duplicates:(cur.duplicates||0)+1})
-          });
-          invMap[c.id]={...cur,duplicates:(cur.duplicates||0)+1};
-          resultType="duplicate";
-        } else {
-          // Auto-sell — credit PO directly
+    // Then do all Supabase ops in background (fire and forget)
+    (async()=>{
+      try{
+        // Debit PO
+        if(pack.cost>0){
+          const wData=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
+          const bal=(wData?.[0]?.balance)||0;
+          if(bal<pack.cost&&bal<999999)return;
           await fetch(`${SUPABASE_URL}/rest/v1/wallets?player_id=eq.${currentPlayer.id}`,{
             method:"PATCH",
             headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-            body:JSON.stringify({balance:0}) // we'll reload anyway
+            body:JSON.stringify({balance:Math.max(0,bal-pack.cost),updated_at:new Date().toISOString()})
           });
-          // Just add a transaction log
-          await fetch(`${SUPABASE_URL}/rest/v1/po_transactions`,{
+        }
+        // Load fresh inventory
+        const freshInv=await sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`);
+        const invMap={};(freshInv||[]).forEach(r=>{invMap[r.card_id]=r;});
+        // Add each card
+        for(const c of drawn){
+          const cur=invMap[c.id]||{collection:0,duplicates:0};
+          if(cur.collection===0){
+            await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts`,{
+              method:"POST",
+              headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
+              body:JSON.stringify({player_id:currentPlayer.id,card_id:c.id,collection:1,duplicates:0})
+            });
+            invMap[c.id]={collection:1,duplicates:0};
+          } else if((cur.duplicates||0)<3){
+            await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts?player_id=eq.${currentPlayer.id}&card_id=eq.${c.id}`,{
+              method:"PATCH",
+              headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+              body:JSON.stringify({duplicates:(cur.duplicates||0)+1})
+            });
+          }
+        }
+        // Record pack
+        if(pack.id==="daily"){
+          await fetch(`${SUPABASE_URL}/rest/v1/daily_pack_claims`,{
             method:"POST",
             headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
-            body:JSON.stringify({player_id:currentPlayer.id,amount:quickSell,reason:"auto_sell",ref_id:String(c.id)})
+            body:JSON.stringify({player_id:currentPlayer.id,claimed_date:new Date().toISOString().slice(0,10)})
           });
-          resultType="auto_sold";
         }
-        results.push({card:c, result:resultType});
-      }
-
-      // Record pack
-      if(pack.id==="daily"){
-        await sbCollectionPost("daily_pack_claims",{player_id:currentPlayer.id,claimed_date:new Date().toISOString().slice(0,10)},"return=minimal");
-      }
-      await sbCollectionPost("pack_history",{player_id:currentPlayer.id,pack_type:pack.id,cost:pack.cost,cards_received:drawn.map(c=>c.id)},"return=minimal");
-
-      // Reload inventory + wallet
-      const [invData2,walletData2]=await Promise.all([
-        sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
-        sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
-      ]);
-      const inv2={};(invData2||[]).forEach(r=>{inv2[r.card_id]=r;});
-      setInventory(inv2);
-      setWallet(walletData2?.[0]||{balance:0});
-
-      // Lancer animation
-      setPackAnim({cards:drawn,results});
-    }catch(e){setPackMsg("Erreur : "+e.message);setTimeout(()=>setPackMsg(null),3000);}
+        // Reload inventory + wallet silently
+        const [inv2,w2]=await Promise.all([
+          sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
+          sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
+        ]);
+        const newInv={};(inv2||[]).forEach(r=>{newInv[r.card_id]=r;});
+        setInventory(newInv);
+        setWallet(w2?.[0]||{balance:999999});
+      }catch(e){console.warn("Pack bg error:",e);}
+    })();
   }
+
 
   if(packAnim) return <PackReveal items={packAnim} onClose={()=>setPackAnim(null)}/>;
 
@@ -5693,7 +5668,7 @@ function CollectionPage({currentPlayer, onBack}){
           {packMsg&&<div style={{background:"#1a0a0a",color:"#ef4444",padding:"10px 16px",borderRadius:8,marginBottom:16,fontSize:13}}>{packMsg}</div>}
           <DailyCountdown/>
           <div style={{marginBottom:16,fontSize:13,color:"#60607a"}}>
-            Ouvre un pack pour l'album <strong style={{color:"#22d3ee"}}>{ALBUMS.find(a=>a.id===tab)?.label}</strong>
+            Chaque pack peut contenir des cartes de <strong style={{color:"#22d3ee"}}>tous les albums</strong>
           </div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(2,1fr)",gap:12}}>
             {PACKS.map(pack=>{
