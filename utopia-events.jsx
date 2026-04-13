@@ -50,6 +50,7 @@ const css=`
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:#080810;color:#eeeef5;}
   .fade{animation:fadeIn .25s ease;}
+  @keyframes shimmer{0%{left:-60%}100%{left:120%}}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   ::-webkit-scrollbar{width:4px;height:4px;}
   ::-webkit-scrollbar-track{background:#0d0d1c;}
@@ -5329,8 +5330,7 @@ function CardVisual({card, owned=true, small=false, onClick}){
       {/* Gradient overlay top */}
       {owned && <div style={{position:"absolute",top:0,left:0,right:0,height:"35%",background:`linear-gradient(180deg,${c2}15 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${R}px ${R}px 0 0`}}/>}
 
-      {/* Shimmer on rares */}
-      {owned && isRare && <div style={{position:"absolute",top:"-50%",left:"-60%",width:"40%",height:"200%",background:"linear-gradient(105deg,transparent 40%,rgba(255,220,100,.12) 50%,transparent 60%)",pointerEvents:"none",animation:"shimmer 3s infinite 1s"}}/>}
+
 
       {/* Album badge top-left */}
       <div style={{position:"absolute",top:5,left:6,fontSize:7,fontWeight:800,color:owned?accentColor+"cc":"#1e1e28",fontFamily:"'Outfit',sans-serif",letterSpacing:"0.05em",textTransform:"uppercase",background:owned?accentColor+"22":"transparent",padding:"1px 5px",borderRadius:3}}>
@@ -5390,7 +5390,7 @@ function CardVisual({card, owned=true, small=false, onClick}){
       {/* Bottom accent bar */}
       {owned && <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:isRare?"#f59e0b":accentColor,opacity:.6,borderRadius:`0 0 ${R}px ${R}px`}}/>}
 
-      <style>{`@keyframes shimmer{0%{left:-60%}100%{left:120%}}`}</style>
+
     </div>
   );
 }
