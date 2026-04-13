@@ -5290,9 +5290,12 @@ function CardVisual({card, owned=true, small=false, onClick}){
   const isLogo = card.type === "logo";
 
   // Get SVG for logo cards
-  const teamSvg = isLogo && card.team_id && TEAM_SVG_RAW[card.team_id]
-    ? TEAM_SVG_RAW[card.team_id].replace(/LOGO_COLOR/g, c2).replace(/<svg /,
-        `<svg width="${Math.round(sz.w*0.48)}" height="${Math.round(sz.w*0.48)}" style="max-height:${Math.round(sz.w*0.48)}px" `)
+  // Show team SVG for both logo cards AND rare team cards
+  const showSvg = (isLogo || (isRare && card.type!=='player')) && card.team_id && TEAM_SVG_RAW[card.team_id];
+  const teamSvg = showSvg
+    ? TEAM_SVG_RAW[card.team_id]
+        .replace(/LOGO_COLOR/g, '#FFFFFF')
+        .replace(/<svg /, `<svg width="${Math.round(sz.w*0.44)}" height="${Math.round(sz.w*0.44)}" style="max-height:${Math.round(sz.w*0.44)}px" `)
     : null;
 
   return(
@@ -5330,7 +5333,7 @@ function CardVisual({card, owned=true, small=false, onClick}){
 
       {/* Photo / Logo zone */}
       <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:isLogo?"12%":"50%",marginTop:sz.h*0.13,background:owned?c2+"15":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"33":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {owned && isLogo && teamSvg ? (
+        {owned && teamSvg ? (
           <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
         ) : owned && card.photo_url ? (
           <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
@@ -5514,7 +5517,9 @@ function CollectionPage({currentPlayer, onBack}){
     const drawn=[];
     const usedIds=new Set();
     for(let i=0;i<pack.cards;i++){
-      const isRareDraw=i>0&&Math.random()<pack.rare_chance;
+      // Rare chance ONLY on last card of the pack
+      const isLastCard = i===pack.cards-1;
+      const isRareDraw = isLastCard && Math.random()<pack.rare_chance;
       const pool=isRareDraw&&rares.length>0?rares:commons;
       const available=pool.filter(c=>!usedIds.has(c.id));
       if(!available.length)break;
