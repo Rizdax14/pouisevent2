@@ -6229,7 +6229,7 @@ function TournoiPage({currentPlayer,onBack}){
 // ─── BUREAU BL ───────────────────────────────────────────
 const OFFICERS_BY_UID = {
   "louis-mar":  "Vice Secrétaire",
-  "maxime-m":   "Président",
+  "maxime-mar": "Président",
   "thisma":     "Vice Présidente",
   "samuel-oll": "Secrétaire",
   "thomas-pey": "Trésorier",
@@ -6260,7 +6260,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
-    {id:"collection",label:"Collection",icon:"🃏",desc:isLouis?"Packs · Albums · Bourse":"Bientôt disponible",color:"#22d3ee",active:isLouis},
+    {id:"collection",label:"Collection",icon:"🃏",desc:"Packs · Albums · Bourse",color:"#22d3ee",active:true},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
   return(
