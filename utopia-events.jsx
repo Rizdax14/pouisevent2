@@ -5392,24 +5392,19 @@ function DailyCountdown({currentPlayerId}){
 
   React.useEffect(()=>{
     if(!currentPlayerId)return;
-    (async()=>{
-      try{
-        const fourHoursAgo=new Date(Date.now()-4*60*60*1000).toISOString();
-        const ex=await sbCollection("pack_history",`?player_id=eq.${currentPlayerId}&pack_type=eq.daily&opened_at=gte.${fourHoursAgo}&order=opened_at.desc&limit=1`);
-        if(!ex?.length){setReady(true);return;}
-        const lastOpen=new Date(ex[0].opened_at);
-        const nextOpen=new Date(lastOpen.getTime()+4*60*60*1000);
-        function calc(){
-          const diff=nextOpen-Date.now();
-          if(diff<=0){setReady(true);return;}
-          const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
-          setTimeLeft(`${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`);
-        }
-        calc();
-        const t=setInterval(calc,1000);
-        return()=>clearInterval(t);
-      }catch(e){setReady(true);}
-    })();
+    const lastKey=`free_pack_${currentPlayerId}`;
+    const lastTs=parseInt(localStorage.getItem(lastKey)||'0');
+    if(!lastTs||Date.now()-lastTs>=4*60*60*1000){setReady(true);return;}
+    const nextOpen=lastTs+4*60*60*1000;
+    function calc(){
+      const diff=nextOpen-Date.now();
+      if(diff<=0){setReady(true);return;}
+      const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
+      setTimeLeft(`${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`);
+    }
+    calc();
+    const t=setInterval(calc,1000);
+    return()=>clearInterval(t);
   },[currentPlayerId]);
 
   return(
@@ -5493,20 +5488,18 @@ function CollectionPage({currentPlayer, onBack}){
     if(!currentPlayer)return;
     if(!cards.length){setPackMsg("Cartes non chargées, réessaie.");setTimeout(()=>setPackMsg(null),2000);return;}
 
-    // Check 4h cooldown
+    // Check 4h cooldown via localStorage
     if(pack.id==="daily"){
-      try{
-        const fourHoursAgo=new Date(Date.now()-4*60*60*1000).toISOString();
-        const ex=await sbCollection("pack_history",`?player_id=eq.${currentPlayer.id}&pack_type=eq.daily&opened_at=gte.${fourHoursAgo}&limit=1`);
-        if(ex?.length>0){
-          const lastOpen=new Date(ex[0].opened_at);
-          const nextOpen=new Date(lastOpen.getTime()+4*60*60*1000);
-          const diff=nextOpen-Date.now();
-          const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
-          setPackMsg(`Pack gratuit dispo dans ${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s`);
-          setTimeout(()=>setPackMsg(null),3000);return;
-        }
-      }catch(e){}
+      const lastKey=`free_pack_${currentPlayer.id}`;
+      const lastTs=parseInt(localStorage.getItem(lastKey)||'0');
+      const diff=Date.now()-lastTs;
+      if(lastTs>0&&diff<4*60*60*1000){
+        const remaining=4*60*60*1000-diff;
+        const h=Math.floor(remaining/3600000),m=Math.floor((remaining%3600000)/60000),s=Math.floor((remaining%60000)/1000);
+        setPackMsg(`Pack gratuit dispo dans ${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s`);
+        setTimeout(()=>setPackMsg(null),3000);return;
+      }
+      localStorage.setItem(lastKey,String(Date.now()));
     }
 
     // Draw cards FIRST — animation must always launch
@@ -5587,7 +5580,7 @@ function CollectionPage({currentPlayer, onBack}){
   }
 
 
-  if(packAnim) return <PackReveal items={packAnim} onClose={()=>setPackAnim(null)}/>;
+  if(packAnim) return <PackReveal items={packAnim} onClose={()=>{setPackAnim(null);window.location.reload();}}/>;
 
   return(
     <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
@@ -5771,18 +5764,35 @@ function launch(){
       bg.fillStyle(c1,1);bg.fillRoundedRect(-bw/2,-bh/2,bw,bh,12);
       if(isRare){bg.lineStyle(3,0xf59e0b,1);bg.strokeRoundedRect(-bw/2,-bh/2,bw,bh,12);}
       ct.add(bg);
-      if(isRare){ct.add(this.add.text(bw*.42,-bh*.42,'RARE',{fontFamily:'monospace',fontSize:9,color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      const aLbl=c.album==='o2024'?"O24":c.album==='o2025'?"O25":c.album==='squid'?'SQ':"eO26";
+      if(isRare){ct.add(this.add.text(bw*.42,-bh*.42,'✦ RARE',{fontFamily:'monospace',fontSize:9,color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
+      const aLbl=c.album==='o2024'?"O'24":c.album==='o2025'?"O'25":c.album==='squid'?'SQ':"eO'26";
       ct.add(this.add.text(-bw*.42,-bh*.42,aLbl,{fontFamily:'monospace',fontSize:8,color:c2+'77'}).setOrigin(0,.5));
-      if(c.rating){ct.add(this.add.text(0,-bh*.15,'* '+parseFloat(c.rating).toFixed(2),{fontFamily:'monospace',fontSize:Math.round(bw*.072),color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      ct.add(this.add.text(0,bh*.03,c.name||'?',{fontFamily:'monospace',fontSize:Math.round(bw*.072),fontStyle:'bold',color:c2,wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
-      ct.add(this.add.text(0,bh*.2,c.subtitle||'',{fontFamily:'monospace',fontSize:Math.round(bw*.044),color:c2+'88',wordWrap:{width:bh*.85},align:'center'}).setOrigin(.5));
+      // Photo circle
+      if(c.photo_url){
+        const photoKey='ph_'+this.step;
+        const photoSize=Math.round(bw*.44);
+        this.load.image(photoKey,c.photo_url);
+        this.load.once('complete',()=>{
+          if(!this.bc)return;
+          try{
+            const img=this.add.image(0,-bh*.08,photoKey).setDisplaySize(photoSize,photoSize);
+            const mask=this.make.graphics({add:false});mask.fillStyle(0xffffff);mask.fillCircle(cx,-bh*.08+cy,photoSize/2);
+            img.setMask(mask.createBitmapMask());
+            ct.add(img);
+          }catch(e){}
+        });
+        this.load.start();
+      }
+      if(c.rating){ct.add(this.add.text(0,isRare?bh*.05:-bh*.18,'⭐ '+parseFloat(c.rating).toFixed(2),{fontFamily:'monospace',fontSize:Math.round(bw*.065),color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
+      const nameY=c.photo_url?bh*.27:(c.rating?bh*.05:-bh*.02);
+      ct.add(this.add.text(0,nameY,c.name||'?',{fontFamily:'monospace',fontSize:Math.round(bw*.07),fontStyle:'bold',color:c2,wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
+      ct.add(this.add.text(0,nameY+bh*.14,c.subtitle||'',{fontFamily:'monospace',fontSize:Math.round(bw*.042),color:c2+'88',wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
       const rCol=res==='collection'?0x22c55e:res==='duplicate'?0x808080:0xf59e0b;
-      const rLbl=res==='collection'?'NOUVELLE!':res==='duplicate'?'DOUBLON':'VENDU AUTO';
+      const rLbl=res==='collection'?'✨ NOUVELLE!':res==='duplicate'?'📋 DOUBLON':'💰 VENDU AUTO';
       const rbg=this.add.graphics();rbg.fillStyle(rCol,.2);rbg.fillRoundedRect(-bw*.42,bh*.36,bw*.84,22,6);ct.add(rbg);
       ct.add(this.add.text(0,bh*.375,rLbl,{fontFamily:'monospace',fontSize:10,color:'#'+rCol.toString(16).padStart(6,'0'),fontStyle:'bold'}).setOrigin(.5));
       ct.setAlpha(0).setScale(.5);this.tweens.add({targets:ct,alpha:1,scaleX:1,scaleY:1,duration:320,ease:'Back.Out'});
-      if(isRare)this.cameras.main.flash(120,255,180,0);
+      if(isRare)this.cameras.main.flash(150,255,200,0);
       if(res==='collection')this.cameras.main.shake(60,.004);
       this.bc=ct;
       const mw=54,mh=76,cols=5,n=this.step-1,col=n%cols,row=Math.floor(n/cols);
