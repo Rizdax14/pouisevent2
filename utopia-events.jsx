@@ -6419,6 +6419,12 @@ export default function App(){
     if(!dbLoaded)return;
     const tryAutoLogin=async()=>{
       try{
+        // Version check - force reset if cached section could crash
+        const APP_VERSION = "v2.4";
+        if(localStorage.getItem("bl_app_version") !== APP_VERSION){
+          localStorage.setItem("bl_app_version", APP_VERSION);
+          localStorage.removeItem("bl_section");
+        }
         const savedId=localStorage.getItem("bl_player_id");
         const savedSection=localStorage.getItem("bl_section")||"menu";
         if(savedId){
