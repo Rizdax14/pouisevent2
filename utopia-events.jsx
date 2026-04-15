@@ -5282,88 +5282,160 @@ async function sbRpc(fn, params={}){
 }
 
 // ─── COMPOSANT CARTE ────────────────────────────────────
-function CardVisual({card, owned=true, small=false, onClick}){
-  const sz = small ? {w:120,h:170,r:8} : {w:160,h:224,r:12};
-  const c1 = card.color1 || "#1a3d2b";
-  const c2 = card.color2 || "#FFFFFF";
-  const isRare = card.rarity === "rare";
-  const isLogo = card.type === "logo";
+// ─── COMPOSANT CARTE ─────────────────────────────────────
+const ALBUM_THEMES = {
+  o2024:  {
+    bg: (c1)=>"#FFFFFF",
+    label:"Olympiade 2024",
+    font:"'Georgia',serif",
+  },
+  o2025:  {
+    bg: (c1)=>"linear-gradient(160deg,#4a4a4a 0%,#232323 100%)",
+    label:"Olympiade 2025",
+    font:"'Georgia',serif",
+  },
+  squid:  {
+    bg: (c1)=>"#080810",
+    label:"Squid Game",
+    font:"monospace",
+  },
+  eo2026: {
+    bg: (c1)=>"linear-gradient(160deg,#0d1b4b 0%,#1a0a3a 100%)",
+    label:"eOlympiade 2026",
+    font:"monospace",
+  },
+};
 
-  // Get SVG for logo cards
-  // Show team SVG for both logo cards AND rare team cards
-  const showSvg = (isLogo || (isRare && card.type!=='player')) && card.team_id && TEAM_SVG_RAW[card.team_id];
-  const teamSvg = showSvg
+function CardVisual({card, owned=true, small=false, onClick}){
+  const W = small ? 110 : 160;
+  const H = small ? 154 : 224;
+  const R = Math.round(W * 0.075);
+  const isRare = card.rarity === 'rare';
+  const isLogo = card.type === 'logo' || (card.type === 'rare' && !card.player_id);
+  const teamColor = card.color1 || '#888';
+  const teamColor2 = card.color2 || '#fff';
+  const accent = isRare ? '#f59e0b' : teamColor;
+
+  const ALBUM_BG = {
+    o2024: 'linear-gradient(160deg,#f8f4e8 0%,#ede7d0 100%)',
+    o2025: 'linear-gradient(150deg,#3a3a3a 0%,#181818 100%)',
+    squid: 'linear-gradient(160deg,#0a0010 0%,#080008 100%)',
+    eo2026:'linear-gradient(150deg,#0d1b4b 0%,#1a0a3a 100%)',
+    rare:  'linear-gradient(150deg,#1a1000 0%,#0a0a0a 55%,#180e00 100%)',
+  };
+  const ALBUM_LABEL = {o2024:"Olympiade 2024",o2025:"Olympiade 2025",squid:"Squid Game",eo2026:"eOlympiade 2026"};
+  const RING_COLORS = ['#0085C7','#F4C300','#000000','#009F3D','#DF0024'];
+
+  const bg = isRare ? ALBUM_BG.rare : (ALBUM_BG[card.album] || ALBUM_BG.o2024);
+  const photoShape = isLogo ? `${Math.round(W*.16)}px` : '50%';
+  const photoSize = Math.round(W * 0.52);
+  const photoBg = isLogo ? (isRare ? '#2a1800' : teamColor2) : (card.album==='o2024' ? '#ede7d0' : '#0a0a14');
+
+  const teamSvg = card.team_id && TEAM_SVG_RAW[card.team_id]
     ? TEAM_SVG_RAW[card.team_id]
-        .replace(/LOGO_COLOR/g, '#FFFFFF')
-        .replace(/<svg /, `<svg width="${Math.round(sz.w*0.44)}" height="${Math.round(sz.w*0.44)}" style="max-height:${Math.round(sz.w*0.44)}px" `)
+        .replace(/LOGO_COLOR/g, isLogo ? (isRare ? '#ffffff' : teamColor) : accent)
+        .replace('<svg ', `<svg width="${Math.round(photoSize*.68)}" height="${Math.round(photoSize*.68)}" `)
     : null;
+
+  // Squid: show position from subtitle
+  const squidPos = card.album === 'squid' && card.subtitle
+    ? (card.subtitle.match(/(\d+)/) ? card.subtitle.match(/(\d+)/)[0]+'è' : '—')
+    : '—';
+
+  // Team from TEAMS array
+  const team = TEAMS.find(t => t.id === card.team_id);
 
   return(
     <div onClick={onClick} style={{
-      width:sz.w, height:sz.h, borderRadius:sz.r, cursor:onClick?"pointer":"default",
-      background: owned ? c1 : "#111118",
-      border: isRare
-        ? `2.5px solid ${owned?"#f59e0b":"#1e1e28"}`
-        : `2px solid ${owned?c1+"55":"#1e1e28"}`,
-      boxShadow: owned
-        ? isRare ? `0 4px 20px #f59e0b55, inset 0 1px 0 ${c2}22` : `0 3px 10px rgba(0,0,0,.5)`
-        : "none",
-      opacity: owned ? 1 : 0.38,
-      position:"relative", overflow:"hidden", flexShrink:0,
-      transition:"transform .12s, box-shadow .12s",
-      display:"flex", flexDirection:"column", alignItems:"center",
-      userSelect:"none",
+      width:W, height:H, borderRadius:R, cursor:onClick?'pointer':'default',
+      background:owned?bg:'#111118',
+      border:`${isRare?'2.5':'2'}px solid ${owned?accent:'#1e1e28'}`,
+      boxShadow:owned&&isRare?`0 0 0 1px #f59e0b33,0 4px 16px #f59e0b22`:'none',
+      opacity:owned?1:0.38, position:'relative', overflow:'hidden',
+      flexShrink:0, userSelect:'none', display:'flex', flexDirection:'column', alignItems:'center',
+      transition:'transform .12s',
     }}
-    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="scale(1.04)";}}
-    onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
+    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform='translateY(-3px) scale(1.03)';}}
+    onMouseLeave={e=>{if(onClick)e.currentTarget.style.transform='';}}
+    >
+      {/* Theme overlays */}
+      {owned && card.album==='squid' && <div style={{position:'absolute',inset:0,background:'radial-gradient(circle at 50% 20%,rgba(232,77,155,.12),transparent 60%)',pointerEvents:'none'}}/>}
+      {owned && card.album==='eo2026' && <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)',backgroundSize:'16px 16px',pointerEvents:'none'}}/>}
 
-      {owned && isRare && (
-        <div style={{position:"absolute",top:0,left:0,right:0,height:"40%",background:`linear-gradient(180deg,${c2}18 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${sz.r}px ${sz.r}px 0 0`}}/>
-      )}
+      {/* Inner rare border */}
+      {isRare && owned && <div style={{position:'absolute',inset:3,borderRadius:R-2,border:'1px solid #f59e0b33',pointerEvents:'none'}}/>}
 
-      {isRare && (
-        <div style={{position:"absolute",top:6,right:6,background:owned?"#f59e0b":"#2a2a40",color:owned?"#080810":"#404058",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:4,letterSpacing:"0.05em",fontFamily:"'Outfit',sans-serif"}}>
-          ✦ RARE
+      {/* Rare shimmer */}
+      {isRare && owned && <div style={{position:'absolute',top:0,left:'-60%',width:'40%',height:'100%',background:'linear-gradient(105deg,transparent 40%,rgba(255,220,100,.1) 50%,transparent 60%)',animation:'shimmer 3s infinite 1s',pointerEvents:'none'}}/>}
+
+      {/* O2024 rings */}
+      {owned && card.album==='o2024' && (
+        <div style={{display:'flex',gap:2,alignItems:'center',justifyContent:'center',padding:'3px 0 1px',position:'relative',zIndex:2}}>
+          {RING_COLORS.map((c,i)=><div key={i} style={{width:9,height:9,borderRadius:'50%',border:`2px solid ${c}`,flexShrink:0}}/>)}
         </div>
       )}
 
-      <div style={{position:"absolute",top:5,left:5,fontSize:7,color:owned?({o2024:"#E8B84B",o2025:"#22c55e",squid:"#E84D9B",eo2026:"#E8000E"}[card.album]||c2):"#1e1e28",fontFamily:"'Outfit',sans-serif",fontWeight:800,letterSpacing:"0.05em",textTransform:"uppercase",background:owned?"rgba(0,0,0,.25)":"transparent",padding:"1px 4px",borderRadius:3}}>
-        {card.album==="o2024"?"O'24":card.album==="o2025"?"O'25":card.album==="squid"?"SQ":card.album==="eo2026"?"eO'26":""}
+      {/* Album label */}
+      <div style={{fontSize:small?6.5:8,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:owned?accent:'#333',textAlign:'center',paddingTop:card.album==='o2024'?1:6,position:'relative',zIndex:2,fontFamily:"'Outfit',sans-serif"}}>
+        {ALBUM_LABEL[card.album]||''}
       </div>
 
-      {/* Photo / Logo zone */}
-      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:isLogo?"12%":"50%",marginTop:sz.h*0.13,background:owned?c2+"15":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"33":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {owned && teamSvg ? (
-          <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
-        ) : owned && card.photo_url ? (
-          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
+      {/* Photo */}
+      <div style={{width:photoSize,height:photoSize,borderRadius:photoShape,marginTop:small?6:10,border:`2.5px solid ${owned?accent:'#222'}`,overflow:'hidden',background:owned?photoBg:'#111',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',position:'relative',zIndex:2}}>
+        {owned && isLogo && teamSvg ? (
+          <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:'flex'}}/>
+        ) : owned && !isLogo && card.photo_url ? (
+          <img src={card.photo_url} alt={card.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>
         ) : (
-          <span style={{fontSize:sz.w*0.2,color:owned?c2+"66":"#1e1e30"}}>
-            {isLogo?"🏆":isRare?"⭐":"👤"}
-          </span>
+          <span style={{fontSize:W*.16,opacity:.3}}>{isLogo?'🏆':'👤'}</span>
         )}
       </div>
 
-      {/* Name + rating */}
-      <div style={{marginTop:5,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
-        <div style={{fontSize:small?9:10,fontWeight:700,color:owned?c2:"#30304a",fontFamily:"'Outfit',sans-serif",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
-          {owned ? card.name : "???"}
-        </div>
-        {card.rating && owned && (
-          <div style={{fontSize:8,color:"#f59e0b",fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>
-            ⭐ {Number(card.rating).toFixed(2)}
-          </div>
-        )}
-        {!small && (
-          <div style={{fontSize:7,color:owned?c2+"88":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {owned ? (card.subtitle||"") : ""}
-          </div>
-        )}
+      {/* Name */}
+      <div style={{fontSize:small?9:12.5,fontWeight:800,color:owned?accent:'#333',textAlign:'center',lineHeight:1.1,padding:'0 6px',marginTop:small?5:8,position:'relative',zIndex:2,fontFamily:"'Outfit',sans-serif",overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+        {owned?(card.name||'?'):'???'}
       </div>
-      {owned&&<div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:isRare?"#f59e0b":({o2024:"#E8B84B",o2025:"#22c55e",squid:"#E84D9B",eo2026:"#E8000E"}[card.album]||c2),opacity:.7,borderRadius:`0 0 ${sz.r}px ${sz.r}px`}}/>}
+      {isRare && owned && !small && (
+        <div style={{fontSize:7,fontWeight:600,fontStyle:'italic',color:accent,opacity:.6,textAlign:'center',position:'relative',zIndex:2}}>
+          {isLogo?"Champion d'équipe":"Meilleur joueur"}
+        </div>
+      )}
+
+      {/* Bottom strip */}
+      <div style={{width:'100%',display:'flex',alignItems:'stretch',borderTop:`1.5px solid ${owned?accent:'#1e1e28'}`,marginTop:'auto',background:card.album==='o2024'?'rgba(0,0,0,.05)':'rgba(0,0,0,.22)',position:'relative',zIndex:2}}>
+        {/* Left */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'5px 3px'}}>
+          {isLogo ? (
+            <>
+              <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7}}>classement</span>
+              <span style={{fontSize:small?10:12,fontWeight:800,color:accent}}>{'—'}</span>
+            </>
+          ) : card.album==='squid' ? (
+            <>
+              <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7}}>position</span>
+              <span style={{fontSize:small?10:12,fontWeight:800,color:accent}}>{squidPos}</span>
+            </>
+          ) : (
+            <>
+              {teamSvg&&owned ? (
+                <div dangerouslySetInnerHTML={{__html:TEAM_SVG_RAW[card.team_id]?.replace(/LOGO_COLOR/g,accent).replace('<svg ',`<svg width="${Math.round(W*.2)}" height="${Math.round(W*.2)}" `)}} style={{display:'flex'}}/>
+              ) : <span style={{fontSize:small?12:16,opacity:.4}}>⭐</span>}
+              <span style={{fontSize:small?6:7,fontWeight:700,color:accent,textAlign:'center',lineHeight:1.1,maxWidth:W*.44,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{team?.name||''}</span>
+            </>
+          )}
+        </div>
+        {/* Divider */}
+        <div style={{width:1,background:accent,opacity:.4,margin:'5px 0'}}/>
+        {/* Right — rating */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'5px 3px'}}>
+          <span style={{fontSize:small?10:13,fontWeight:800,color:accent}}>{card.rating?Number(card.rating).toFixed(2):'—'}</span>
+          <span style={{fontSize:small?6:7,color:accent,opacity:.6}}>rating</span>
+        </div>
+      </div>
     </div>
   );
 }
+
 
 // ─── MODAL CARTE ────────────────────────────────────────
 function CardModal({card, owned, onClose}){
@@ -5433,7 +5505,9 @@ function CollectionPage({currentPlayer, onBack}){
   const [wallet, setWallet] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [selectedCard, setSelectedCard] = React.useState(null);
-  const [subView, setSubView] = React.useState("albums"); // albums | packs
+  const [subView, setSubView] = React.useState("albums");
+  const [dupeAlbumFilter, setDupeAlbumFilter] = React.useState("all");
+  const [dupeTeamFilter, setDupeTeamFilter] = React.useState("all");
   const [packAnim, setPackAnim] = React.useState(null); // null | {cards:[], step:0}
   const [packMsg, setPackMsg] = React.useState(null);
 
@@ -5456,6 +5530,16 @@ function CollectionPage({currentPlayer, onBack}){
     (async()=>{
       setLoading(true);
       try{
+        // Météo des drops : regénère toutes les 12h
+        const wKey="bl_weather_ts";
+        if(Date.now()-parseInt(localStorage.getItem(wKey)||'0')>12*60*60*1000){
+          try{
+            await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_drop_weather`,{
+              method:"POST",headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},body:"{}"
+            });
+            localStorage.setItem(wKey,String(Date.now()));
+          }catch(e){}
+        }
         const [allCards, invData, walletData] = await Promise.all([
           sbCollection("cards","?select=*&order=id"),
           sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
@@ -5608,9 +5692,9 @@ function CollectionPage({currentPlayer, onBack}){
 
       {/* Sub-nav */}
       <div style={{display:"flex",borderBottom:"1px solid #1e1e30",background:"#080810",flexShrink:0}}>
-        {["albums","packs"].map(v=>(
+        {["albums","packs","dupes"].map(v=>(
           <button key={v} onClick={()=>setSubView(v)} style={{flex:1,padding:"12px",background:"none",border:"none",cursor:"pointer",color:subView===v?"#22d3ee":"#60607a",fontSize:14,fontWeight:subView===v?700:400,fontFamily:"'Outfit',sans-serif",borderBottom:subView===v?"2px solid #22d3ee":"2px solid transparent"}}>
-            {v==="albums"?"📚 Albums":"📦 Packs"}
+            {v==="albums"?"📚 Albums":v==="packs"?"📦 Packs":"🃏 Doublons"}
           </button>
         ))}
       </div>
@@ -5727,7 +5811,80 @@ function CollectionPage({currentPlayer, onBack}){
         </div>
       )}
 
-      {selectedCard&&<CardModal card={selectedCard.card} owned={selectedCard.owned} onClose={()=>setSelectedCard(null)}/>}
+      {subView==="dupes"&&(
+        <div style={{flex:1,overflowY:"auto",padding:m?"12px 12px 80px":"16px 16px 80px"}}>
+          {/* Filters */}
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            <select value={dupeAlbumFilter} onChange={e=>setDupeAlbumFilter(e.target.value)}
+              style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
+              <option value="all">Tous les albums</option>
+              <option value="o2024">Olympiade 2024</option>
+              <option value="o2025">Olympiade 2025</option>
+              <option value="squid">Squid Game</option>
+              <option value="eo2026">eOlympiade 2026</option>
+            </select>
+            <select value={dupeTeamFilter} onChange={e=>setDupeTeamFilter(e.target.value)}
+              style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
+              <option value="all">Toutes les équipes</option>
+              {TEAMS.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          {/* Dupe cards */}
+          {(()=>{
+            const dupeCards = cards.filter(c=>{
+              const cnt = inventory[c.id];
+              if(!cnt||cnt.duplicates<=0) return false;
+              if(dupeAlbumFilter!=="all"&&c.album!==dupeAlbumFilter) return false;
+              if(dupeTeamFilter!=="all"&&String(c.team_id)!==String(dupeTeamFilter)) return false;
+              return true;
+            });
+            if(!dupeCards.length) return <div style={{color:"#60607a",fontSize:13,textAlign:"center",marginTop:40}}>Aucun doublon 🎉</div>;
+            return(
+              <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+                {dupeCards.map(c=>(
+                  <div key={c.id} style={{position:"relative"}}>
+                    <CardVisual card={c} owned small onClick={()=>setSelectedCard({card:c,owned:true})}/>
+                    <div style={{position:"absolute",top:4,right:4,background:"#f59e0b",color:"#080810",fontSize:9,fontWeight:800,borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Outfit',sans-serif"}}>
+                      {inventory[c.id]?.duplicates}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {subView==="dupes"&&(
+        <div style={{flex:1,overflowY:"auto",padding:m?"12px 12px 80px":"16px 16px 80px"}}>
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            <select value={dupeAlbumFilter} onChange={e=>setDupeAlbumFilter(e.target.value)} style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
+              <option value="all">Tous les albums</option>
+              <option value="o2024">O2024</option><option value="o2025">O2025</option>
+              <option value="squid">Squid Game</option><option value="eo2026">eO2026</option>
+            </select>
+            <select value={dupeTeamFilter} onChange={e=>setDupeTeamFilter(e.target.value)} style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
+              <option value="all">Toutes les équipes</option>
+              {TEAMS.map(t=><option key={t.id} value={String(t.id)}>{t.name}</option>)}
+            </select>
+          </div>
+          {(()=>{
+            const dupes=cards.filter(c=>{
+              if(!(inventory[c.id]?.duplicates>0))return false;
+              if(dupeAlbumFilter!=="all"&&c.album!==dupeAlbumFilter)return false;
+              if(dupeTeamFilter!=="all"&&String(c.team_id)!==dupeTeamFilter)return false;
+              return true;
+            });
+            if(!dupes.length)return <div style={{color:"#60607a",fontSize:13,textAlign:"center",marginTop:40}}>Aucun doublon 🎉</div>;
+            return <div style={{display:"flex",flexWrap:"wrap",gap:10}}>{dupes.map(c=>(
+              <div key={c.id} style={{position:"relative"}}>
+                <CardVisual card={c} owned small onClick={()=>setSelectedCard({card:c,owned:true})}/>
+                <div style={{position:"absolute",top:4,right:4,background:"#f59e0b",color:"#080810",fontSize:9,fontWeight:800,borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center"}}>{inventory[c.id]?.duplicates}</div>
+              </div>
+            ))}</div>;
+          })()}
+        </div>
+      )}
+            {selectedCard&&<CardModal card={selectedCard.card} owned={selectedCard.owned} onClose={()=>setSelectedCard(null)}/>}
     </div>
   );
 }
