@@ -5306,16 +5306,17 @@ function CardVisual({card, owned=true, small=false, onClick}){
   const RINGS=["#0085C7","#F4C300","#000000","#009F3D","#DF0024"];
 
   // SVG logo: color1 sur fond color2 (ou blanc sur fond doré si rare)
-  const teamSvg=card.team_id&&TEAM_SVG_RAW[card.team_id]
-    ?TEAM_SVG_RAW[card.team_id]
+  const tid=card.team_id?parseInt(card.team_id):0;
+  const teamSvg=tid&&TEAM_SVG_RAW[tid]
+    ?TEAM_SVG_RAW[tid]
         .replace(/LOGO_COLOR/g, isLogo?(isRare?"#ffffff":c1):accent)
         .replace("<svg ",`<svg width="${Math.round(photoSize*.7)}" height="${Math.round(photoSize*.7)}" `)
     :null;
 
   const photoBg=isLogo?(isRare?"#2a1800":c2):(isO24?"#ede7d0":"#0a0a14");
   const photoRadius=isLogo?"16%":"50%";
-  const teamSvgSmall=card.team_id&&TEAM_SVG_RAW[card.team_id]
-    ?TEAM_SVG_RAW[card.team_id]
+  const teamSvgSmall=tid&&TEAM_SVG_RAW[tid]
+    ?TEAM_SVG_RAW[tid]
         .replace(/LOGO_COLOR/g,accent)
         .replace("<svg ",`<svg width="${Math.round(W*.22)}" height="${Math.round(W*.22)}" `)
     :null;
@@ -5371,8 +5372,8 @@ function CardVisual({card, owned=true, small=false, onClick}){
       {/* Photo zone */}
       <div style={{width:photoSize,height:photoSize,borderRadius:photoRadius,marginTop:small?6:10,border:`2.5px solid ${accent}`,overflow:"hidden",background:photoBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",zIndex:3}}>
         {isLogo&&teamSvg
-          ?<div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex"}}/>
-          :card.photo_url&&!isLogo
+          ?<div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
+          :!isLogo&&card.photo_url
             ?<img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
             :<span style={{fontSize:W*.14,opacity:.3}}>{isLogo?"🏆":"👤"}</span>
         }
@@ -5399,7 +5400,7 @@ function CardVisual({card, owned=true, small=false, onClick}){
             <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7,fontFamily:"'Outfit',sans-serif"}}>position</span>
             <span style={{fontSize:small?10:12,fontWeight:800,color:accent,fontFamily:"'Outfit',sans-serif"}}>{squidPos}</span>
           </>):(<>
-            {teamSvgSmall?<div dangerouslySetInnerHTML={{__html:teamSvgSmall}} style={{display:"flex"}}/>:<span style={{fontSize:small?12:16,opacity:.4}}>⭐</span>}
+            {teamSvgSmall?<div dangerouslySetInnerHTML={{__html:teamSvgSmall}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>:<span style={{fontSize:small?12:16,opacity:.4}}>⭐</span>}
             <span style={{fontSize:small?6:7,fontWeight:700,color:accent,textAlign:"center",maxWidth:W*.44,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif"}}>{teamName}</span>
           </>)}
         </div>
@@ -5407,7 +5408,7 @@ function CardVisual({card, owned=true, small=false, onClick}){
         {/* Droite */}
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"5px 3px"}}>
           <span style={{fontSize:small?10:12,fontWeight:800,color:card.marketPrice?"#22c55e":accent,fontFamily:"'Outfit',sans-serif"}}>{rVal}</span>
-          <span style={{fontSize:small?6:7,color:accent,opacity:.6,fontFamily:"'Outfit',sans-serif"}}>{rLabel}</span>
+          <span style={{fontSize:small?5.5:7,color:card.marketPrice?"#22c55e55":accent+"99",fontFamily:"'Outfit',sans-serif"}}>{rLabel}</span>
         </div>
       </div>
     </div>
@@ -6516,10 +6517,13 @@ function TournoiPage({currentPlayer,onBack}){
 const OFFICERS_BY_UID = {
   "louis-mar":  "Vice Secrétaire",
   "maxime-mar": "Président",
+  "maxime-m":   "Président",
   "thisma-bru": "Vice Présidente",
+  "thisma":     "Vice Présidente",
   "samuel-oll": "Secrétaire",
   "thomas-pey": "Trésorier",
   "salome-dev": "Membre honoraire",
+  "salome":     "Membre honoraire",
 };
 const OFFICERS_BY_NAME = {
   "Louis":   "Vice Secrétaire",
@@ -6547,7 +6551,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
-    {id:"collection",label:"Collection",icon:"🃏",desc:isLouis?"Packs · Albums · Bourse":"Bientôt disponible",color:"#22d3ee",active:isLouis},
+    {id:"collection",label:"Collection",icon:"🃏",desc:(isLouis||getOfficerRole(currentPlayer))?"Packs · Albums · Bourse":"Bientôt disponible",color:"#22d3ee",active:!!(isLouis||getOfficerRole(currentPlayer))},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
   return(
