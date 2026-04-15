@@ -5283,81 +5283,137 @@ async function sbRpc(fn, params={}){
 
 // ─── COMPOSANT CARTE ────────────────────────────────────
 function CardVisual({card, owned=true, small=false, onClick}){
-  const sz = small ? {w:120,h:170,r:8} : {w:160,h:224,r:12};
-  const c1 = card.color1 || "#1a3d2b";
-  const c2 = card.color2 || "#FFFFFF";
-  const isRare = card.rarity === "rare";
-  const isLogo = card.type === "logo";
+  const W=small?110:160, H=small?154:224;
+  const R=Math.round(W*0.075);
+  const isRare=card.rarity==="rare";
+  const isLogo=card.type==="logo";
+  const isSquid=card.album==="squid";
+  const isEO=card.album==="eo2026";
+  const isO24=card.album==="o2024";
+  const c1=card.color1||"#E8000E";
+  const c2=card.color2||"#FFFFFF";
+  const accent=isRare?"#f59e0b":c1;
+  const photoSize=Math.round(W*0.52);
 
-  // Get SVG for logo cards
-  const teamSvg = isLogo && card.team_id && TEAM_SVG_RAW[card.team_id]
-    ? TEAM_SVG_RAW[card.team_id].replace(/LOGO_COLOR/g, c2).replace(/<svg /,
-        `<svg width="${Math.round(sz.w*0.48)}" height="${Math.round(sz.w*0.48)}" style="max-height:${Math.round(sz.w*0.48)}px" `)
-    : null;
+  const THEMES={
+    o2024:{label:"Olympiade 2024",bg:"linear-gradient(160deg,#f8f4e8 0%,#ede7d0 100%)"},
+    o2025:{label:"Olympiade 2025",bg:"linear-gradient(150deg,#3a3a3a 0%,#181818 100%)"},
+    squid:{label:"Squid Game",bg:"linear-gradient(160deg,#0a0010 0%,#080008 100%)"},
+    eo2026:{label:"eOlympiade 2026",bg:"linear-gradient(150deg,#0d1b4b 0%,#1a0a3a 100%)"},
+    rare:{label:"",bg:"linear-gradient(150deg,#1a1000 0%,#0a0a0a 55%,#180e00 100%)"},
+  };
+  const theme=isRare?THEMES.rare:THEMES[card.album]||THEMES.o2024;
+  const RINGS=["#0085C7","#F4C300","#000000","#009F3D","#DF0024"];
+
+  // SVG logo: color1 sur fond color2 (ou blanc sur fond doré si rare)
+  const teamSvg=card.team_id&&TEAM_SVG_RAW[card.team_id]
+    ?TEAM_SVG_RAW[card.team_id]
+        .replace(/LOGO_COLOR/g, isLogo?(isRare?"#ffffff":c1):accent)
+        .replace("<svg ",`<svg width="${Math.round(photoSize*.7)}" height="${Math.round(photoSize*.7)}" `)
+    :null;
+
+  const photoBg=isLogo?(isRare?"#2a1800":c2):(isO24?"#ede7d0":"#0a0a14");
+  const photoRadius=isLogo?"16%":"50%";
+  const teamSvgSmall=card.team_id&&TEAM_SVG_RAW[card.team_id]
+    ?TEAM_SVG_RAW[card.team_id]
+        .replace(/LOGO_COLOR/g,accent)
+        .replace("<svg ",`<svg width="${Math.round(W*.22)}" height="${Math.round(W*.22)}" `)
+    :null;
+
+  // Squid: position from subtitle
+  const squidPos=(card.subtitle||"").match(/(\d+)/)?.[0]?`${(card.subtitle||"").match(/(\d+)/)[0]}è`:"—";
+
+  const teamName=TEAMS.find(t=>t.id===card.team_id)?.name||"";
+  const rVal=card.marketPrice?`${card.marketPrice} PO`:card.rating?Number(card.rating).toFixed(2):"—";
+  const rLabel=card.marketPrice?"bourse":"rating";
+
+  if(!owned) return(
+    <div onClick={onClick} style={{width:W,height:H,borderRadius:R,cursor:onClick?"pointer":"default",background:"#111118",border:"2px solid #1e1e28",opacity:.38,position:"relative",overflow:"hidden",flexShrink:0,userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <span style={{fontSize:W*.18,opacity:.2}}>🃏</span>
+      <div style={{fontSize:9,color:"#333",fontFamily:"'Outfit',sans-serif",marginTop:6}}>???</div>
+    </div>
+  );
 
   return(
     <div onClick={onClick} style={{
-      width:sz.w, height:sz.h, borderRadius:sz.r, cursor:onClick?"pointer":"default",
-      background: owned ? c1 : "#1a1a2e",
-      border: isRare
-        ? `2px solid ${owned?"#f59e0b":"#2a2a40"}`
-        : `1px solid ${owned?(card.album==="squid"?c2:c1)+"88":"#2a2a40"}`,
-      boxShadow: owned && isRare ? `0 0 12px ${c1}66` : "none",
-      opacity: owned ? 1 : 0.45,
-      position:"relative", overflow:"hidden", flexShrink:0,
-      transition:"transform .15s",
-      display:"flex", flexDirection:"column", alignItems:"center",
-      userSelect:"none",
+      width:W,height:H,borderRadius:R,cursor:onClick?"pointer":"default",
+      background:theme.bg,
+      border:`${isRare?"2.5":"2"}px solid ${accent}`,
+      boxShadow:isRare?"0 0 0 1px #f59e0b33,0 4px 16px #f59e0b22":"none",
+      position:"relative",overflow:"hidden",flexShrink:0,
+      userSelect:"none",display:"flex",flexDirection:"column",alignItems:"center",
+      transition:"transform .12s",
     }}
-    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="scale(1.04)";}}
-    onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
+    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="translateY(-3px) scale(1.03)";}}
+    onMouseLeave={e=>{if(onClick)e.currentTarget.style.transform="";}}>
 
-      {owned && isRare && (
-        <div style={{position:"absolute",top:0,left:0,right:0,height:"40%",background:`linear-gradient(180deg,${c2}18 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${sz.r}px ${sz.r}px 0 0`}}/>
-      )}
+      {/* eO2026 pixel grid */}
+      {isEO&&<div style={{position:"absolute",inset:0,pointerEvents:"none",backgroundImage:"linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)",backgroundSize:"16px 16px"}}/>}
+      {/* Squid glow */}
+      {isSquid&&<div style={{position:"absolute",inset:0,pointerEvents:"none",background:"radial-gradient(circle at 50% 20%,rgba(232,77,155,.12),transparent 60%)"}}/>}
+      {/* Rare inner border */}
+      {isRare&&<div style={{position:"absolute",inset:3,borderRadius:R-2,border:"1px solid #f59e0b33",pointerEvents:"none",zIndex:2}}/>}
+      {/* Rare shimmer */}
+      {isRare&&<div style={{position:"absolute",top:0,left:"-60%",width:"40%",height:"100%",background:"linear-gradient(105deg,transparent 40%,rgba(255,220,100,.12) 50%,transparent 60%)",animation:"shimmer 3s infinite 1s",pointerEvents:"none",zIndex:3}}/>}
 
-      {isRare && (
-        <div style={{position:"absolute",top:6,right:6,background:owned?"#f59e0b":"#2a2a40",color:owned?"#080810":"#404058",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:4,letterSpacing:"0.05em",fontFamily:"'Outfit',sans-serif"}}>
-          ✦ RARE
+      {/* O2024: anneaux EN PREMIER, puis label */}
+      {isO24&&(
+        <div style={{display:"flex",gap:2,alignItems:"center",justifyContent:"center",padding:"3px 0 0",position:"relative",zIndex:3}}>
+          {RINGS.map((c,i)=><div key={i} style={{width:9,height:9,borderRadius:"50%",border:`2px solid ${c}`,flexShrink:0}}/>)}
         </div>
       )}
 
-      <div style={{position:"absolute",top:6,left:6,fontSize:7,color:owned?c2+"99":"#30304a",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-        {card.album==="o2024"?"O'24":card.album==="o2025"?"O'25":card.album==="squid"?"SQ":card.album==="eo2026"?"eO'26":""}
+      {/* Album label */}
+      <div style={{fontSize:small?6.5:8,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:isRare?"#f59e0b":accent,textAlign:"center",paddingTop:isO24?1:6,position:"relative",zIndex:3,fontFamily:"'Outfit',sans-serif"}}>
+        {THEMES[card.album]?.label.toUpperCase()||""}
       </div>
 
-      {/* Photo / Logo zone */}
-      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:isLogo?"12%":"50%",marginTop:sz.h*0.13,background:owned?c2+"15":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"33":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {owned && isLogo && teamSvg ? (
-          <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
-        ) : owned && card.photo_url ? (
-          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
-        ) : (
-          <span style={{fontSize:sz.w*0.2,color:owned?c2+"66":"#1e1e30"}}>
-            {isLogo?"🏆":isRare?"⭐":"👤"}
-          </span>
-        )}
+      {/* Photo zone */}
+      <div style={{width:photoSize,height:photoSize,borderRadius:photoRadius,marginTop:small?6:10,border:`2.5px solid ${accent}`,overflow:"hidden",background:photoBg,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",zIndex:3}}>
+        {isLogo&&teamSvg
+          ?<div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex"}}/>
+          :card.photo_url&&!isLogo
+            ?<img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+            :<span style={{fontSize:W*.14,opacity:.3}}>{isLogo?"🏆":"👤"}</span>
+        }
       </div>
 
-      {/* Name + rating */}
-      <div style={{marginTop:5,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
-        <div style={{fontSize:small?9:10,fontWeight:700,color:owned?c2:"#30304a",fontFamily:"'Outfit',sans-serif",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
-          {owned ? card.name : "???"}
+      {/* Nom joueur ou équipe */}
+      <div style={{fontSize:small?9:13,fontWeight:800,color:isRare?"#f59e0b":accent,textAlign:"center",lineHeight:1.1,padding:"0 6px",marginTop:small?6:9,position:"relative",zIndex:3,fontFamily:"'Outfit',sans-serif",overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+        {card.name||"?"}
+      </div>
+      {isRare&&!small&&(
+        <div style={{fontSize:7,fontWeight:600,fontStyle:"italic",color:"#f59e0b",opacity:.7,textAlign:"center",position:"relative",zIndex:3,fontFamily:"'Outfit',sans-serif"}}>
+          {isLogo?"Champion d'équipe":"Meilleur joueur"}
         </div>
-        {owned && (
-          <div style={{fontSize:8,color:card.marketPrice?"#22c55e":"#f59e0b",fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>
-            {card.marketPrice?`${card.marketPrice} PO`:card.rating?`⭐ ${Number(card.rating).toFixed(2)}`:""}
-          </div>
-        )}
-        {!small && (
-          <div style={{fontSize:7,color:owned?c2+"88":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {owned ? (card.subtitle||"") : ""}
-          </div>
-        )}
+      )}
+
+      {/* Bottom strip */}
+      <div style={{width:"100%",display:"flex",alignItems:"stretch",borderTop:`1.5px solid ${accent}`,marginTop:"auto",background:isO24?"rgba(0,0,0,.06)":"rgba(0,0,0,.22)",position:"relative",zIndex:3}}>
+        {/* Gauche */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"5px 3px"}}>
+          {isLogo?(<>
+            <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7,fontFamily:"'Outfit',sans-serif"}}>classement</span>
+            <span style={{fontSize:small?10:12,fontWeight:800,color:accent,fontFamily:"'Outfit',sans-serif"}}>—</span>
+          </>):isSquid?(<>
+            <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7,fontFamily:"'Outfit',sans-serif"}}>position</span>
+            <span style={{fontSize:small?10:12,fontWeight:800,color:accent,fontFamily:"'Outfit',sans-serif"}}>{squidPos}</span>
+          </>):(<>
+            {teamSvgSmall?<div dangerouslySetInnerHTML={{__html:teamSvgSmall}} style={{display:"flex"}}/>:<span style={{fontSize:small?12:16,opacity:.4}}>⭐</span>}
+            <span style={{fontSize:small?6:7,fontWeight:700,color:accent,textAlign:"center",maxWidth:W*.44,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif"}}>{teamName}</span>
+          </>)}
+        </div>
+        <div style={{width:1,background:accent,opacity:.4,margin:"5px 0"}}/>
+        {/* Droite */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"5px 3px"}}>
+          <span style={{fontSize:small?10:12,fontWeight:800,color:card.marketPrice?"#22c55e":accent,fontFamily:"'Outfit',sans-serif"}}>{rVal}</span>
+          <span style={{fontSize:small?6:7,color:accent,opacity:.6,fontFamily:"'Outfit',sans-serif"}}>{rLabel}</span>
+        </div>
       </div>
     </div>
   );
 }
+
 
 // ─── MODAL CARTE ────────────────────────────────────────
 function CardModal({card, owned, onClose}){
@@ -6270,10 +6326,11 @@ function TournoiPage({currentPlayer,onBack}){
 // ─── BUREAU BL ───────────────────────────────────────────
 const OFFICERS_BY_UID = {
   "louis-mar":  "Vice Secrétaire",
-  "maxime-m":   "Président",
-  "thisma":     "Vice Présidente",
+  "maxime-mar": "Président",
+  "thisma-bru": "Vice Présidente",
   "samuel-oll": "Secrétaire",
   "thomas-pey": "Trésorier",
+  "salome-dev": "Membre honoraire",
 };
 const OFFICERS_BY_NAME = {
   "Louis":   "Vice Secrétaire",
