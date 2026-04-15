@@ -5283,81 +5283,92 @@ async function sbRpc(fn, params={}){
 
 // ─── COMPOSANT CARTE ────────────────────────────────────
 function CardVisual({card, owned=true, small=false, onClick}){
-  const sz = small ? {w:120,h:170,r:8} : {w:160,h:224,r:12};
-  const c1 = card.color1 || "#1a3d2b";
-  const c2 = card.color2 || "#FFFFFF";
-  const isRare = card.rarity === "rare";
-  const isLogo = card.type === "logo";
+  const W=small?110:160, H=small?154:224, R=Math.round((small?110:160)*.078);
+  const isRare=card.rarity==='rare';
+  const isLogo=card.type==='logo'||(card.type==='rare'&&!card.player_id&&card.team_id);
+  const isSquid=card.album==='squid';
+  const c1=card.color1||'#1a3d2b', c2=card.color2||'#fff';
+  const accent=isRare?'#f59e0b':(isSquid?c2:c1);
 
-  // Get SVG for logo cards
-  const teamSvg = isLogo && card.team_id && TEAM_SVG_RAW[card.team_id]
-    ? TEAM_SVG_RAW[card.team_id].replace(/LOGO_COLOR/g, c2).replace(/<svg /,
-        `<svg width="${Math.round(sz.w*0.48)}" height="${Math.round(sz.w*0.48)}" style="max-height:${Math.round(sz.w*0.48)}px" `)
-    : null;
+  const BG={o2024:'linear-gradient(160deg,#f8f4e8 0%,#ede7d0 100%)',o2025:'linear-gradient(150deg,#3a3a3a 0%,#181818 100%)',squid:'linear-gradient(160deg,#0a0010 0%,#080008 100%)',eo2026:'linear-gradient(150deg,#0d1b4b 0%,#1a0a3a 100%)',rare:'linear-gradient(150deg,#1a1000 0%,#0a0a0a 55%,#180e00 100%)'};
+  const LABEL={o2024:"Olympiade 2024",o2025:"Olympiade 2025",squid:"Squid Game",eo2026:"eOlympiade 2026"};
+  const RINGS=['#0085C7','#F4C300','#000000','#009F3D','#DF0024'];
+
+  const bg=isRare?BG.rare:(BG[card.album]||BG.o2024);
+  const photoSize=Math.round(W*.52);
+  const photoBg=isLogo?(isRare?'#2a1800':c2):(card.album==='o2024'?'#ede7d0':'#0a0a14');
+  const photoRadius=isLogo?`${Math.round(W*.16)}px`:'50%';
+
+  const teamSvg=card.team_id&&TEAM_SVG_RAW[card.team_id]
+    ?TEAM_SVG_RAW[card.team_id]
+      .replace(/LOGO_COLOR/g,isLogo?(isRare?'#ffffff':c1):accent)
+      .replace('<svg ',`<svg width="${Math.round(photoSize*.68)}" height="${Math.round(photoSize*.68)}" `)
+    :null;
 
   return(
     <div onClick={onClick} style={{
-      width:sz.w, height:sz.h, borderRadius:sz.r, cursor:onClick?"pointer":"default",
-      background: owned ? c1 : "#1a1a2e",
-      border: isRare
-        ? `2px solid ${owned?"#f59e0b":"#2a2a40"}`
-        : `1px solid ${owned?(card.album==="squid"?c2:c1)+"88":"#2a2a40"}`,
-      boxShadow: owned && isRare ? `0 0 12px ${c1}66` : "none",
-      opacity: owned ? 1 : 0.45,
-      position:"relative", overflow:"hidden", flexShrink:0,
-      transition:"transform .15s",
-      display:"flex", flexDirection:"column", alignItems:"center",
-      userSelect:"none",
+      width:W,height:H,borderRadius:R,cursor:onClick?'pointer':'default',
+      background:owned?bg:'#111118',
+      border:`${isRare?'2.5':'2'}px solid ${owned?accent:'#1e1e28'}`,
+      boxShadow:owned&&isRare?`0 0 0 1px #f59e0b33,0 4px 16px #f59e0b22`:'none',
+      opacity:owned?1:0.38,position:'relative',overflow:'hidden',flexShrink:0,
+      userSelect:'none',display:'flex',flexDirection:'column',alignItems:'center',
+      transition:'transform .12s',
     }}
-    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform="scale(1.04)";}}
-    onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}>
+    onMouseEnter={e=>{if(onClick)e.currentTarget.style.transform='translateY(-3px) scale(1.03)';}}
+    onMouseLeave={e=>{if(onClick)e.currentTarget.style.transform='';}}>
 
-      {owned && isRare && (
-        <div style={{position:"absolute",top:0,left:0,right:0,height:"40%",background:`linear-gradient(180deg,${c2}18 0%,transparent 100%)`,pointerEvents:"none",borderRadius:`${sz.r}px ${sz.r}px 0 0`}}/>
-      )}
+      {owned&&card.album==='squid'&&<div style={{position:'absolute',inset:0,background:'radial-gradient(circle at 50% 20%,rgba(232,77,155,.12),transparent 60%)',pointerEvents:'none'}}/>}
+      {owned&&card.album==='eo2026'&&<div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)',backgroundSize:'16px 16px',pointerEvents:'none'}}/>}
+      {isRare&&owned&&<div style={{position:'absolute',inset:3,borderRadius:R-2,border:'1px solid #f59e0b33',pointerEvents:'none'}}/>}
+      {isRare&&owned&&<div style={{position:'absolute',top:0,left:'-60%',width:'40%',height:'100%',background:'linear-gradient(105deg,transparent 40%,rgba(255,220,100,.1) 50%,transparent 60%)',animation:'shimmer 3s infinite 1s',pointerEvents:'none'}}/>}
 
-      {isRare && (
-        <div style={{position:"absolute",top:6,right:6,background:owned?"#f59e0b":"#2a2a40",color:owned?"#080810":"#404058",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:4,letterSpacing:"0.05em",fontFamily:"'Outfit',sans-serif"}}>
-          ✦ RARE
+      {owned&&card.album==='o2024'&&(
+        <div style={{display:'flex',gap:2,alignItems:'center',justifyContent:'center',padding:'3px 0 0',position:'relative',zIndex:2}}>
+          {RINGS.map((c,i)=><div key={i} style={{width:9,height:9,borderRadius:'50%',border:`2px solid ${c}`,flexShrink:0}}/>)}
         </div>
       )}
 
-      <div style={{position:"absolute",top:6,left:6,fontSize:7,color:owned?c2+"99":"#30304a",fontFamily:"'Outfit',sans-serif",fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-        {card.album==="o2024"?"O'24":card.album==="o2025"?"O'25":card.album==="squid"?"SQ":card.album==="eo2026"?"eO'26":""}
+      <div style={{fontSize:small?6.5:8,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:owned?accent:'#333',textAlign:'center',paddingTop:card.album==='o2024'?1:6,position:'relative',zIndex:2,fontFamily:"'Outfit',sans-serif"}}>
+        {LABEL[card.album]||''}
       </div>
 
-      {/* Photo / Logo zone */}
-      <div style={{width:sz.w*0.52,height:sz.w*0.52,borderRadius:isLogo?"12%":"50%",marginTop:sz.h*0.13,background:owned?c2+"15":"#0a0a0f",overflow:"hidden",border:`2px solid ${owned?c2+"33":"#1e1e30"}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {owned && isLogo && teamSvg ? (
-          <div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:"flex",alignItems:"center",justifyContent:"center"}}/>
-        ) : owned && card.photo_url ? (
-          <img src={card.photo_url} alt={card.name} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
-        ) : (
-          <span style={{fontSize:sz.w*0.2,color:owned?c2+"66":"#1e1e30"}}>
-            {isLogo?"🏆":isRare?"⭐":"👤"}
-          </span>
-        )}
+      <div style={{width:photoSize,height:photoSize,borderRadius:photoRadius,marginTop:small?5:8,border:`2.5px solid ${owned?accent:'#222'}`,overflow:'hidden',background:owned?photoBg:'#111',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',position:'relative',zIndex:2}}>
+        {owned&&isLogo&&teamSvg?<div dangerouslySetInnerHTML={{__html:teamSvg}} style={{display:'flex'}}/>
+        :owned&&!isLogo&&card.photo_url?<img src={card.photo_url} alt={card.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>e.target.style.display='none'}/>
+        :<span style={{fontSize:W*.16,opacity:.3}}>{isLogo?'🏆':'👤'}</span>}
       </div>
 
-      {/* Name + rating */}
-      <div style={{marginTop:5,padding:"0 6px",textAlign:"center",flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:2}}>
-        <div style={{fontSize:small?9:10,fontWeight:700,color:owned?c2:"#30304a",fontFamily:"'Outfit',sans-serif",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
-          {owned ? card.name : "???"}
+      <div style={{fontSize:small?9:12.5,fontWeight:800,color:owned?accent:'#333',textAlign:'center',lineHeight:1.1,padding:'0 6px',marginTop:small?4:7,position:'relative',zIndex:2,fontFamily:"'Outfit',sans-serif",overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+        {owned?(card.name||'?'):'???'}
+      </div>
+      {isRare&&owned&&!small&&<div style={{fontSize:7,fontWeight:600,fontStyle:'italic',color:accent,opacity:.6,textAlign:'center',position:'relative',zIndex:2}}>{isLogo?"Champion d'équipe":"Meilleur joueur"}</div>}
+
+      <div style={{width:'100%',display:'flex',alignItems:'stretch',borderTop:`1.5px solid ${owned?accent:'#1e1e28'}`,marginTop:'auto',background:card.album==='o2024'?'rgba(0,0,0,.05)':'rgba(0,0,0,.22)',position:'relative',zIndex:2}}>
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'5px 3px'}}>
+          {isLogo?(<>
+            <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7}}>classement</span>
+            <span style={{fontSize:small?10:12,fontWeight:800,color:accent}}>—</span>
+          </>):isSquid?(<>
+            <span style={{fontSize:small?6:7,fontWeight:600,color:accent,opacity:.7}}>position</span>
+            <span style={{fontSize:small?10:12,fontWeight:800,color:accent}}>{(card.subtitle||'').match(/(\d+)/)?.[0]?`${(card.subtitle||'').match(/(\d+)/)[0]}è`:'—'}</span>
+          </>):(<>
+            {teamSvg&&owned?<div dangerouslySetInnerHTML={{__html:TEAM_SVG_RAW[card.team_id]?.replace(/LOGO_COLOR/g,accent).replace('<svg ',`<svg width="${Math.round(W*.2)}" height="${Math.round(W*.2)}" `)}} style={{display:'flex'}}/>:<span style={{fontSize:small?12:16,opacity:.4}}>⭐</span>}
+            <span style={{fontSize:small?6:7,fontWeight:700,color:accent,textAlign:'center',lineHeight:1.1,maxWidth:W*.44,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {TEAMS.find(t=>t.id===card.team_id)?.name||''}
+            </span>
+          </>)}
         </div>
-        {card.rating && owned && (
-          <div style={{fontSize:8,color:"#f59e0b",fontWeight:700,fontFamily:"'Outfit',sans-serif"}}>
-            ⭐ {Number(card.rating).toFixed(2)}
-          </div>
-        )}
-        {!small && (
-          <div style={{fontSize:7,color:owned?c2+"88":"#252540",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {owned ? (card.subtitle||"") : ""}
-          </div>
-        )}
+        <div style={{width:1,background:accent,opacity:.4,margin:'5px 0'}}/>
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'5px 3px'}}>
+          <span style={{fontSize:small?10:13,fontWeight:800,color:accent}}>{card.rating?Number(card.rating).toFixed(2):'—'}</span>
+          <span style={{fontSize:small?6:7,color:accent,opacity:.6}}>rating</span>
+        </div>
       </div>
     </div>
   );
 }
+
 
 // ─── MODAL CARTE ────────────────────────────────────────
 function CardModal({card, owned, onClose}){
@@ -5751,121 +5762,233 @@ function CollectionPage({currentPlayer, onBack}){
 }
 
 // ─── ANIMATION OUVERTURE PACK (PHASER) ─────────────────
-const PACK_REVEAL_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#030310;overflow:hidden;touch-action:none;}</style></head><body><div id="g"></div><script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script><script>
-const W=Math.min(window.innerWidth,420),H=window.innerHeight;
-let cards=[],results=[],onDone=null;
-window.init=function(c,r,d){cards=c;results=r;onDone=d;launch();}
-function hexToInt(h){return parseInt((h||'1a3d2b').replace('#',''),16);}
-function launch(){
-  if(window._pg){try{window._pg.destroy(true);}catch(e){}}
-  class S extends Phaser.Scene{
-    constructor(){super('S');}
-    create(){
-      const cx=W/2,cy=H/2;
-      this.step=0;this.add.rectangle(cx,cy,W,H,0x030310);
-      this.ttl=this.add.text(cx,55,'PACK OUVERTURE',{fontFamily:'monospace',fontSize:Math.round(W*.065),fontStyle:'bold',color:'#22d3ee',stroke:'#000',strokeThickness:3}).setOrigin(.5);
-      this.cnt=this.add.text(cx,95,'',{fontFamily:'monospace',fontSize:Math.round(W*.038),color:'#404058'}).setOrigin(.5);
-      this.tapTxt=this.add.text(cx,H-55,'TAP POUR COMMENCER',{fontFamily:'monospace',fontSize:Math.round(W*.036),color:'#22d3ee'}).setOrigin(.5);
-      this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
-      this.stk=this.add.container(cx,cy);
-      for(let i=0;i<Math.min(5,cards.length);i++){
-        const g=this.add.graphics();
-        g.fillStyle(0x0a0a1f,1);g.fillRoundedRect(-68,-95,136,190,10);
-        g.lineStyle(2,0x22d3ee,.3);g.strokeRoundedRect(-68,-95,136,190,10);
-        g.x=(i-2)*7;g.y=(i-2)*5;g.angle=(i-2)*3;this.stk.add(g);
-      }
-      this.tweens.add({targets:this.stk,scaleX:1.04,scaleY:1.04,duration:900,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
-      this.grid=this.add.container(cx,H*.76);this.bc=null;
-      this.input.on('pointerdown',()=>this.tap2());
-      this.input.keyboard?.on('keydown-SPACE',()=>this.tap2());
-    }
-    tap2(){
-      if(this.step===0){
-        this.tweens.add({targets:[this.stk,this.tapTxt],alpha:0,duration:250,onComplete:()=>{this.stk.setVisible(false);this.tapTxt.setVisible(false);this.next();}});
-      } else if(this.step<=cards.length){this.next();}
-      else{if(onDone)onDone();}
-    }
-    next(){
-      this.step++;
-      if(this.step>cards.length){
-        this.tapTxt.setText('TAP POUR FERMER').setAlpha(1).setVisible(true);
-        this.tweens.add({targets:this.tapTxt,alpha:.2,duration:600,yoyo:true,repeat:-1});
-        return;
-      }
-      const c=cards[this.step-1],res=(results[this.step-1]||{}).result||'collection';
-      this.cnt.setText(this.step+' / '+cards.length).setColor('#22d3ee');
-      if(this.bc){this.bc.destroy();this.bc=null;}
-      const c1=hexToInt(c.color1),c2='#'+(hexToInt(c.color2)).toString(16).padStart(6,'0');
-      const isRare=c.rarity==='rare';
-      const bw=148,bh=208,cx=W/2,cy=H/2-15;
-      const ct=this.add.container(cx,cy);
-      const bg=this.add.graphics();
-      bg.fillStyle(c1,1);bg.fillRoundedRect(-bw/2,-bh/2,bw,bh,12);
-      if(isRare){bg.lineStyle(3,0xf59e0b,1);bg.strokeRoundedRect(-bw/2,-bh/2,bw,bh,12);}
-      ct.add(bg);
-      if(isRare){ct.add(this.add.text(bw*.42,-bh*.42,'✦ RARE',{fontFamily:'monospace',fontSize:9,color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      const aLbl=c.album==='o2024'?"O'24":c.album==='o2025'?"O'25":c.album==='squid'?'SQ':"eO'26";
-      ct.add(this.add.text(-bw*.42,-bh*.42,aLbl,{fontFamily:'monospace',fontSize:8,color:c2+'77'}).setOrigin(0,.5));
-      // Photo circle
-      if(c.photo_url){
-        const photoKey='ph_'+this.step;
-        const photoSize=Math.round(bw*.44);
-        this.load.image(photoKey,c.photo_url);
-        this.load.once('complete',()=>{
-          if(!this.bc)return;
-          try{
-            const img=this.add.image(0,-bh*.08,photoKey).setDisplaySize(photoSize,photoSize);
-            const mask=this.make.graphics({add:false});mask.fillStyle(0xffffff);mask.fillCircle(cx,-bh*.08+cy,photoSize/2);
-            img.setMask(mask.createBitmapMask());
-            ct.add(img);
-          }catch(e){}
-        });
-        this.load.start();
-      }
-      if(c.rating){ct.add(this.add.text(0,isRare?bh*.05:-bh*.18,'⭐ '+parseFloat(c.rating).toFixed(2),{fontFamily:'monospace',fontSize:Math.round(bw*.065),color:'#f59e0b',fontStyle:'bold'}).setOrigin(.5));}
-      const nameY=c.photo_url?bh*.27:(c.rating?bh*.05:-bh*.02);
-      ct.add(this.add.text(0,nameY,c.name||'?',{fontFamily:'monospace',fontSize:Math.round(bw*.07),fontStyle:'bold',color:c2,wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
-      ct.add(this.add.text(0,nameY+bh*.14,c.subtitle||'',{fontFamily:'monospace',fontSize:Math.round(bw*.042),color:c2+'88',wordWrap:{width:bw*.85},align:'center'}).setOrigin(.5));
-      const rCol=res==='collection'?0x22c55e:res==='duplicate'?0x808080:0xf59e0b;
-      const rLbl=res==='collection'?'✨ NOUVELLE!':res==='duplicate'?'📋 DOUBLON':'💰 VENDU AUTO';
-      const rbg=this.add.graphics();rbg.fillStyle(rCol,.2);rbg.fillRoundedRect(-bw*.42,bh*.36,bw*.84,22,6);ct.add(rbg);
-      ct.add(this.add.text(0,bh*.375,rLbl,{fontFamily:'monospace',fontSize:10,color:'#'+rCol.toString(16).padStart(6,'0'),fontStyle:'bold'}).setOrigin(.5));
-      ct.setAlpha(0).setScale(.5);this.tweens.add({targets:ct,alpha:1,scaleX:1,scaleY:1,duration:320,ease:'Back.Out'});
-      if(isRare)this.cameras.main.flash(150,255,200,0);
-      if(res==='collection')this.cameras.main.shake(60,.004);
-      this.bc=ct;
-      const mw=54,mh=76,cols=5,n=this.step-1,col=n%cols,row=Math.floor(n/cols);
-      const sx=-(mw*Math.min(cards.length,cols)/2)+mw/2;
-      const mg=this.add.container(sx+col*mw,row*(mh+4));
-      const mbg=this.add.graphics();mbg.fillStyle(c1,1);mbg.fillRoundedRect(-mw/2,-mh/2,mw,mh,6);mg.add(mbg);
-      if(isRare){mg.add(this.add.circle(mw*.36,-mh*.4,4,0xf59e0b));}
-      mg.setAlpha(0);this.tweens.add({targets:mg,alpha:1,duration:200});this.grid.add(mg);
-    }
-  }
-  window._pg=new Phaser.Game({type:Phaser.AUTO,width:W,height:H,parent:'g',backgroundColor:'#030310',scene:[S],scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{touch:{capture:true}}});
-}
-<\/script></body></html>`;
-
+// ─── ANIMATION OUVERTURE PACK (canvas pur) ────────────
 function PackReveal({items, onClose}){
-  const iframeRef=React.useRef(null);
+  const canvasRef = React.useRef(null);
+
   React.useEffect(()=>{
-    const iframe=iframeRef.current;
-    if(!iframe)return;
-    const onLoad=()=>{
-      try{iframe.contentWindow.init(items.cards||[],items.results||[],()=>{onClose();});}
-      catch(e){console.error('PackReveal init error',e);}
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    const cards   = items.cards||[];
+    const results = items.results||[];
+    const W = canvas.width  = Math.min(window.innerWidth, 420);
+    const H = canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    let step = 0;
+    let raf;
+    let blink = 0;
+    let cardAlpha = 0, cardScale = 0.5;
+
+    // Pre-load photos
+    const imgs = {};
+    cards.forEach((c,i)=>{
+      if(c.photo_url){
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = c.photo_url;
+        imgs[i] = img;
+      }
+    });
+
+    function hexNum(hex){ return parseInt((hex||'#1a3d2b').replace('#',''),16); }
+    function hexRgb(hex){ const n=hexNum(hex); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+    function rr(ctx,x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+      ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+      ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+      ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+      ctx.closePath();
+    }
+
+    function drawBigCard(c, i){
+      const bw=160,bh=224,cx=W/2,cy=H*.42;
+      const x=cx-bw/2, y=cy-bh/2;
+      const isRare=c.rarity==='rare';
+      const res=(results[i]||{}).result||'collection';
+      const accent = isRare?'#f59e0b':(c.album==='squid'?c.color2:c.color1)||'#888';
+
+      ctx.save();
+      ctx.globalAlpha = cardAlpha;
+      ctx.translate(cx,cy);
+      ctx.scale(cardScale,cardScale);
+      ctx.translate(-cx,-cy);
+
+      // BG
+      rr(ctx,x,y,bw,bh,12);
+      ctx.fillStyle=isRare?'#1a1000':c.color1||'#1a3d2b';
+      ctx.fill();
+      // Border
+      rr(ctx,x,y,bw,bh,12);
+      ctx.strokeStyle=accent; ctx.lineWidth=isRare?2.5:2; ctx.stroke();
+
+      // Album label
+      ctx.fillStyle=accent;
+      ctx.font=`700 ${Math.round(bw*.05)}px 'Outfit',monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      const albumLabel={o2024:"Olympiade 2024",o2025:"Olympiade 2025",squid:"Squid Game",eo2026:"eOlympiade 2026"};
+      ctx.fillText(albumLabel[c.album]||'',cx,y+6);
+
+      // Photo circle
+      const cr=bw*.26, pcx=cx, pcy=y+bh*.31;
+      ctx.beginPath();ctx.arc(pcx,pcy,cr+2,0,Math.PI*2);
+      ctx.strokeStyle=accent;ctx.lineWidth=2.5;ctx.stroke();
+      ctx.save();
+      ctx.beginPath();ctx.arc(pcx,pcy,cr,0,Math.PI*2);ctx.clip();
+      ctx.fillStyle=c.album==='o2024'?'#ede7d0':'#0a0a14';ctx.fill();
+      if(imgs[i]&&imgs[i].complete&&imgs[i].naturalWidth){
+        ctx.drawImage(imgs[i],pcx-cr,pcy-cr,cr*2,cr*2);
+      } else {
+        ctx.font=`${Math.round(cr*.8)}px sans-serif`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle=accent+'55';
+        ctx.fillText('👤',pcx,pcy);
+      }
+      ctx.restore();
+
+      // Name
+      const nameY=y+bh*.56;
+      ctx.fillStyle=accent;
+      ctx.font=`800 ${Math.round(bw*.08)}px 'Outfit',monospace`;
+      ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillText(c.name||'?',cx,nameY);
+
+      // Rating
+      if(c.rating){
+        ctx.fillStyle='#f59e0b';
+        ctx.font=`700 ${Math.round(bw*.065)}px monospace`;
+        ctx.fillText('⭐ '+parseFloat(c.rating).toFixed(2),cx,nameY+bh*.1);
+      }
+
+      // Result badge
+      const rCol=res==='collection'?'#22c55e':res==='duplicate'?'#808080':'#f59e0b';
+      const rLbl=res==='collection'?'✨ NOUVELLE !':res==='duplicate'?'📋 DOUBLON':'💰 VENDU AUTO';
+      const by=y+bh*.82;
+      rr(ctx,x+bw*.1,by,bw*.8,22,6);
+      ctx.fillStyle=rCol+'33';ctx.fill();
+      ctx.fillStyle=rCol;
+      ctx.font=`700 ${Math.round(bw*.055)}px monospace`;
+      ctx.textAlign='center';ctx.textBaseline='top';
+      ctx.fillText(rLbl,cx,by+4);
+
+      // Bottom bar
+      rr(ctx,x,y+bh-3,bw,3,0);
+      ctx.fillStyle=isRare?'#f59e0b':accent;ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawMini(c,i,mx,my,mw,mh){
+      const isRare=c.rarity==='rare';
+      rr(ctx,mx,my,mw,mh,6);
+      ctx.fillStyle=isRare?'#1a1000':(c.color1||'#1a3d2b');
+      ctx.fill();
+      if(isRare){rr(ctx,mx,my,mw,mh,6);ctx.strokeStyle='#f59e0b';ctx.lineWidth=1.5;ctx.stroke();}
+      else{
+        const res=(results[i]||{}).result;
+        if(res==='new'||res==='collection'){
+          rr(ctx,mx,my,mw,mh,6);ctx.strokeStyle='#22c55e55';ctx.lineWidth=1;ctx.stroke();
+        }
+      }
+    }
+
+    function draw(){
+      ctx.fillStyle='#030310'; ctx.fillRect(0,0,W,H);
+
+      // Counter
+      if(step>0){
+        ctx.fillStyle='#22d3ee';
+        ctx.font=`700 ${Math.round(W*.04)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='top';
+        ctx.fillText(`${Math.min(step,cards.length)} / ${cards.length}`, W/2, 20);
+      }
+
+      // Mini grid
+      const COLS=5, MW=50, MH=70, GAP=4;
+      const totalMinis=Math.min(step,cards.length);
+      const gridY=H*.82;
+      const gridW=(Math.min(totalMinis,COLS))*(MW+GAP)-GAP;
+      const startX=W/2-gridW/2;
+      for(let i=0;i<totalMinis;i++){
+        const col=i%COLS, row=Math.floor(i/COLS);
+        const mx=startX+col*(MW+GAP), my=gridY+row*(MH+GAP)-MH/2;
+        ctx.save();ctx.globalAlpha=1;
+        drawMini(cards[i],i,mx,my,MW,MH);
+        ctx.restore();
+      }
+
+      if(step===0){
+        // Intro — pack stack
+        for(let i=0;i<Math.min(5,cards.length);i++){
+          const ox=(i-2)*9, oy=(i-2)*6;
+          ctx.save();
+          ctx.translate(W/2+ox, H/2+oy);
+          ctx.rotate((i-2)*.06);
+          rr(ctx,-70,-98,140,196,10);
+          ctx.fillStyle='#0a0a1f';ctx.fill();
+          ctx.strokeStyle='#22d3ee';ctx.lineWidth=1.5;ctx.stroke();
+          ctx.restore();
+        }
+        blink=(blink+.03)%1;
+        ctx.globalAlpha=.4+Math.sin(blink*Math.PI*2)*.4;
+        ctx.fillStyle='#22d3ee';
+        ctx.font=`700 ${Math.round(W*.04)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('TAP POUR OUVRIR', W/2, H-55);
+        ctx.globalAlpha=1;
+      } else if(step<=cards.length){
+        cardAlpha=Math.min(1,cardAlpha+.08);
+        cardScale=cardScale+(1-cardScale)*.15;
+        drawBigCard(cards[step-1], step-1);
+        blink=(blink+.03)%1;
+        ctx.globalAlpha=.4+Math.sin(blink*Math.PI*2)*.4;
+        ctx.fillStyle='#ffffff33';
+        ctx.font=`${Math.round(W*.033)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(step<cards.length?'TAP POUR CONTINUER':'TAP POUR FERMER', W/2, H-55);
+        ctx.globalAlpha=1;
+      } else {
+        ctx.fillStyle='#22c55e';
+        ctx.font=`700 ${Math.round(W*.055)}px monospace`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('🎉 PACK OUVERT !', W/2, H*.35);
+        blink=(blink+.03)%1;
+        ctx.globalAlpha=.4+Math.sin(blink*Math.PI*2)*.4;
+        ctx.fillStyle='#ffffff';
+        ctx.font=`${Math.round(W*.038)}px monospace`;
+        ctx.fillText('TAP POUR FERMER', W/2, H-55);
+        ctx.globalAlpha=1;
+      }
+      raf=requestAnimationFrame(draw);
+    }
+
+    function tap(){
+      if(step===0){step=1;cardAlpha=0;cardScale=0.5;}
+      else if(step<cards.length){step++;cardAlpha=0;cardScale=0.5;}
+      else{cancelAnimationFrame(raf);onClose();}
+    }
+
+    canvas.addEventListener('click',tap);
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();tap();},{passive:false});
+    const onKey=e=>{if(e.code==='Space'||e.code==='ArrowRight')tap();};
+    document.addEventListener('keydown',onKey);
+    raf=requestAnimationFrame(draw);
+
+    return()=>{
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener('click',tap);
+      document.removeEventListener('keydown',onKey);
     };
-    iframe.addEventListener('load',onLoad);
-    const blob=new Blob([PACK_REVEAL_HTML],{type:'text/html'});
-    iframe.src=URL.createObjectURL(blob);
-    return()=>{iframe.removeEventListener('load',onLoad);};
   },[]);
+
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999,background:"#030310"}}>
-      <iframe ref={iframeRef} style={{width:"100%",height:"100%",border:"none",display:"block"}} sandbox="allow-scripts allow-same-origin"/>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999,background:"#030310",touchAction:"none"}}>
+      <canvas ref={canvasRef} style={{display:"block",width:"100%",height:"100%"}}/>
     </div>
   );
 }
+
 
 
 // ─── GAMES HOME ──────────────────────────────────────
