@@ -5388,8 +5388,8 @@ function CardVisual({card, owned=true, small=false, onClick}){
         </div>
         <div style={{width:1,background:accent,opacity:.4,margin:'5px 0'}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'5px 3px'}}>
-          <span style={{fontSize:small?10:13,fontWeight:800,color:accent}}>{card.rating?Number(card.rating).toFixed(2):'—'}</span>
-          <span style={{fontSize:small?6:7,color:accent,opacity:.6}}>rating</span>
+          <span style={{fontSize:small?10:13,fontWeight:800,color:accent}}>{card.marketPrice||card.price?(card.marketPrice||card.price)+' PO':card.rating?Number(card.rating).toFixed(2)+'★':'—'}</span>
+          <span style={{fontSize:small?6:7,color:accent,opacity:.6}}>{card.marketPrice||card.price?'bourse':'rating'}</span>
         </div>
       </div>
     </div>
@@ -5405,7 +5405,7 @@ function CardModal({card, owned, onClose}){
   return(
     <div onClick={onClose} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-        <CardVisual card={card} owned={owned}/>
+        <CardVisual card={{...card,marketPrice:marketPrices?.[card.id]}} owned={owned}/>
         <div style={{textAlign:"center",color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>
           <div style={{fontSize:18,fontWeight:700}}>{owned?card.name:"Carte inconnue"}</div>
           <div style={{fontSize:12,color:"#60607a",marginTop:4}}>{owned?card.subtitle:""}</div>
@@ -5458,54 +5458,49 @@ function DailyCountdown({currentPlayerId}){
 
 // ─── PAGE COLLECTION ────────────────────────────────────
 // ─── BOURSE D'ÉCHANGE ──────────────────────────────────────
+// ─── BOURSE D'ÉCHANGE ──────────────────────────────────────
 function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
   const [listings, setListings] = React.useState([]);
   const [myListings, setMyListings] = React.useState([]);
+  const [transactions, setTransactions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [msg, setMsg] = React.useState(null);
   const [filterAlbum, setFilterAlbum] = React.useState("all");
-  const [buyModal, setBuyModal] = React.useState(null); // {listing, sellers:[]}
-  const [activeTab, setActiveTab] = React.useState("market"); // market | mes_annonces | doublons
+  const [buyModal, setBuyModal] = React.useState(null);
+  const [activeTab, setActiveTab] = React.useState("market");
 
-  const supaFetch = async (path) => {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-      headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}
-    });
-    return r.json();
-  };
   const rpc = async (fn, body) => {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`,{
       method:"POST",
       headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-      body: JSON.stringify(body)
+      body:JSON.stringify(body)
     });
     return r.json();
   };
 
   const load = async () => {
     setLoading(true);
-    const [all, mine] = await Promise.all([
-      supaFetch("market_view?order=listed_at.desc&limit=200"),
-      supaFetch(`market_listings?seller_id=eq.${currentPlayer.id}&status=eq.active&select=*`)
+    const [all, mine, tx] = await Promise.all([
+      sbCollection("market_view","?order=listed_at.desc&limit=200"),
+      sbCollection("market_listings",`?seller_id=eq.${currentPlayer.id}&status=eq.active&select=*,cards(name,rarity,album,color1,color2,team_id,photo_url)`),
+      sbCollection("market_listings",`?or=(seller_id.eq.${currentPlayer.id})&status=neq.active&select=*,cards(name,rarity,album)&order=listed_at.desc&limit=50`),
     ]);
     setListings(Array.isArray(all)?all:[]);
     setMyListings(Array.isArray(mine)?mine:[]);
+    setTransactions(Array.isArray(tx)?tx:[]);
     setLoading(false);
   };
 
-  React.useEffect(()=>{ load(); },[]);
+  React.useEffect(()=>{ load(); },[activeTab]);
 
-  const flash = (m,ok=true) => { setMsg({text:m,ok}); setTimeout(()=>setMsg(null),3000); };
+  const flash = (m,ok=true) => { setMsg({text:m,ok}); setTimeout(()=>setMsg(null),3500); };
 
-  const doQuickSell = async (cardId) => {
+  const doQuickSell = async (listingId, cardId) => {
+    // Cancel listing, then quick sell the doublon that was re-incremented
+    const cancel = await rpc("cancel_market_listing",{p_player_id:currentPlayer.id,p_listing_id:listingId});
+    if(!cancel.success){ flash(cancel.error||"Erreur",false); return; }
     const res = await rpc("quick_sell_card",{p_player_id:currentPlayer.id,p_card_id:cardId});
-    if(res.success){ flash(`Vendu ! +${res.earned} PO 💰`); onWalletUpdate(); load(); }
-    else flash(res.error||"Erreur",false);
-  };
-
-  const doList = async (cardId) => {
-    const res = await rpc("list_card_market",{p_player_id:currentPlayer.id,p_card_id:cardId});
-    if(res.success){ flash(`Mis en bourse à ${res.price} PO 📈`); load(); }
+    if(res.success){ flash(`Vendu ! +${res.earned} PO ⚡`); onWalletUpdate(); load(); }
     else flash(res.error||"Erreur",false);
   };
 
@@ -5515,13 +5510,12 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
     else flash(res.error||"Erreur",false);
   };
 
-  const doBuy = async (listingId) => {
+  const doBuy = async (listingId, price) => {
     const res = await rpc("buy_market_listing",{p_buyer_id:currentPlayer.id,p_listing_id:listingId});
-    if(res.success){ flash(`Carte achetée ! -${res.price} PO`); setBuyModal(null); onWalletUpdate(); load(); }
+    if(res.success){ flash(`Achetée ! -${price} PO 🎉`); setBuyModal(null); onWalletUpdate(); load(); }
     else flash(res.error||"Erreur",false);
   };
 
-  // Group listings by card for market view
   const grouped = React.useMemo(()=>{
     const g={};
     listings.forEach(l=>{
@@ -5532,48 +5526,33 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
     return Object.values(g).sort((a,b)=>a.card.rarity==="rare"?-1:b.card.rarity==="rare"?1:0);
   },[listings,filterAlbum]);
 
-  // My dupes not in market
-  const myDupes = React.useMemo(()=>
-    cards.filter(c=>(inventory[c.id]?.duplicates||0)>0)
-  ,[cards,inventory]);
-
-  const s = {
-    tab:(active)=>({
-      padding:"7px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
-      fontFamily:"'Outfit',sans-serif",
-      background:active?"#22d3ee22":"transparent",
-      color:active?"#22d3ee":"#404058",
-    }),
-    pill:(color)=>({fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:color+"22",color:color,fontFamily:"'Outfit',sans-serif"}),
-    btn:(color="#22d3ee")=>({background:color+"22",border:`1px solid ${color}44`,color:color,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}),
+  const STY = {
+    tab:(a)=>({padding:"7px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",fontFamily:"'Outfit',sans-serif",background:a?"#22d3ee22":"transparent",color:a?"#22d3ee":"#404058"}),
+    pill:(c)=>({fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:c+"22",color:c,fontFamily:"'Outfit',sans-serif"}),
+    btn:(c="#22d3ee",sm)=>({background:c+"22",border:`1px solid ${c}44`,color:c,borderRadius:6,padding:sm?"4px 9px":"5px 12px",fontSize:sm?10:11,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}),
+    info:{background:"#0d1b2a",border:"1px solid #1e3a5a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:"#60a0c0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5},
   };
 
   return(
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      {/* Tabs internes */}
-      <div style={{display:"flex",gap:6,padding:"10px 12px 0",borderBottom:"1px solid #1a1a2e",flexShrink:0}}>
-        {[["market","🏪 Marché"],["mes_annonces","📋 Mes annonces"],["doublons","🎁 Mes doublons"]].map(([v,l])=>(
-          <button key={v} style={s.tab(activeTab===v)} onClick={()=>setActiveTab(v)}>{l}</button>
+      <div style={{display:"flex",gap:4,padding:"10px 12px 0",borderBottom:"1px solid #1a1a2e",flexShrink:0,overflowX:"auto",scrollbarWidth:"none"}}>
+        {[["market","🏪 Marché"],["mes_annonces","📋 Mes annonces"],["transactions","📜 Transactions"]].map(([v,l])=>(
+          <button key={v} style={STY.tab(activeTab===v)} onClick={()=>setActiveTab(v)}>{l}</button>
         ))}
       </div>
-
       {msg&&<div style={{margin:"8px 12px 0",padding:"8px 12px",borderRadius:8,background:msg.ok?"#0a2a0a":"#2a0a0a",color:msg.ok?"#22c55e":"#ef4444",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>{msg.text}</div>}
-
-      {loading ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#60607a"}}>Chargement...</div> : (<>
-
+      {loading?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#60607a"}}>Chargement...</div>:(
+      <>
       {/* ── MARCHÉ ── */}
       {activeTab==="market"&&(
         <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
-          {/* Explication */}
-          <div style={{background:"#0d1b2a",border:"1px solid #1e3a5a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:"#60a0c0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
+          <div style={STY.info}>
             💡 <b style={{color:"#22d3ee"}}>Comment ça marche</b><br/>
-            Les doublons vont automatiquement en bourse. Tu peux les laisser ou faire une vente rapide (moitié du prix). Les prix varient selon l'offre et la demande. Tu choisis à qui tu achètes.
+            Tes doublons partent automatiquement en bourse. Les prix varient selon l'offre et la demande (10–50 PO communes, 100–500 PO rares). Tu choisis à qui tu achètes.
           </div>
-          {/* Filtre album */}
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {["all","o2024","o2025","squid","eo2026"].map(a=>(
-              <button key={a} style={{...s.btn(filterAlbum===a?"#22d3ee":"#404058"),background:filterAlbum===a?"#22d3ee22":"transparent"}}
-                onClick={()=>setFilterAlbum(a)}>
+              <button key={a} style={{...STY.btn(filterAlbum===a?"#22d3ee":"#404058"),background:filterAlbum===a?"#22d3ee22":"transparent"}} onClick={()=>setFilterAlbum(a)}>
                 {a==="all"?"Tous":a==="o2024"?"O2024":a==="o2025"?"O2025":a==="squid"?"Squid":"eO2026"}
               </button>
             ))}
@@ -5582,24 +5561,24 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {grouped.map(({card,sellers})=>{
               const minPrice=Math.min(...sellers.map(s=>s.price));
-              const isMine=sellers.every(s=>s.seller_id===currentPlayer.id);
-              const canBuy=!isMine&&(wallet?.balance||0)>=minPrice;
+              const mySellers=sellers.filter(s=>s.seller_id===currentPlayer.id);
+              const otherSellers=sellers.filter(s=>s.seller_id!==currentPlayer.id);
+              const canBuy=otherSellers.length>0&&(wallet?.balance||0)>=otherSellers[0]?.price;
               return(
                 <div key={card.card_id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
-                  <CardVisual card={{...card,id:card.card_id,type:card.rarity==="rare"?"rare":"player"}} owned small/>
+                  <CardVisual card={{...card,id:card.card_id,name:card.card_name,type:card.rarity==="rare"?"rare":"player",rating:null}} owned small/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.card_name}</div>
-                    <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                      <span style={s.pill(card.rarity==="rare"?"#f59e0b":"#60607a")}>{card.rarity==="rare"?"✦ RARE":"COMMUNE"}</span>
-                      <span style={s.pill("#22d3ee")}>{sellers.length} {sellers.length>1?"vendeurs":"vendeur"}</span>
+                    <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                      <span style={STY.pill(card.rarity==="rare"?"#f59e0b":"#60607a")}>{card.rarity==="rare"?"✦ Rare":"Commune"}</span>
+                      <span style={STY.pill("#22d3ee")}>{sellers.length} {sellers.length>1?"vendeurs":"vendeur"}</span>
+                      {mySellers.length>0&&<span style={STY.pill("#8b5cf6")}>dont toi</span>}
                     </div>
-                    <div style={{fontSize:13,fontWeight:800,color:"#22c55e",marginTop:4,fontFamily:"'Outfit',sans-serif"}}>
-                      À partir de {minPrice} PO
-                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#22c55e",marginTop:4,fontFamily:"'Outfit',sans-serif"}}>À partir de {minPrice} PO</div>
                   </div>
-                  <button style={s.btn(canBuy?"#22c55e":"#404058")} disabled={!canBuy}
-                    onClick={()=>setBuyModal({card,sellers:sellers.filter(s=>s.seller_id!==currentPlayer.id).sort((a,b)=>a.price-b.price)})}>
-                    {isMine?"Ma carte":"Acheter"}
+                  <button style={STY.btn(canBuy?"#22c55e":"#404058")} disabled={!canBuy}
+                    onClick={()=>canBuy&&setBuyModal({card,sellers:otherSellers.sort((a,b)=>a.price-b.price)})}>
+                    {otherSellers.length===0?"Ma carte":"Acheter"}
                   </button>
                 </div>
               );
@@ -5607,55 +5586,55 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
           </div>
         </div>
       )}
-
       {/* ── MES ANNONCES ── */}
       {activeTab==="mes_annonces"&&(
         <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
           {myListings.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucune annonce active 📭</div>}
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {myListings.map(l=>{
-              const card=cards.find(c=>c.id===l.card_id)||{id:l.card_id,name:"?",rarity:"common",album:"o2025"};
+              const c=l.cards||{};
+              const fakeCard={id:l.card_id,name:c.name||"?",rarity:c.rarity||"common",album:c.album||"o2025",color1:c.color1,color2:c.color2,team_id:c.team_id,photo_url:c.photo_url};
+              const quickPrice=Math.max(5,Math.floor(l.price/2));
               return(
                 <div key={l.id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
-                  <CardVisual card={card} owned small/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>{card.name}</div>
+                  <CardVisual card={fakeCard} owned small/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name||"?"}</div>
                     <div style={{fontSize:13,fontWeight:800,color:"#22c55e",marginTop:4,fontFamily:"'Outfit',sans-serif"}}>{l.price} PO</div>
-                    <div style={{fontSize:10,color:"#404058",marginTop:2,fontFamily:"'Outfit',sans-serif"}}>Mis en ligne {new Date(l.listed_at).toLocaleDateString("fr")}</div>
+                    <div style={{fontSize:10,color:"#404058",marginTop:1,fontFamily:"'Outfit',sans-serif"}}>{new Date(l.listed_at).toLocaleDateString("fr")}</div>
                   </div>
-                  <button style={s.btn("#ef4444")} onClick={()=>doCancel(l.id)}>Retirer</button>
+                  <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
+                    <button style={STY.btn("#f59e0b",true)} onClick={()=>doQuickSell(l.id,l.card_id)}>⚡ {quickPrice} PO</button>
+                    <button style={STY.btn("#ef4444",true)} onClick={()=>doCancel(l.id)}>✕ Retirer</button>
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       )}
-
-      {/* ── MES DOUBLONS ── */}
-      {activeTab==="doublons"&&(
+      {/* ── TRANSACTIONS ── */}
+      {activeTab==="transactions"&&(
         <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
-          <div style={{background:"#0d1b2a",border:"1px solid #1e3a5a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:"#60a0c0",fontFamily:"'Outfit',sans-serif"}}>
-            💡 <b style={{color:"#22d3ee"}}>Vente rapide</b> = moitié du prix bourse, immédiat.<br/>
-            <b style={{color:"#22d3ee"}}>Mettre en bourse</b> = un acheteur te paie le prix plein.
-          </div>
-          {myDupes.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucun doublon 🎉</div>}
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {myDupes.map(c=>{
-              const cnt=inventory[c.id]?.duplicates||0;
-              const inMarket=myListings.filter(l=>l.card_id===c.id).length;
+          {transactions.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucune transaction 📭</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {transactions.map(t=>{
+              const isSell=t.seller_id===currentPlayer.id;
+              const c=t.cards||{};
+              const statusColor=t.status==="sold"?"#22c55e":t.status==="cancelled"?"#ef4444":"#f59e0b";
+              const statusLabel={sold:"Vendu",cancelled:"Annulé",auto_sold:"Vente rapide"}[t.status]||t.status;
               return(
-                <div key={c.id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{position:"relative"}}>
-                    <CardVisual card={c} owned small/>
-                    <div style={{position:"absolute",top:3,right:3,background:"#f59e0b",color:"#080810",fontSize:8,fontWeight:800,borderRadius:"50%",width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×{cnt}</div>
+                <div key={t.id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:8,background:isSell?"#22c55e22":"#3b82f622",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                    {isSell?"💰":"🛒"}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
-                    <div style={{fontSize:10,color:"#60607a",marginTop:2,fontFamily:"'Outfit',sans-serif"}}>{inMarket} en bourse</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name||"?"}</div>
+                    <div style={{fontSize:10,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>{new Date(t.listed_at).toLocaleDateString("fr")} · {isSell?"Vente":"Achat"}</div>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                    <button style={s.btn("#22d3ee")} disabled={inMarket>=3} onClick={()=>doList(c.id)}>📈 Bourse</button>
-                    <button style={s.btn("#f59e0b")} onClick={()=>doQuickSell(c.id)}>⚡ Vente rapide</button>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:12,fontWeight:800,color:isSell?"#22c55e":"#ef4444",fontFamily:"'Outfit',sans-serif"}}>{isSell?"+":"-"}{t.price} PO</div>
+                    <div style={{fontSize:9,color:statusColor,fontFamily:"'Outfit',sans-serif"}}>{statusLabel}</div>
                   </div>
                 </div>
               );
@@ -5663,31 +5642,26 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
           </div>
         </div>
       )}
-
       </>)}
-
-      {/* Modal achat */}
       {buyModal&&(
         <div onClick={()=>setBuyModal(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div onClick={e=>e.stopPropagation()} style={{background:"#0d0d1c",border:"1px solid #2a2a40",borderRadius:14,padding:20,width:"100%",maxWidth:360}}>
             <div style={{fontSize:15,fontWeight:700,color:"#eeeef5",marginBottom:4,fontFamily:"'Outfit',sans-serif"}}>{buyModal.card.card_name}</div>
-            <div style={{fontSize:12,color:"#60607a",marginBottom:14,fontFamily:"'Outfit',sans-serif"}}>Choisis ton vendeur :</div>
+            <div style={{fontSize:11,color:"#60607a",marginBottom:14,fontFamily:"'Outfit',sans-serif"}}>Solde : {wallet?.balance||0} PO · Choisis ton vendeur :</div>
             <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:300,overflowY:"auto"}}>
               {buyModal.sellers.map(l=>(
                 <div key={l.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#111120",borderRadius:8,padding:"10px 12px"}}>
                   <div>
                     <div style={{fontSize:12,fontWeight:600,color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>{l.seller_display||l.seller_name}</div>
-                    <div style={{fontSize:11,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>{new Date(l.listed_at).toLocaleDateString("fr")}</div>
+                    <div style={{fontSize:10,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>{new Date(l.listed_at).toLocaleDateString("fr")}</div>
                   </div>
-                  <button style={s.btn((wallet?.balance||0)>=l.price?"#22c55e":"#404058")}
-                    disabled={(wallet?.balance||0)<l.price}
-                    onClick={()=>doBuy(l.id)}>
+                  <button style={STY.btn((wallet?.balance||0)>=l.price?"#22c55e":"#404058")} disabled={(wallet?.balance||0)<l.price} onClick={()=>doBuy(l.id,l.price)}>
                     {l.price} PO
                   </button>
                 </div>
               ))}
             </div>
-            <button onClick={()=>setBuyModal(null)} style={{marginTop:14,width:"100%",background:"#1a1a2e",border:"1px solid #2a2a40",color:"#60607a",borderRadius:8,padding:"8px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12}}>Fermer</button>
+            <button onClick={()=>setBuyModal(null)} style={{marginTop:14,width:"100%",background:"#1a1a2e",border:"1px solid #2a2a40",color:"#60607a",borderRadius:8,padding:8,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12}}>Fermer</button>
           </div>
         </div>
       )}
@@ -5695,371 +5669,6 @@ function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
   );
 }
 
-
-function CollectionPage({currentPlayer, onBack}){
-  const m = useIsMobile();
-  const [tab, setTab] = React.useState("o2024");
-  const [cards, setCards] = React.useState([]);
-  const [inventory, setInventory] = React.useState({}); // {card_id: {collection,duplicates}}
-  const [wallet, setWallet] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [selectedCard, setSelectedCard] = React.useState(null);
-  const [subView, setSubView] = React.useState(()=>sessionStorage.getItem("bl_subview")||"albums");
-  const [dupeAlbumFilter, setDupeAlbumFilter] = React.useState("all");
-  const [dupeTeamFilter, setDupeTeamFilter] = React.useState("all");
-  const [packAnim, setPackAnim] = React.useState(null); // null | {cards:[], step:0}
-  const [packMsg, setPackMsg] = React.useState(null);
-
-  const ALBUMS = [
-    {id:"o2024",label:"Olympiade 2024",color:"#E8B84B",icon:"🏅"},
-    {id:"o2025",label:"Olympiade 2025",color:"#2DBD6E",icon:"🧙"},
-    {id:"squid", label:"Squid Game",   color:"#E84D9B",icon:"🦑"},
-    {id:"eo2026",label:"eO 2026",      color:"#E8000E",icon:"🎮"},
-  ];
-
-  const PACKS = [
-    {id:"daily",   label:"Pack Gratuit",   cost:0,   cards:4,  rare_chance:0.0375, color:"#22c55e", desc:"Gratuit · toutes les 4h"},
-    {id:"novice",  label:"Pack Novice",    cost:60,  cards:5,  rare_chance:0.075,  color:"#60a5fa", desc:"60 PO · 5 cartes"},
-    {id:"expert",  label:"Pack Expert",    cost:160, cards:10, rare_chance:0.15,   color:"#a855f7", desc:"160 PO · 10 cartes"},
-    {id:"legend",  label:"Pack Légende",   cost:450, cards:12, rare_chance:0.40,   color:"#f59e0b", desc:"450 PO · 12 cartes"},
-  ];
-
-  React.useEffect(()=>{
-    if(!currentPlayer) return;
-    (async()=>{
-      setLoading(true);
-      try{
-        const [allCards, invData, walletData] = await Promise.all([
-          sbCollection("cards","?select=*&order=id"),
-          sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
-          sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
-        ]);
-        setCards(allCards||[]);
-        const inv={};
-        (invData||[]).forEach(r=>{inv[r.card_id]=r;});
-        setInventory(inv);
-        setWallet(walletData?.[0]||{balance:999999});
-      }catch(e){console.error(e);}
-      setLoading(false);
-    })();
-  },[currentPlayer?.id]);
-
-  function isOwned(cardId){ return (inventory[cardId]?.collection||0)>0; }
-  function dupCount(cardId){ return inventory[cardId]?.duplicates||0; }
-
-  const tabCards = cards.filter(c=>c.album===tab);
-  const tabOwned = tabCards.filter(c=>isOwned(c.id)).length;
-  const albumTotal = cards.reduce((acc,c)=>{acc[c.album]=(acc[c.album]||0)+1;return acc;},{});
-  const albumOwned = cards.reduce((acc,c)=>{if(isOwned(c.id))acc[c.album]=(acc[c.album]||0)+1;return acc;},{});
-
-  // Group by team for album display
-  const cardsByTeam = React.useMemo(()=>{
-    const groups={};
-    tabCards.forEach(c=>{
-      let key;
-      if(c.type==='rare') key='__rares__';
-      else if(!c.team_id||c.team_id===0) key='__solo__';
-      else key=c.team_id;
-      if(!groups[key]) groups[key]=[];
-      groups[key].push(c);
-    });
-    return groups;
-  },[tab, cards]);
-
-  async function openPack(pack){
-    if(!currentPlayer)return;
-    if(!cards.length){setPackMsg("Cartes non chargées, réessaie.");setTimeout(()=>setPackMsg(null),2000);return;}
-
-    // Check 4h cooldown via localStorage
-    if(pack.id==="daily"){
-      const lastKey=`free_pack_${currentPlayer.id}`;
-      const lastTs=parseInt(localStorage.getItem(lastKey)||'0');
-      const diff=Date.now()-lastTs;
-      if(lastTs>0&&diff<4*60*60*1000){
-        const remaining=4*60*60*1000-diff;
-        const h=Math.floor(remaining/3600000),m=Math.floor((remaining%3600000)/60000),s=Math.floor((remaining%60000)/1000);
-        setPackMsg(`Pack gratuit dispo dans ${h}h${String(m).padStart(2,'0')}m${String(s).padStart(2,'0')}s`);
-        setTimeout(()=>setPackMsg(null),3000);return;
-      }
-      localStorage.setItem(lastKey,String(Date.now()));
-    }
-
-    // Draw cards FIRST — animation must always launch
-    const commons=cards.filter(c=>c.rarity==="common");
-    const rares=cards.filter(c=>c.rarity==="rare");
-    const drawn=[];
-    const usedIds=new Set();
-    for(let i=0;i<pack.cards;i++){
-      const isRareDraw=(i===pack.cards-1)&&Math.random()<pack.rare_chance;
-      const pool=isRareDraw&&rares.length>0?rares:commons;
-      const available=pool.filter(c=>!usedIds.has(c.id));
-      if(!available.length)break;
-      const totalW=available.reduce((s,c)=>s+(c.daily_weight||1),0);
-      let r2=Math.random()*totalW,cumul=0,chosen=available[0];
-      for(const c of available){cumul+=(c.daily_weight||1);if(cumul>=r2){chosen=c;break;}}
-      drawn.push(chosen);
-      usedIds.add(chosen.id);
-    }
-    if(!drawn.length){setPackMsg("Aucune carte disponible.");setTimeout(()=>setPackMsg(null),2000);return;}
-
-    // Launch animation immediately with optimistic results
-    const freshCheck=await sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`);
-    const freshMap={};(freshCheck||[]).forEach(r=>{freshMap[r.card_id]=r;});
-    const optimisticResults=drawn.map(c=>{
-      const cur=freshMap[c.id]||{collection:0,duplicates:0};
-      if(cur.collection===0)return{result:"collection"};
-      if((cur.duplicates||0)<3)return{result:"duplicate"};
-      return{result:"auto_sold"};
-    });
-    setPackAnim({cards:drawn,results:optimisticResults});
-
-    // Then do all Supabase ops in background (fire and forget)
-    (async()=>{
-      try{
-        // Debit PO
-        if(pack.cost>0){
-          const wData=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
-          const bal=(wData?.[0]?.balance)||0;
-          if(bal<pack.cost&&bal<999999)return;
-          await fetch(`${SUPABASE_URL}/rest/v1/wallets?player_id=eq.${currentPlayer.id}`,{
-            method:"PATCH",
-            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-            body:JSON.stringify({balance:Math.max(0,bal-pack.cost),updated_at:new Date().toISOString()})
-          });
-        }
-        // Load fresh inventory
-        const freshInv=await sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`);
-        const invMap={};(freshInv||[]).forEach(r=>{invMap[r.card_id]=r;});
-        // Add each card
-        for(const c of drawn){
-          const cur=invMap[c.id]||{collection:0,duplicates:0};
-          if(cur.collection===0){
-            await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts`,{
-              method:"POST",
-              headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},
-              body:JSON.stringify({player_id:currentPlayer.id,card_id:c.id,collection:1,duplicates:0})
-            });
-            invMap[c.id]={collection:1,duplicates:0};
-          } else if((cur.duplicates||0)<3){
-            await fetch(`${SUPABASE_URL}/rest/v1/inventory_counts?player_id=eq.${currentPlayer.id}&card_id=eq.${c.id}`,{
-              method:"PATCH",
-              headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-              body:JSON.stringify({duplicates:(cur.duplicates||0)+1})
-            });
-          }
-        }
-        // Record pack
-        if(pack.id==="daily"){
-          await fetch(`${SUPABASE_URL}/rest/v1/daily_pack_claims`,{
-            method:"POST",
-            headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
-            body:JSON.stringify({player_id:currentPlayer.id,claimed_date:new Date().toISOString().slice(0,10)})
-          });
-        }
-        // Reload inventory + wallet silently
-        const [inv2,w2]=await Promise.all([
-          sbCollection("inventory_counts",`?player_id=eq.${currentPlayer.id}&select=card_id,collection,duplicates`),
-          sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`),
-        ]);
-        const newInv={};(inv2||[]).forEach(r=>{newInv[r.card_id]=r;});
-        setInventory(newInv);
-        setWallet(w2?.[0]||{balance:999999});
-      }catch(e){console.warn("Pack bg error:",e);}
-    })();
-  }
-
-
-  if(packAnim) return <PackReveal items={packAnim} onClose={()=>{sessionStorage.setItem("bl_subview","packs");setPackAnim(null);window.location.reload();}}/>;
-
-  return(
-    <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
-      {/* Header */}
-      <div style={{background:"#080810",borderBottom:"1px solid #1e1e30",padding:m?"12px 16px":"16px 40px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-        <button onClick={onBack} style={{background:"none",border:"1px solid #1e1e30",borderRadius:8,color:"#60607a",cursor:"pointer",padding:"6px 12px",fontSize:13,fontFamily:"'Outfit',sans-serif"}}>← Retour</button>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#22d3ee"}}>COLLECTION</div>
-        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
-          <div style={{background:"#1e1e30",borderRadius:20,padding:"4px 12px",fontSize:13,fontWeight:700,color:"#f59e0b"}}>
-            🪙 {(wallet?.balance??0)>=999999?"∞":(wallet?.balance??150)} PO
-          </div>
-        </div>
-      </div>
-
-      {/* Sub-nav */}
-      <div style={{display:"flex",borderBottom:"1px solid #1e1e30",background:"#080810",flexShrink:0}}>
-        {["albums","packs","dupes","bourse"].map(v=>(
-          <button key={v} onClick={()=>{sessionStorage.setItem("bl_subview",v);setSubView(v);}} style={{flex:1,padding:"12px",background:"none",border:"none",cursor:"pointer",color:subView===v?"#22d3ee":"#60607a",fontSize:14,fontWeight:subView===v?700:400,fontFamily:"'Outfit',sans-serif",borderBottom:subView===v?"2px solid #22d3ee":"2px solid transparent"}}>
-            {v==="albums"?"📚 Albums":v==="packs"?"📦 Packs":v==="dupes"?"🃏 Doublons":"📈 Bourse"}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#60607a"}}>Chargement...</div>
-      ) : subView==="albums" ? (
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          {/* Album tabs */}
-          <div style={{display:"flex",gap:8,padding:"12px 16px",overflowX:"auto",flexShrink:0,scrollbarWidth:"none"}}>
-            {ALBUMS.map(a=>(
-              <button key={a.id} onClick={()=>setTab(a.id)} style={{
-                flexShrink:0,padding:"8px 14px",borderRadius:20,border:`1px solid ${tab===a.id?a.color:"#1e1e30"}`,
-                background:tab===a.id?a.color+"22":"#12121f",color:tab===a.id?a.color:"#60607a",
-                cursor:"pointer",fontSize:13,fontFamily:"'Outfit',sans-serif",fontWeight:tab===a.id?700:400,
-                display:"flex",alignItems:"center",gap:6
-              }}>
-                {a.icon} {a.label}
-                <span style={{fontSize:11,opacity:0.8}}>
-                  {albumOwned[a.id]||0}/{albumTotal[a.id]||0}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Progress bar */}
-          {(()=>{const pct=tabCards.length?Math.round(tabOwned/tabCards.length*100):0;const alb=ALBUMS.find(a=>a.id===tab);return(
-            <div style={{padding:"0 16px 12px",flexShrink:0}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#60607a",marginBottom:4}}>
-                <span>{tabOwned} / {tabCards.length} cartes</span>
-                <span style={{color:alb?.color}}>{pct}%</span>
-              </div>
-              <div style={{height:4,background:"#1e1e30",borderRadius:2,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct}%`,background:alb?.color||"#22d3ee",borderRadius:2,transition:"width .5s"}}/>
-              </div>
-            </div>
-          );})()}
-
-          {/* Cards grid by team */}
-          <div style={{flex:1,overflowY:"auto",padding:"0 16px 80px"}}>
-            {/* Rares first */}
-            {cardsByTeam['__rares__']?.length>0&&(
-              <div style={{marginBottom:24}}>
-                <div style={{fontSize:12,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                  <span>✦</span> Cartes Rares
-                </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
-                  {cardsByTeam['__rares__'].map(c=>(
-                    <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Team pages */}
-            {cardsByTeam['__solo__']?.length>0&&(
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#E84D9B",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>🦑 Tous les joueurs</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {cardsByTeam['__solo__'].map(c=>(
-                    <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
-                  ))}
-                </div>
-              </div>
-            )}
-            {cardsByTeam['__solo__']?.length>0&&(
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#E84D9B",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,fontFamily:"'Outfit',sans-serif"}}>🦑 Tous les joueurs</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                {cardsByTeam['__solo__'].map(c=>(
-                  <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
-                ))}
-              </div>
-            </div>
-          )}
-          {Object.entries(cardsByTeam).filter(([k])=>k!=='__rares__'&&k!=='__solo__'&&k!=='__others__'&&k!=='__solo__').map(([teamId, teamCards])=>{
-              const t=(()=>{const found=TEAMS.find(tt=>tt.id===parseInt(teamId));return found?{name:found.name,color:found.color}:{name:"Équipe",color:"#60607a"};})();
-              const ownedCount=teamCards.filter(c=>isOwned(c.id)).length;
-              return(
-                <div key={teamId} style={{marginBottom:20}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"#eeeef5"}}>{t.name}</div>
-                    <div style={{fontSize:11,color:"#60607a"}}>{ownedCount}/{teamCards.length}</div>
-                  </div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {teamCards.map(c=>(
-                      <CardVisual key={c.id} card={c} owned={isOwned(c.id)} small onClick={()=>setSelectedCard({card:c,owned:isOwned(c.id)})}/>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : subView==="packs" ? (
-        /* PACKS */
-        <div style={{flex:1,overflowY:"auto",padding:m?"16px":"24px 40px"}}>
-          {packMsg&&<div style={{background:"#1a0a0a",color:"#ef4444",padding:"10px 16px",borderRadius:8,marginBottom:16,fontSize:13}}>{packMsg}</div>}
-          <DailyCountdown currentPlayerId={currentPlayer?.id}/>
-          <div style={{marginBottom:16,fontSize:13,color:"#60607a"}}>
-            Chaque pack peut contenir des cartes de <strong style={{color:"#22d3ee"}}>tous les albums</strong>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(2,1fr)",gap:12}}>
-            {PACKS.map(pack=>{
-              const canAfford=pack.cost===0||(wallet?.balance||0)>=pack.cost;
-              return(
-                <div key={pack.id} onClick={()=>canAfford&&openPack(pack)}
-                  style={{background:"#12121f",border:`1px solid ${canAfford?pack.color+"44":"#1e1e30"}`,borderRadius:12,padding:16,cursor:canAfford?"pointer":"not-allowed",opacity:canAfford?1:0.5,transition:"all .15s"}}
-                  onMouseEnter={e=>{if(canAfford)e.currentTarget.style.borderColor=pack.color;}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=canAfford?pack.color+"44":"#1e1e30";}}>
-                  <div style={{fontSize:22,marginBottom:8}}>📦</div>
-                  <div style={{fontSize:14,fontWeight:700,color:pack.color,marginBottom:4}}>{pack.label}</div>
-                  <div style={{fontSize:11,color:"#60607a",marginBottom:10}}>{pack.desc}</div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:11,color:"#60607a"}}>Rare: {Math.round(pack.rare_chance*100)}%</div>
-                    <div style={{fontSize:13,fontWeight:700,color:pack.cost===0?"#22c55e":"#f59e0b"}}>
-                      {pack.cost===0?"GRATUIT":`${pack.cost} PO`}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : subView==="dupes" ? (
-        /* DOUBLONS */
-        <div style={{flex:1,overflowY:"auto",padding:m?"12px 12px 80px":"16px 16px 80px"}}>
-          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            <select value={dupeAlbumFilter} onChange={e=>setDupeAlbumFilter(e.target.value)} style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
-              <option value="all">Tous les albums</option>
-              <option value="o2024">O2024</option><option value="o2025">O2025</option>
-              <option value="squid">Squid Game</option><option value="eo2026">eO2026</option>
-            </select>
-            <select value={dupeTeamFilter} onChange={e=>setDupeTeamFilter(e.target.value)} style={{background:"#1e1e30",border:"1px solid #2a2a40",color:"#eeeef5",borderRadius:6,padding:"5px 10px",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>
-              <option value="all">Toutes les équipes</option>
-              {TEAMS.map(t=><option key={t.id} value={String(t.id)}>{t.name}</option>)}
-            </select>
-          </div>
-          {(()=>{
-            const dupes=cards.filter(c=>{
-              if(!(inventory[c.id]?.duplicates>0))return false;
-              if(dupeAlbumFilter!=="all"&&c.album!==dupeAlbumFilter)return false;
-              if(dupeTeamFilter!=="all"&&String(c.team_id)!==dupeTeamFilter)return false;
-              return true;
-            });
-            if(!dupes.length)return <div style={{color:"#60607a",fontSize:13,textAlign:"center",marginTop:40}}>Aucun doublon 🎉</div>;
-            return <div style={{display:"flex",flexWrap:"wrap",gap:10}}>{dupes.map(c=>(
-              <div key={c.id} style={{position:"relative"}}>
-                <CardVisual card={c} owned small onClick={()=>setSelectedCard({card:c,owned:true})}/>
-                <div style={{position:"absolute",top:4,right:4,background:"#f59e0b",color:"#080810",fontSize:9,fontWeight:800,borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center"}}>{inventory[c.id]?.duplicates}</div>
-              </div>
-            ))}</div>;
-          })()}
-        </div>
-      ) : (
-        <BourseTab
-          currentPlayer={currentPlayer}
-          wallet={wallet}
-          cards={cards}
-          inventory={inventory}
-          onWalletUpdate={async()=>{
-            const w=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
-            setWallet(w?.[0]||{balance:0});
-          }}
-        />
-      )}
-
-      {selectedCard&&<CardModal card={selectedCard.card} owned={selectedCard.owned} onClose={()=>setSelectedCard(null)}/>}
-    </div>
-  );
-}
 
 // ─── ANIMATION OUVERTURE PACK (PHASER) ─────────────────
 // ─── ANIMATION OUVERTURE PACK (canvas pur) ────────────
@@ -6115,9 +5724,10 @@ function PackReveal({items, onClose}){
       ctx.scale(cardScale,cardScale);
       ctx.translate(-cx,-cy);
 
-      // BG
+      // BG — match new CardVisual DA
+      const albumBg={o2024:'#f0ece0',o2025:'#282828',squid:'#080810',eo2026:'#0d1040'};
       rr(ctx,x,y,bw,bh,12);
-      ctx.fillStyle=isRare?'#1a1000':c.color1||'#1a3d2b';
+      ctx.fillStyle=isRare?'#1a1000':(albumBg[c.album]||c.color1||'#1a3d2b');
       ctx.fill();
       // Border
       rr(ctx,x,y,bw,bh,12);
