@@ -5457,6 +5457,245 @@ function DailyCountdown({currentPlayerId}){
 
 
 // ─── PAGE COLLECTION ────────────────────────────────────
+// ─── BOURSE D'ÉCHANGE ──────────────────────────────────────
+function BourseTab({currentPlayer, wallet, cards, inventory, onWalletUpdate}){
+  const [listings, setListings] = React.useState([]);
+  const [myListings, setMyListings] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [msg, setMsg] = React.useState(null);
+  const [filterAlbum, setFilterAlbum] = React.useState("all");
+  const [buyModal, setBuyModal] = React.useState(null); // {listing, sellers:[]}
+  const [activeTab, setActiveTab] = React.useState("market"); // market | mes_annonces | doublons
+
+  const supaFetch = async (path) => {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}
+    });
+    return r.json();
+  };
+  const rpc = async (fn, body) => {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method:"POST",
+      headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+    return r.json();
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const [all, mine] = await Promise.all([
+      supaFetch("market_view?order=listed_at.desc&limit=200"),
+      supaFetch(`market_listings?seller_id=eq.${currentPlayer.id}&status=eq.active&select=*`)
+    ]);
+    setListings(Array.isArray(all)?all:[]);
+    setMyListings(Array.isArray(mine)?mine:[]);
+    setLoading(false);
+  };
+
+  React.useEffect(()=>{ load(); },[]);
+
+  const flash = (m,ok=true) => { setMsg({text:m,ok}); setTimeout(()=>setMsg(null),3000); };
+
+  const doQuickSell = async (cardId) => {
+    const res = await rpc("quick_sell_card",{p_player_id:currentPlayer.id,p_card_id:cardId});
+    if(res.success){ flash(`Vendu ! +${res.earned} PO 💰`); onWalletUpdate(); load(); }
+    else flash(res.error||"Erreur",false);
+  };
+
+  const doList = async (cardId) => {
+    const res = await rpc("list_card_market",{p_player_id:currentPlayer.id,p_card_id:cardId});
+    if(res.success){ flash(`Mis en bourse à ${res.price} PO 📈`); load(); }
+    else flash(res.error||"Erreur",false);
+  };
+
+  const doCancel = async (listingId) => {
+    const res = await rpc("cancel_market_listing",{p_player_id:currentPlayer.id,p_listing_id:listingId});
+    if(res.success){ flash("Annonce retirée"); load(); }
+    else flash(res.error||"Erreur",false);
+  };
+
+  const doBuy = async (listingId) => {
+    const res = await rpc("buy_market_listing",{p_buyer_id:currentPlayer.id,p_listing_id:listingId});
+    if(res.success){ flash(`Carte achetée ! -${res.price} PO`); setBuyModal(null); onWalletUpdate(); load(); }
+    else flash(res.error||"Erreur",false);
+  };
+
+  // Group listings by card for market view
+  const grouped = React.useMemo(()=>{
+    const g={};
+    listings.forEach(l=>{
+      if(filterAlbum!=="all"&&l.album!==filterAlbum) return;
+      if(!g[l.card_id]) g[l.card_id]={card:l,sellers:[]};
+      g[l.card_id].sellers.push(l);
+    });
+    return Object.values(g).sort((a,b)=>a.card.rarity==="rare"?-1:b.card.rarity==="rare"?1:0);
+  },[listings,filterAlbum]);
+
+  // My dupes not in market
+  const myDupes = React.useMemo(()=>
+    cards.filter(c=>(inventory[c.id]?.duplicates||0)>0)
+  ,[cards,inventory]);
+
+  const s = {
+    tab:(active)=>({
+      padding:"7px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
+      fontFamily:"'Outfit',sans-serif",
+      background:active?"#22d3ee22":"transparent",
+      color:active?"#22d3ee":"#404058",
+    }),
+    pill:(color)=>({fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,background:color+"22",color:color,fontFamily:"'Outfit',sans-serif"}),
+    btn:(color="#22d3ee")=>({background:color+"22",border:`1px solid ${color}44`,color:color,borderRadius:6,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}),
+  };
+
+  return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* Tabs internes */}
+      <div style={{display:"flex",gap:6,padding:"10px 12px 0",borderBottom:"1px solid #1a1a2e",flexShrink:0}}>
+        {[["market","🏪 Marché"],["mes_annonces","📋 Mes annonces"],["doublons","🎁 Mes doublons"]].map(([v,l])=>(
+          <button key={v} style={s.tab(activeTab===v)} onClick={()=>setActiveTab(v)}>{l}</button>
+        ))}
+      </div>
+
+      {msg&&<div style={{margin:"8px 12px 0",padding:"8px 12px",borderRadius:8,background:msg.ok?"#0a2a0a":"#2a0a0a",color:msg.ok?"#22c55e":"#ef4444",fontSize:12,fontFamily:"'Outfit',sans-serif"}}>{msg.text}</div>}
+
+      {loading ? <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#60607a"}}>Chargement...</div> : (<>
+
+      {/* ── MARCHÉ ── */}
+      {activeTab==="market"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
+          {/* Explication */}
+          <div style={{background:"#0d1b2a",border:"1px solid #1e3a5a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:"#60a0c0",fontFamily:"'Outfit',sans-serif",lineHeight:1.5}}>
+            💡 <b style={{color:"#22d3ee"}}>Comment ça marche</b><br/>
+            Les doublons vont automatiquement en bourse. Tu peux les laisser ou faire une vente rapide (moitié du prix). Les prix varient selon l'offre et la demande. Tu choisis à qui tu achètes.
+          </div>
+          {/* Filtre album */}
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {["all","o2024","o2025","squid","eo2026"].map(a=>(
+              <button key={a} style={{...s.btn(filterAlbum===a?"#22d3ee":"#404058"),background:filterAlbum===a?"#22d3ee22":"transparent"}}
+                onClick={()=>setFilterAlbum(a)}>
+                {a==="all"?"Tous":a==="o2024"?"O2024":a==="o2025"?"O2025":a==="squid"?"Squid":"eO2026"}
+              </button>
+            ))}
+          </div>
+          {grouped.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucune carte en bourse 📭</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {grouped.map(({card,sellers})=>{
+              const minPrice=Math.min(...sellers.map(s=>s.price));
+              const isMine=sellers.every(s=>s.seller_id===currentPlayer.id);
+              const canBuy=!isMine&&(wallet?.balance||0)>=minPrice;
+              return(
+                <div key={card.card_id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
+                  <CardVisual card={{...card,id:card.card_id,type:card.rarity==="rare"?"rare":"player"}} owned small/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{card.card_name}</div>
+                    <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
+                      <span style={s.pill(card.rarity==="rare"?"#f59e0b":"#60607a")}>{card.rarity==="rare"?"✦ RARE":"COMMUNE"}</span>
+                      <span style={s.pill("#22d3ee")}>{sellers.length} {sellers.length>1?"vendeurs":"vendeur"}</span>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#22c55e",marginTop:4,fontFamily:"'Outfit',sans-serif"}}>
+                      À partir de {minPrice} PO
+                    </div>
+                  </div>
+                  <button style={s.btn(canBuy?"#22c55e":"#404058")} disabled={!canBuy}
+                    onClick={()=>setBuyModal({card,sellers:sellers.filter(s=>s.seller_id!==currentPlayer.id).sort((a,b)=>a.price-b.price)})}>
+                    {isMine?"Ma carte":"Acheter"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── MES ANNONCES ── */}
+      {activeTab==="mes_annonces"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
+          {myListings.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucune annonce active 📭</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {myListings.map(l=>{
+              const card=cards.find(c=>c.id===l.card_id)||{id:l.card_id,name:"?",rarity:"common",album:"o2025"};
+              return(
+                <div key={l.id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
+                  <CardVisual card={card} owned small/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>{card.name}</div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#22c55e",marginTop:4,fontFamily:"'Outfit',sans-serif"}}>{l.price} PO</div>
+                    <div style={{fontSize:10,color:"#404058",marginTop:2,fontFamily:"'Outfit',sans-serif"}}>Mis en ligne {new Date(l.listed_at).toLocaleDateString("fr")}</div>
+                  </div>
+                  <button style={s.btn("#ef4444")} onClick={()=>doCancel(l.id)}>Retirer</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── MES DOUBLONS ── */}
+      {activeTab==="doublons"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"12px 12px 80px"}}>
+          <div style={{background:"#0d1b2a",border:"1px solid #1e3a5a",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:"#60a0c0",fontFamily:"'Outfit',sans-serif"}}>
+            💡 <b style={{color:"#22d3ee"}}>Vente rapide</b> = moitié du prix bourse, immédiat.<br/>
+            <b style={{color:"#22d3ee"}}>Mettre en bourse</b> = un acheteur te paie le prix plein.
+          </div>
+          {myDupes.length===0&&<div style={{color:"#60607a",textAlign:"center",marginTop:40,fontSize:13}}>Aucun doublon 🎉</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {myDupes.map(c=>{
+              const cnt=inventory[c.id]?.duplicates||0;
+              const inMarket=myListings.filter(l=>l.card_id===c.id).length;
+              return(
+                <div key={c.id} style={{background:"#0d0d1c",border:"1px solid #1a1a30",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{position:"relative"}}>
+                    <CardVisual card={c} owned small/>
+                    <div style={{position:"absolute",top:3,right:3,background:"#f59e0b",color:"#080810",fontSize:8,fontWeight:800,borderRadius:"50%",width:16,height:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×{cnt}</div>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#eeeef5",fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                    <div style={{fontSize:10,color:"#60607a",marginTop:2,fontFamily:"'Outfit',sans-serif"}}>{inMarket} en bourse</div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                    <button style={s.btn("#22d3ee")} disabled={inMarket>=3} onClick={()=>doList(c.id)}>📈 Bourse</button>
+                    <button style={s.btn("#f59e0b")} onClick={()=>doQuickSell(c.id)}>⚡ Vente rapide</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      </>)}
+
+      {/* Modal achat */}
+      {buyModal&&(
+        <div onClick={()=>setBuyModal(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0d0d1c",border:"1px solid #2a2a40",borderRadius:14,padding:20,width:"100%",maxWidth:360}}>
+            <div style={{fontSize:15,fontWeight:700,color:"#eeeef5",marginBottom:4,fontFamily:"'Outfit',sans-serif"}}>{buyModal.card.card_name}</div>
+            <div style={{fontSize:12,color:"#60607a",marginBottom:14,fontFamily:"'Outfit',sans-serif"}}>Choisis ton vendeur :</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:300,overflowY:"auto"}}>
+              {buyModal.sellers.map(l=>(
+                <div key={l.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#111120",borderRadius:8,padding:"10px 12px"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:600,color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>{l.seller_display||l.seller_name}</div>
+                    <div style={{fontSize:11,color:"#60607a",fontFamily:"'Outfit',sans-serif"}}>{new Date(l.listed_at).toLocaleDateString("fr")}</div>
+                  </div>
+                  <button style={s.btn((wallet?.balance||0)>=l.price?"#22c55e":"#404058")}
+                    disabled={(wallet?.balance||0)<l.price}
+                    onClick={()=>doBuy(l.id)}>
+                    {l.price} PO
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>setBuyModal(null)} style={{marginTop:14,width:"100%",background:"#1a1a2e",border:"1px solid #2a2a40",color:"#60607a",borderRadius:8,padding:"8px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12}}>Fermer</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function CollectionPage({currentPlayer, onBack}){
   const m = useIsMobile();
   const [tab, setTab] = React.useState("o2024");
@@ -5465,7 +5704,7 @@ function CollectionPage({currentPlayer, onBack}){
   const [wallet, setWallet] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [selectedCard, setSelectedCard] = React.useState(null);
-  const [subView, setSubView] = React.useState("albums");
+  const [subView, setSubView] = React.useState(()=>sessionStorage.getItem("bl_subview")||"albums");
   const [dupeAlbumFilter, setDupeAlbumFilter] = React.useState("all");
   const [dupeTeamFilter, setDupeTeamFilter] = React.useState("all");
   const [packAnim, setPackAnim] = React.useState(null); // null | {cards:[], step:0}
@@ -5630,7 +5869,7 @@ function CollectionPage({currentPlayer, onBack}){
   }
 
 
-  if(packAnim) return <PackReveal items={packAnim} onClose={()=>{setPackAnim(null);window.location.reload();}}/>;
+  if(packAnim) return <PackReveal items={packAnim} onClose={()=>{sessionStorage.setItem("bl_subview","packs");setPackAnim(null);window.location.reload();}}/>;
 
   return(
     <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column"}}>
@@ -5647,9 +5886,9 @@ function CollectionPage({currentPlayer, onBack}){
 
       {/* Sub-nav */}
       <div style={{display:"flex",borderBottom:"1px solid #1e1e30",background:"#080810",flexShrink:0}}>
-        {["albums","packs","dupes"].map(v=>(
-          <button key={v} onClick={()=>setSubView(v)} style={{flex:1,padding:"12px",background:"none",border:"none",cursor:"pointer",color:subView===v?"#22d3ee":"#60607a",fontSize:14,fontWeight:subView===v?700:400,fontFamily:"'Outfit',sans-serif",borderBottom:subView===v?"2px solid #22d3ee":"2px solid transparent"}}>
-            {v==="albums"?"📚 Albums":v==="packs"?"📦 Packs":"🃏 Doublons"}
+        {["albums","packs","dupes","bourse"].map(v=>(
+          <button key={v} onClick={()=>{sessionStorage.setItem("bl_subview",v);setSubView(v);}} style={{flex:1,padding:"12px",background:"none",border:"none",cursor:"pointer",color:subView===v?"#22d3ee":"#60607a",fontSize:14,fontWeight:subView===v?700:400,fontFamily:"'Outfit',sans-serif",borderBottom:subView===v?"2px solid #22d3ee":"2px solid transparent"}}>
+            {v==="albums"?"📚 Albums":v==="packs"?"📦 Packs":v==="dupes"?"🃏 Doublons":"📈 Bourse"}
           </button>
         ))}
       </div>
@@ -5774,7 +6013,7 @@ function CollectionPage({currentPlayer, onBack}){
             })}
           </div>
         </div>
-      ) : (
+      ) : subView==="dupes" ? (
         /* DOUBLONS */
         <div style={{flex:1,overflowY:"auto",padding:m?"12px 12px 80px":"16px 16px 80px"}}>
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
@@ -5804,6 +6043,17 @@ function CollectionPage({currentPlayer, onBack}){
             ))}</div>;
           })()}
         </div>
+      ) : (
+        <BourseTab
+          currentPlayer={currentPlayer}
+          wallet={wallet}
+          cards={cards}
+          inventory={inventory}
+          onWalletUpdate={async()=>{
+            const w=await sbCollection("wallets",`?player_id=eq.${currentPlayer.id}&limit=1`);
+            setWallet(w?.[0]||{balance:0});
+          }}
+        />
       )}
 
       {selectedCard&&<CardModal card={selectedCard.card} owned={selectedCard.owned} onClose={()=>setSelectedCard(null)}/>}
