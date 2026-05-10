@@ -7233,6 +7233,7 @@ async function generateQuizPin(){
   for(let i=0;i<10;i++){
     const pin=String(Math.floor(1000+Math.random()*9000));
     const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&status=eq.lobby&select=pin`,{headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
+    if(!r.ok){const e=await r.text();throw new Error('quiz_games select: '+e);}
     const d=await r.json();
     if(!d.length)return pin;
   }
@@ -7255,7 +7256,7 @@ function QuizPage({currentPlayer,onBack}){
     try{
       const pin=await generateQuizPin();
       const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:selectedQuiz.title,status:'lobby',total_questions:selectedQuiz.questions.length})});
-      if(!r.ok)throw new Error('Erreur création partie');
+      if(!r.ok){const err=await r.text();throw new Error('Insert quiz_games: '+err);}
       setGamePin(pin);setView('host_game');
     }catch(e){setError(e.message);}finally{setLoading(false);}
   };
