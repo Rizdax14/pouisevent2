@@ -1,6 +1,4 @@
-
-// Supabase client pour Realtime (quiz)
-const _sb = window._supabaseClient || (window._supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY));// VERSION: 2.0
+// VERSION: 2.0
 import { useState, useEffect } from "react";
 // ─── SUPABASE ────────────────────────────────────────
 const SUPABASE_URL = "https://daerxouhvmvqhirgyrjr.supabase.co";
@@ -8,6 +6,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SUPABASE = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY)||{
   from:()=>({select:()=>({eq:()=>({single:async()=>({data:null})})}),upsert:async()=>({})})
 };
+
+const _sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function sbFetch(table, params="") {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
