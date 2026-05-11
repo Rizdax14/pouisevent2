@@ -6896,20 +6896,30 @@ function DataBL({onBack}){
 
 // ─── APP ──────────────────────────────────────────────
 // ─── LEVERCULQUIZ ─────────────────────────────────────────────────────────────
-// Hardcoded quizzes (preset mode)
-const QUIZ_PRESETS = [
-  {id:'pouis-1', title:'Pouis Events', emoji:'🏆', description:'50 questions culture Leverculsec', _fromDB:true, questions:[]},
+const QUIZ_THEMES=[
+  ['math','➗','Mathématiques'],['geo','🌍','Géographie'],['histoire','📜','Histoire'],
+  ['anglais','🇬🇧','Anglais'],['physique','⚛️','Physique'],['grammaire','📝','Grammaire'],
+  ['musique','🎵','Musique'],['cinema','🎬','Cinéma/Séries'],['sport','⚽','Sport'],['logique','🧩','Logique']
 ];
 
-// Fetch from Supabase quiz_questions table
-async function loadBDDQuestions(limit){
+const QUIZ_PRESETS=[
+  {id:'pouis-1',title:'Pouis Events',emoji:'🏆',description:'50 questions culture Leverculsec',_fromDB:true,questions:[]},
+];
+
+// ── Fetch from quiz_questions ─────────────────────────────────────────────────
+async function loadBDDQuestions(limit, themes=[]){
   try{
-    const rows=await sbCollection("quiz_questions","?select=id,question,answers,correct,time_limit,theme,difficulty&category=eq.bdd&limit=1000");
+    const themeFilter=themes.length?`&theme=in.(${themes.join(',')})`:'';
+    const rows=await sbCollection("quiz_questions",`?select=id,question,answers,correct,time_limit,theme,difficulty&category=eq.bdd${themeFilter}&limit=2000`);
     if(!Array.isArray(rows))throw new Error("Réponse inattendue: "+JSON.stringify(rows).slice(0,200));
-    if(!rows.length)throw new Error("0 questions retournées pour category=bdd");
-    // Balance: round-robin by theme+difficulty
+    if(!rows.length)throw new Error("0 questions retournées"+( themes.length?" pour ces thèmes":""));
+    // Balance round-robin par thème × difficulté
     const buckets={};
-    rows.forEach(r=>{const k=(r.theme||'x')+'_'+(r.difficulty||2);if(!buckets[k])buckets[k]=[];buckets[k].push(r);});
+    rows.forEach(r=>{
+      const k=(r.theme||'x')+'_'+(r.difficulty||2);
+      if(!buckets[k])buckets[k]=[];
+      buckets[k].push(r);
+    });
     Object.values(buckets).forEach(b=>b.sort(()=>Math.random()-.5));
     const keys=Object.keys(buckets).sort(()=>Math.random()-.5);
     const out=[];let i=0;
@@ -6923,19 +6933,19 @@ async function loadBDDQuestions(limit){
       a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
       c:r.correct,t:r.time_limit||20
     }));
-  }catch(e){throw e;} // propagate so UI shows real error
+  }catch(e){throw e;}
 }
 
 async function loadPouisQuestions(limit){
   try{
-    const rows=await sbCollection("quiz_questions","?category=eq.pouis&limit=1000");
-    if(!Array.isArray(rows)||!rows.length)return null;
+    const rows=await sbCollection("quiz_questions","?select=id,question,answers,correct,time_limit&category=eq.pouis&limit=1000");
+    if(!Array.isArray(rows)||!rows.length)throw new Error("0 questions Pouis");
     return rows.sort(()=>Math.random()-.5).slice(0,limit).map(r=>({
       q:r.question,
       a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
       c:r.correct,t:r.time_limit||20
     }));
-  }catch(e){console.error('[QUIZ] loadPouis error',e);return null;}
+  }catch(e){throw e;}
 }
 
 async function quizGenPin(){
@@ -6980,15 +6990,18 @@ function useQuizGame({pin,userId,username,isHost}){
     if(!isHost)return;stopTimer();
     const quiz=R.current.quiz,q=quiz?.questions[R.current.idx];if(!q)return;
     const ans=R.current.answers;
+    // Give points to everyone who answered correctly (including host)
     ans.forEach(a=>{if(a.ok)R.current.scores[a.uid]=(R.current.scores[a.uid]||0)+a.pts;});
+    // Scores for ALL players including host
     const sc=R.current.players
-      .filter(p=>String(p.userId)!==String(userId))
-      .map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0,
-        delta:ans.find(a=>a.uid===p.userId)?.pts||0,ok:!!ans.find(a=>a.uid===p.userId)?.ok}))
+      .map(p=>({userId:p.userId,username:p.username,
+        total:R.current.scores[p.userId]||0,
+        delta:ans.find(a=>String(a.uid)===String(p.userId))?.pts||0,
+        ok:!!ans.find(a=>String(a.uid)===String(p.userId))?.ok}))
       .sort((a,b)=>b.total-a.total);
     await bcast('SHOW_RESULTS',{correctIndex:q.c,scores:sc});
     setResults({correctIndex:q.c,scores:sc});setPhase('results');
-  },[isHost,userId,stopTimer,bcast]);
+  },[isHost,stopTimer,bcast]);
 
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
@@ -6997,24 +7010,29 @@ function useQuizGame({pin,userId,username,isHost}){
         const{idx,q,a,c,t}=payload;
         setQuestion({idx,q,a,c,t});setMyAnswer(null);setResults(null);setAnswersIn([]);
         R.current.qStart=Date.now();R.current.answers=[];setPhase('question');
-        startTimer(t,()=>setPhase('answered'));break;}
+        // Host also starts timer (for display), auto-reveal on timeout
+        startTimer(t,()=>{ if(isHost)hostReveal(); else setPhase('answered'); });
+        break;}
       case 'PLAYER_ANSWER':
         if(isHost){
           const{uid,uname,ai,ms}=payload;
           const q=R.current.quiz?.questions[R.current.idx];if(!q)break;
           const ok=ai===q.c,pts=ok?calcQuizPoints(ms,q.t*1000):0;
-          const prev=R.current.answers.filter(a=>a.uid!==uid);
+          const prev=R.current.answers.filter(a=>String(a.uid)!==String(uid));
           const next=[...prev,{uid,uname,ai,ok,pts}];
           R.current.answers=next;setAnswersIn(next);
-          // Auto-reveal when all non-host players answered
-          const nonHost=R.current.players.filter(p=>String(p.userId)!==String(userId));
-          if(next.length>=nonHost.length&&nonHost.length>0)setTimeout(()=>hostReveal(),400);
+          // Auto-reveal when ALL players answered
+          if(next.length>=R.current.players.length&&R.current.players.length>0)
+            setTimeout(()=>hostReveal(),400);
         }break;
       case 'SHOW_RESULTS':{
         stopTimer();
         const{correctIndex,scores}=payload;
         const me=scores.find(s=>String(s.userId)===String(userId));
-        setResults({correctIndex,scores,myPts:me?.delta??0,myRank:me?scores.findIndex(s=>String(s.userId)===String(userId))+1:null,myTotal:me?.total??0});
+        setResults({correctIndex,scores,
+          myPts:me?.delta??0,
+          myRank:me?scores.findIndex(s=>String(s.userId)===String(userId))+1:null,
+          myTotal:me?.total??0});
         setPhase('results');break;}
       case 'GAME_OVER':stopTimer();setFinalScores(payload.scores);setPhase('finished');break;
     }
@@ -7025,8 +7043,10 @@ function useQuizGame({pin,userId,username,isHost}){
     const ch=_sb.channel('quiz:'+pin,{config:{broadcast:{self:false},presence:{key:String(userId)}}});
     ch.on('presence',{event:'sync'},()=>{
       const state=ch.presenceState();
+      // ALL players including host
       const all=Object.values(state).flat().map(p=>({userId:p.userId,username:p.username}));
       setPlayers(all);R.current.players=all;
+      if(isHost) all.forEach(p=>{if(R.current.scores[p.userId]===undefined)R.current.scores[p.userId]=0;});
     });
     ['GAME_START','SHOW_QUESTION','PLAYER_ANSWER','SHOW_RESULTS','GAME_OVER'].forEach(e=>
       ch.on('broadcast',{event:e},({payload})=>handleEvt(e,payload)));
@@ -7038,10 +7058,10 @@ function useQuizGame({pin,userId,username,isHost}){
   const hostStart=React.useCallback(async(quiz)=>{
     if(!isHost||!R.current.ch)return;
     R.current.quiz=quiz;R.current.idx=0;R.current.scores={};R.current.answers=[];
-    R.current.players.filter(p=>String(p.userId)!==String(userId)).forEach(p=>{R.current.scores[p.userId]=0;});
+    R.current.players.forEach(p=>{R.current.scores[p.userId]=0;});
     setQuizTitle(quiz.title);setTotalQ(quiz.questions.length);
     await bcast('GAME_START',{title:quiz.title,total:quiz.questions.length});
-  },[isHost,userId,bcast]);
+  },[isHost,bcast]);
 
   const hostSendQ=React.useCallback(async(idx)=>{
     if(!isHost||!R.current.quiz)return;
@@ -7057,7 +7077,6 @@ function useQuizGame({pin,userId,username,isHost}){
     const next=R.current.idx+1;
     if(next>=R.current.quiz.questions.length){
       const sc=R.current.players
-        .filter(p=>String(p.userId)!==String(userId))
         .map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0}))
         .sort((a,b)=>b.total-a.total);
       await bcast('GAME_OVER',{scores:sc});setFinalScores(sc);setPhase('finished');
@@ -7076,136 +7095,154 @@ function useQuizGame({pin,userId,username,isHost}){
         }
       }catch(e){}
     }else{hostSendQ(next);}
-  },[isHost,pin,userId,hostSendQ,bcast]);
+  },[isHost,pin,hostSendQ,bcast]);
 
+  // Host can also answer (sends PLAYER_ANSWER to itself via broadcast self)
   const playerAnswer=React.useCallback(async(ai)=>{
-    if(isHost||myAnswer!==null||phase!=='question')return;
+    if(myAnswer!==null||phase!=='question')return;
     const ms=Date.now()-R.current.qStart;
-    setMyAnswer(ai);setPhase('answered');
+    setMyAnswer(ai);
+    if(!isHost)setPhase('answered');
+    // Both host and player send answer broadcast
     await bcast('PLAYER_ANSWER',{uid:userId,uname:username,ai,ms});
-  },[isHost,myAnswer,phase,userId,username,bcast]);
+    // Host handles its own answer locally too
+    if(isHost){
+      const q=R.current.quiz?.questions[R.current.idx];if(!q)return;
+      const ok=ai===q.c,pts=ok?calcQuizPoints(ms,q.t*1000):0;
+      const prev=R.current.answers.filter(a=>String(a.uid)!==String(userId));
+      const next=[...prev,{uid:userId,uname:username,ai,ok,pts}];
+      R.current.answers=next;setAnswersIn(next);
+      if(next.length>=R.current.players.length&&R.current.players.length>0)
+        setTimeout(()=>hostReveal(),400);
+    }
+  },[myAnswer,phase,isHost,userId,username,bcast,hostReveal]);
 
   return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
-// ─── QuizHost ─────────────────────────────────────────────────────────────────
+// ─── QuizHost (host plays too) ────────────────────────────────────────────────
 const QC=['#e74c3c','#2980b9','#f39c12','#27ae60'];
 const QS=['▲','◆','●','■'];
 
 function QuizHost({pin,userId,username,quiz,onExit}){
-  const{phase,players,question,timeLeft,results,finalScores,answersIn,totalQ,hostStart,hostSendQ,hostReveal,hostNext}=
+  const{phase,players,question,timeLeft,results,finalScores,answersIn,totalQ,
+    hostStart,hostSendQ,hostReveal,hostNext,playerAnswer,myAnswer}=
     useQuizGame({pin,userId,username,isHost:true});
   const[started,setStarted]=React.useState(false);
   const m=useIsMobile();
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
-  const nonHostPlayers=players.filter(p=>String(p.userId)!==String(userId));
+  const otherPlayers=players.filter(p=>String(p.userId)!==String(userId));
 
   const doStart=async()=>{setStarted(true);await hostStart(quiz);await hostSendQ(0);};
 
   const S={
     root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'},
     hdr:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 20px',borderBottom:'1px solid #1a1a2e',flexShrink:0},
-    body:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'20px 16px',gap:16,maxWidth:900,margin:'0 auto',width:'100%'},
-    card:{background:'rgba(255,255,255,0.05)',borderRadius:16,padding:'20px 24px',width:'100%',border:'1px solid rgba(255,255,255,0.08)'},
-    grid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,width:'100%'},
-    tile:(c,dim)=>({background:dim?'rgba(255,255,255,0.04)':c,borderRadius:14,padding:'16px 20px',fontSize:16,fontWeight:700,
-      display:'flex',alignItems:'center',gap:10,opacity:dim?0.4:1,color:'#fff',border:dim?`2px solid ${c}`:'none'}),
-    btn:(c='#7c3aed',dis=false)=>({background:dis?'#333':c,color:'#fff',border:'none',borderRadius:12,
-      padding:'12px 28px',fontSize:15,fontWeight:700,cursor:dis?'not-allowed':'pointer',opacity:dis?0.5:1,
-      fontFamily:"'Outfit',sans-serif"}),
-    row:(i)=>({display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:10,marginBottom:6,
-      background:i===0?'rgba(255,215,0,0.1)':i===1?'rgba(192,192,192,0.08)':i===2?'rgba(205,127,50,0.08)':'rgba(255,255,255,0.04)',
-      border:`1px solid ${i===0?'rgba(255,215,0,0.25)':'rgba(255,255,255,0.05)'}`}),
+    body:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'16px',gap:14,maxWidth:800,margin:'0 auto',width:'100%'},
+    card:(pad)=>({background:'rgba(255,255,255,0.05)',borderRadius:14,padding:pad||'18px 20px',width:'100%',border:'1px solid rgba(255,255,255,0.08)'}),
+    grid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,width:'100%'},
+    ansBtn:(i,sel,correct,show)=>({
+      background:show?(correct?'#27ae60':sel?'#e74c3c':'rgba(255,255,255,0.05)'):sel?QC[i]+'cc':QC[i],
+      border:show&&!correct&&!sel?`2px solid ${QC[i]}`:'none',
+      borderRadius:12,padding:m?'14px 10px':'16px 14px',fontSize:m?14:16,fontWeight:700,
+      color:'#fff',display:'flex',alignItems:'center',gap:8,cursor:show||myAnswer!==null?'default':'pointer',
+      transform:sel&&!show?'scale(0.97)':'scale(1)',transition:'all .15s',
+      boxShadow:sel&&!show?'0 0 0 3px rgba(255,255,255,.25)':'none',fontFamily:"'Outfit',sans-serif"
+    }),
+    row:(i)=>({display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:10,marginBottom:5,
+      background:i===0?'rgba(255,215,0,0.1)':i===1?'rgba(192,192,192,0.07)':i===2?'rgba(205,127,50,0.07)':'rgba(255,255,255,0.03)',
+      border:`1px solid ${i===0?'rgba(255,215,0,0.2)':'rgba(255,255,255,0.05)'}`}),
+    btn:(c,dis)=>({background:dis?'#222':c,color:dis?'#555':'#fff',border:'none',borderRadius:10,
+      padding:'10px 22px',fontSize:14,fontWeight:700,cursor:dis?'not-allowed':'pointer',fontFamily:"'Outfit',sans-serif"}),
   };
+  const showRes=phase==='results';
 
-  // Lobby
-  if(!started) return(
+  if(!started)return(
     <div style={S.root}>
       <div style={S.hdr}>
-        <span style={{fontWeight:800,fontSize:18}}>🎯 {quiz.title}</span>
-        <div style={{fontSize:32,fontWeight:900,letterSpacing:6,color:'#7c3aed',background:'rgba(124,58,237,0.15)',padding:'6px 16px',borderRadius:10}}>{pin}</div>
-        <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#aaa',borderRadius:8,padding:'6px 14px',cursor:'pointer'}}>Quitter</button>
+        <span style={{fontWeight:800,fontSize:17}}>🎯 {quiz.title}</span>
+        <div style={{fontSize:28,fontWeight:900,letterSpacing:5,color:'#7c3aed',background:'rgba(124,58,237,0.15)',padding:'5px 14px',borderRadius:10}}>{pin}</div>
+        <button onClick={onExit} style={{...S.btn('#333'),fontSize:12}}>Quitter</button>
       </div>
       <div style={{...S.body,justifyContent:'center'}}>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:13,color:'#aaa',marginBottom:6}}>Les joueurs vont sur <b style={{color:'#fff'}}>leverculsec.com → Games → LEVERCULQUIZ</b> et entrent :</div>
-          <div style={{fontSize:64,fontWeight:900,letterSpacing:10,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,0.4)'}}>{pin}</div>
+          <div style={{fontSize:13,color:'#aaa',marginBottom:8}}>Les joueurs entrent ce code sur <b style={{color:'#fff'}}>leverculsec.com → LEVERCULQUIZ</b></div>
+          <div style={{fontSize:60,fontWeight:900,letterSpacing:8,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)'}}>{pin}</div>
         </div>
-        <div style={S.card}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
-            <span style={{fontWeight:700}}>👥 Joueurs</span>
-            <span style={{background:'#7c3aed',borderRadius:20,padding:'2px 12px',fontWeight:800}}>{nonHostPlayers.length}</span>
+        <div style={S.card()}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+            <span style={{fontWeight:700}}>👥 Joueurs connectés</span>
+            <span style={{background:'#7c3aed',borderRadius:16,padding:'1px 10px',fontWeight:800}}>{players.length}</span>
           </div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {nonHostPlayers.length===0
-              ?<span style={{color:'#555',fontStyle:'italic'}}>En attente…</span>
-              :nonHostPlayers.map(p=><span key={p.userId} style={{background:'rgba(124,58,237,0.15)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:20,padding:'5px 12px',fontSize:13}}>🟢 {p.username}</span>)}
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {players.map(p=>(
+              <span key={p.userId} style={{background:'rgba(124,58,237,.15)',border:'1px solid rgba(124,58,237,.3)',borderRadius:20,padding:'4px 10px',fontSize:12}}>
+                {String(p.userId)===String(userId)?'👑':''}{p.username}
+              </span>
+            ))}
+            {players.length===0&&<span style={{color:'#555',fontStyle:'italic',fontSize:13}}>En attente…</span>}
           </div>
         </div>
-        <button style={S.btn('#7c3aed',nonHostPlayers.length===0)} disabled={nonHostPlayers.length===0} onClick={doStart}>
-          🚀 Lancer ({nonHostPlayers.length} joueur{nonHostPlayers.length>1?'s':''})
+        <button style={{...S.btn('#7c3aed',players.length<1),fontSize:15,padding:'12px 28px'}}
+          disabled={players.length<1} onClick={doStart}>
+          🚀 Lancer ({players.length} joueur{players.length>1?'s':''})
         </button>
       </div>
     </div>
   );
 
-  // Question
-  if(phase==='question') return(
+  if(phase==='question'||phase==='results')return(
     <div style={S.root}>
       <div style={S.hdr}>
         <span style={{color:'#aaa',fontSize:13}}>Q<b style={{color:'#fff'}}>{qIdx+1}</b>/{totalQ}</span>
-        <span style={{fontSize:28,fontWeight:900,color:timeLeft<=5?'#e74c3c':'#fff'}}>{timeLeft}s</span>
-        <span style={{background:'rgba(255,255,255,0.08)',borderRadius:20,padding:'4px 12px',fontSize:13}}>{answersIn.length}/{nonHostPlayers.length} réponses</span>
-      </div>
-      <div style={S.body}>
-        <div style={{height:10,borderRadius:5,background:'rgba(255,255,255,0.08)',width:'100%',overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${tRatio*100}%`,borderRadius:5,transition:'width 0.2s linear',background:tRatio>0.4?'#27ae60':tRatio>0.2?'#f39c12':'#e74c3c'}}/>
+        <span style={{fontSize:26,fontWeight:900,color:timeLeft<=5?'#e74c3c':'#fff'}}>{timeLeft}s</span>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{background:'rgba(255,255,255,.07)',borderRadius:16,padding:'3px 10px',fontSize:12}}>{answersIn.length}/{players.length} ✓</span>
+          {phase==='question'&&<button style={S.btn('#e67e22')} onClick={hostReveal}>Révéler</button>}
+          {showRes&&<button style={S.btn('#7c3aed')} onClick={hostNext}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
         </div>
-        <div style={{...S.card,textAlign:'center',fontSize:22,fontWeight:800}}>{question?.q}</div>
-        <div style={S.grid}>{question?.a?.map((ans,i)=><div key={i} style={S.tile(QC[i])}><span>{QS[i]}</span><span>{ans}</span></div>)}</div>
-        <button style={S.btn('#e67e22')} onClick={hostReveal}>Révéler →</button>
+      </div>
+      <div style={{...S.body}}>
+        <div style={{height:8,borderRadius:4,background:'rgba(255,255,255,.08)',width:'100%',overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${tRatio*100}%`,borderRadius:4,transition:'width .2s linear',
+            background:tRatio>.4?'#27ae60':tRatio>.2?'#f39c12':'#e74c3c'}}/>
+        </div>
+        <div style={{...S.card('14px 18px'),textAlign:'center',fontSize:m?16:20,fontWeight:800,lineHeight:1.4}}>{question?.q}</div>
+        <div style={S.grid}>{question?.a?.map((ans,i)=>(
+          <button key={i} style={S.ansBtn(i,myAnswer===i,showRes&&question?.c===i,showRes)}
+            onClick={()=>!showRes&&playerAnswer(i)} disabled={myAnswer!==null||showRes}>
+            <span style={{fontSize:18,opacity:.85}}>{QS[i]}</span><span style={{flex:1,textAlign:'left',fontSize:m?12:14}}>{ans}</span>
+          </button>
+        ))}</div>
+        {showRes&&results&&(
+          <div style={S.card('14px 18px')}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>🏆 Classement</div>
+            {results.scores?.slice(0,6).map((s,i)=>(
+              <div key={s.userId} style={S.row(i)}>
+                <span style={{width:24,textAlign:'center',fontSize:15}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+                <span style={{flex:1,fontWeight:700,fontSize:13}}>{s.username}{String(s.userId)===String(userId)?' 👑':''}</span>
+                {s.delta>0&&<span style={{color:'#27ae60',fontWeight:700,fontSize:12}}>+{s.delta}</span>}
+                <span style={{fontWeight:900,fontSize:13}}>{s.total} pts</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 
-  // Results
-  if(phase==='results'&&results) return(
-    <div style={S.root}>
-      <div style={S.hdr}>
-        <span style={{fontWeight:700}}>Résultats Q{qIdx+1}/{totalQ}</span>
-        <span style={{color:'#aaa',fontSize:13}}>{results.scores?.filter(s=>s.ok).length}/{nonHostPlayers.length} bonnes réponses</span>
-      </div>
-      <div style={S.body}>
-        <div style={S.grid}>{question?.a?.map((ans,i)=><div key={i} style={S.tile(QC[i],i!==results.correctIndex)}>{i===results.correctIndex&&'✅'}<span>{QS[i]}</span><span>{ans}</span></div>)}</div>
-        <div style={S.card}>
-          <div style={{fontWeight:700,marginBottom:10}}>🏆 Classement</div>
-          {results.scores?.slice(0,5).map((s,i)=>(
-            <div key={s.userId} style={S.row(i)}>
-              <span style={{fontWeight:900,width:28,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
-              <span style={{flex:1,fontWeight:700}}>{s.username}</span>
-              {s.delta>0&&<span style={{color:'#27ae60',fontWeight:700}}>+{s.delta}</span>}
-              <span style={{fontWeight:900}}>{s.total} pts</span>
-            </div>
-          ))}
-        </div>
-        <button style={S.btn('#7c3aed')} onClick={hostNext}>{qIdx+1>=totalQ?'🏁 Fin':'Question suivante →'}</button>
-      </div>
-    </div>
-  );
-
-  // Finished
-  if(phase==='finished'&&finalScores) return(
-    <div style={S.root}><div style={{...S.body,justifyContent:'center',paddingTop:40}}>
-      <div style={{textAlign:'center',marginBottom:16}}><div style={{fontSize:56}}>🏆</div><div style={{fontSize:24,fontWeight:900}}>{quiz.title}</div></div>
+  if(phase==='finished'&&finalScores)return(
+    <div style={S.root}><div style={{...S.body,justifyContent:'center',paddingTop:32}}>
+      <div style={{textAlign:'center',marginBottom:12}}><div style={{fontSize:52}}>🏆</div><div style={{fontSize:22,fontWeight:900}}>{quiz.title}</div></div>
       <div style={{width:'100%'}}>{finalScores.map((s,i)=>(
-        <div key={s.userId} style={{...S.row(i),padding:'14px 18px'}}>
-          <span style={{fontSize:20,width:32,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
-          <span style={{flex:1,fontWeight:700,fontSize:i<3?17:14}}>{s.username}</span>
-          <span style={{fontWeight:900,fontSize:i<3?20:16,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
+        <div key={s.userId} style={{...S.row(i),padding:'12px 16px'}}>
+          <span style={{fontSize:18,width:30,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+          <span style={{flex:1,fontWeight:700,fontSize:i<3?16:13}}>{s.username}{String(s.userId)===String(userId)?' 👑':''}</span>
+          <span style={{fontWeight:900,fontSize:i<3?18:14,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
         </div>
       ))}</div>
-      <button style={S.btn('#7c3aed')} onClick={onExit}>Retour</button>
+      <button style={{...S.btn('#7c3aed'),padding:'12px 28px',fontSize:15,marginTop:8}} onClick={onExit}>Retour</button>
     </div></div>
   );
 
@@ -7219,63 +7256,63 @@ function QuizPlayer({pin,userId,username,onExit}){
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
 
-  const btnStyle=(i)=>{
+  const ansBtn=(i)=>{
     const sel=myAnswer===i,corr=question?.c===i;
-    return{background:showRes?(corr?'#27ae60':sel?'#e74c3c':'rgba(255,255,255,0.05)'):QC[i],
+    return{background:showRes?(corr?'#27ae60':sel?'#e74c3c':'rgba(255,255,255,0.04)'):QC[i],
       border:showRes&&!corr&&!sel?`2px solid ${QC[i]}`:'none',borderRadius:16,padding:'20px 14px',
-      fontSize:16,fontWeight:700,color:'#fff',display:'flex',alignItems:'center',gap:10,
-      cursor:showRes?'default':'pointer',transform:sel&&!showRes?'scale(0.97)':'scale(1)',
-      transition:'all 0.2s',boxShadow:sel&&!showRes?`0 0 0 3px rgba(255,255,255,0.3)`:'none',
+      fontSize:15,fontWeight:700,color:'#fff',display:'flex',alignItems:'center',gap:10,
+      cursor:showRes||myAnswer!==null?'default':'pointer',transform:sel&&!showRes?'scale(0.97)':'scale(1)',
+      transition:'all .2s',boxShadow:sel&&!showRes?'0 0 0 3px rgba(255,255,255,.3)':'none',
       fontFamily:"'Outfit',sans-serif"};
   };
 
   const root={minHeight:'100dvh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'};
 
-  if(phase==='lobby') return(
+  if(phase==='lobby')return(
     <div style={root}>
-      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'32px 20px',gap:20}}>
-        <div style={{fontSize:52}}>🎯</div>
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'32px 20px',gap:18}}>
+        <div style={{fontSize:48}}>🎯</div>
         <div style={{fontSize:20,fontWeight:800,textAlign:'center'}}>{quizTitle||'En attente…'}</div>
-        <div style={{background:'rgba(124,58,237,0.15)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:14,padding:'16px 28px',textAlign:'center'}}>
-          <div style={{fontSize:12,color:'#aaa',marginBottom:3}}>Connecté en tant que</div>
-          <div style={{fontSize:22,fontWeight:900,color:'#a78bfa'}}>{username}</div>
+        <div style={{background:'rgba(124,58,237,.15)',border:'1px solid rgba(124,58,237,.3)',borderRadius:14,padding:'14px 24px',textAlign:'center'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:2}}>Connecté en tant que</div>
+          <div style={{fontSize:20,fontWeight:900,color:'#a78bfa'}}>{username}</div>
         </div>
-        <div style={{color:'#aaa',fontSize:14}}>⏳ En attente du host…</div>
-        <div style={{color:'#555',fontSize:12}}>{players.filter(p=>String(p.userId)!==String(userId)).length+1} joueur(s)</div>
-        <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#666',borderRadius:10,padding:'8px 20px',cursor:'pointer',marginTop:8}}>Quitter</button>
+        <div style={{color:'#aaa',fontSize:13}}>⏳ En attente du host… ({players.length} joueur{players.length>1?'s':''})</div>
+        <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#666',borderRadius:10,padding:'7px 18px',cursor:'pointer',marginTop:6}}>Quitter</button>
       </div>
     </div>
   );
 
-  if(['question','answered','results'].includes(phase)) return(
+  if(['question','answered','results'].includes(phase))return(
     <div style={root}>
-      <div style={{padding:'10px 16px',borderBottom:'1px solid #1a1a2e'}}>
-        <div style={{height:7,borderRadius:4,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
-          <div style={{height:'100%',borderRadius:4,width:`${tRatio*100}%`,transition:'width 0.2s linear',background:tRatio>0.4?'#27ae60':tRatio>0.2?'#f39c12':'#e74c3c'}}/>
+      <div style={{padding:'10px 14px',borderBottom:'1px solid #1a1a2e'}}>
+        <div style={{height:7,borderRadius:3,background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
+          <div style={{height:'100%',borderRadius:3,width:`${tRatio*100}%`,transition:'width .2s linear',background:tRatio>.4?'#27ae60':tRatio>.2?'#f39c12':'#e74c3c'}}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:12,color:'#555'}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:11,color:'#555'}}>
           <span>Q {qIdx+1}/{totalQ}</span>
-          <span style={{color:tRatio<0.2?'#e74c3c':'#aaa',fontWeight:700}}>{timeLeft}s</span>
+          <span style={{color:tRatio<.2?'#e74c3c':'#aaa',fontWeight:700}}>{timeLeft}s</span>
         </div>
       </div>
-      <div style={{padding:'18px 18px 10px',textAlign:'center'}}>
-        <div style={{fontSize:18,fontWeight:800,lineHeight:1.4}}>{question?.q}</div>
+      <div style={{padding:'16px 16px 10px',textAlign:'center'}}>
+        <div style={{fontSize:17,fontWeight:800,lineHeight:1.4}}>{question?.q}</div>
       </div>
-      <div style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,flex:1,alignContent:'start'}}>
+      <div style={{padding:'0 12px 10px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,flex:1,alignContent:'start'}}>
         {question?.a?.map((ans,i)=>(
-          <button key={i} style={btnStyle(i)} onClick={()=>playerAnswer(i)} disabled={phase!=='question'}>
-            <span style={{fontSize:20,opacity:.8}}>{QS[i]}</span><span style={{flex:1,textAlign:'left',lineHeight:1.2,fontSize:14}}>{ans}</span>
+          <button key={i} style={ansBtn(i)} onClick={()=>playerAnswer(i)} disabled={phase!=='question'}>
+            <span style={{fontSize:20,opacity:.85}}>{QS[i]}</span>
+            <span style={{flex:1,textAlign:'left',lineHeight:1.2,fontSize:13}}>{ans}</span>
           </button>
         ))}
       </div>
-      {phase==='answered'&&!showRes&&<div style={{textAlign:'center',padding:'12px',color:'#a78bfa',fontWeight:700}}>✓ Réponse envoyée !</div>}
+      {phase==='answered'&&!showRes&&<div style={{textAlign:'center',padding:'10px',color:'#a78bfa',fontWeight:700,fontSize:14}}>✓ Réponse envoyée !</div>}
       {showRes&&results&&(
-        <div style={{margin:'0 14px 14px',borderRadius:14,padding:'14px 18px',textAlign:'center',
-          background:results.myPts>0?'rgba(39,174,96,0.15)':'rgba(231,76,60,0.1)',
-          border:`1px solid ${results.myPts>0?'rgba(39,174,96,0.3)':'rgba(231,76,60,0.2)'}`}}>
+        <div style={{margin:'0 12px 12px',borderRadius:14,padding:'14px 16px',textAlign:'center',
+          background:results.myPts>0?'rgba(39,174,96,.15)':'rgba(231,76,60,.1)',
+          border:`1px solid ${results.myPts>0?'rgba(39,174,96,.3)':'rgba(231,76,60,.2)'}`}}>
           {results.myPts>0
             ?<><div style={{fontSize:28}}>🎯</div><div style={{fontWeight:900,fontSize:20,color:'#2ecc71'}}>+{results.myPts} pts</div><div style={{color:'#aaa',fontSize:12,marginTop:3}}>#{results.myRank} · Total {results.myTotal} pts</div></>
-            :<><div style={{fontSize:28}}>💔</div><div style={{fontWeight:700,color:'#e74c3c'}}>Raté !</div><div style={{color:'#aaa',fontSize:12,marginTop:3}}>Total {results.myTotal} pts</div></>}
+            :<><div style={{fontSize:28}}>💔</div><div style={{fontWeight:700,fontSize:16,color:'#e74c3c'}}>Raté !</div><div style={{color:'#aaa',fontSize:12,marginTop:3}}>Total {results.myTotal} pts</div></>}
         </div>
       )}
     </div>
@@ -7287,32 +7324,64 @@ function QuizPlayer({pin,userId,username,onExit}){
     const medals=['🥇','🥈','🥉'];
     return(
       <div style={root}>
-        <div style={{padding:'28px 20px 0',textAlign:'center'}}>
-          <div style={{fontSize:52}}>{medals[myRank]||'🎮'}</div>
-          <div style={{fontSize:22,fontWeight:900,marginTop:6}}>{myRank===0?'VICTOIRE !':myRank<3?'Podium !':'Fin du quiz !'}</div>
-          {myScore&&<div style={{fontSize:16,color:'#a78bfa',marginTop:4,fontWeight:700}}>{myScore.total} pts — #{myRank+1}</div>}
+        <div style={{padding:'24px 20px 0',textAlign:'center'}}>
+          <div style={{fontSize:48}}>{medals[myRank]||'🎮'}</div>
+          <div style={{fontSize:20,fontWeight:900,marginTop:4}}>{myRank===0?'VICTOIRE !':myRank<3?'Podium !':'Fin du quiz !'}</div>
+          {myScore&&<div style={{fontSize:15,color:'#a78bfa',marginTop:3,fontWeight:700}}>{myScore.total} pts — #{myRank+1}</div>}
         </div>
-        <div style={{padding:'20px 14px',flex:1}}>
+        <div style={{padding:'16px 12px',flex:1}}>
           {finalScores.map((s,i)=>(
-            <div key={s.userId} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,marginBottom:5,
-              background:String(s.userId)===String(userId)?'rgba(124,58,237,0.12)':i===0?'rgba(255,215,0,0.1)':'rgba(255,255,255,0.03)',
-              border:`1px solid ${String(s.userId)===String(userId)?'#7c3aed':i===0?'rgba(255,215,0,0.2)':'rgba(255,255,255,0.05)'}`}}>
-              <span style={{fontSize:16,width:26,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
-              <span style={{flex:1,fontWeight:700,fontSize:String(s.userId)===String(userId)?15:13}}>{s.username}{String(s.userId)===String(userId)?' ← toi':''}</span>
-              <span style={{fontWeight:900,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
+            <div key={s.userId} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:5,
+              background:String(s.userId)===String(userId)?'rgba(124,58,237,.12)':i===0?'rgba(255,215,0,.1)':'rgba(255,255,255,.03)',
+              border:`1px solid ${String(s.userId)===String(userId)?'#7c3aed':i===0?'rgba(255,215,0,.2)':'rgba(255,255,255,.04)'}`}}>
+              <span style={{fontSize:16,width:24,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:700,fontSize:String(s.userId)===String(userId)?14:12}}>{s.username}{String(s.userId)===String(userId)?' ← toi':''}</span>
+              <span style={{fontWeight:900,color:i===0?'#ffd700':'#fff',fontSize:13}}>{s.total} pts</span>
             </div>
           ))}
         </div>
-        <div style={{padding:'14px 20px'}}>
-          <button onClick={onExit} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:14,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Retour</button>
+        <div style={{padding:'12px 16px'}}>
+          <button onClick={onExit} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:12,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Retour</button>
         </div>
       </div>
     );
   }
-  return <div style={{minHeight:'100dvh',background:'#0d0d1a',display:'flex',justifyContent:'center',alignItems:'center',color:'#aaa'}}>⏳ Connexion…</div>;
+  return <div style={{minHeight:'100dvh',background:'#0d0d1a',display:'flex',justifyContent:'center',alignItems:'center',color:'#aaa'}}>⏳</div>;
 }
 
 // ─── QuizPage ─────────────────────────────────────────────────────────────────
+function ThemeSelector({selected,onChange}){
+  const toggleAll=selected.length===QUIZ_THEMES.length;
+  return(
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <span style={{fontWeight:700,fontSize:13}}>Thèmes :</span>
+        <button onClick={()=>onChange(toggleAll?[]:QUIZ_THEMES.map(t=>t[0]))}
+          style={{background:'none',border:'1px solid #2a2a40',color:'#a78bfa',borderRadius:8,padding:'3px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+          {toggleAll?'Tout déselect.':'Tout sélecter'}
+        </button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+        {QUIZ_THEMES.map(([id,emoji,label])=>{
+          const active=selected.includes(id);
+          return(
+            <button key={id} onClick={()=>onChange(active?selected.filter(t=>t!==id):[...selected,id])}
+              style={{background:active?'rgba(124,58,237,.2)':'rgba(255,255,255,.04)',
+                border:`1px solid ${active?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'}`,
+                borderRadius:10,padding:'8px 10px',color:active?'#a78bfa':'#888',
+                cursor:'pointer',fontSize:12,fontWeight:active?700:400,
+                display:'flex',alignItems:'center',gap:6,fontFamily:"'Outfit',sans-serif"}}>
+              <span>{emoji}</span><span>{label}</span>
+              {active&&<span style={{marginLeft:'auto',fontSize:10}}>✓</span>}
+            </button>
+          );
+        })}
+      </div>
+      {selected.length===0&&<div style={{color:'#e74c3c',fontSize:11,marginTop:4}}>Sélectionne au moins un thème</div>}
+    </div>
+  );
+}
+
 function QuizPage({currentPlayer,onBack}){
   const[view,setView]=React.useState('home');
   const[gamePin,setGamePin]=React.useState(null);
@@ -7320,9 +7389,11 @@ function QuizPage({currentPlayer,onBack}){
   const[pinInput,setPinInput]=React.useState('');
   const[loading,setLoading]=React.useState(false);
   const[error,setError]=React.useState(null);
-  const[duelCat,setDuelCat]=React.useState('all');
+  const ALL_T=QUIZ_THEMES.map(t=>t[0]);
+  const[duelThemes,setDuelThemes]=React.useState(ALL_T);
   const[duelCount,setDuelCount]=React.useState(20);
   const[socialSrc,setSocialSrc]=React.useState('bdd');
+  const[socialThemes,setSocialThemes]=React.useState(ALL_T);
   const[socialCount,setSocialCount]=React.useState(20);
   const[selectedPreset,setSelectedPreset]=React.useState(null);
 
@@ -7365,40 +7436,33 @@ function QuizPage({currentPlayer,onBack}){
 
   const S={
     root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'},
-    back:{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12},
-    body:{width:'100%',maxWidth:480,padding:'20px',display:'flex',flexDirection:'column',gap:12},
-    card:{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:18,padding:'20px'},
-    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,
-      padding:'14px',fontSize:24,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:8,outline:'none',
-      boxSizing:'border-box',fontFamily:"'Outfit',sans-serif"},
-    btn:(c,dis,full)=>({background:dis?'#222':c,border:'none',borderRadius:12,padding:full?'14px':'12px 24px',
-      width:full?'100%':'auto',fontSize:15,fontWeight:700,color:dis?'#555':'#fff',cursor:dis?'not-allowed':'pointer',
-      marginTop:8,fontFamily:"'Outfit',sans-serif",opacity:dis?0.5:1}),
-    err:{color:'#e74c3c',fontSize:13,textAlign:'center',marginTop:4},
+    back:{width:'100%',maxWidth:600,padding:'22px 20px 0',display:'flex',alignItems:'center',gap:12},
+    body:{width:'100%',maxWidth:480,padding:'16px 18px',display:'flex',flexDirection:'column',gap:12},
+    card:{background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',borderRadius:16,padding:'18px'},
+    input:{width:'100%',background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.15)',borderRadius:12,padding:'13px',fontSize:22,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:8,outline:'none',boxSizing:'border-box',fontFamily:"'Outfit',sans-serif"},
+    btn:(c,dis)=>({background:dis?'#1a1a2e':c,border:`1px solid ${dis?'#2a2a40':c}`,borderRadius:12,padding:'13px',width:'100%',fontSize:14,fontWeight:700,color:dis?'#555':'#fff',cursor:dis?'not-allowed':'pointer',marginTop:8,fontFamily:"'Outfit',sans-serif",opacity:dis?0.5:1}),
+    err:{color:'#e74c3c',fontSize:12,textAlign:'center',marginTop:4},
     back_btn:{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'},
-    mode:(sel)=>({background:sel?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',
-      border:`2px solid ${sel?'rgba(124,58,237,0.6)':'rgba(255,255,255,0.08)'}`,
-      borderRadius:16,padding:'16px 18px',cursor:'pointer',display:'flex',alignItems:'center',gap:14}),
+    mode:(sel)=>({background:sel?'rgba(124,58,237,.2)':'rgba(255,255,255,.04)',border:`2px solid ${sel?'rgba(124,58,237,.6)':'rgba(255,255,255,.08)'}`,borderRadius:14,padding:'14px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left'}),
   };
 
-  // ── HOME ──
-  if(view==='home') return(
+  if(view==='home')return(
     <div style={S.root}>
       <div style={S.back}><button onClick={onBack} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>🎯 LEVERCULQUIZ</span></div>
       <div style={S.body}>
-        <div style={{...S.card,marginBottom:4}}>
-          <div style={{fontWeight:800,fontSize:16,marginBottom:6}}>🎛️ Créer une partie</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Lance une partie et invite tes amis</div>
-          <button style={S.btn('#7c3aed',false,true)} onClick={()=>setView('mode_pick')}>Créer une partie →</button>
-        </div>
-        <div style={{color:'#555',fontSize:14,textAlign:'center'}}>— ou —</div>
         <div style={S.card}>
-          <div style={{fontWeight:800,fontSize:16,marginBottom:6}}>📱 Rejoindre</div>
+          <div style={{fontWeight:800,fontSize:15,marginBottom:6}}>🎛️ Créer une partie</div>
+          <div style={{color:'#aaa',fontSize:12,marginBottom:10}}>Tu joues aussi en tant qu'hôte</div>
+          <button style={S.btn('#7c3aed')} onClick={()=>setView('mode_pick')}>Créer une partie →</button>
+        </div>
+        <div style={{color:'#555',fontSize:13,textAlign:'center'}}>— ou —</div>
+        <div style={S.card}>
+          <div style={{fontWeight:800,fontSize:15,marginBottom:6}}>📱 Rejoindre une partie</div>
           <input style={S.input} type="text" inputMode="numeric" maxLength={4} placeholder="0000"
             value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/\D/g,'').slice(0,4))}
             onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>
           {error&&<div style={S.err}>{error}</div>}
-          <button style={S.btn('#2980b9',pinInput.length!==4||loading,true)} disabled={pinInput.length!==4||loading} onClick={handleJoin}>
+          <button style={S.btn('#2980b9',pinInput.length!==4||loading)} disabled={pinInput.length!==4||loading} onClick={handleJoin}>
             {loading?'Connexion…':'Rejoindre →'}
           </button>
         </div>
@@ -7406,50 +7470,40 @@ function QuizPage({currentPlayer,onBack}){
     </div>
   );
 
-  // ── MODE PICK ──
-  if(view==='mode_pick') return(
+  if(view==='mode_pick')return(
     <div style={S.root}>
       <div style={S.back}><button onClick={()=>setView('home')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>Choisir un mode</span></div>
       <div style={S.body}>
-        <div style={S.mode(false)} onClick={()=>setView('duel_setup')}>
-          <span style={{fontSize:32}}>⚔️</span>
-          <div><div style={{fontWeight:800,fontSize:16,color:'#e74c3c'}}>Mode Duel</div><div style={{color:'#aaa',fontSize:13}}>1v1 — questions de la base de données</div></div>
-          <span style={{marginLeft:'auto',color:'#e74c3c',fontSize:20}}>→</span>
-        </div>
-        <div style={S.mode(false)} onClick={()=>setView('social_setup')}>
-          <span style={{fontSize:32}}>🎮</span>
-          <div><div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>Mode Social</div><div style={{color:'#aaa',fontSize:13}}>Multijoueur — BDD ou quiz préenregistrés</div></div>
-          <span style={{marginLeft:'auto',color:'#a78bfa',fontSize:20}}>→</span>
-        </div>
+        <button style={S.mode(false)} onClick={()=>setView('duel_setup')}>
+          <span style={{fontSize:30}}>⚔️</span>
+          <div><div style={{fontWeight:800,fontSize:15,color:'#e74c3c'}}>Mode Duel</div><div style={{color:'#aaa',fontSize:12}}>1v1 — questions de la BDD</div></div>
+          <span style={{marginLeft:'auto',color:'#e74c3c'}}>→</span>
+        </button>
+        <button style={S.mode(false)} onClick={()=>setView('social_setup')}>
+          <span style={{fontSize:30}}>🎮</span>
+          <div><div style={{fontWeight:800,fontSize:15,color:'#a78bfa'}}>Mode Social</div><div style={{color:'#aaa',fontSize:12}}>Multijoueur — BDD ou quiz préenregistrés</div></div>
+          <span style={{marginLeft:'auto',color:'#a78bfa'}}>→</span>
+        </button>
       </div>
     </div>
   );
 
-  // ── DUEL SETUP ──
-  if(view==='duel_setup') return(
+  if(view==='duel_setup')return(
     <div style={S.root}>
       <div style={S.back}><button onClick={()=>setView('mode_pick')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span></div>
-      <div style={S.body}>
-        <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
-          <div style={{fontWeight:700,marginBottom:10}}>Questions : <span style={{color:'#e74c3c',fontWeight:900}}>{duelCount}</span></div>
+      <div style={{...S.body,paddingBottom:80,overflowY:'auto',flex:1}}>
+        <div style={{background:'rgba(255,255,255,.05)',borderRadius:12,padding:'14px 16px'}}>
+          <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>Nombre de questions : <span style={{color:'#e74c3c',fontWeight:900}}>{duelCount}</span></div>
           <input type='range' min={10} max={100} step={5} value={duelCount} onChange={e=>setDuelCount(Number(e.target.value))} style={{width:'100%',accentColor:'#e74c3c'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:3}}><span>10</span><span>100</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:2}}><span>10</span><span>100</span></div>
         </div>
-        <div style={{fontWeight:700,fontSize:14}}>Catégorie :</div>
-        {[['all','🎲','Tout mélangé'],['math','➗','Mathématiques'],['geo','🌍','Géographie'],['histoire','📜','Histoire'],
-          ['anglais','🇬🇧','Anglais'],['physique','⚛️','Physique'],['grammaire','📝','Grammaire'],
-          ['musique','🎵','Musique'],['cinema','🎬','Cinéma / Séries'],['sport','⚽','Sport'],['logique','🧩','Logique']].map(([cat,emoji,label])=>(
-          <button key={cat} style={{...S.mode(duelCat===cat),width:'100%',textAlign:'left'}} onClick={()=>setDuelCat(cat)}>
-            <span style={{fontSize:20}}>{emoji}</span><span style={{fontWeight:duelCat===cat?800:400}}>{label}</span>
-            {duelCat===cat&&<span style={{marginLeft:'auto',color:'#e74c3c'}}>✓</span>}
-          </button>
-        ))}
+        <ThemeSelector selected={duelThemes} onChange={setDuelThemes}/>
         {error&&<div style={S.err}>{error}</div>}
-        <button style={S.btn('#e74c3c',loading,true)} disabled={loading} onClick={async()=>{
+        <button style={S.btn('#e74c3c',loading||duelThemes.length===0)} disabled={loading||duelThemes.length===0} onClick={async()=>{
           setLoading(true);setError(null);
           try{
-            const qs=await loadBDDQuestions(duelCount);
-            if(!qs||qs.length<3)throw new Error(`Pas assez de questions (${qs?.length||0}) — vérifiez la table quiz_questions`);
+            const qs=await loadBDDQuestions(duelCount,duelThemes);
+            if(!qs||qs.length<2)throw new Error(`Pas assez de questions (${qs?.length||0})`);
             const quiz={title:'⚔️ Duel',emoji:'⚔️',questions:qs};
             const pin=await createGame(quiz);
             setHostQuiz(quiz);setGamePin(pin);setView('host_game');
@@ -7460,31 +7514,31 @@ function QuizPage({currentPlayer,onBack}){
     </div>
   );
 
-  // ── SOCIAL SETUP ──
-  if(view==='social_setup') return(
+  if(view==='social_setup')return(
     <div style={S.root}>
       <div style={S.back}><button onClick={()=>setView('mode_pick')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>🎮 Mode Social</span></div>
-      <div style={S.body}>
-        <div style={{display:'flex',gap:10}}>
-          {[['bdd','🗄️','Base de données'],['preset','📋','Quiz préenregistrés']].map(([src,emoji,label])=>(
-            <button key={src} style={{flex:1,background:socialSrc===src?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialSrc===src?'rgba(124,58,237,0.6)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 10px',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:socialSrc===src?800:400,display:'flex',flexDirection:'column',alignItems:'center',gap:6,fontFamily:"'Outfit',sans-serif"}} onClick={()=>setSocialSrc(src)}>
-              <span style={{fontSize:24}}>{emoji}</span><span>{label}</span>
+      <div style={{...S.body,paddingBottom:80,overflowY:'auto',flex:1}}>
+        <div style={{display:'flex',gap:8}}>
+          {[['bdd','🗄️','Base de données'],['preset','📋','Préenregistrés']].map(([src,emoji,label])=>(
+            <button key={src} style={{flex:1,background:socialSrc===src?'rgba(124,58,237,.2)':'rgba(255,255,255,.04)',border:`2px solid ${socialSrc===src?'rgba(124,58,237,.6)':'rgba(255,255,255,.08)'}`,borderRadius:12,padding:'12px 8px',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:socialSrc===src?800:400,display:'flex',flexDirection:'column',alignItems:'center',gap:5,fontFamily:"'Outfit',sans-serif"}} onClick={()=>setSocialSrc(src)}>
+              <span style={{fontSize:22}}>{emoji}</span><span>{label}</span>
             </button>
           ))}
         </div>
 
         {socialSrc==='bdd'&&<>
-          <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
-            <div style={{fontWeight:700,marginBottom:10}}>Questions : <span style={{color:'#a78bfa',fontWeight:900}}>{socialCount}</span></div>
+          <div style={{background:'rgba(255,255,255,.05)',borderRadius:12,padding:'14px 16px'}}>
+            <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>Nombre de questions : <span style={{color:'#a78bfa',fontWeight:900}}>{socialCount}</span></div>
             <input type='range' min={10} max={100} step={5} value={socialCount} onChange={e=>setSocialCount(Number(e.target.value))} style={{width:'100%',accentColor:'#7c3aed'}}/>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:3}}><span>10</span><span>100</span></div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:2}}><span>10</span><span>100</span></div>
           </div>
+          <ThemeSelector selected={socialThemes} onChange={setSocialThemes}/>
           {error&&<div style={S.err}>{error}</div>}
-          <button style={S.btn('#7c3aed',loading,true)} disabled={loading} onClick={async()=>{
+          <button style={S.btn('#7c3aed',loading||socialThemes.length===0)} disabled={loading||socialThemes.length===0} onClick={async()=>{
             setLoading(true);setError(null);
             try{
-              const qs=await loadBDDQuestions(socialCount);
-              if(!qs||qs.length<3)throw new Error(`Pas assez de questions (${qs?.length||0})`);
+              const qs=await loadBDDQuestions(socialCount,socialThemes);
+              if(!qs||qs.length<2)throw new Error(`Pas assez de questions (${qs?.length||0})`);
               const quiz={title:'🎮 Social',emoji:'🎮',questions:qs};
               const pin=await createGame(quiz);
               setHostQuiz(quiz);setGamePin(pin);setView('host_game');
@@ -7497,28 +7551,24 @@ function QuizPage({currentPlayer,onBack}){
           {QUIZ_PRESETS.map(q=>{
             const locked=q.id==='pouis-1'&&currentPlayer?.uid!=='louis-mar';
             return(
-              <div key={q.id} style={{...S.mode(selectedPreset?.id===q.id),opacity:locked?0.3:1,cursor:locked?'not-allowed':'pointer'}}
+              <button key={q.id} style={{...S.mode(selectedPreset?.id===q.id),opacity:locked?.3:1,cursor:locked?'not-allowed':'pointer'}}
                 onClick={async()=>{
                   if(locked)return;
-                  if(q._fromDB){
-                    const qs=await loadPouisQuestions(50);
-                    setSelectedPreset({...q,questions:qs||q.questions});
-                  }else setSelectedPreset(q);
+                  if(q._fromDB){const qs=await loadPouisQuestions(50).catch(()=>null);setSelectedPreset({...q,questions:qs||[]});}
+                  else setSelectedPreset(q);
                 }}>
                 <span style={{fontSize:26}}>{q.emoji}</span>
-                <div><div style={{fontWeight:700}}>{q.title}</div><div style={{color:'#aaa',fontSize:12}}>{q.description}</div></div>
+                <div><div style={{fontWeight:700,fontSize:14}}>{q.title}</div><div style={{color:'#aaa',fontSize:11}}>{q.description}</div></div>
                 {locked&&<span style={{marginLeft:'auto'}}>🔒</span>}
                 {!locked&&selectedPreset?.id===q.id&&<span style={{marginLeft:'auto',color:'#a78bfa'}}>✓</span>}
-              </div>
+              </button>
             );
           })}
           {error&&<div style={S.err}>{error}</div>}
-          <button style={S.btn('#7c3aed',!selectedPreset||loading,true)} disabled={!selectedPreset||loading} onClick={async()=>{
+          <button style={S.btn('#7c3aed',!selectedPreset||!selectedPreset.questions?.length||loading)} disabled={!selectedPreset||!selectedPreset.questions?.length||loading} onClick={async()=>{
             setLoading(true);setError(null);
-            try{
-              const pin=await createGame(selectedPreset);
-              setHostQuiz(selectedPreset);setGamePin(pin);setView('host_game');
-            }catch(e){setError(e.message);}
+            try{const pin=await createGame(selectedPreset);setHostQuiz(selectedPreset);setGamePin(pin);setView('host_game');}
+            catch(e){setError(e.message);}
             setLoading(false);
           }}>{loading?'Création…':'🚀 Créer la partie'}</button>
         </>}
