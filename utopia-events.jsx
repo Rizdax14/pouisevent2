@@ -6898,18 +6898,14 @@ function DataBL({onBack}){
 // ─── QUIZ DATA ────────────────────────────────────────────────────────────────
 async function fetchQuizQuestions(category, limit=20){
   // Fetch all matching questions then balance by theme + difficulty
+  // category='bdd' for main DB, theme for sub-category
+  const themeFilter = (category && category!=='all') ? `&theme=eq.${category}` : '';
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*&limit=1000`,
+    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*&category=eq.bdd${themeFilter}&limit=1000`,
     {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
   );
-  if(!r.ok){ console.error('quiz fetch error',r.status); return []; }
-  const raw = await r.json();
-  // Filter client-side: exclude pouis, then filter by category if specified
-  const all = raw.filter(q => {
-    if(q.category==='pouis') return false;
-    if(category && category!=='all' && q.category!==category && q.theme!==category) return false;
-    return true;
-  });
+  if(!r.ok){ console.error('quiz fetch',r.status,await r.text()); return []; }
+  const all = await r.json();
   if(!all.length) return [];
 
   // Group by theme + difficulty
