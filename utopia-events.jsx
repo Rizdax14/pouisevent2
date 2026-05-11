@@ -6952,7 +6952,7 @@ const QUIZZES = [
     id:'pouis-1', title:'Pouis Events', emoji:'🏆',
     description:'Culture Leverculsec & Olympiades — 50 questions',
     questions:[], _fromDB:true
-  },,
+  },
   {
     id:'sport-1', title:'Quiz Sport', emoji:'⚽',
     description:'Football, tennis, basket et plus',
