@@ -7023,16 +7023,58 @@ function DataBL({onBack,currentPlayer}){
 // ─── APP ──────────────────────────────────────────────
 // ─── QUIZ DATA ────────────────────────────────────────────────────────────────
 async function fetchQuizQuestions(category, limit=20){
-  const cat = category==='all' ? '' : `&category=eq.${category}`;
+  // Fetch all matching questions then balance by theme + difficulty
+  const cat = category==='all'||!category ? '&category.neq=pouis' : `&category=eq.${category}`;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*${cat}&order=random()&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*${cat}&limit=1000`,
     {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
   );
   if(!r.ok) return [];
-  const rows = await r.json();
-  return rows.map(q=>({
+  const all = await r.json();
+  if(!all.length) return [];
+
+  // Group by theme + difficulty
+  const groups = {};
+  all.forEach(q=>{
+    const key = (q.theme||q.category) + '_' + (q.difficulty||2);
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(q);
+  });
+
+  // Shuffle each group
+  Object.values(groups).forEach(g=>g.sort(()=>Math.random()-.5));
+
+  // Round-robin pick from groups to balance
+  const picked = [];
+  const keys = Object.keys(groups).sort(()=>Math.random()-.5);
+  let i=0;
+  while(picked.length < limit && Object.values(groups).some(g=>g.length>0)){
+    const key = keys[i % keys.length];
+    if(groups[key] && groups[key].length > 0) picked.push(groups[key].shift());
+    i++;
+    if(i > keys.length * (limit+10)) break; // safety
+  }
+
+  return picked.slice(0,limit).map(q=>({
     question: q.question,
-    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers),
+    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers||'[]'),
+    correct: q.correct,
+    time_limit: q.time_limit||20,
+    theme: q.theme||q.category,
+    difficulty: q.difficulty||2,
+  }));
+}
+
+async function fetchPouisQuestions(limit=50){
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*&category=eq.pouis&limit=1000`,
+    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
+  );
+  if(!r.ok) return [];
+  const all = (await r.json()).sort(()=>Math.random()-.5);
+  return all.slice(0,limit).map(q=>({
+    question: q.question,
+    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers||'[]'),
     correct: q.correct,
     time_limit: q.time_limit||20,
   }));
@@ -7041,17 +7083,9 @@ async function fetchQuizQuestions(category, limit=20){
 const QUIZZES = [
   {
     id:'pouis-1', title:'Pouis Events', emoji:'🏆',
-    description:'Culture Leverculsec & Olympiades',
-    questions:[
-      {question:'Combien y a-t-il de joueurs dans une équipe de football ?',answers:['9 joueurs','10 joueurs','11 joueurs','12 joueurs'],correct:2,time_limit:15},
-      {question:'Dans quel sport marque-t-on un « strike » ?',answers:['Tennis','Pétanque','Bowling','Golf'],correct:2,time_limit:15},
-      {question:'Quelle ville est surnommée « la capitale des Gaules » ?',answers:['Paris','Lyon','Marseille','Bordeaux'],correct:1,time_limit:20},
-      {question:'Combien de bouteilles de 33cl dans un fût de 30L ?',answers:['60','75','90','100'],correct:2,time_limit:20},
-      {question:'Quelle est la monnaie officielle du Japon ?',answers:['Yuan','Won','Yen','Ringgit'],correct:2,time_limit:15},
-      {question:'Combien de couleurs y a-t-il sur le drapeau français ?',answers:['2','3','4','5'],correct:1,time_limit:10},
-      {question:'Quel est le record du 100m masculin (en secondes) ?',answers:['9.58','9.69','9.72','9.81'],correct:0,time_limit:20},
-    ]
-  },
+    description:'Culture Leverculsec & Olympiades — 50 questions',
+    questions:[], _fromDB:true
+  },,
   {
     id:'sport-1', title:'Quiz Sport', emoji:'⚽',
     description:'Football, tennis, basket et plus',
@@ -7405,6 +7439,11 @@ function QuizPage({currentPlayer,onBack}){
   const[gamePin,setGamePin]=React.useState(null);
   const[loading,setLoading]=React.useState(false);
   const[error,setError]=React.useState(null);
+  const[duelCat,setDuelCat]=React.useState('all');
+  const[duelCount,setDuelCount]=React.useState(20);
+  const[socialSrc,setSocialSrc]=React.useState('bdd');
+  const[socialCat,setSocialCat]=React.useState('all');
+  const[socialCount,setSocialCount]=React.useState(20);
 
   const userId=currentPlayer?.id;
   const username=currentPlayer?.display_name||currentPlayer?.name||'Joueur';
@@ -7475,40 +7514,185 @@ function QuizPage({currentPlayer,onBack}){
     </div>
   );
 
-  if(view==='host_pick')return(
-    <div style={S.root}>
+  // ── Mode picker ──
+  if(view==='host_pick') return(
+    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
       <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
         <button onClick={()=>setView('home')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>Choisir un quiz</span>
+        <span style={{fontWeight:800,fontSize:20}}>🎯 LEVERCULQUIZ</span>
       </div>
-      <div style={S.main}>
-        {/* Duel mode */}
-        <div style={{width:'100%',background:'rgba(231,76,60,0.08)',border:'2px solid rgba(231,76,60,0.3)',borderRadius:16,padding:'16px 20px',cursor:'pointer',display:'flex',alignItems:'center',gap:14,marginBottom:8}}
-          onClick={()=>setView('duel_setup')}>
-          <span style={{fontSize:32}}>⚔️</span>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:16,color:'#e74c3c'}}>MODE DUEL</div>
-            <div style={{color:'#aaa',fontSize:13}}>1v1 · 20 questions aléatoires de la BDD</div>
+      <div style={{width:'100%',maxWidth:480,padding:'28px 20px',display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{color:'#aaa',fontSize:13,marginBottom:4}}>Choisis ton mode de jeu :</div>
+        {/* DUEL */}
+        <div style={{background:'rgba(231,76,60,0.08)',border:'2px solid rgba(231,76,60,0.35)',borderRadius:18,padding:'20px 22px',cursor:'pointer'}} onClick={()=>setView('duel_setup')}>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <span style={{fontSize:36}}>⚔️</span>
+            <div>
+              <div style={{fontWeight:800,fontSize:17,color:'#e74c3c'}}>Mode Duel</div>
+              <div style={{color:'#aaa',fontSize:13,marginTop:2}}>1v1 — questions piochées en base de données</div>
+            </div>
+            <span style={{marginLeft:'auto',color:'#e74c3c',fontSize:20}}>→</span>
           </div>
-          <span style={{color:'#e74c3c',fontSize:20}}>→</span>
         </div>
-        {QUIZZES.map(q=>{
-          const locked=q.id==='pouis-1'&&currentPlayer?.uid!=='louis-mar';
-          return(
-          <div key={q.id} style={{width:'100%',background:selectedQuiz?.id===q.id?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${locked?'rgba(255,255,255,0.04)':selectedQuiz?.id===q.id?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:16,padding:'16px 20px',cursor:locked?'not-allowed':'pointer',opacity:locked?0.3:1,display:'flex',alignItems:'center',gap:14}} onClick={()=>!locked&&setSelectedQuiz(q)}>
-            <span style={{fontSize:32}}>{q.emoji}</span>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>{q.title}</div><div style={{color:'#aaa',fontSize:13}}>{q.description} · {q.questions.length} questions</div></div>
-            {locked&&<span style={{fontSize:14}}>🔒</span>}
-            {!locked&&selectedQuiz?.id===q.id&&<span style={{color:'#a78bfa'}}>✓</span>}
-          </div>);
-        })}
-        {error&&<div style={S.err}>{error}</div>}
-        <button style={{...S.btn('#7c3aed',true),opacity:selectedQuiz?1:0.4}} disabled={!selectedQuiz||loading} onClick={handleCreate}>{loading?'Création…':'🚀 Créer la partie'}</button>
+        {/* SOCIAL */}
+        <div style={{background:'rgba(124,58,237,0.08)',border:'2px solid rgba(124,58,237,0.35)',borderRadius:18,padding:'20px 22px',cursor:'pointer'}} onClick={()=>setView('social_setup')}>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <span style={{fontSize:36}}>🎮</span>
+            <div>
+              <div style={{fontWeight:800,fontSize:17,color:'#a78bfa'}}>Mode Social</div>
+              <div style={{color:'#aaa',fontSize:13,marginTop:2}}>Multijoueur — BDD complète ou quiz préenregistrés</div>
+            </div>
+            <span style={{marginLeft:'auto',color:'#a78bfa',fontSize:20}}>→</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 
   // ── Duel setup ──
+  if(view==='duel_setup') return(
+    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
+      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
+        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
+        <span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span>
+      </div>
+      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:14}}>
+        {/* Questions count */}
+        <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Nombre de questions : <span style={{color:'#e74c3c'}}>{duelCount}</span></div>
+          <input type='range' min={10} max={100} step={5} value={duelCount} onChange={e=>setDuelCount(Number(e.target.value))}
+            style={{width:'100%',accentColor:'#e74c3c'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#60607a',marginTop:4}}><span>10</span><span>100</span></div>
+        </div>
+        {/* Category */}
+        <div style={{fontWeight:700,fontSize:14,marginBottom:6}}>Catégorie :</div>
+        {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art']].map(([cat,emoji,label])=>(
+          <button key={cat}
+            style={{background:duelCat===cat?'rgba(231,76,60,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${duelCat===cat?'rgba(231,76,60,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'12px 18px',color:'#fff',cursor:'pointer',fontSize:14,fontWeight:duelCat===cat?800:400,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",textAlign:'left'}}
+            onClick={()=>setDuelCat(cat)}>
+            <span style={{fontSize:22}}>{emoji}</span><span>{label}</span>
+            {duelCat===cat&&<span style={{marginLeft:'auto',color:'#e74c3c'}}>✓</span>}
+          </button>
+        ))}
+        {error&&<div style={{color:'#e74c3c',fontSize:13,textAlign:'center'}}>{error}</div>}
+        <button style={{background:'#e74c3c',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:8,fontFamily:"'Outfit',sans-serif",opacity:loading?0.6:1}}
+          disabled={loading}
+          onClick={async()=>{
+            setLoading(true);setError(null);
+            try{
+              const qs=await fetchQuizQuestions(duelCat,duelCount);
+              if(qs.length<3)throw new Error("Pas assez de questions en base ("+qs.length+") — ajoutes-en via DataBL !");
+              const dq={id:'duel-'+duelCat,title:'⚔️ Duel · '+duelCount+'Q',description:'Mode Duel',emoji:'⚔️',questions:qs};
+              setSelectedQuiz(dq);
+              const pin=await generateQuizPin();
+              const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:dq.title,status:'lobby',total_questions:dq.questions.length})});
+              if(!r2.ok){const e=await r2.text();throw new Error(e);}
+              setGamePin(pin);setView('host_game');
+            }catch(e){setError(e.message);}
+            setLoading(false);
+          }}>
+          {loading?'Chargement…':'🚀 Lancer le duel'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Social setup ──
+  if(view==='social_setup') return(
+    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
+      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
+        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
+        <span style={{fontWeight:800,fontSize:20}}>🎮 Mode Social</span>
+      </div>
+      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:14}}>
+        {/* Source */}
+        <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Source des questions :</div>
+        <div style={{display:'flex',gap:10}}>
+          {[['bdd','🗄️','Base de données'],['preset','📋','Quiz préenregistrés']].map(([src,emoji,label])=>(
+            <button key={src}
+              style={{flex:1,background:socialSrc===src?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialSrc===src?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 10px',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:socialSrc===src?800:400,display:'flex',flexDirection:'column',alignItems:'center',gap:6,fontFamily:"'Outfit',sans-serif"}}
+              onClick={()=>setSocialSrc(src)}>
+              <span style={{fontSize:24}}>{emoji}</span><span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {socialSrc==='bdd'&&(<>
+          {/* Questions count */}
+          <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Questions : <span style={{color:'#a78bfa'}}>{socialCount}</span></div>
+            <input type='range' min={10} max={100} step={5} value={socialCount} onChange={e=>setSocialCount(Number(e.target.value))}
+              style={{width:'100%',accentColor:'#7c3aed'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#60607a',marginTop:4}}><span>10</span><span>100</span></div>
+          </div>
+          {/* Category */}
+          <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Catégorie :</div>
+          {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art'],['pouis','🏆','Pouis Events',currentPlayer?.uid!=='louis-mar']].map(([cat,emoji,label,locked])=>{
+            if(locked)return null;
+            return(
+            <button key={cat}
+              style={{background:socialCat===cat?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialCat===cat?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'12px 18px',color:'#fff',cursor:'pointer',fontSize:14,fontWeight:socialCat===cat?800:400,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",textAlign:'left'}}
+              onClick={()=>setSocialCat(cat)}>
+              <span style={{fontSize:22}}>{emoji}</span><span>{label}</span>
+              {socialCat===cat&&<span style={{marginLeft:'auto',color:'#a78bfa'}}>✓</span>}
+            </button>);
+          })}
+          {error&&<div style={{color:'#e74c3c',fontSize:13}}>{error}</div>}
+          <button style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:4,fontFamily:"'Outfit',sans-serif",opacity:loading?0.6:1}}
+            disabled={loading}
+            onClick={async()=>{
+              setLoading(true);setError(null);
+              try{
+                const qs=await fetchQuizQuestions(socialCat,socialCount);
+                if(qs.length<3)throw new Error("Pas assez de questions ("+qs.length+")");
+                const sq={id:'social-'+socialCat,title:'🎮 Social · '+socialCount+'Q',description:'Mode Social',emoji:'🎮',questions:qs};
+                setSelectedQuiz(sq);
+                const pin=await generateQuizPin();
+                const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:sq.title,status:'lobby',total_questions:sq.questions.length})});
+                if(!r2.ok){const e=await r2.text();throw new Error(e);}
+                setGamePin(pin);setView('host_game');
+              }catch(e){setError(e.message);}
+              setLoading(false);
+            }}>
+            {loading?'Chargement…':'🚀 Créer la partie'}
+          </button>
+        </>)}
+
+        {socialSrc==='preset'&&(<>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Choisir un quiz :</div>
+          {QUIZZES.map(q=>{
+            const locked=q.id==='pouis-1'&&currentPlayer?.uid!=='louis-mar';
+            return(
+            <div key={q.id}
+              style={{background:selectedQuiz?.id===q.id?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${locked?'rgba(255,255,255,0.05)':selectedQuiz?.id===q.id?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 18px',cursor:locked?'not-allowed':'pointer',opacity:locked?0.3:1,display:'flex',alignItems:'center',gap:14}}
+              onClick={async()=>{
+                if(locked)return;
+                if(q._fromDB){
+                  const qs=await fetchPouisQuestions(50);
+                  setSelectedQuiz({...q,questions:qs});
+                } else {
+                  setSelectedQuiz(q);
+                }
+              }}>
+              <span style={{fontSize:28}}>{q.emoji}</span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:14}}>{q.title}</div>
+                <div style={{color:'#aaa',fontSize:12}}>{q.description} · {q.questions.length} questions</div>
+              </div>
+              {locked&&<span>🔒</span>}
+              {!locked&&selectedQuiz?.id===q.id&&<span style={{color:'#a78bfa',fontSize:18}}>✓</span>}
+            </div>);
+          })}
+          {error&&<div style={{color:'#e74c3c',fontSize:13}}>{error}</div>}
+          <button style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:4,fontFamily:"'Outfit',sans-serif",opacity:(selectedQuiz&&!loading)?1:0.4}}
+            disabled={!selectedQuiz||loading} onClick={handleCreate}>
+            {loading?'Création…':'🚀 Créer la partie'}
+          </button>
+        </>)}
+      </div>
+    </div>
+  );
+
   if(view==='duel_setup') return(
     <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
       <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
