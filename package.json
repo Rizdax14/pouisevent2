@@ -1,0 +1,13 @@
+{
+  "name": "pouisevent3",
+  "version": "2.0.0",
+  "description": "Pouis Events v2.0 - Beer Leverculsec Events Site",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'No build step required for static site'",
+    "dev": "python3 -m http.server 8000"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
