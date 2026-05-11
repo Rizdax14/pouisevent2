@@ -6984,7 +6984,6 @@ function useQuizGame({pin,userId,username,isHost}){
   const[answersIn,setAnswersIn]=React.useState([]);
   const[quizTitle,setQuizTitle]=React.useState('');
   const[totalQ,setTotalQ]=React.useState(0);
-  const[countdown,setCountdown]=React.useState(0);
   const R=React.useRef({ch:null,quiz:null,idx:0,qStart:0,scores:{},answers:[],players:[],timer:null});
 
   const stopTimer=React.useCallback(()=>{clearInterval(R.current.timer);R.current.timer=null;},[]);
@@ -7019,7 +7018,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
       case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
-      case 'COUNTDOWN':if(!isHost){setCountdown(payload.count);setPhase(prev=>prev==='lobby'||prev==='results'||prev==='answered'?'countdown':prev);}break;
+      case 'COUNTDOWN':if(!isHost&&onCountdown)onCountdown(payload.count);break;
 
       case 'SHOW_QUESTION':{
         const{idx,q,a,c,t,diff=1,theme=''}=payload;
@@ -7132,7 +7131,7 @@ function useQuizGame({pin,userId,username,isHost}){
     }
   },[myAnswer,phase,isHost,userId,username,bcast,hostReveal]);
 
-  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,countdown,
+  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
@@ -7294,13 +7293,23 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
     </div></div>
   );
 
-  return <div style={{minHeight:'100vh',background:'#0d0d1a',display:'flex',justifyContent:'center',alignItems:'center',color:'#aaa'}}>⏳</div>;
+  // started=true but not yet in question phase (countdown before first Q)
+  if(started)return(
+    <div style={S.root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}}>
+      {cdCount>0
+        ?<><div style={{fontSize:12,color:'#aaa'}}>Première question dans…</div>
+          <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,.5)',lineHeight:1}}>{cdCount}</div></>
+        :<><div style={{fontSize:48}}>⏳</div><div style={{fontSize:13,color:'#aaa'}}>Chargement…</div></>}
+    </div></div>
+  );
+  return null;
 }
 
 // ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,countdown,playerAnswer}=
-    useQuizGame({pin,userId,username,isHost:false});
+  const[playerCd,setPlayerCd]=React.useState(0);
+  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
+    useQuizGame({pin,userId,username,isHost:false,onCountdown:(n)=>setPlayerCd(n)});
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
 
@@ -7318,6 +7327,7 @@ function QuizPlayer({pin,userId,username,onExit}){
 
   if(phase==='lobby')return(
     <div style={root}>
+      {playerCd>0&&<div style={{position:'fixed',inset:0,background:'rgba(10,10,26,.95)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:14,zIndex:99}}><div style={{fontSize:12,color:'#aaa'}}>Prochaine question…</div><div style={{fontSize:80,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{playerCd}</div></div>}
       <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'32px 20px',gap:18}}>
         <div style={{fontSize:48}}>🎯</div>
         <div style={{fontSize:20,fontWeight:800,textAlign:'center'}}>{quizTitle||'En attente…'}</div>
@@ -7331,14 +7341,9 @@ function QuizPlayer({pin,userId,username,onExit}){
     </div>
   );
 
-  if(phase==='countdown')return(
-    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}}>
-      <div style={{fontSize:13,color:'#aaa',fontFamily:"'Outfit',sans-serif"}}>{countdown>0?'Prochaine question…':'Go !'}</div>
-      <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{countdown||'!'}</div>
-    </div></div>
-  );
   if(['question','answered','results'].includes(phase))return(
     <div style={root}>
+      {playerCd>0&&<div style={{position:'fixed',inset:0,background:'rgba(10,10,26,.95)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:14,zIndex:99}}><div style={{fontSize:12,color:'#aaa'}}>Prochaine question…</div><div style={{fontSize:80,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{playerCd}</div></div>}
       <div style={{padding:'10px 14px',borderBottom:'1px solid #1a1a2e'}}>
         <div style={{height:7,borderRadius:3,background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
           <div style={{height:'100%',borderRadius:3,width:`${tRatio*100}%`,transition:'width .2s linear',background:tRatio>.4?'#27ae60':tRatio>.2?'#f39c12':'#e74c3c'}}/>
