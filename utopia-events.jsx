@@ -7019,7 +7019,12 @@ function useQuizGame({pin,userId,username,isHost}){
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
       case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
-      case 'COUNTDOWN':setCountdown(payload.count);setPhase('countdown');break;
+      case 'COUNTDOWN':{
+        setCountdown(3);setPhase('countdown');
+        let c=3;
+        const tick=()=>{c--;setCountdown(c);if(c>0)setTimeout(tick,1000);};
+        setTimeout(tick,1000);
+        break;}
       case 'SHOW_QUESTION':{
         const{idx,q,a,c,t,diff=1,theme=''}=payload;
         setQuestion({idx,q,a,c,t,diff,theme});setMyAnswer(null);setResults(null);setAnswersIn([]);
@@ -7077,18 +7082,30 @@ function useQuizGame({pin,userId,username,isHost}){
     await bcast('GAME_START',{title:quiz.title,total:quiz.questions.length});
   },[isHost,bcast]);
 
+  const pendingQ=React.useRef(null);
+
   const hostSendQ=React.useCallback(async(idx)=>{
     if(!isHost||!R.current.quiz)return;
     const q=R.current.quiz.questions[idx];R.current.idx=idx;R.current.answers=[];setAnswersIn([]);
-    // 3-second countdown
-    await bcast('COUNTDOWN',{count:3});
+    pendingQ.current=q;
+    // Broadcast countdown to all, then fire question after 3s
+    await bcast('COUNTDOWN',{count:3,pendingIdx:idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
     setCountdown(3);setPhase('countdown');
-    await new Promise(res=>{let c=3;const t=setInterval(()=>{c--;setCountdown(c);if(c<=0){clearInterval(t);res();}},1000);});
-    setCountdown(0);
-    await bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
-    setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});setMyAnswer(null);setResults(null);
-    R.current.qStart=Date.now();setPhase('question');
-    startTimer(q.t,()=>hostReveal());
+    let c=3;
+    const tick=()=>{
+      c--;
+      setCountdown(c);
+      if(c>0){setTimeout(tick,1000);}
+      else{
+        setCountdown(0);
+        bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
+        setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
+        setMyAnswer(null);setResults(null);
+        R.current.qStart=Date.now();setPhase('question');
+        startTimer(q.t,()=>hostReveal());
+      }
+    };
+    setTimeout(tick,1000);
   },[isHost,startTimer,hostReveal,bcast]);
 
   const hostNext=React.useCallback(async()=>{
