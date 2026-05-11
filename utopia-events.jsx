@@ -6904,8 +6904,9 @@ const QUIZ_PRESETS = [
 // Fetch from Supabase quiz_questions table
 async function loadBDDQuestions(limit){
   try{
-    const rows=await sbCollection("quiz_questions","?category=eq.bdd&limit=1000");
-    if(!Array.isArray(rows)||!rows.length)return null;
+    const rows=await sbCollection("quiz_questions","?select=id,question,answers,correct,time_limit,theme,difficulty&category=eq.bdd&limit=1000");
+    if(!Array.isArray(rows))throw new Error("Réponse inattendue: "+JSON.stringify(rows).slice(0,200));
+    if(!rows.length)throw new Error("0 questions retournées pour category=bdd");
     // Balance: round-robin by theme+difficulty
     const buckets={};
     rows.forEach(r=>{const k=(r.theme||'x')+'_'+(r.difficulty||2);if(!buckets[k])buckets[k]=[];buckets[k].push(r);});
@@ -6922,7 +6923,7 @@ async function loadBDDQuestions(limit){
       a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
       c:r.correct,t:r.time_limit||20
     }));
-  }catch(e){console.error('[QUIZ] loadBDD error',e);return null;}
+  }catch(e){throw e;} // propagate so UI shows real error
 }
 
 async function loadPouisQuestions(limit){
