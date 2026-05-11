@@ -6898,34 +6898,13 @@ function DataBL({onBack}){
 // ─── LEVERCULQUIZ ─────────────────────────────────────────────────────────────
 // Hardcoded quizzes (preset mode)
 const QUIZ_PRESETS = [
-  {
-    id:'sport', title:'Quiz Sport', emoji:'⚽', description:'Football, basket, tennis…',
-    questions:[
-      {q:'Quel pays a remporté la Coupe du Monde 2022 ?',a:['France','Brésil','Argentine','Angleterre'],c:2,t:20},
-      {q:'En NBA, combien de points vaut un lancer franc ?',a:['1','2','3','4'],c:0,t:15},
-      {q:"Quel joueur détient le record de Ballons d'Or ?",a:['Ronaldo','Messi','Zidane','Ronaldinho'],c:1,t:20},
-      {q:'Combien de joueurs dans une équipe de rugby à XV ?',a:['13','14','15','16'],c:2,t:15},
-      {q:'Quelle est la distance du marathon ?',a:['40km','41.195km','42.195km','43km'],c:2,t:20},
-    ]
-  },
-  {
-    id:'culture', title:'Culture Générale', emoji:'🧠', description:'Histoire, géo, sciences…',
-    questions:[
-      {q:'Quelle est la capitale de lAustralie ?',a:['Sydney','Melbourne','Canberra','Brisbane'],c:2,t:20},
-      {q:'Qui a peint la Joconde ?',a:['Raphaël','Michel-Ange','Léonard de Vinci','Botticelli'],c:2,t:15},
-      {q:'En quelle année est tombé le mur de Berlin ?',a:['1987','1988','1989','1990'],c:2,t:15},
-      {q:'Quel est le pays le plus grand du monde ?',a:['Canada','Chine','USA','Russie'],c:3,t:15},
-      {q:'Combien de chromosomes a lêtre humain ?',a:['23','44','46','48'],c:2,t:20},
-    ]
-  },
+  {id:'pouis-1', title:'Pouis Events', emoji:'🏆', description:'50 questions culture Leverculsec', _fromDB:true, questions:[]},
 ];
 
 // Fetch from Supabase quiz_questions table
 async function loadBDDQuestions(limit){
   try{
-    const url=`${SUPABASE_URL}/rest/v1/quiz_questions?select=id,question,answers,correct,time_limit,theme,difficulty&category=eq.bdd&limit=1000`;
-    const res=await fetch(url,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
-    const rows=await res.json();
+    const rows=await sbCollection("quiz_questions","?category=eq.bdd&limit=1000");
     if(!Array.isArray(rows)||!rows.length)return null;
     // Balance: round-robin by theme+difficulty
     const buckets={};
@@ -6948,9 +6927,7 @@ async function loadBDDQuestions(limit){
 
 async function loadPouisQuestions(limit){
   try{
-    const url=`${SUPABASE_URL}/rest/v1/quiz_questions?select=id,question,answers,correct,time_limit&category=eq.pouis&limit=1000`;
-    const res=await fetch(url,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
-    const rows=await res.json();
+    const rows=await sbCollection("quiz_questions","?category=eq.pouis&limit=1000");
     if(!Array.isArray(rows)||!rows.length)return null;
     return rows.sort(()=>Math.random()-.5).slice(0,limit).map(r=>({
       q:r.question,
