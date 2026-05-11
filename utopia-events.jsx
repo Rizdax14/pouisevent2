@@ -6765,7 +6765,126 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
 }
 
 // ─── DATA BIÈRE LEVERCULSEC ────────────────────────────
-function DataBL({onBack}){
+// ─── QUIZ ADMIN PANEL ─────────────────────────────────────────────────────────
+function QuizAdminPanel({currentPlayer}){
+  const[questions,setQuestions]=React.useState([]);
+  const[loading,setLoading]=React.useState(true);
+  const[form,setForm]=React.useState({category:'general',question:'',a0:'',a1:'',a2:'',a3:'',correct:0,time_limit:20});
+  const[msg,setMsg]=React.useState(null);
+  const[catFilter,setCatFilter]=React.useState('all');
+
+  const CATS=[['all','Toutes'],['general','Culture G'],['sport','Sport'],['culture','Culture & Art'],['pouis','Pouis Events']];
+
+  const load=async()=>{
+    setLoading(true);
+    const cat=catFilter==='all'?'':`&category=eq.${catFilter}`;
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_questions?select=*${cat}&order=id.desc`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
+    setQuestions(await r.json());
+    setLoading(false);
+  };
+  React.useEffect(()=>{load();},[catFilter]);
+
+  const save=async()=>{
+    if(!form.question.trim()||!form.a0||!form.a1||!form.a2||!form.a3){
+      setMsg({ok:false,t:'Tous les champs sont requis'});return;
+    }
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_questions`,{
+      method:'POST',
+      headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({category:form.category,question:form.question,answers:JSON.stringify([form.a0,form.a1,form.a2,form.a3]),correct:Number(form.correct),time_limit:Number(form.time_limit),created_by:currentPlayer?.id})
+    });
+    if(r.ok){
+      setMsg({ok:true,t:'Question ajoutée !'});
+      setForm({category:'general',question:'',a0:'',a1:'',a2:'',a3:'',correct:0,time_limit:20});
+      load();
+    }else{setMsg({ok:false,t:'Erreur'});}
+    setTimeout(()=>setMsg(null),2500);
+  };
+
+  const del=async(id)=>{
+    await fetch(`${SUPABASE_URL}/rest/v1/quiz_questions?id=eq.${id}`,{
+      method:'DELETE',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}
+    });
+    load();
+  };
+
+  const INP={background:'#1a1a2e',border:'1px solid #2a2a40',borderRadius:8,padding:'8px 12px',color:'#eeeef5',fontFamily:"'Outfit',sans-serif",fontSize:13,width:'100%',boxSizing:'border-box',outline:'none'};
+  const CAT_COLORS={general:'#7c3aed',sport:'#22c55e',culture:'#f59e0b',pouis:'#e74c3c',all:'#60607a'};
+
+  return(
+    <div style={{padding:'0 0 60px'}}>
+      <div style={{fontWeight:800,fontSize:16,color:'#eeeef5',marginBottom:16}}>❓ Gestion des questions quiz</div>
+
+      {/* Add form */}
+      <div style={{background:'#0d0d1c',border:'1px solid #1a1a30',borderRadius:12,padding:'16px',marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:14,color:'#22d3ee',marginBottom:12}}>➕ Ajouter une question</div>
+        <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+          <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{...INP,width:'auto',flex:'0 0 auto'}}>
+            {CATS.filter(([k])=>k!=='all').map(([k,l])=><option key={k} value={k}>{l}</option>)}
+          </select>
+          <select value={form.time_limit} onChange={e=>setForm(f=>({...f,time_limit:e.target.value}))} style={{...INP,width:80,flex:'0 0 auto'}}>
+            {[10,15,20,30].map(t=><option key={t} value={t}>{t}s</option>)}
+          </select>
+        </div>
+        <input style={{...INP,marginBottom:8}} placeholder="Question…" value={form.question} onChange={e=>setForm(f=>({...f,question:e.target.value}))}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+          {[0,1,2,3].map(i=>(
+            <div key={i} style={{display:'flex',gap:6,alignItems:'center'}}>
+              <button onClick={()=>setForm(f=>({...f,correct:i}))} style={{width:24,height:24,borderRadius:'50%',border:'2px solid '+(form.correct===i?'#22c55e':'#2a2a40'),background:form.correct===i?'#22c55e22':'transparent',flexShrink:0,cursor:'pointer'}}>
+                {form.correct===i&&<span style={{fontSize:10,color:'#22c55e'}}>✓</span>}
+              </button>
+              <input style={{...INP}} placeholder={`Réponse ${['A','B','C','D'][i]}`} value={form['a'+i]} onChange={e=>setForm(f=>({...f,['a'+i]:e.target.value}))}/>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:'#60607a',marginBottom:8}}>Coche ✓ la bonne réponse</div>
+        {msg&&<div style={{padding:'6px 10px',borderRadius:6,marginBottom:8,background:msg.ok?'#0a2a0a':'#2a0a0a',color:msg.ok?'#22c55e':'#ef4444',fontSize:12}}>{msg.t}</div>}
+        <button onClick={save} style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:'10px 24px',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Sauvegarder</button>
+      </div>
+
+      {/* Filter + list */}
+      <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+        {CATS.map(([k,l])=>(
+          <button key={k} onClick={()=>setCatFilter(k)} style={{background:catFilter===k?CAT_COLORS[k]+'33':'transparent',border:`1px solid ${catFilter===k?CAT_COLORS[k]:' #1a1a30'}`,color:catFilter===k?CAT_COLORS[k]:'#60607a',borderRadius:20,padding:'4px 12px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>{l}</button>
+        ))}
+        <span style={{color:'#404058',fontSize:11,alignSelf:'center',marginLeft:'auto'}}>{questions.length} question{questions.length>1?'s':''}</span>
+      </div>
+      {loading?<div style={{color:'#60607a',textAlign:'center',padding:40}}>Chargement…</div>:(
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {questions.map(q=>{
+            const answers=Array.isArray(q.answers)?q.answers:JSON.parse(q.answers||'[]');
+            return(
+              <div key={q.id} style={{background:'#0d0d1c',border:'1px solid #1a1a30',borderRadius:10,padding:'12px 14px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:'#eeeef5',fontWeight:600,marginBottom:6}}>{q.question}</div>
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                      {answers.map((a,i)=>(
+                        <span key={i} style={{fontSize:10,padding:'2px 8px',borderRadius:10,background:i===q.correct?'#22c55e22':'rgba(255,255,255,0.05)',color:i===q.correct?'#22c55e':'#60607a',border:`1px solid ${i===q.correct?'#22c55e33':'#1a1a30'}`}}>
+                          {['A','B','C','D'][i]}: {a}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    <span style={{fontSize:9,padding:'2px 6px',borderRadius:8,background:CAT_COLORS[q.category]+'22',color:CAT_COLORS[q.category]||'#60607a'}}>{q.category}</span>
+                    <span style={{fontSize:9,color:'#404058'}}>{q.time_limit}s</span>
+                    <button onClick={()=>del(q.id)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:14,padding:'0 4px'}}>🗑</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {questions.length===0&&<div style={{color:'#60607a',textAlign:'center',padding:30,fontSize:13}}>Aucune question dans cette catégorie</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function DataBL({onBack,currentPlayer}){
   const m=useIsMobile();
   const [players,setPlayers]=React.useState([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));
   const [search,setSearch]=React.useState("");
@@ -6890,12 +7009,35 @@ function DataBL({onBack}){
           ))}
         </div>
       </div>
+      {/* Quiz Admin */}
+      <div style={{margin:"32px 40px 0",borderTop:"1px solid #2d4a3e",paddingTop:24}}>
+        <button onClick={()=>setShowQuizAdmin(s=>!s)} style={{background:"#7c3aed22",border:"1px solid #7c3aed55",color:"#a78bfa",borderRadius:10,padding:"10px 18px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:8}}>
+          ❓ Gestion des questions Quiz {showQuizAdmin?"▲":"▼"}
+        </button>
+        {showQuizAdmin&&<div style={{marginTop:16}}><QuizAdminPanel currentPlayer={currentPlayer}/></div>}
+      </div>
     </div>
   );
 }
 
 // ─── APP ──────────────────────────────────────────────
 // ─── QUIZ DATA ────────────────────────────────────────────────────────────────
+async function fetchQuizQuestions(category, limit=20){
+  const cat = category==='all' ? '' : `&category=eq.${category}`;
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*${cat}&order=random()&limit=${limit}`,
+    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
+  );
+  if(!r.ok) return [];
+  const rows = await r.json();
+  return rows.map(q=>({
+    question: q.question,
+    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers),
+    correct: q.correct,
+    time_limit: q.time_limit||20,
+  }));
+}
+
 const QUIZZES = [
   {
     id:'pouis-1', title:'Pouis Events', emoji:'🏆',
@@ -6992,7 +7134,14 @@ function useQuizGame({pin,userId,username,isHost}){
           const q=R.current.quiz?.questions[R.current.currentIndex];if(!q)break;
           const isCorrect=answerIndex===q.correct;
           const points=isCorrect?calcQuizPoints(timeTakenMs,q.time_limit*1000):0;
-          setAnswersIn(prev=>prev.find(a=>a.userId===uid)?prev:[...prev,{userId:uid,username:uname,answerIndex,isCorrect,points}]);
+          const newAnswers=[...R.current.answersIn.filter(a=>a.userId!==uid),{userId:uid,username:uname,answerIndex,isCorrect,points}];
+          R.current.answersIn=newAnswers;
+          setAnswersIn(newAnswers);
+          // Auto-reveal if everyone answered
+          const totalPlayers=R.current.players.filter(p=>p.userId!==uid||true).length;
+          if(newAnswers.length>=totalPlayers&&totalPlayers>0){
+            setTimeout(()=>hostShowResultsNow(),400);
+          }
         }break;
       case 'SHOW_RESULTS':{
         const{correctIndex,scores}=payload;stopTimer();
@@ -7333,6 +7482,16 @@ function QuizPage({currentPlayer,onBack}){
         <span style={{fontWeight:800,fontSize:20}}>Choisir un quiz</span>
       </div>
       <div style={S.main}>
+        {/* Duel mode */}
+        <div style={{width:'100%',background:'rgba(231,76,60,0.08)',border:'2px solid rgba(231,76,60,0.3)',borderRadius:16,padding:'16px 20px',cursor:'pointer',display:'flex',alignItems:'center',gap:14,marginBottom:8}}
+          onClick={()=>setView('duel_setup')}>
+          <span style={{fontSize:32}}>⚔️</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:16,color:'#e74c3c'}}>MODE DUEL</div>
+            <div style={{color:'#aaa',fontSize:13}}>1v1 · 20 questions aléatoires de la BDD</div>
+          </div>
+          <span style={{color:'#e74c3c',fontSize:20}}>→</span>
+        </div>
         {QUIZZES.map(q=>{
           const locked=q.id==='pouis-1'&&currentPlayer?.uid!=='louis-mar';
           return(
@@ -7348,6 +7507,43 @@ function QuizPage({currentPlayer,onBack}){
       </div>
     </div>
   );
+
+  // ── Duel setup ──
+  if(view==='duel_setup') return(
+    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
+      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
+        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
+        <span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span>
+      </div>
+      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:12}}>
+        <div style={{color:'#aaa',fontSize:13,marginBottom:4}}>20 questions aléatoires. Choisis la catégorie :</div>
+        {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art']].map(([cat,emoji,label])=>(
+          <button key={cat} style={{background:'rgba(231,76,60,0.1)',border:'2px solid rgba(231,76,60,0.3)',borderRadius:14,padding:'14px 20px',color:'#fff',cursor:'pointer',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",opacity:loading?0.5:1}}
+            disabled={loading}
+            onClick={async()=>{
+              setLoading(true);setError(null);
+              try{
+                const qs=await fetchQuizQuestions(cat,20);
+                if(qs.length<3)throw new Error("Pas assez de questions en base");
+                const dq={id:'duel-'+cat,title:'⚔️ Duel · '+label,description:'Mode Duel',emoji:'⚔️',questions:qs};
+                setSelectedQuiz(dq);
+                // Create the game directly
+                const pin=await generateQuizPin();
+                const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:dq.title,status:'lobby',total_questions:dq.questions.length})});
+                if(!r2.ok){const e=await r2.text();throw new Error('Insert: '+e);}
+                setGamePin(pin);setView('host_game');
+              }catch(e){setError(e.message);}
+              setLoading(false);
+            }}>
+            <span style={{fontSize:24}}>{emoji}</span>{label}
+            {loading&&<span style={{marginLeft:'auto',fontSize:12,color:'#aaa'}}>…</span>}
+          </button>
+        ))}
+        {error&&<div style={{color:'#e74c3c',fontSize:13,textAlign:'center',marginTop:8}}>{error}</div>}
+      </div>
+    </div>
+  );
+
   return null;
 }
 
@@ -7412,23 +7608,50 @@ async function p4GenPin(){
 
 function P4Board({board,myColor,turn,winner,onPlay}){
   const m=useIsMobile();
-  const cs=m?42:52;
+  const cs=m?46:58;
+  const gap=m?5:6;
   const[hov,setHov]=React.useState(-1);
   const canPlay=!winner&&turn===myColor;
   return(
-    <div style={{background:'#1a2480',borderRadius:12,padding:8,display:'inline-block',boxShadow:'0 8px 32px rgba(0,0,0,.5)',userSelect:'none'}}>
-      <div style={{display:'flex',gap:4,marginBottom:4}}>
+    <div style={{background:'#1e2fa0',borderRadius:16,padding:10,display:'inline-block',boxShadow:'0 8px 40px rgba(0,0,0,.6)',userSelect:'none'}}>
+      {/* Drop buttons — always visible */}
+      <div style={{display:'flex',gap:gap,marginBottom:6}}>
         {Array.from({length:P4_COLS},(_,c)=>(
-          <div key={c} style={{width:cs,height:cs*.5,display:'flex',alignItems:'center',justifyContent:'center',cursor:canPlay?'pointer':'default',borderRadius:8,background:hov===c&&canPlay?P4_C[myColor]+'44':'transparent',transition:'background .15s'}}
-            onClick={()=>canPlay&&onPlay(c)} onMouseEnter={()=>setHov(c)} onMouseLeave={()=>setHov(-1)}>
-            {hov===c&&canPlay&&<span style={{fontSize:14,color:P4_C[myColor]}}>▼</span>}
-          </div>
+          <button key={c}
+            onClick={()=>canPlay&&onPlay(c)}
+            disabled={!canPlay}
+            style={{
+              width:cs,height:Math.round(cs*.55),
+              display:'flex',alignItems:'center',justifyContent:'center',
+              borderRadius:10,border:'none',
+              background:canPlay
+                ? hov===c
+                  ? P4_C[myColor]
+                  : P4_C[myColor]+'55'
+                : 'rgba(255,255,255,0.07)',
+              cursor:canPlay?'pointer':'not-allowed',
+              transition:'background .12s, transform .1s',
+              transform:hov===c&&canPlay?'scale(1.1)':'scale(1)',
+              fontSize:16,
+            }}
+            onMouseEnter={()=>setHov(c)}
+            onMouseLeave={()=>setHov(-1)}>
+            {canPlay&&<span style={{color:'#fff',fontWeight:900,fontSize:cs*.28,lineHeight:1}}>▼</span>}
+          </button>
         ))}
       </div>
+      {/* Grid */}
       {board.map((row,r)=>(
-        <div key={r} style={{display:'flex',gap:4,marginBottom:4}}>
+        <div key={r} style={{display:'flex',gap:gap,marginBottom:gap}}>
           {row.map((cell,c)=>(
-            <div key={c} style={{width:cs,height:cs,borderRadius:'50%',background:P4_C[cell]||'#0a0a2a',boxShadow:cell?`0 2px 8px ${P4_C[cell]}88`:'inset 0 2px 4px rgba(0,0,0,.4)',transition:'background .2s'}}/>
+            <div key={c} style={{
+              width:cs,height:cs,borderRadius:'50%',
+              background:P4_C[cell]||'#0d0d3a',
+              boxShadow:cell
+                ?`0 3px 10px ${P4_C[cell]}99, inset 0 -2px 4px rgba(0,0,0,.3)`
+                :'inset 0 3px 6px rgba(0,0,0,.5)',
+              transition:'background .18s',
+            }}/>
           ))}
         </div>
       ))}
@@ -7774,7 +7997,7 @@ export default function App(){
 
   // Data BL (Louis only)
   if(section==="dataBL"&&(isAdmin||getOfficerRole(currentPlayer))) return(
-    <DataBL onBack={()=>setSection("menu")}/>
+    <DataBL onBack={()=>setSection("menu")} currentPlayer={currentPlayer}/>
   );
 
   // Games section
