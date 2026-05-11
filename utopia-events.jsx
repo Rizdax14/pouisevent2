@@ -6984,6 +6984,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const[answersIn,setAnswersIn]=React.useState([]);
   const[quizTitle,setQuizTitle]=React.useState('');
   const[totalQ,setTotalQ]=React.useState(0);
+  const[countdown,setCountdown]=React.useState(0);
   const R=React.useRef({ch:null,quiz:null,idx:0,qStart:0,scores:{},answers:[],players:[],timer:null});
 
   const stopTimer=React.useCallback(()=>{clearInterval(R.current.timer);R.current.timer=null;},[]);
@@ -7018,6 +7019,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
       case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
+      case 'COUNTDOWN':if(!isHost){setCountdown(payload.count);setPhase(prev=>prev==='lobby'||prev==='results'||prev==='answered'?'countdown':prev);}break;
 
       case 'SHOW_QUESTION':{
         const{idx,q,a,c,t,diff=1,theme=''}=payload;
@@ -7130,7 +7132,7 @@ function useQuizGame({pin,userId,username,isHost}){
     }
   },[myAnswer,phase,isHost,userId,username,bcast,hostReveal]);
 
-  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
+  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,countdown,
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
@@ -7151,9 +7153,10 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
   const doStart=async()=>{
     setStarted(true);
     await hostStart(quiz);
+    bcast('COUNTDOWN',{count:3});
     setCdCount(3);
     let c=3;
-    const tick=()=>{c--;setCdCount(c);if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(0);}};
+    const tick=()=>{c--;setCdCount(c);bcast('COUNTDOWN',{count:c});if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(0);}};
     setTimeout(tick,1000);
   };
 
@@ -7224,9 +7227,10 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
           {showRes&&<button style={S.btn('#7c3aed')} onClick={()=>{
   if(qIdx+1>=totalQ){hostNext();}
   else{
+    bcast('COUNTDOWN',{count:3});
     setCdCount(3);
     let c=3;
-    const tick=()=>{c--;setCdCount(c);if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(qIdx+1);}};
+    const tick=()=>{c--;setCdCount(c);bcast('COUNTDOWN',{count:c});if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(qIdx+1);}};
     setTimeout(tick,1000);
   }
 }}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
@@ -7295,7 +7299,7 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
 
 // ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
+  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,countdown,playerAnswer}=
     useQuizGame({pin,userId,username,isHost:false});
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
@@ -7327,6 +7331,12 @@ function QuizPlayer({pin,userId,username,onExit}){
     </div>
   );
 
+  if(phase==='countdown')return(
+    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}}>
+      <div style={{fontSize:13,color:'#aaa',fontFamily:"'Outfit',sans-serif"}}>{countdown>0?'Prochaine question…':'Go !'}</div>
+      <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{countdown||'!'}</div>
+    </div></div>
+  );
   if(['question','answered','results'].includes(phase))return(
     <div style={root}>
       <div style={{padding:'10px 14px',borderBottom:'1px solid #1a1a2e'}}>
