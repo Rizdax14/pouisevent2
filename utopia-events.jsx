@@ -6984,7 +6984,6 @@ function useQuizGame({pin,userId,username,isHost}){
   const[answersIn,setAnswersIn]=React.useState([]);
   const[quizTitle,setQuizTitle]=React.useState('');
   const[totalQ,setTotalQ]=React.useState(0);
-  const[countdown,setCountdown]=React.useState(0);
   const R=React.useRef({ch:null,quiz:null,idx:0,qStart:0,scores:{},answers:[],players:[],timer:null});
 
   const stopTimer=React.useCallback(()=>{clearInterval(R.current.timer);R.current.timer=null;},[]);
@@ -7019,12 +7018,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
       case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
-      case 'COUNTDOWN':{
-        setCountdown(3);setPhase('countdown');
-        let c=3;
-        const tick=()=>{c--;setCountdown(c);if(c>0)setTimeout(tick,1000);};
-        setTimeout(tick,1000);
-        break;}
+
       case 'SHOW_QUESTION':{
         const{idx,q,a,c,t,diff=1,theme=''}=payload;
         setQuestion({idx,q,a,c,t,diff,theme});setMyAnswer(null);setResults(null);setAnswersIn([]);
@@ -7082,30 +7076,13 @@ function useQuizGame({pin,userId,username,isHost}){
     await bcast('GAME_START',{title:quiz.title,total:quiz.questions.length});
   },[isHost,bcast]);
 
-  const pendingQ=React.useRef(null);
-
   const hostSendQ=React.useCallback(async(idx)=>{
     if(!isHost||!R.current.quiz)return;
     const q=R.current.quiz.questions[idx];R.current.idx=idx;R.current.answers=[];setAnswersIn([]);
-    pendingQ.current=q;
-    // Broadcast countdown to all, then fire question after 3s
-    await bcast('COUNTDOWN',{count:3,pendingIdx:idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
-    setCountdown(3);setPhase('countdown');
-    let c=3;
-    const tick=()=>{
-      c--;
-      setCountdown(c);
-      if(c>0){setTimeout(tick,1000);}
-      else{
-        setCountdown(0);
-        bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
-        setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
-        setMyAnswer(null);setResults(null);
-        R.current.qStart=Date.now();setPhase('question');
-        startTimer(q.t,()=>hostReveal());
-      }
-    };
-    setTimeout(tick,1000);
+    await bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
+    setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});setMyAnswer(null);setResults(null);
+    R.current.qStart=Date.now();setPhase('question');
+    startTimer(q.t,()=>hostReveal());
   },[isHost,startTimer,hostReveal,bcast]);
 
   const hostNext=React.useCallback(async()=>{
@@ -7153,7 +7130,7 @@ function useQuizGame({pin,userId,username,isHost}){
     }
   },[myAnswer,phase,isHost,userId,username,bcast,hostReveal]);
 
-  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,countdown,
+  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
@@ -7166,11 +7143,19 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer,myAnswer}=
     useQuizGame({pin,userId,username,isHost:true});
   const[started,setStarted]=React.useState(false);
+  const[cdCount,setCdCount]=React.useState(0);
   const m=useIsMobile();
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const otherPlayers=players.filter(p=>String(p.userId)!==String(userId));
 
-  const doStart=async()=>{setStarted(true);await hostStart(quiz);await hostSendQ(0);};
+  const doStart=async()=>{
+    setStarted(true);
+    await hostStart(quiz);
+    setCdCount(3);
+    let c=3;
+    const tick=()=>{c--;setCdCount(c);if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(0);}};
+    setTimeout(tick,1000);
+  };
 
   const S={
     root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'},
@@ -7228,12 +7213,6 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
     </div>
   );
 
-  if(phase==='countdown')return(
-    <div style={S.root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-      <div style={{fontSize:13,color:'#aaa'}}>Question {(question?.idx??R.current?.idx??0)+2} arrive…</div>
-      <div style={{fontSize:96,fontWeight:900,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,.5)',lineHeight:1}}>{countdown}</div>
-    </div></div>
-  );
   if(phase==='question'||phase==='results')return(
     <div style={S.root}>
       <div style={S.hdr}>
@@ -7242,11 +7221,23 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <span style={{background:'rgba(255,255,255,.07)',borderRadius:16,padding:'3px 10px',fontSize:12}}>{answersIn.length}/{players.length} ✓</span>
           {phase==='question'&&<button style={S.btn('#e67e22')} onClick={hostReveal}>Révéler</button>}
-          {showRes&&<button style={S.btn('#7c3aed')} onClick={hostNext}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
+          {showRes&&<button style={S.btn('#7c3aed')} onClick={()=>{
+  if(qIdx+1>=totalQ){hostNext();}
+  else{
+    setCdCount(3);
+    let c=3;
+    const tick=()=>{c--;setCdCount(c);if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(qIdx+1);}};
+    setTimeout(tick,1000);
+  }
+}}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
           <button style={{...S.btn('#555'),fontSize:11,padding:'6px 10px'}} onClick={onExit}>✕</button>
         </div>
       </div>
       <div style={{...S.body}}>
+        {cdCount>0&&<div style={{position:'absolute',inset:0,background:'rgba(10,10,26,.92)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12,zIndex:10,borderRadius:0}}>
+          <div style={{fontSize:12,color:'#aaa'}}>Prochaine question…</div>
+          <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,.5)',lineHeight:1,transition:'all .3s'}}>{cdCount}</div>
+        </div>}
         <div style={{height:8,borderRadius:4,background:'rgba(255,255,255,.08)',width:'100%',overflow:'hidden'}}>
           <div style={{height:'100%',width:`${tRatio*100}%`,borderRadius:4,transition:'width .2s linear',
             background:tRatio>.4?'#27ae60':tRatio>.2?'#f39c12':'#e74c3c'}}/>
@@ -7304,7 +7295,7 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
 
 // ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,countdown,playerAnswer}=
+  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
     useQuizGame({pin,userId,username,isHost:false});
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
@@ -7336,12 +7327,6 @@ function QuizPlayer({pin,userId,username,onExit}){
     </div>
   );
 
-  if(phase==='countdown')return(
-    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12}}>
-      <div style={{fontSize:13,color:'#aaa'}}>Prochaine question…</div>
-      <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{countdown}</div>
-    </div></div>
-  );
   if(['question','answered','results'].includes(phase))return(
     <div style={root}>
       <div style={{padding:'10px 14px',borderBottom:'1px solid #1a1a2e'}}>
