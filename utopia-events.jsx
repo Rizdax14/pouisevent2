@@ -6897,15 +6897,9 @@ function DataBL({onBack}){
 // ─── APP ──────────────────────────────────────────────
 // ─── QUIZ DATA ────────────────────────────────────────────────────────────────
 async function fetchQuizQuestions(category, limit=20){
-  // Fetch all matching questions then balance by theme + difficulty
-  // category='bdd' for main DB, theme for sub-category
-  const themeFilter = (category && category!=='all') ? `&theme=eq.${category}` : '';
-  const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*&category=eq.bdd${themeFilter}&limit=1000`,
-    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
-  );
-  if(!r.ok){ console.error('quiz fetch',r.status,await r.text()); return []; }
-  const all = await r.json();
+  let all=[];
+  try{ all=await sbCollection("quiz_questions","?category=eq.bdd&limit=1000"); }
+  catch(e){ console.error("[QUIZ] sbCollection error",e); return []; }
   if(!all.length) return [];
 
   // Group by theme + difficulty
@@ -6941,13 +6935,11 @@ async function fetchQuizQuestions(category, limit=20){
 }
 
 async function fetchPouisQuestions(limit=50){
-  const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/quiz_questions?select=*&category=eq.pouis&limit=1000`,
-    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
-  );
-  if(!r.ok) return [];
-  const all = (await r.json()).sort(()=>Math.random()-.5);
-  return all.slice(0,limit).map(q=>({
+  let all=[];
+  try{ all=await sbCollection("quiz_questions","?category=eq.pouis&limit=1000"); }
+  catch(e){ return []; }
+  const sorted = all.sort(()=>Math.random()-.5);
+  return sorted.slice(0,limit).map(q=>({
     question: q.question,
     answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers||'[]'),
     correct: q.correct,
