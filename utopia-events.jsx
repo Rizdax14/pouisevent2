@@ -7352,118 +7352,83 @@ function QuizPage({currentPlayer,onBack}){
 }
 
 // ─── PUISSANCE 4 ──────────────────────────────────────────────────────────────
-const P4_COLS=7, P4_ROWS=6;
-const P4_EMPTY=0, P4_RED=1, P4_YEL=2;
-const P4_COLORS={0:'transparent',1:'#e74c3c',2:'#f1c40f'};
+const P4_COLS=7,P4_ROWS=6,P4_EMPTY=0,P4_RED=1,P4_YEL=2;
+const P4_C={0:'transparent',1:'#e74c3c',2:'#f1c40f'};
 
-function p4CheckWin(board,col,row,player){
+function p4Win(board,col,row,player){
   const dirs=[[1,0],[0,1],[1,1],[1,-1]];
   for(const[dc,dr]of dirs){
-    let count=1;
-    for(let d=1;d<4;d++){const c=col+dc*d,r=row+dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)count++;else break;}
-    for(let d=1;d<4;d++){const c=col-dc*d,r=row-dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)count++;else break;}
-    if(count>=4)return true;
-  }
-  return false;
+    let n=1;
+    for(let d=1;d<4;d++){const c=col+dc*d,r=row+dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)n++;else break;}
+    for(let d=1;d<4;d++){const c=col-dc*d,r=row-dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)n++;else break;}
+    if(n>=4)return true;
+  }return false;
 }
-function p4MakeBoard(){return Array.from({length:P4_ROWS},()=>Array(P4_COLS).fill(P4_EMPTY));}
 function p4Drop(board,col,player){
-  for(let r=P4_ROWS-1;r>=0;r--){if(board[r][col]===P4_EMPTY){board[r][col]=player;return r;}}
-  return -1;
+  for(let r=P4_ROWS-1;r>=0;r--){if(board[r][col]===P4_EMPTY){board[r][col]=player;return r;}}return -1;
 }
+function p4Empty(){return Array.from({length:P4_ROWS},()=>Array(P4_COLS).fill(P4_EMPTY));}
 
+// Store game state as JSON in quiz_games.quiz_title field (reuse existing table)
+// Format: "p4:${JSON}"
+async function p4Load(pin){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games?pin=eq.${pin}&select=*`,
+    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
+  const d=await r.json();
+  if(!d.length)return null;
+  const row=d[0];
+  return{
+    id:row.id,
+    state:{
+      board:JSON.parse(row.board),
+      turn:row.turn,
+      winner:row.winner,
+      hostName:row.host_name,
+      guestName:row.guest_name||'',
+      guestReady:!!(row.guest_name),
+    }
+  };
+}
+async function p4Save(id,state){
+  await fetch(`${SUPABASE_URL}/rest/v1/p4_games?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+    body:JSON.stringify({
+      board:JSON.stringify(state.board),
+      turn:state.turn,
+      winner:state.winner||null,
+      guest_name:state.guestName||null,
+    })
+  });
+}
 async function p4GenPin(){
   for(let i=0;i<10;i++){
     const pin='P'+String(Math.floor(1000+Math.random()*9000));
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&status=eq.lobby&select=pin`,{headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-    const d=await r.json();
-    if(!d.length)return pin;
-  }
-  return 'P'+String(Math.floor(1000+Math.random()*9000));
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games?pin=eq.${pin}&select=pin`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
+    const d=await r.json();if(!d.length)return pin;
+  }return 'P'+String(Math.floor(1000+Math.random()*9000));
 }
 
-function useP4Game({pin,userId,isHost}){
-  const[board,setBoard]=React.useState(p4MakeBoard());
-  const[turn,setTurn]=React.useState(P4_RED);
-  const[winner,setWinner]=React.useState(null);// null|P4_RED|P4_YEL|'draw'
-  const[oppJoined,setOppJoined]=React.useState(false);
-  const[oppName,setOppName]=React.useState('');
-  const R=React.useRef({channel:null,board:p4MakeBoard(),turn:P4_RED});
-
-  React.useEffect(()=>{
-    if(!pin||!userId||!_sb)return;
-    const ch=_sb.channel('p4:'+pin,{config:{broadcast:{self:false},presence:{key:String(userId)}}});
-    ch.on('presence',{event:'sync'},()=>{
-      const state=ch.presenceState();
-      const others=Object.entries(state).filter(([k])=>k!==String(userId));
-      if(others.length>0){setOppJoined(true);setOppName(others[0][1][0]?.username||'Adversaire');}
-      else{setOppJoined(false);}
-    });
-    ch.on('broadcast',{event:'P4_MOVE'},({payload})=>{
-      const{col,player}=payload;
-      const nb=R.current.board.map(r=>[...r]);
-      const row=p4Drop(nb,col,player);
-      if(row<0)return;
-      const won=p4CheckWin(nb,col,row,player);
-      const full=nb[0].every(c=>c!==P4_EMPTY);
-      R.current.board=nb;R.current.turn=player===P4_RED?P4_YEL:P4_RED;
-      setBoard(nb.map(r=>[...r]));
-      setTurn(R.current.turn);
-      if(won)setWinner(player);
-      else if(full)setWinner('draw');
-    });
-    ch.on('broadcast',{event:'P4_RESET'},()=>{
-      const nb=p4MakeBoard();R.current.board=nb;R.current.turn=P4_RED;
-      setBoard(nb.map(r=>[...r]));setTurn(P4_RED);setWinner(null);
-    });
-    ch.subscribe(async(s)=>{if(s==='SUBSCRIBED')await ch.track({userId,username:window._myName||'Joueur'});});
-    R.current.channel=ch;
-    return()=>{_sb.removeChannel(ch);};
-  },[pin,userId]);
-
-  const myColor=isHost?P4_RED:P4_YEL;
-
-  const playMove=React.useCallback(async(col)=>{
-    if(winner||turn!==myColor)return;
-    const nb=R.current.board.map(r=>[...r]);
-    const row=p4Drop(nb,col,myColor);
-    if(row<0)return;
-    const won=p4CheckWin(nb,col,row,myColor);
-    const full=nb[0].every(c=>c!==P4_EMPTY);
-    R.current.board=nb;R.current.turn=myColor===P4_RED?P4_YEL:P4_RED;
-    setBoard(nb.map(r=>[...r]));setTurn(R.current.turn);
-    if(won)setWinner(myColor);else if(full)setWinner('draw');
-    await R.current.channel?.send({type:'broadcast',event:'P4_MOVE',payload:{col,player:myColor}});
-  },[winner,turn,myColor]);
-
-  const resetGame=React.useCallback(async()=>{
-    const nb=p4MakeBoard();R.current.board=nb;R.current.turn=P4_RED;
-    setBoard(nb.map(r=>[...r]));setTurn(P4_RED);setWinner(null);
-    await R.current.channel?.send({type:'broadcast',event:'P4_RESET',payload:{}});
-  },[]);
-
-  return{board,turn,winner,myColor,oppJoined,oppName,playMove,resetGame};
-}
-
-function P4Board({board,myColor,turn,winner,onPlay,hovCol,setHovCol}){
+function P4Board({board,myColor,turn,winner,onPlay}){
   const m=useIsMobile();
-  const cellSize=m?42:52;
+  const cs=m?42:52;
+  const[hov,setHov]=React.useState(-1);
+  const canPlay=!winner&&turn===myColor;
   return(
-    <div style={{background:'#1a2480',borderRadius:12,padding:8,display:'inline-block',boxShadow:'0 8px 32px rgba(0,0,0,.5)'}}>
-      {/* Column hover buttons */}
+    <div style={{background:'#1a2480',borderRadius:12,padding:8,display:'inline-block',boxShadow:'0 8px 32px rgba(0,0,0,.5)',userSelect:'none'}}>
       <div style={{display:'flex',gap:4,marginBottom:4}}>
         {Array.from({length:P4_COLS},(_,c)=>(
-          <div key={c} style={{width:cellSize,height:cellSize*.5,display:'flex',alignItems:'center',justifyContent:'center',cursor:(!winner&&turn===myColor)?'pointer':'default',borderRadius:8,background:hovCol===c&&!winner&&turn===myColor?P4_COLORS[myColor]+'33':'transparent',transition:'background .15s'}}
-            onClick={()=>onPlay(c)} onMouseEnter={()=>setHovCol(c)} onMouseLeave={()=>setHovCol(-1)}>
-            {hovCol===c&&!winner&&turn===myColor&&<span style={{fontSize:16,color:P4_COLORS[myColor]}}>▼</span>}
+          <div key={c} style={{width:cs,height:cs*.5,display:'flex',alignItems:'center',justifyContent:'center',cursor:canPlay?'pointer':'default',borderRadius:8,background:hov===c&&canPlay?P4_C[myColor]+'44':'transparent',transition:'background .15s'}}
+            onClick={()=>canPlay&&onPlay(c)} onMouseEnter={()=>setHov(c)} onMouseLeave={()=>setHov(-1)}>
+            {hov===c&&canPlay&&<span style={{fontSize:14,color:P4_C[myColor]}}>▼</span>}
           </div>
         ))}
       </div>
-      {/* Grid */}
       {board.map((row,r)=>(
         <div key={r} style={{display:'flex',gap:4,marginBottom:4}}>
           {row.map((cell,c)=>(
-            <div key={c} style={{width:cellSize,height:cellSize,borderRadius:'50%',background:P4_COLORS[cell]||'#0a0a2a',boxShadow:cell?`0 2px 8px ${P4_COLORS[cell]}88`:'inset 0 2px 4px rgba(0,0,0,.4)',transition:'background .2s'}}/>
+            <div key={c} style={{width:cs,height:cs,borderRadius:'50%',background:P4_C[cell]||'#0a0a2a',boxShadow:cell?`0 2px 8px ${P4_C[cell]}88`:'inset 0 2px 4px rgba(0,0,0,.4)',transition:'background .2s'}}/>
           ))}
         </div>
       ))}
@@ -7472,26 +7437,61 @@ function P4Board({board,myColor,turn,winner,onPlay,hovCol,setHovCol}){
 }
 
 function P4Page({currentPlayer,onBack}){
-  const[view,setView]=React.useState('home');// home|host|join|game
+  const[view,setView]=React.useState('home');
   const[pin,setPin]=React.useState('');
   const[pinInput,setPinInput]=React.useState('');
   const[isHost,setIsHost]=React.useState(false);
+  const[gameId,setGameId]=React.useState(null);
+  const[board,setBoard]=React.useState(p4Empty());
+  const[turn,setTurn]=React.useState(P4_RED);
+  const[winner,setWinner]=React.useState(null);
+  const[oppName,setOppName]=React.useState('');
+  const[oppReady,setOppReady]=React.useState(false);
   const[loading,setLoading]=React.useState(false);
   const[error,setError]=React.useState(null);
-  const[hovCol,setHovCol]=React.useState(-1);
+  const pollRef=React.useRef(null);
+  const myColor=isHost?P4_RED:P4_YEL;
   const userId=currentPlayer?.id;
   const myName=currentPlayer?.display_name||currentPlayer?.name||'Joueur';
-  window._myName=myName;
 
-  const{board,turn,winner,myColor,oppJoined,oppName,playMove,resetGame}=useP4Game({pin,userId,isHost:isHost});
+  const initState=()=>({
+    board:p4Empty(),turn:P4_RED,winner:null,
+    hostName:myName,guestName:'',hostReady:true,guestReady:false
+  });
+
+  // Poll game state every 600ms
+  React.useEffect(()=>{
+    if(view!=='game'||!gameId)return;
+    const poll=async()=>{
+      try{
+        const g=await p4Load(pin);
+        if(!g)return;
+        const s=g.state;
+        setBoard(s.board||p4Empty());
+        setTurn(s.turn||P4_RED);
+        setWinner(s.winner||null);
+        if(isHost){setOppName(s.guestName||'');setOppReady(!!s.guestReady);}
+        else{setOppName(s.hostName||'');setOppReady(true);}
+      }catch(e){}
+    };
+    poll();
+    pollRef.current=setInterval(poll,600);
+    return()=>clearInterval(pollRef.current);
+  },[view,gameId,pin,isHost]);
 
   const handleHost=async()=>{
     setLoading(true);setError(null);
     try{
       const p=await p4GenPin();
-      // Store pin in quiz_games reusing the table
-      await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin:p,host_id:userId,host_username:myName,quiz_title:'puissance4',status:'lobby',total_questions:0})});
-      setPin(p);setIsHost(true);setView('game');
+      const state=initState();
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games`,{
+        method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"},
+        body:JSON.stringify({pin:p,host_id:userId,host_name:myName,board:JSON.stringify(state.board),turn:P4_RED,winner:null})
+      });
+      if(!r.ok){const e=await r.text();throw new Error(e);}
+      const d=await r.json();
+      setPin(p);setIsHost(true);setGameId(d[0]?.id||null);setView('game');
     }catch(e){setError('Erreur: '+e.message);}
     setLoading(false);
   };
@@ -7501,23 +7501,50 @@ function P4Page({currentPlayer,onBack}){
     if(p.length<3){setError('Code invalide');return;}
     setLoading(true);setError(null);
     try{
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${p}&status=eq.lobby&select=id`,{headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-      const d=await r.json();
-      if(!d.length)throw new Error('Partie introuvable');
-      setPin(p);setIsHost(false);setView('game');
+      const g=await p4Load(p);
+      if(!g)throw new Error('Partie introuvable');
+      const s={...g.state,guestName:myName,guestReady:true};
+      await p4Save(g.id,s);
+      setPin(p);setIsHost(false);setGameId(g.id);
+      setBoard(s.board);setTurn(s.turn);setOppName(s.hostName);setOppReady(true);
+      setView('game');
     }catch(e){setError(e.message);}
     setLoading(false);
+  };
+
+  const playMove=async(col)=>{
+    if(winner||turn!==myColor||(!oppReady&&isHost))return;
+    try{
+      const g=await p4Load(pin);if(!g)return;
+      const s={...g.state};
+      const nb=s.board.map(r=>[...r]);
+      const row=p4Drop(nb,col,myColor);if(row<0)return;
+      const won=p4Win(nb,col,row,myColor);
+      const draw=!won&&nb[0].every(c=>c!==P4_EMPTY);
+      s.board=nb;s.turn=myColor===P4_RED?P4_YEL:P4_RED;
+      s.winner=won?myColor:draw?'draw':null;
+      await p4Save(g.id,s);
+      setBoard(nb.map(r=>[...r]));setTurn(s.turn);setWinner(s.winner);
+    }catch(e){}
+  };
+
+  const resetGame=async()=>{
+    try{
+      const g=await p4Load(pin);if(!g)return;
+      const s={...g.state,board:p4Empty(),turn:P4_RED,winner:null};
+      await p4Save(g.id,s);
+      setBoard(p4Empty());setTurn(P4_RED);setWinner(null);
+    }catch(e){}
   };
 
   const S={
     root:{minHeight:'100vh',background:'#080812',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'},
     header:{width:'100%',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #1a1a2e'},
     card:{width:'100%',maxWidth:380,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:20,padding:'24px',marginTop:16},
-    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,padding:'14px 18px',fontSize:20,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:6,outline:'none',boxSizing:'border-box',fontFamily:"'Outfit',sans-serif",textTransform:'uppercase'},
-    btn:(c)=>({background:c,border:'none',borderRadius:14,padding:'14px',width:'100%',fontSize:16,fontWeight:700,color:'#fff',cursor:'pointer',marginTop:12,fontFamily:"'Outfit',sans-serif"}),
+    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,padding:'14px 18px',fontSize:22,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:8,outline:'none',boxSizing:'border-box',fontFamily:"'Outfit',sans-serif",textTransform:'uppercase'},
+    btn:(c,tc='#fff')=>({background:c,border:'none',borderRadius:14,padding:'14px',width:'100%',fontSize:16,fontWeight:700,color:tc,cursor:'pointer',marginTop:12,fontFamily:"'Outfit',sans-serif"}),
   };
 
-  // ── HOME ──
   if(view==='home')return(
     <div style={S.root}>
       <div style={S.header}>
@@ -7525,9 +7552,9 @@ function P4Page({currentPlayer,onBack}){
         <span style={{fontWeight:800,fontSize:20}}>🔴 PUISSANCE 4</span>
       </div>
       <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'32px 20px',width:'100%',maxWidth:440}}>
-        <div style={{fontSize:64,marginBottom:8}}>🔴🟡</div>
-        <div style={{fontSize:22,fontWeight:900,textAlign:'center'}}>1v1 en temps réel</div>
-        <div style={{color:'#aaa',fontSize:13,marginTop:6,textAlign:'center'}}>Aligne 4 jetons avant ton adversaire</div>
+        <div style={{fontSize:60,margin:'0 0 8px'}}>🔴🟡</div>
+        <div style={{fontSize:22,fontWeight:900}}>1v1 en temps réel</div>
+        <div style={{color:'#aaa',fontSize:13,marginTop:6}}>Aligne 4 jetons avant ton adversaire</div>
         <div style={S.card}>
           <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>🎛️ Créer une partie</div>
           <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Tu joues les 🔴 rouges</div>
@@ -7536,50 +7563,51 @@ function P4Page({currentPlayer,onBack}){
         <div style={{color:'#333',fontSize:14,marginTop:16}}>— ou —</div>
         <div style={{...S.card,marginTop:8}}>
           <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>📱 Rejoindre</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Tu joues les 🟡 jaunes</div>
+          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Tu joues les 🟡 jaunes · Entre le code de l'hôte</div>
           <input style={S.input} value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/[^A-Za-z0-9]/g,'').slice(0,5))} placeholder="CODE" onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>
           {error&&<div style={{color:'#e74c3c',fontSize:12,marginTop:8,textAlign:'center'}}>{error}</div>}
-          <button style={{...S.btn('#f1c40f'),color:'#080812'}} onClick={handleJoin} disabled={loading}>{loading?'…':'Rejoindre →'}</button>
+          <button style={{...S.btn('#f1c40f','#080812')}} onClick={handleJoin} disabled={loading}>{loading?'…':'Rejoindre →'}</button>
         </div>
       </div>
     </div>
   );
 
-  // ── GAME ──
-  const myTurn=turn===myColor&&!winner;
-  const winnerMsg=winner==='draw'?'Match nul !':winner===myColor?'Tu as gagné ! 🎉':'Adversaire gagne 😔';
+  const myTurn=!winner&&turn===myColor&&(isHost?oppReady:true);
+  const winMsg=winner==='draw'?'Match nul !':(winner===myColor?'Tu as gagné ! 🎉':'Adversaire gagne 😔');
   return(
     <div style={S.root}>
       <div style={S.header}>
         <button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
         <span style={{fontWeight:800,fontSize:18}}>🔴 PUISSANCE 4</span>
-        {isHost&&<div style={{marginLeft:'auto',background:'rgba(231,76,60,0.2)',border:'1px solid #e74c3c44',borderRadius:20,padding:'4px 14px',fontSize:13,fontWeight:700,letterSpacing:4,color:'#e74c3c'}}>{pin}</div>}
+        {isHost&&<div style={{marginLeft:'auto',background:'rgba(231,76,60,0.2)',border:'1px solid #e74c3c55',borderRadius:20,padding:'4px 16px',fontSize:15,fontWeight:900,letterSpacing:6,color:'#e74c3c'}}>{pin}</div>}
       </div>
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 16px',gap:16}}>
-        {/* Status */}
-        {!oppJoined&&!winner&&(
-          <div style={{textAlign:'center',color:'#aaa',fontSize:14}}>
-            {isHost?(<>En attente… <br/><span style={{fontWeight:800,fontSize:28,color:'#e74c3c',letterSpacing:6}}>{pin}</span></>):('Connexion…')}
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',gap:12}}>
+        {isHost&&!oppReady&&!winner&&(
+          <div style={{textAlign:'center',color:'#aaa',fontSize:14,lineHeight:2}}>
+            En attente d'un adversaire…<br/>
+            <span style={{fontWeight:900,fontSize:32,color:'#e74c3c',letterSpacing:8}}>{pin}</span>
           </div>
         )}
-        {oppJoined&&!winner&&(
-          <div style={{display:'flex',gap:20,alignItems:'center',fontSize:14}}>
-            <span style={{fontWeight:800,color:P4_COLORS[myColor]}}>Toi ({myColor===P4_RED?'🔴':'🟡'})</span>
-            <span style={{color:'#555'}}>VS</span>
-            <span style={{fontWeight:800,color:P4_COLORS[myColor===P4_RED?P4_YEL:P4_RED]}}>{oppName} ({myColor===P4_RED?'🟡':'🔴'})</span>
-          </div>
+        {(oppReady||!isHost)&&!winner&&(
+          <>
+            <div style={{display:'flex',gap:20,alignItems:'center',fontSize:14}}>
+              <span style={{fontWeight:800,color:P4_C[myColor]}}>
+                {isHost?'Toi':oppName} {myColor===P4_RED?'🔴':'🟡'}
+              </span>
+              <span style={{color:'#555'}}>VS</span>
+              <span style={{fontWeight:800,color:P4_C[myColor===P4_RED?P4_YEL:P4_RED]}}>
+                {isHost?oppName:'Toi'} {myColor===P4_RED?'🟡':'🔴'}
+              </span>
+            </div>
+            <div style={{fontWeight:700,fontSize:14,color:myTurn?P4_C[myColor]:'#666'}}>
+              {myTurn?'▶ Ton tour !':'⏳ Tour adversaire…'}
+            </div>
+          </>
         )}
-        {(oppJoined||!isHost)&&!winner&&(
-          <div style={{fontWeight:700,fontSize:14,color:myTurn?P4_COLORS[myColor]:'#aaa'}}>
-            {myTurn?'▶ Ton tour !':'⏳ Tour adversaire…'}
-          </div>
-        )}
+        {winner&&<div style={{fontWeight:900,fontSize:24,color:winner===myColor?'#2ecc71':winner==='draw'?'#f1c40f':'#e74c3c'}}>{winMsg}</div>}
+        <P4Board board={board} myColor={myColor} turn={turn} winner={winner} onPlay={playMove}/>
         {winner&&(
-          <div style={{fontWeight:900,fontSize:22,color:winner===myColor?'#2ecc71':winner==='draw'?'#f1c40f':'#e74c3c',textAlign:'center'}}>{winnerMsg}</div>
-        )}
-        <P4Board board={board} myColor={myColor} turn={turn} winner={winner} onPlay={playMove} hovCol={hovCol} setHovCol={setHovCol}/>
-        {winner&&(
-          <button style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'12px 28px',fontSize:15,fontWeight:700,cursor:'pointer',marginTop:8}} onClick={resetGame}>Rejouer</button>
+          <button onClick={resetGame} style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'12px 28px',fontSize:15,fontWeight:700,cursor:'pointer',marginTop:4}}>Rejouer</button>
         )}
       </div>
     </div>
