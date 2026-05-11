@@ -6895,106 +6895,96 @@ function DataBL({onBack}){
 }
 
 // ─── APP ──────────────────────────────────────────────
-// ─── QUIZ DATA ────────────────────────────────────────────────────────────────
-async function fetchQuizQuestions(category, limit=20){
-  let all=[];
-  try{ all=await sbCollection("quiz_questions","?category=eq.bdd&limit=1000"); }
-  catch(e){ console.error("[QUIZ] sbCollection error",e); return []; }
-  if(!all.length) return [];
-
-  // Group by theme + difficulty
-  const groups = {};
-  all.forEach(q=>{
-    const key = (q.theme||q.category) + '_' + (q.difficulty||2);
-    if(!groups[key]) groups[key]=[];
-    groups[key].push(q);
-  });
-
-  // Shuffle each group
-  Object.values(groups).forEach(g=>g.sort(()=>Math.random()-.5));
-
-  // Round-robin pick from groups to balance
-  const picked = [];
-  const keys = Object.keys(groups).sort(()=>Math.random()-.5);
-  let i=0;
-  while(picked.length < limit && Object.values(groups).some(g=>g.length>0)){
-    const key = keys[i % keys.length];
-    if(groups[key] && groups[key].length > 0) picked.push(groups[key].shift());
-    i++;
-    if(i > keys.length * (limit+10)) break; // safety
-  }
-
-  return picked.slice(0,limit).map(q=>({
-    question: q.question,
-    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers||'[]'),
-    correct: q.correct,
-    time_limit: q.time_limit||20,
-    theme: q.theme||q.category,
-    difficulty: q.difficulty||2,
-  }));
-}
-
-async function fetchPouisQuestions(limit=50){
-  let all=[];
-  try{ all=await sbCollection("quiz_questions","?category=eq.pouis&limit=1000"); }
-  catch(e){ return []; }
-  const sorted = all.sort(()=>Math.random()-.5);
-  return sorted.slice(0,limit).map(q=>({
-    question: q.question,
-    answers: Array.isArray(q.answers) ? q.answers : JSON.parse(q.answers||'[]'),
-    correct: q.correct,
-    time_limit: q.time_limit||20,
-  }));
-}
-
-const QUIZZES = [
+// ─── LEVERCULQUIZ ─────────────────────────────────────────────────────────────
+// Hardcoded quizzes (preset mode)
+const QUIZ_PRESETS = [
   {
-    id:'pouis-1', title:'Pouis Events', emoji:'🏆',
-    description:'Culture Leverculsec & Olympiades — 50 questions',
-    questions:[], _fromDB:true
-  },
-  {
-    id:'sport-1', title:'Quiz Sport', emoji:'⚽',
-    description:'Football, tennis, basket et plus',
+    id:'sport', title:'Quiz Sport', emoji:'⚽', description:'Football, basket, tennis…',
     questions:[
-      {question:'Quel pays a remporté la Coupe du Monde 2018 ?',answers:['Brésil','Allemagne','France','Argentine'],correct:2,time_limit:20},
-      {question:'En NBA, combien de points vaut un lancer franc ?',answers:['1','2','3','4'],correct:0,time_limit:15},
-      {question:'Combien de sets gagnés faut-il pour remporter un match de Grand Chelem masculin ?',answers:['2','3','4','5'],correct:1,time_limit:15},
-      {question:"Quel joueur détient le record de Ballons d'Or ?",answers:['Ronaldo','Messi','Zidane','Ronaldinho'],correct:1,time_limit:20},
-      {question:'Combien de joueurs dans une équipe de rugby à XV ?',answers:['13','14','15','16'],correct:2,time_limit:15},
+      {q:'Quel pays a remporté la Coupe du Monde 2022 ?',a:['France','Brésil','Argentine','Angleterre'],c:2,t:20},
+      {q:'En NBA, combien de points vaut un lancer franc ?',a:['1','2','3','4'],c:0,t:15},
+      {q:"Quel joueur détient le record de Ballons d'Or ?",a:['Ronaldo','Messi','Zidane','Ronaldinho'],c:1,t:20},
+      {q:'Combien de joueurs dans une équipe de rugby à XV ?',a:['13','14','15','16'],c:2,t:15},
+      {q:'Quelle est la distance du marathon ?',a:['40km','41.195km','42.195km','43km'],c:2,t:20},
     ]
   },
   {
-    id:'culture-1', title:'Culture Générale', emoji:'🧠',
-    description:'Géo, sciences, histoire',
+    id:'culture', title:'Culture Générale', emoji:'🧠', description:'Histoire, géo, sciences…',
     questions:[
-      {question:'Quelle est la planète la plus grande du système solaire ?',answers:['Saturne','Uranus','Jupiter','Neptune'],correct:2,time_limit:15},
-      {question:'En quelle année a eu lieu la Révolution française ?',answers:['1776','1789','1804','1815'],correct:1,time_limit:20},
-      {question:'Quel est le pays le plus grand du monde en superficie ?',answers:['Canada','Chine','USA','Russie'],correct:3,time_limit:15},
-      {question:"Combien de chromosomes possède l'être humain ?",answers:['23','44','46','48'],correct:2,time_limit:20},
-      {question:'Qui a peint la Joconde ?',answers:['Raphaël','Michel-Ange','Léonard de Vinci','Botticelli'],correct:2,time_limit:15},
+      {q:'Quelle est la capitale de lAustralie ?',a:['Sydney','Melbourne','Canberra','Brisbane'],c:2,t:20},
+      {q:'Qui a peint la Joconde ?',a:['Raphaël','Michel-Ange','Léonard de Vinci','Botticelli'],c:2,t:15},
+      {q:'En quelle année est tombé le mur de Berlin ?',a:['1987','1988','1989','1990'],c:2,t:15},
+      {q:'Quel est le pays le plus grand du monde ?',a:['Canada','Chine','USA','Russie'],c:3,t:15},
+      {q:'Combien de chromosomes a lêtre humain ?',a:['23','44','46','48'],c:2,t:20},
     ]
-  }
+  },
 ];
 
-// ─── useQuizGame HOOK ─────────────────────────────────────────────────────────
-function calcQuizPoints(timeTakenMs, timeLimitMs){
-  return Math.round(500 + Math.max(0,1-timeTakenMs/timeLimitMs)*500);
+// Fetch from Supabase quiz_questions table
+async function loadBDDQuestions(limit){
+  try{
+    const url=`${SUPABASE_URL}/rest/v1/quiz_questions?select=id,question,answers,correct,time_limit,theme,difficulty&category=eq.bdd&limit=1000`;
+    const res=await fetch(url,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+    const rows=await res.json();
+    if(!Array.isArray(rows)||!rows.length)return null;
+    // Balance: round-robin by theme+difficulty
+    const buckets={};
+    rows.forEach(r=>{const k=(r.theme||'x')+'_'+(r.difficulty||2);if(!buckets[k])buckets[k]=[];buckets[k].push(r);});
+    Object.values(buckets).forEach(b=>b.sort(()=>Math.random()-.5));
+    const keys=Object.keys(buckets).sort(()=>Math.random()-.5);
+    const out=[];let i=0;
+    while(out.length<limit&&Object.values(buckets).some(b=>b.length)){
+      const k=keys[i%keys.length];
+      if(buckets[k]&&buckets[k].length)out.push(buckets[k].shift());
+      i++;if(i>keys.length*(limit+10))break;
+    }
+    return out.slice(0,limit).map(r=>({
+      q:r.question,
+      a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
+      c:r.correct,t:r.time_limit||20
+    }));
+  }catch(e){console.error('[QUIZ] loadBDD error',e);return null;}
 }
+
+async function loadPouisQuestions(limit){
+  try{
+    const url=`${SUPABASE_URL}/rest/v1/quiz_questions?select=id,question,answers,correct,time_limit&category=eq.pouis&limit=1000`;
+    const res=await fetch(url,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+    const rows=await res.json();
+    if(!Array.isArray(rows)||!rows.length)return null;
+    return rows.sort(()=>Math.random()-.5).slice(0,limit).map(r=>({
+      q:r.question,
+      a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
+      c:r.correct,t:r.time_limit||20
+    }));
+  }catch(e){console.error('[QUIZ] loadPouis error',e);return null;}
+}
+
+async function quizGenPin(){
+  for(let i=0;i<10;i++){
+    const pin=String(Math.floor(1000+Math.random()*9000));
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&select=pin`,
+      {headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+    const d=await res.json();if(!d.length)return pin;
+  }
+  return String(Math.floor(1000+Math.random()*9000));
+}
+
+function calcQuizPoints(ms,limitMs){return Math.round(500+Math.max(0,1-ms/limitMs)*500);}
+
+// ─── useQuizGame ──────────────────────────────────────────────────────────────
 function useQuizGame({pin,userId,username,isHost}){
-  const [phase,setPhase]=React.useState('lobby');
-  const [players,setPlayers]=React.useState([]);
-  const [question,setQuestion]=React.useState(null);
-  const [timeLeft,setTimeLeft]=React.useState(0);
-  const [myAnswer,setMyAnswer]=React.useState(null);
-  const [results,setResults]=React.useState(null);
-  const [finalScores,setFinalScores]=React.useState(null);
-  const [answersIn,setAnswersIn]=React.useState([]);
-  const [quizTitle,setQuizTitle]=React.useState('');
-  const [totalQuestions,setTotalQuestions]=React.useState(0);
-  const R=React.useRef({channel:null,quiz:null,currentIndex:0,questionStartTime:0,scores:{},answersIn:[],players:[],timer:null});
-  React.useEffect(()=>{R.current.answersIn=answersIn;},[answersIn]);
-  React.useEffect(()=>{R.current.players=players;},[players]);
+  const[phase,setPhase]=React.useState('lobby');
+  const[players,setPlayers]=React.useState([]);
+  const[question,setQuestion]=React.useState(null);
+  const[timeLeft,setTimeLeft]=React.useState(0);
+  const[myAnswer,setMyAnswer]=React.useState(null);
+  const[results,setResults]=React.useState(null);
+  const[finalScores,setFinalScores]=React.useState(null);
+  const[answersIn,setAnswersIn]=React.useState([]);
+  const[quizTitle,setQuizTitle]=React.useState('');
+  const[totalQ,setTotalQ]=React.useState(0);
+  const R=React.useRef({ch:null,quiz:null,idx:0,qStart:0,scores:{},answers:[],players:[],timer:null});
 
   const stopTimer=React.useCallback(()=>{clearInterval(R.current.timer);R.current.timer=null;},[]);
   const startTimer=React.useCallback((secs,onEnd)=>{
@@ -7002,890 +6992,563 @@ function useQuizGame({pin,userId,username,isHost}){
     const end=Date.now()+secs*1000;
     R.current.timer=setInterval(()=>{
       const left=Math.max(0,Math.ceil((end-Date.now())/1000));
-      setTimeLeft(left);
-      if(left===0){stopTimer();onEnd?.();}
+      setTimeLeft(left);if(left===0){stopTimer();onEnd?.();}
     },200);
   },[stopTimer]);
 
-  function bcast(evt,payload){return R.current.channel?.send({type:'broadcast',event:evt,payload});}
+  const bcast=React.useCallback((evt,payload)=>R.current.ch?.send({type:'broadcast',event:evt,payload}),[]);
 
-  const hostShowResultsNow=React.useCallback(async()=>{
+  const hostReveal=React.useCallback(async()=>{
     if(!isHost)return;stopTimer();
-    const quiz=R.current.quiz,idx=R.current.currentIndex;if(!quiz)return;
-    const q=quiz.questions[idx],answers=R.current.answersIn;
-    answers.forEach(a=>{if(a.isCorrect)R.current.scores[a.userId]=(R.current.scores[a.userId]||0)+a.points;});
-    const scores=R.current.players.map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0,delta:answers.find(a=>a.userId===p.userId)?.points||0,isCorrect:!!answers.find(a=>a.userId===p.userId)?.isCorrect})).sort((a,b)=>b.total-a.total);
-    await bcast('SHOW_RESULTS',{correctIndex:q.correct,scores});
-    setResults({correctIndex:q.correct,scores});setPhase('results');
-  },[isHost,stopTimer]);
+    const quiz=R.current.quiz,q=quiz?.questions[R.current.idx];if(!q)return;
+    const ans=R.current.answers;
+    ans.forEach(a=>{if(a.ok)R.current.scores[a.uid]=(R.current.scores[a.uid]||0)+a.pts;});
+    const sc=R.current.players
+      .filter(p=>String(p.userId)!==String(userId))
+      .map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0,
+        delta:ans.find(a=>a.uid===p.userId)?.pts||0,ok:!!ans.find(a=>a.uid===p.userId)?.ok}))
+      .sort((a,b)=>b.total-a.total);
+    await bcast('SHOW_RESULTS',{correctIndex:q.c,scores:sc});
+    setResults({correctIndex:q.c,scores:sc});setPhase('results');
+  },[isHost,userId,stopTimer,bcast]);
 
-  const handleEvent=React.useCallback((evt,payload)=>{
+  const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
-      case 'GAME_START':setQuizTitle(payload.quizTitle);setTotalQuestions(payload.totalQuestions);break;
+      case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
       case 'SHOW_QUESTION':{
-        const{index,question:q,answers,correct,time_limit}=payload;
-        setQuestion({index,question:q,answers,correct,time_limit});
-        setMyAnswer(null);setResults(null);setAnswersIn([]);
-        R.current.questionStartTime=Date.now();setPhase('question');
-        startTimer(time_limit,()=>setPhase('answered'));
-        break;}
+        const{idx,q,a,c,t}=payload;
+        setQuestion({idx,q,a,c,t});setMyAnswer(null);setResults(null);setAnswersIn([]);
+        R.current.qStart=Date.now();R.current.answers=[];setPhase('question');
+        startTimer(t,()=>setPhase('answered'));break;}
       case 'PLAYER_ANSWER':
         if(isHost){
-          const{userId:uid,username:uname,answerIndex,timeTakenMs}=payload;
-          const q=R.current.quiz?.questions[R.current.currentIndex];if(!q)break;
-          const isCorrect=answerIndex===q.correct;
-          const points=isCorrect?calcQuizPoints(timeTakenMs,q.time_limit*1000):0;
-          const newAnswers=[...R.current.answersIn.filter(a=>a.userId!==uid),{userId:uid,username:uname,answerIndex,isCorrect,points}];
-          R.current.answersIn=newAnswers;
-          setAnswersIn(newAnswers);
-          // Auto-reveal if everyone answered
-          const totalPlayers=R.current.players.filter(p=>p.userId!==uid||true).length;
-          if(newAnswers.length>=totalPlayers&&totalPlayers>0){
-            setTimeout(()=>hostShowResultsNow(),400);
-          }
+          const{uid,uname,ai,ms}=payload;
+          const q=R.current.quiz?.questions[R.current.idx];if(!q)break;
+          const ok=ai===q.c,pts=ok?calcQuizPoints(ms,q.t*1000):0;
+          const prev=R.current.answers.filter(a=>a.uid!==uid);
+          const next=[...prev,{uid,uname,ai,ok,pts}];
+          R.current.answers=next;setAnswersIn(next);
+          // Auto-reveal when all non-host players answered
+          const nonHost=R.current.players.filter(p=>String(p.userId)!==String(userId));
+          if(next.length>=nonHost.length&&nonHost.length>0)setTimeout(()=>hostReveal(),400);
         }break;
       case 'SHOW_RESULTS':{
-        const{correctIndex,scores}=payload;stopTimer();
-        const mine=scores.find(s=>s.userId===userId);
-        setResults({correctIndex,scores,myPoints:mine?.delta??0,myRank:mine?scores.findIndex(s=>s.userId===userId)+1:null,myTotal:mine?.total??0});
+        stopTimer();
+        const{correctIndex,scores}=payload;
+        const me=scores.find(s=>String(s.userId)===String(userId));
+        setResults({correctIndex,scores,myPts:me?.delta??0,myRank:me?scores.findIndex(s=>String(s.userId)===String(userId))+1:null,myTotal:me?.total??0});
         setPhase('results');break;}
       case 'GAME_OVER':stopTimer();setFinalScores(payload.scores);setPhase('finished');break;
-      default:break;
     }
-  },[isHost,userId,startTimer,stopTimer]);
+  },[isHost,userId,startTimer,stopTimer,hostReveal]);
 
   React.useEffect(()=>{
     if(!pin||!userId||!_sb)return;
-    const channel=_sb.channel('quiz:'+pin,{config:{broadcast:{self:false},presence:{key:userId}}});
-    channel.on('presence',{event:'sync'},()=>{
-      const state=channel.presenceState();
-      setPlayers(Object.values(state).flat().map(p=>({userId:p.userId,username:p.username,score:p.score??0})));
+    const ch=_sb.channel('quiz:'+pin,{config:{broadcast:{self:false},presence:{key:String(userId)}}});
+    ch.on('presence',{event:'sync'},()=>{
+      const state=ch.presenceState();
+      const all=Object.values(state).flat().map(p=>({userId:p.userId,username:p.username}));
+      setPlayers(all);R.current.players=all;
     });
-    ['GAME_START','SHOW_QUESTION','PLAYER_ANSWER','SHOW_RESULTS','GAME_OVER'].forEach(e=>{
-      channel.on('broadcast',{event:e},({payload})=>handleEvent(e,payload));
-    });
-    channel.subscribe(async(status)=>{if(status==='SUBSCRIBED')await channel.track({userId,username,score:0});});
-    R.current.channel=channel;
-    return()=>{stopTimer();_sb.removeChannel(channel);};
-  },[pin,userId,username,handleEvent,stopTimer]);
+    ['GAME_START','SHOW_QUESTION','PLAYER_ANSWER','SHOW_RESULTS','GAME_OVER'].forEach(e=>
+      ch.on('broadcast',{event:e},({payload})=>handleEvt(e,payload)));
+    ch.subscribe(async s=>{if(s==='SUBSCRIBED')await ch.track({userId,username});});
+    R.current.ch=ch;
+    return()=>{stopTimer();_sb.removeChannel(ch);};
+  },[pin,userId,username,handleEvt,stopTimer]);
 
-  const hostStartGame=React.useCallback(async(quiz)=>{
-    if(!isHost||!R.current.channel)return;
-    R.current.quiz=quiz;R.current.currentIndex=0;R.current.scores={};
-    R.current.players.forEach(p=>{R.current.scores[p.userId]=0;});
-    setQuizTitle(quiz.title);setTotalQuestions(quiz.questions.length);
-    await bcast('GAME_START',{quizTitle:quiz.title,totalQuestions:quiz.questions.length});
-  },[isHost]);
+  const hostStart=React.useCallback(async(quiz)=>{
+    if(!isHost||!R.current.ch)return;
+    R.current.quiz=quiz;R.current.idx=0;R.current.scores={};R.current.answers=[];
+    R.current.players.filter(p=>String(p.userId)!==String(userId)).forEach(p=>{R.current.scores[p.userId]=0;});
+    setQuizTitle(quiz.title);setTotalQ(quiz.questions.length);
+    await bcast('GAME_START',{title:quiz.title,total:quiz.questions.length});
+  },[isHost,userId,bcast]);
 
-  const hostSendQuestion=React.useCallback(async(index)=>{
+  const hostSendQ=React.useCallback(async(idx)=>{
     if(!isHost||!R.current.quiz)return;
-    const q=R.current.quiz.questions[index];
-    R.current.currentIndex=index;R.current.answersIn=[];setAnswersIn([]);
-    await bcast('SHOW_QUESTION',{index,question:q.question,answers:q.answers,correct:q.correct,time_limit:q.time_limit});
-    setQuestion({index,question:q.question,answers:q.answers,correct:q.correct,time_limit:q.time_limit});
-    setMyAnswer(null);setResults(null);R.current.questionStartTime=Date.now();setPhase('question');
-    startTimer(q.time_limit,()=>hostShowResultsNow());
-  },[isHost,startTimer,hostShowResultsNow]);
+    const q=R.current.quiz.questions[idx];R.current.idx=idx;R.current.answers=[];setAnswersIn([]);
+    await bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t});
+    setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t});setMyAnswer(null);setResults(null);
+    R.current.qStart=Date.now();setPhase('question');
+    startTimer(q.t,()=>hostReveal());
+  },[isHost,startTimer,hostReveal,bcast]);
 
-  const hostNextQuestion=React.useCallback(async()=>{
+  const hostNext=React.useCallback(async()=>{
     if(!isHost||!R.current.quiz)return;
-    const next=R.current.currentIndex+1;
+    const next=R.current.idx+1;
     if(next>=R.current.quiz.questions.length){
-      const scores=R.current.players.map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0})).sort((a,b)=>b.total-a.total);
-      await bcast('GAME_OVER',{scores});setFinalScores(scores);setPhase('finished');
+      const sc=R.current.players
+        .filter(p=>String(p.userId)!==String(userId))
+        .map(p=>({userId:p.userId,username:p.username,total:R.current.scores[p.userId]||0}))
+        .sort((a,b)=>b.total-a.total);
+      await bcast('GAME_OVER',{scores:sc});setFinalScores(sc);setPhase('finished');
       try{
-        const{data:game}=await _sb.from('quiz_games').select('id').eq('pin',pin).single();
-        if(game){
-          await _sb.from('quiz_games').update({status:'finished',finished_at:new Date().toISOString()}).eq('id',game.id);
-          for(const[i,s]of scores.entries())await _sb.from('quiz_game_players').upsert({game_id:game.id,user_id:s.userId,username:s.username,final_score:s.total,final_rank:i+1},{onConflict:'game_id,user_id'});
+        const g=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&select=id`,
+          {headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+        const gd=await g.json();
+        if(gd[0]){
+          await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?id=eq.${gd[0].id}`,{method:'PATCH',
+            headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json"},
+            body:JSON.stringify({status:'finished'})});
+          for(const[i,s]of sc.entries())
+            await fetch(`${SUPABASE_URL}/rest/v1/quiz_game_players`,{method:'POST',
+              headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
+              body:JSON.stringify({game_id:gd[0].id,user_id:s.userId,username:s.username,final_score:s.total,final_rank:i+1})});
         }
       }catch(e){}
-    }else{hostSendQuestion(next);}
-  },[isHost,pin,hostSendQuestion]);
+    }else{hostSendQ(next);}
+  },[isHost,pin,userId,hostSendQ,bcast]);
 
-  const playerAnswer=React.useCallback(async(answerIndex)=>{
+  const playerAnswer=React.useCallback(async(ai)=>{
     if(isHost||myAnswer!==null||phase!=='question')return;
-    const timeTakenMs=Date.now()-R.current.questionStartTime;
-    setMyAnswer(answerIndex);setPhase('answered');
-    await bcast('PLAYER_ANSWER',{userId,username,answerIndex,timeTakenMs});
-  },[isHost,myAnswer,phase,userId,username]);
+    const ms=Date.now()-R.current.qStart;
+    setMyAnswer(ai);setPhase('answered');
+    await bcast('PLAYER_ANSWER',{uid:userId,uname:username,ai,ms});
+  },[isHost,myAnswer,phase,userId,username,bcast]);
 
-  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQuestions,hostStartGame,hostSendQuestion,hostShowResultsNow,hostNextQuestion,playerAnswer};
+  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
+    hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
-// ─── QUIZ HOST ────────────────────────────────────────────────────────────────
-const QZ_COLORS=['#e74c3c','#2980b9','#f39c12','#27ae60'];
-const QZ_SHAPES=['▲','◆','●','■'];
+// ─── QuizHost ─────────────────────────────────────────────────────────────────
+const QC=['#e74c3c','#2980b9','#f39c12','#27ae60'];
+const QS=['▲','◆','●','■'];
 
 function QuizHost({pin,userId,username,quiz,onExit}){
-  const{phase,players,question,timeLeft,results,finalScores,answersIn,totalQuestions,hostStartGame,hostSendQuestion,hostShowResultsNow,hostNextQuestion}=useQuizGame({pin,userId,username,isHost:true});
-  const[gameStarted,setGameStarted]=React.useState(false);
-  const qIndex=question?.index??0,timeLimitSecs=question?.time_limit??20,timerRatio=timeLimitSecs>0?timeLeft/timeLimitSecs:0;
+  const{phase,players,question,timeLeft,results,finalScores,answersIn,totalQ,hostStart,hostSendQ,hostReveal,hostNext}=
+    useQuizGame({pin,userId,username,isHost:true});
+  const[started,setStarted]=React.useState(false);
+  const m=useIsMobile();
+  const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
+  const nonHostPlayers=players.filter(p=>String(p.userId)!==String(userId));
 
-  const handleStart=async()=>{setGameStarted(true);await hostStartGame(quiz);await hostSendQuestion(0);};
+  const doStart=async()=>{setStarted(true);await hostStart(quiz);await hostSendQ(0);};
 
   const S={
-    root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'},
-    header:{width:'100%',background:'rgba(255,255,255,0.04)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'12px 24px',display:'flex',justifyContent:'space-between',alignItems:'center'},
-    main:{width:'100%',maxWidth:900,padding:'24px 16px',flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:24},
-    card:{background:'rgba(255,255,255,0.05)',borderRadius:20,padding:'24px 32px',width:'100%',border:'1px solid rgba(255,255,255,0.08)'},
-    btn:(c='#7c3aed',d=false)=>({background:d?'#333':c,color:'#fff',border:'none',borderRadius:14,padding:'14px 32px',fontSize:16,fontWeight:700,cursor:d?'not-allowed':'pointer',opacity:d?0.5:1}),
-    grid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,width:'100%'},
-    tile:(c,dim=false)=>({background:dim?'rgba(255,255,255,0.05)':c,borderRadius:16,padding:'20px 24px',fontSize:18,fontWeight:700,display:'flex',alignItems:'center',gap:12,opacity:dim?0.4:1,color:'#fff',border:dim?`2px solid ${c}`:'none'}),
-    score:(r)=>({display:'flex',alignItems:'center',gap:16,padding:'12px 16px',borderRadius:12,background:r===0?'rgba(255,215,0,0.12)':r===1?'rgba(192,192,192,0.1)':r===2?'rgba(205,127,50,0.1)':'rgba(255,255,255,0.04)',border:`1px solid ${r===0?'rgba(255,215,0,0.3)':'rgba(255,255,255,0.06)'}`,marginBottom:8}),
+    root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'},
+    hdr:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 20px',borderBottom:'1px solid #1a1a2e',flexShrink:0},
+    body:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',padding:'20px 16px',gap:16,maxWidth:900,margin:'0 auto',width:'100%'},
+    card:{background:'rgba(255,255,255,0.05)',borderRadius:16,padding:'20px 24px',width:'100%',border:'1px solid rgba(255,255,255,0.08)'},
+    grid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,width:'100%'},
+    tile:(c,dim)=>({background:dim?'rgba(255,255,255,0.04)':c,borderRadius:14,padding:'16px 20px',fontSize:16,fontWeight:700,
+      display:'flex',alignItems:'center',gap:10,opacity:dim?0.4:1,color:'#fff',border:dim?`2px solid ${c}`:'none'}),
+    btn:(c='#7c3aed',dis=false)=>({background:dis?'#333':c,color:'#fff',border:'none',borderRadius:12,
+      padding:'12px 28px',fontSize:15,fontWeight:700,cursor:dis?'not-allowed':'pointer',opacity:dis?0.5:1,
+      fontFamily:"'Outfit',sans-serif"}),
+    row:(i)=>({display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:10,marginBottom:6,
+      background:i===0?'rgba(255,215,0,0.1)':i===1?'rgba(192,192,192,0.08)':i===2?'rgba(205,127,50,0.08)':'rgba(255,255,255,0.04)',
+      border:`1px solid ${i===0?'rgba(255,215,0,0.25)':'rgba(255,255,255,0.05)'}`}),
   };
 
-  if(phase==='lobby'&&!gameStarted)return(
+  // Lobby
+  if(!started) return(
     <div style={S.root}>
-      <div style={S.header}>
-        <span style={{fontWeight:800,fontSize:20}}>🎯 LEVERCULQUIZ</span>
-        <div style={{fontSize:36,fontWeight:900,letterSpacing:8,color:'#7c3aed',background:'rgba(124,58,237,0.2)',padding:'8px 20px',borderRadius:12}}>{pin}</div>
-        <button onClick={onExit} style={{background:'none',border:'1px solid #444',color:'#aaa',borderRadius:8,padding:'6px 14px',cursor:'pointer'}}>Quitter</button>
+      <div style={S.hdr}>
+        <span style={{fontWeight:800,fontSize:18}}>🎯 {quiz.title}</span>
+        <div style={{fontSize:32,fontWeight:900,letterSpacing:6,color:'#7c3aed',background:'rgba(124,58,237,0.15)',padding:'6px 16px',borderRadius:10}}>{pin}</div>
+        <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#aaa',borderRadius:8,padding:'6px 14px',cursor:'pointer'}}>Quitter</button>
       </div>
-      <div style={S.main}>
+      <div style={{...S.body,justifyContent:'center'}}>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:14,color:'#aaa',marginBottom:4}}>Les joueurs vont sur <b style={{color:'#fff'}}>leverculsec.com → Games → Quiz</b> et entrent :</div>
-          <div style={{fontSize:72,fontWeight:900,letterSpacing:12,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,0.5)',margin:'12px 0'}}>{pin}</div>
+          <div style={{fontSize:13,color:'#aaa',marginBottom:6}}>Les joueurs vont sur <b style={{color:'#fff'}}>leverculsec.com → Games → LEVERCULQUIZ</b> et entrent :</div>
+          <div style={{fontSize:64,fontWeight:900,letterSpacing:10,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,0.4)'}}>{pin}</div>
         </div>
         <div style={S.card}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-            <span style={{fontWeight:700}}>👥 Joueurs connectés</span>
-            <span style={{background:'#7c3aed',borderRadius:20,padding:'2px 12px',fontWeight:800,fontSize:18}}>{players.length}</span>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+            <span style={{fontWeight:700}}>👥 Joueurs</span>
+            <span style={{background:'#7c3aed',borderRadius:20,padding:'2px 12px',fontWeight:800}}>{nonHostPlayers.length}</span>
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {players.filter(p=>p.userId!==userId).length===0?<span style={{color:'#666',fontStyle:'italic'}}>En attente…</span>:players.filter(p=>p.userId!==userId).map(p=>(
-              <span key={p.userId} style={{background:'rgba(124,58,237,0.2)',border:'1px solid rgba(124,58,237,0.4)',borderRadius:30,padding:'6px 14px',fontSize:14,fontWeight:600}}>🟢 {p.username}</span>
-            ))}
+            {nonHostPlayers.length===0
+              ?<span style={{color:'#555',fontStyle:'italic'}}>En attente…</span>
+              :nonHostPlayers.map(p=><span key={p.userId} style={{background:'rgba(124,58,237,0.15)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:20,padding:'5px 12px',fontSize:13}}>🟢 {p.username}</span>)}
           </div>
         </div>
-        <button style={S.btn('#7c3aed',players.length===0)} disabled={players.length===0} onClick={handleStart}>
-          🚀 Lancer ({players.length} joueur{players.length>1?'s':''})
+        <button style={S.btn('#7c3aed',nonHostPlayers.length===0)} disabled={nonHostPlayers.length===0} onClick={doStart}>
+          🚀 Lancer ({nonHostPlayers.length} joueur{nonHostPlayers.length>1?'s':''})
         </button>
       </div>
     </div>
   );
 
-  if(phase==='question')return(
+  // Question
+  if(phase==='question') return(
     <div style={S.root}>
-      <div style={S.header}>
-        <span style={{color:'#aaa',fontSize:14}}>Q <b style={{color:'#fff'}}>{qIndex+1}</b>/{totalQuestions}</span>
-        <span style={{fontSize:32,fontWeight:900,color:timeLeft<=5?'#e74c3c':'#fff'}}>{timeLeft}s</span>
-        <span style={{background:'rgba(255,255,255,0.1)',borderRadius:20,padding:'4px 14px',fontSize:14}}>{answersIn.length}/{players.length} réponses</span>
+      <div style={S.hdr}>
+        <span style={{color:'#aaa',fontSize:13}}>Q<b style={{color:'#fff'}}>{qIdx+1}</b>/{totalQ}</span>
+        <span style={{fontSize:28,fontWeight:900,color:timeLeft<=5?'#e74c3c':'#fff'}}>{timeLeft}s</span>
+        <span style={{background:'rgba(255,255,255,0.08)',borderRadius:20,padding:'4px 12px',fontSize:13}}>{answersIn.length}/{nonHostPlayers.length} réponses</span>
       </div>
-      <div style={S.main}>
-        <div style={{height:12,borderRadius:6,background:'rgba(255,255,255,0.1)',overflow:'hidden',width:'100%'}}>
-          <div style={{height:'100%',borderRadius:6,width:`${timerRatio*100}%`,background:timerRatio>0.4?'#27ae60':timerRatio>0.2?'#f39c12':'#e74c3c',transition:'width 0.2s linear'}}/>
+      <div style={S.body}>
+        <div style={{height:10,borderRadius:5,background:'rgba(255,255,255,0.08)',width:'100%',overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${tRatio*100}%`,borderRadius:5,transition:'width 0.2s linear',background:tRatio>0.4?'#27ae60':tRatio>0.2?'#f39c12':'#e74c3c'}}/>
         </div>
-        <div style={{...S.card,textAlign:'center'}}><div style={{fontSize:26,fontWeight:800}}>{question?.question}</div></div>
-        <div style={S.grid}>{question?.answers?.map((ans,i)=>(<div key={i} style={S.tile(QZ_COLORS[i])}><span>{QZ_SHAPES[i]}</span><span>{ans}</span></div>))}</div>
-        <button style={S.btn('#e67e22')} onClick={hostShowResultsNow}>Révéler les réponses →</button>
+        <div style={{...S.card,textAlign:'center',fontSize:22,fontWeight:800}}>{question?.q}</div>
+        <div style={S.grid}>{question?.a?.map((ans,i)=><div key={i} style={S.tile(QC[i])}><span>{QS[i]}</span><span>{ans}</span></div>)}</div>
+        <button style={S.btn('#e67e22')} onClick={hostReveal}>Révéler →</button>
       </div>
     </div>
   );
 
-  if(phase==='results'&&results){const{correctIndex,scores}=results;return(
+  // Results
+  if(phase==='results'&&results) return(
     <div style={S.root}>
-      <div style={S.header}>
-        <span style={{fontWeight:700}}>Résultats Q{qIndex+1}/{totalQuestions}</span>
-        <span style={{color:'#aaa',fontSize:14}}>{scores?.filter(s=>s.isCorrect).length}/{players.length} bonnes réponses</span>
+      <div style={S.hdr}>
+        <span style={{fontWeight:700}}>Résultats Q{qIdx+1}/{totalQ}</span>
+        <span style={{color:'#aaa',fontSize:13}}>{results.scores?.filter(s=>s.ok).length}/{nonHostPlayers.length} bonnes réponses</span>
       </div>
-      <div style={S.main}>
-        <div style={S.grid}>{question?.answers?.map((ans,i)=>(<div key={i} style={S.tile(QZ_COLORS[i],i!==correctIndex)}>{i===correctIndex&&<span>✅</span>}<span>{QZ_SHAPES[i]}</span><span>{ans}</span></div>))}</div>
+      <div style={S.body}>
+        <div style={S.grid}>{question?.a?.map((ans,i)=><div key={i} style={S.tile(QC[i],i!==results.correctIndex)}>{i===results.correctIndex&&'✅'}<span>{QS[i]}</span><span>{ans}</span></div>)}</div>
         <div style={S.card}>
-          <div style={{fontWeight:700,marginBottom:12}}>🏆 Classement</div>
-          {scores?.slice(0,5).map((s,i)=>(<div key={s.userId} style={S.score(i)}><span style={{fontWeight:900,fontSize:18,width:28,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span><span style={{flex:1,fontWeight:700}}>{s.username}</span>{s.delta>0&&<span style={{color:'#27ae60',fontWeight:700,fontSize:14}}>+{s.delta}</span>}<span style={{fontWeight:900,minWidth:60,textAlign:'right'}}>{s.total} pts</span></div>))}
+          <div style={{fontWeight:700,marginBottom:10}}>🏆 Classement</div>
+          {results.scores?.slice(0,5).map((s,i)=>(
+            <div key={s.userId} style={S.row(i)}>
+              <span style={{fontWeight:900,width:28,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:700}}>{s.username}</span>
+              {s.delta>0&&<span style={{color:'#27ae60',fontWeight:700}}>+{s.delta}</span>}
+              <span style={{fontWeight:900}}>{s.total} pts</span>
+            </div>
+          ))}
         </div>
-        <button style={S.btn('#7c3aed')} onClick={hostNextQuestion}>{qIndex+1>=totalQuestions?'🏁 Résultats finaux':'Question suivante →'}</button>
+        <button style={S.btn('#7c3aed')} onClick={hostNext}>{qIdx+1>=totalQ?'🏁 Fin':'Question suivante →'}</button>
       </div>
     </div>
-  );}
+  );
 
-  if(phase==='finished'&&finalScores)return(
-    <div style={S.root}><div style={S.main}>
-      <div style={{textAlign:'center',marginTop:24}}><div style={{fontSize:64}}>🏆</div><div style={{fontSize:28,fontWeight:900}}>Résultats finaux</div><div style={{color:'#aaa'}}>{quiz.title}</div></div>
-      <div style={{width:'100%'}}>{finalScores.map((s,i)=>(<div key={s.userId} style={{...S.score(i),padding:'16px 20px'}}><span style={{fontWeight:900,fontSize:22,width:36,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span><span style={{flex:1,fontWeight:700,fontSize:i<3?18:15}}>{s.username}</span><span style={{fontWeight:900,fontSize:i<3?22:18,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span></div>))}</div>
-      <button style={S.btn('#7c3aed')} onClick={onExit}>Retour aux Games</button>
+  // Finished
+  if(phase==='finished'&&finalScores) return(
+    <div style={S.root}><div style={{...S.body,justifyContent:'center',paddingTop:40}}>
+      <div style={{textAlign:'center',marginBottom:16}}><div style={{fontSize:56}}>🏆</div><div style={{fontSize:24,fontWeight:900}}>{quiz.title}</div></div>
+      <div style={{width:'100%'}}>{finalScores.map((s,i)=>(
+        <div key={s.userId} style={{...S.row(i),padding:'14px 18px'}}>
+          <span style={{fontSize:20,width:32,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+          <span style={{flex:1,fontWeight:700,fontSize:i<3?17:14}}>{s.username}</span>
+          <span style={{fontWeight:900,fontSize:i<3?20:16,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
+        </div>
+      ))}</div>
+      <button style={S.btn('#7c3aed')} onClick={onExit}>Retour</button>
     </div></div>
   );
 
-  return <div style={{...S.root,justifyContent:'center',alignItems:'center'}}><div style={{fontSize:48}}>⏳</div></div>;
+  return <div style={{minHeight:'100vh',background:'#0d0d1a',display:'flex',justifyContent:'center',alignItems:'center',color:'#aaa'}}>⏳</div>;
 }
 
-// ─── QUIZ PLAYER ─────────────────────────────────────────────────────────────
+// ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQuestions,playerAnswer}=useQuizGame({pin,userId,username,isHost:false});
-  const qIndex=question?.index??0,timeLimitSecs=question?.time_limit??20,timerRatio=timeLimitSecs>0?timeLeft/timeLimitSecs:0,showResult=phase==='results';
+  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
+    useQuizGame({pin,userId,username,isHost:false});
+  const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
+  const showRes=phase==='results';
 
-  function ansBtn(c,sel,correct,show){let bg=c,scale=1,border='none';if(show){if(correct){bg='#27ae60';scale=1.03;}else if(sel){bg='#e74c3c';}else{bg='rgba(255,255,255,0.06)';border=`2px solid ${c}`;}}else if(sel)scale=0.97;return{background:bg,border,borderRadius:18,padding:'22px 16px',fontSize:18,fontWeight:700,color:'#fff',display:'flex',alignItems:'center',gap:12,cursor:show?'default':'pointer',transform:`scale(${scale})`,transition:'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',boxShadow:sel&&!show?'0 0 0 4px rgba(255,255,255,0.3)':'none'};}
+  const btnStyle=(i)=>{
+    const sel=myAnswer===i,corr=question?.c===i;
+    return{background:showRes?(corr?'#27ae60':sel?'#e74c3c':'rgba(255,255,255,0.05)'):QC[i],
+      border:showRes&&!corr&&!sel?`2px solid ${QC[i]}`:'none',borderRadius:16,padding:'20px 14px',
+      fontSize:16,fontWeight:700,color:'#fff',display:'flex',alignItems:'center',gap:10,
+      cursor:showRes?'default':'pointer',transform:sel&&!showRes?'scale(0.97)':'scale(1)',
+      transition:'all 0.2s',boxShadow:sel&&!showRes?`0 0 0 3px rgba(255,255,255,0.3)`:'none',
+      fontFamily:"'Outfit',sans-serif"};
+  };
 
-  const root={minHeight:'100dvh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',userSelect:'none'};
+  const root={minHeight:'100dvh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'};
 
-  if(phase==='lobby')return(
-    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'24px 20px',gap:20}}>
-      <div style={{fontSize:56}}>🎮</div>
-      <div style={{fontSize:22,fontWeight:800,textAlign:'center'}}>{quizTitle||'Connexion…'}</div>
-      <div style={{background:'rgba(124,58,237,0.15)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:16,padding:'20px 32px',textAlign:'center'}}>
-        <div style={{fontSize:14,color:'#aaa',marginBottom:4}}>Connecté en tant que</div>
-        <div style={{fontSize:24,fontWeight:900,color:'#a78bfa'}}>{username}</div>
+  if(phase==='lobby') return(
+    <div style={root}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'32px 20px',gap:20}}>
+        <div style={{fontSize:52}}>🎯</div>
+        <div style={{fontSize:20,fontWeight:800,textAlign:'center'}}>{quizTitle||'En attente…'}</div>
+        <div style={{background:'rgba(124,58,237,0.15)',border:'1px solid rgba(124,58,237,0.3)',borderRadius:14,padding:'16px 28px',textAlign:'center'}}>
+          <div style={{fontSize:12,color:'#aaa',marginBottom:3}}>Connecté en tant que</div>
+          <div style={{fontSize:22,fontWeight:900,color:'#a78bfa'}}>{username}</div>
+        </div>
+        <div style={{color:'#aaa',fontSize:14}}>⏳ En attente du host…</div>
+        <div style={{color:'#555',fontSize:12}}>{players.filter(p=>String(p.userId)!==String(userId)).length+1} joueur(s)</div>
+        <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#666',borderRadius:10,padding:'8px 20px',cursor:'pointer',marginTop:8}}>Quitter</button>
       </div>
-      <div style={{color:'#aaa',fontSize:15,textAlign:'center'}}>⏳ En attente du host…</div>
-      <div style={{color:'#666',fontSize:13}}>{players.length} joueur{players.length>1?'s':''} connecté{players.length>1?'s':''}</div>
-      <button onClick={onExit} style={{background:'none',border:'1px solid #333',color:'#666',borderRadius:10,padding:'8px 20px',cursor:'pointer',marginTop:8}}>Quitter</button>
-    </div></div>
+    </div>
   );
 
-  if(phase==='question'||phase==='answered'||phase==='results')return(
+  if(['question','answered','results'].includes(phase)) return(
     <div style={root}>
-      <div style={{padding:'12px 16px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-        <div style={{height:8,borderRadius:4,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
-          <div style={{height:'100%',borderRadius:4,width:`${timerRatio*100}%`,background:timerRatio>0.4?'#27ae60':timerRatio>0.2?'#f39c12':'#e74c3c',transition:'width 0.2s linear'}}/>
+      <div style={{padding:'10px 16px',borderBottom:'1px solid #1a1a2e'}}>
+        <div style={{height:7,borderRadius:4,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
+          <div style={{height:'100%',borderRadius:4,width:`${tRatio*100}%`,transition:'width 0.2s linear',background:tRatio>0.4?'#27ae60':tRatio>0.2?'#f39c12':'#e74c3c'}}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:6,fontSize:13,color:'#666'}}>
-          <span>Q {qIndex+1}/{totalQuestions}</span>
-          <span style={{color:timerRatio<0.2?'#e74c3c':'#aaa',fontWeight:700}}>{timeLeft}s</span>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:12,color:'#555'}}>
+          <span>Q {qIdx+1}/{totalQ}</span>
+          <span style={{color:tRatio<0.2?'#e74c3c':'#aaa',fontWeight:700}}>{timeLeft}s</span>
         </div>
       </div>
-      <div style={{padding:'20px 20px 12px',textAlign:'center'}}>
-        <div style={{fontSize:19,fontWeight:800,lineHeight:1.4}}>{question?.question}</div>
+      <div style={{padding:'18px 18px 10px',textAlign:'center'}}>
+        <div style={{fontSize:18,fontWeight:800,lineHeight:1.4}}>{question?.q}</div>
       </div>
-      <div style={{padding:'0 16px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,flex:1,alignContent:'start'}}>
-        {question?.answers?.map((ans,i)=>(
-          <button key={i} style={ansBtn(QZ_COLORS[i],myAnswer===i,question?.correct===i,showResult)} onClick={()=>playerAnswer(i)} disabled={phase!=='question'}>
-            <span style={{fontSize:22,opacity:0.85}}>{QZ_SHAPES[i]}</span>
-            <span style={{flex:1,textAlign:'left',lineHeight:1.2}}>{ans}</span>
+      <div style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,flex:1,alignContent:'start'}}>
+        {question?.a?.map((ans,i)=>(
+          <button key={i} style={btnStyle(i)} onClick={()=>playerAnswer(i)} disabled={phase!=='question'}>
+            <span style={{fontSize:20,opacity:.8}}>{QS[i]}</span><span style={{flex:1,textAlign:'left',lineHeight:1.2,fontSize:14}}>{ans}</span>
           </button>
         ))}
       </div>
-      {phase==='answered'&&!showResult&&<div style={{textAlign:'center',padding:'16px 20px',color:'#a78bfa',fontWeight:700}}>✓ Réponse envoyée !</div>}
-      {phase==='results'&&results&&(
-        <div style={{margin:'0 16px 16px',borderRadius:16,padding:'16px 20px',textAlign:'center',background:results.myPoints>0?'rgba(39,174,96,0.15)':'rgba(231,76,60,0.12)',border:`1px solid ${results.myPoints>0?'rgba(39,174,96,0.3)':'rgba(231,76,60,0.2)'}`}}>
-          {results.myPoints>0?(<><div style={{fontSize:32}}>🎯</div><div style={{fontWeight:900,fontSize:22,color:'#2ecc71'}}>+{results.myPoints} pts</div><div style={{color:'#aaa',fontSize:13,marginTop:4}}>Rang #{results.myRank} · Total {results.myTotal} pts</div></>):(<><div style={{fontSize:32}}>💔</div><div style={{fontWeight:700,fontSize:17,color:'#e74c3c'}}>Raté !</div><div style={{color:'#aaa',fontSize:13,marginTop:4}}>Total {results.myTotal} pts</div></>)}
+      {phase==='answered'&&!showRes&&<div style={{textAlign:'center',padding:'12px',color:'#a78bfa',fontWeight:700}}>✓ Réponse envoyée !</div>}
+      {showRes&&results&&(
+        <div style={{margin:'0 14px 14px',borderRadius:14,padding:'14px 18px',textAlign:'center',
+          background:results.myPts>0?'rgba(39,174,96,0.15)':'rgba(231,76,60,0.1)',
+          border:`1px solid ${results.myPts>0?'rgba(39,174,96,0.3)':'rgba(231,76,60,0.2)'}`}}>
+          {results.myPts>0
+            ?<><div style={{fontSize:28}}>🎯</div><div style={{fontWeight:900,fontSize:20,color:'#2ecc71'}}>+{results.myPts} pts</div><div style={{color:'#aaa',fontSize:12,marginTop:3}}>#{results.myRank} · Total {results.myTotal} pts</div></>
+            :<><div style={{fontSize:28}}>💔</div><div style={{fontWeight:700,color:'#e74c3c'}}>Raté !</div><div style={{color:'#aaa',fontSize:12,marginTop:3}}>Total {results.myTotal} pts</div></>}
         </div>
       )}
     </div>
   );
 
-  if(phase==='finished'&&finalScores){const myRank=finalScores.findIndex(s=>s.userId===userId),myScore=finalScores.find(s=>s.userId===userId),medals=['🥇','🥈','🥉'];return(
-    <div style={root}>
-      <div style={{padding:'32px 20px 0',textAlign:'center'}}>
-        <div style={{fontSize:56}}>{medals[myRank]||'🎮'}</div>
-        <div style={{fontSize:24,fontWeight:900,marginTop:8}}>{myRank===0?'VICTOIRE !':myRank===1||myRank===2?'Podium !':'Fin du quiz !'}</div>
-        {myScore&&<div style={{fontSize:18,color:'#a78bfa',marginTop:4,fontWeight:700}}>{myScore.total} pts — Place #{myRank+1}</div>}
+  if(phase==='finished'&&finalScores){
+    const myRank=finalScores.findIndex(s=>String(s.userId)===String(userId));
+    const myScore=finalScores.find(s=>String(s.userId)===String(userId));
+    const medals=['🥇','🥈','🥉'];
+    return(
+      <div style={root}>
+        <div style={{padding:'28px 20px 0',textAlign:'center'}}>
+          <div style={{fontSize:52}}>{medals[myRank]||'🎮'}</div>
+          <div style={{fontSize:22,fontWeight:900,marginTop:6}}>{myRank===0?'VICTOIRE !':myRank<3?'Podium !':'Fin du quiz !'}</div>
+          {myScore&&<div style={{fontSize:16,color:'#a78bfa',marginTop:4,fontWeight:700}}>{myScore.total} pts — #{myRank+1}</div>}
+        </div>
+        <div style={{padding:'20px 14px',flex:1}}>
+          {finalScores.map((s,i)=>(
+            <div key={s.userId} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,marginBottom:5,
+              background:String(s.userId)===String(userId)?'rgba(124,58,237,0.12)':i===0?'rgba(255,215,0,0.1)':'rgba(255,255,255,0.03)',
+              border:`1px solid ${String(s.userId)===String(userId)?'#7c3aed':i===0?'rgba(255,215,0,0.2)':'rgba(255,255,255,0.05)'}`}}>
+              <span style={{fontSize:16,width:26,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:700,fontSize:String(s.userId)===String(userId)?15:13}}>{s.username}{String(s.userId)===String(userId)?' ← toi':''}</span>
+              <span style={{fontWeight:900,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:'14px 20px'}}>
+          <button onClick={onExit} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:14,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>Retour</button>
+        </div>
       </div>
-      <div style={{padding:'20px 16px',flex:1}}>
-        {finalScores.map((s,i)=>(<div key={s.userId} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:12,marginBottom:6,background:s.userId===userId?'rgba(124,58,237,0.12)':i===0?'rgba(255,215,0,0.12)':'rgba(255,255,255,0.04)',border:`1px solid ${s.userId===userId?'#7c3aed':i===0?'rgba(255,215,0,0.25)':'rgba(255,255,255,0.06)'}`}}>
-          <span style={{fontSize:18,width:28,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
-          <span style={{flex:1,fontWeight:700,fontSize:s.userId===userId?16:14}}>{s.username}{s.userId===userId?' ← toi':''}</span>
-          <span style={{fontWeight:900,color:i===0?'#ffd700':'#fff'}}>{s.total} pts</span>
-        </div>))}
-      </div>
-      <div style={{padding:'16px 20px'}}>
-        <button onClick={onExit} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:16,fontSize:16,fontWeight:700,cursor:'pointer'}}>Retour aux Games</button>
-      </div>
-    </div>
-  );}
+    );
+  }
   return <div style={{minHeight:'100dvh',background:'#0d0d1a',display:'flex',justifyContent:'center',alignItems:'center',color:'#aaa'}}>⏳ Connexion…</div>;
 }
 
-// ─── QUIZ PAGE ────────────────────────────────────────────────────────────────
-async function generateQuizPin(){
-  for(let i=0;i<10;i++){
-    const pin=String(Math.floor(1000+Math.random()*9000));
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&status=eq.lobby&select=pin`,{headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-    if(!r.ok){const e=await r.text();throw new Error('quiz_games select: '+e);}
-    const d=await r.json();
-    if(!d.length)return pin;
-  }
-  throw new Error('PIN impossible à générer');
-}
-
+// ─── QuizPage ─────────────────────────────────────────────────────────────────
 function QuizPage({currentPlayer,onBack}){
   const[view,setView]=React.useState('home');
-  const[selectedQuiz,setSelectedQuiz]=React.useState(null);
-  const[pinInput,setPinInput]=React.useState('');
   const[gamePin,setGamePin]=React.useState(null);
+  const[hostQuiz,setHostQuiz]=React.useState(null);
+  const[pinInput,setPinInput]=React.useState('');
   const[loading,setLoading]=React.useState(false);
   const[error,setError]=React.useState(null);
   const[duelCat,setDuelCat]=React.useState('all');
   const[duelCount,setDuelCount]=React.useState(20);
   const[socialSrc,setSocialSrc]=React.useState('bdd');
-  const[socialCat,setSocialCat]=React.useState('all');
   const[socialCount,setSocialCount]=React.useState(20);
+  const[selectedPreset,setSelectedPreset]=React.useState(null);
 
   const userId=currentPlayer?.id;
   const username=currentPlayer?.display_name||currentPlayer?.name||'Joueur';
 
-  const handleCreate=async()=>{
-    if(!selectedQuiz)return;setLoading(true);setError(null);
-    try{
-      const pin=await generateQuizPin();
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:selectedQuiz.title,status:'lobby',total_questions:selectedQuiz.questions.length})});
-      if(!r.ok){const err=await r.text();throw new Error('Insert quiz_games: '+err);}
-      setGamePin(pin);setView('host_game');
-    }catch(e){setError(e.message);}finally{setLoading(false);}
+  const createGame=async(quiz)=>{
+    const pin=await quizGenPin();
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{
+      method:'POST',
+      headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:quiz.title,status:'lobby',total_questions:quiz.questions.length})
+    });
+    if(!res.ok){const e=await res.text();throw new Error(e);}
+    return pin;
   };
 
   const handleJoin=async()=>{
-    const pin=pinInput.trim();if(pin.length!==4)return;
+    const p=pinInput.trim();if(p.length!==4){setError('Code invalide');return;}
     setLoading(true);setError(null);
     try{
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${pin}&select=id,status,quiz_title,total_questions`,{headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-      const d=await r.json();
+      const res=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games?pin=eq.${p}&status=eq.lobby&select=id`,
+        {headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+      const d=await res.json();
       if(!d.length)throw new Error('Partie introuvable');
-      if(d[0].status!=='lobby')throw new Error('Partie déjà en cours');
-      await fetch(`${SUPABASE_URL}/rest/v1/quiz_game_players`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},body:JSON.stringify({game_id:d[0].id,user_id:userId,username,final_score:0})});
-      setGamePin(pin);setView('player_game');
-    }catch(e){setError(e.message);}finally{setLoading(false);}
+      await fetch(`${SUPABASE_URL}/rest/v1/quiz_game_players`,{method:'POST',
+        headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
+        body:JSON.stringify({game_id:d[0].id,user_id:userId,username,final_score:0})});
+      setGamePin(p);setView('player_game');
+    }catch(e){setError(e.message);}
+    setLoading(false);
   };
 
-  const handleExit=()=>{setView('home');setGamePin(null);setSelectedQuiz(null);setPinInput('');setError(null);};
+  const handleExit=()=>{setView('home');setGamePin(null);setHostQuiz(null);setPinInput('');setError(null);};
 
-  if(view==='host_game'&&gamePin&&selectedQuiz)return <QuizHost pin={gamePin} userId={userId} username={username} quiz={selectedQuiz} onExit={handleExit}/>;
-  if(view==='player_game'&&gamePin)return <QuizPlayer pin={gamePin} userId={userId} username={username} onExit={handleExit}/>;
+  if(view==='host_game'&&gamePin&&hostQuiz)
+    return <QuizHost pin={gamePin} userId={userId} username={username} quiz={hostQuiz} onExit={handleExit}/>;
+  if(view==='player_game'&&gamePin)
+    return <QuizPlayer pin={gamePin} userId={userId} username={username} onExit={handleExit}/>;
 
   const S={
     root:{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'},
-    main:{width:'100%',maxWidth:480,padding:'32px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:20},
-    card:{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:20,padding:'24px 28px'},
-    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,padding:'14px 18px',fontSize:20,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:6,outline:'none',boxSizing:'border-box',fontFamily:"'Outfit',sans-serif"},
-    btn:(c='#7c3aed',full=false)=>({background:c,border:'none',borderRadius:14,padding:full?'16px':'14px 28px',width:full?'100%':'auto',fontSize:16,fontWeight:700,color:'#fff',cursor:'pointer',fontFamily:"'Outfit',sans-serif"}),
-    err:{background:'rgba(231,76,60,0.12)',border:'1px solid rgba(231,76,60,0.3)',borderRadius:10,padding:'10px 16px',color:'#ff6b6b',fontSize:14,textAlign:'center',width:'100%'},
+    back:{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12},
+    body:{width:'100%',maxWidth:480,padding:'20px',display:'flex',flexDirection:'column',gap:12},
+    card:{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:18,padding:'20px'},
+    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,
+      padding:'14px',fontSize:24,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:8,outline:'none',
+      boxSizing:'border-box',fontFamily:"'Outfit',sans-serif"},
+    btn:(c,dis,full)=>({background:dis?'#222':c,border:'none',borderRadius:12,padding:full?'14px':'12px 24px',
+      width:full?'100%':'auto',fontSize:15,fontWeight:700,color:dis?'#555':'#fff',cursor:dis?'not-allowed':'pointer',
+      marginTop:8,fontFamily:"'Outfit',sans-serif",opacity:dis?0.5:1}),
+    err:{color:'#e74c3c',fontSize:13,textAlign:'center',marginTop:4},
+    back_btn:{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'},
+    mode:(sel)=>({background:sel?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',
+      border:`2px solid ${sel?'rgba(124,58,237,0.6)':'rgba(255,255,255,0.08)'}`,
+      borderRadius:16,padding:'16px 18px',cursor:'pointer',display:'flex',alignItems:'center',gap:14}),
   };
 
-  if(view==='home')return(
+  // ── HOME ──
+  if(view==='home') return(
     <div style={S.root}>
-      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:22}}>🎯 LEVERCULQUIZ</span>
-      </div>
-      <div style={S.main}>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontSize:64,marginBottom:8}}>🎯</div>
-          <div style={{fontSize:22,fontWeight:900}}>Quiz Kahoot-style</div>
-          <div style={{color:'#aaa',marginTop:6,fontSize:14}}>Joue en temps réel avec tes potes</div>
+      <div style={S.back}><button onClick={onBack} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>🎯 LEVERCULQUIZ</span></div>
+      <div style={S.body}>
+        <div style={{...S.card,marginBottom:4}}>
+          <div style={{fontWeight:800,fontSize:16,marginBottom:6}}>🎛️ Créer une partie</div>
+          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Lance une partie et invite tes amis</div>
+          <button style={S.btn('#7c3aed',false,true)} onClick={()=>setView('mode_pick')}>Créer une partie →</button>
         </div>
+        <div style={{color:'#555',fontSize:14,textAlign:'center'}}>— ou —</div>
         <div style={S.card}>
-          <div style={{fontWeight:800,fontSize:17,marginBottom:6}}>🎛️ Créer une partie</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:16}}>Tu deviens le host depuis cet écran</div>
-          <button style={S.btn('#7c3aed',true)} onClick={()=>setView('host_pick')}>Créer une partie →</button>
-        </div>
-        <div style={{color:'#333',fontSize:14}}>— ou —</div>
-        <div style={S.card}>
-          <div style={{fontWeight:800,fontSize:17,marginBottom:6}}>📱 Rejoindre une partie</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:16}}>Entre le code PIN donné par le host</div>
-          <input style={S.input} type="text" inputMode="numeric" maxLength={4} placeholder="0000" value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/\D/g,'').slice(0,4))} onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>
-          {error&&<div style={{...S.err,marginTop:12}}>{error}</div>}
-          <button style={{...S.btn('#2980b9',true),marginTop:14,opacity:pinInput.length===4?1:0.4}} disabled={pinInput.length!==4||loading} onClick={handleJoin}>{loading?'Connexion…':'Rejoindre →'}</button>
+          <div style={{fontWeight:800,fontSize:16,marginBottom:6}}>📱 Rejoindre</div>
+          <input style={S.input} type="text" inputMode="numeric" maxLength={4} placeholder="0000"
+            value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/\D/g,'').slice(0,4))}
+            onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>
+          {error&&<div style={S.err}>{error}</div>}
+          <button style={S.btn('#2980b9',pinInput.length!==4||loading,true)} disabled={pinInput.length!==4||loading} onClick={handleJoin}>
+            {loading?'Connexion…':'Rejoindre →'}
+          </button>
         </div>
       </div>
     </div>
   );
 
-  // ── Mode picker ──
-  if(view==='host_pick') return(
-    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
-      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={()=>setView('home')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>🎯 LEVERCULQUIZ</span>
-      </div>
-      <div style={{width:'100%',maxWidth:480,padding:'28px 20px',display:'flex',flexDirection:'column',gap:16}}>
-        <div style={{color:'#aaa',fontSize:13,marginBottom:4}}>Choisis ton mode de jeu :</div>
-        {/* DUEL */}
-        <div style={{background:'rgba(231,76,60,0.08)',border:'2px solid rgba(231,76,60,0.35)',borderRadius:18,padding:'20px 22px',cursor:'pointer'}} onClick={()=>setView('duel_setup')}>
-          <div style={{display:'flex',alignItems:'center',gap:14}}>
-            <span style={{fontSize:36}}>⚔️</span>
-            <div>
-              <div style={{fontWeight:800,fontSize:17,color:'#e74c3c'}}>Mode Duel</div>
-              <div style={{color:'#aaa',fontSize:13,marginTop:2}}>1v1 — questions piochées en base de données</div>
-            </div>
-            <span style={{marginLeft:'auto',color:'#e74c3c',fontSize:20}}>→</span>
-          </div>
+  // ── MODE PICK ──
+  if(view==='mode_pick') return(
+    <div style={S.root}>
+      <div style={S.back}><button onClick={()=>setView('home')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>Choisir un mode</span></div>
+      <div style={S.body}>
+        <div style={S.mode(false)} onClick={()=>setView('duel_setup')}>
+          <span style={{fontSize:32}}>⚔️</span>
+          <div><div style={{fontWeight:800,fontSize:16,color:'#e74c3c'}}>Mode Duel</div><div style={{color:'#aaa',fontSize:13}}>1v1 — questions de la base de données</div></div>
+          <span style={{marginLeft:'auto',color:'#e74c3c',fontSize:20}}>→</span>
         </div>
-        {/* SOCIAL */}
-        <div style={{background:'rgba(124,58,237,0.08)',border:'2px solid rgba(124,58,237,0.35)',borderRadius:18,padding:'20px 22px',cursor:'pointer'}} onClick={()=>setView('social_setup')}>
-          <div style={{display:'flex',alignItems:'center',gap:14}}>
-            <span style={{fontSize:36}}>🎮</span>
-            <div>
-              <div style={{fontWeight:800,fontSize:17,color:'#a78bfa'}}>Mode Social</div>
-              <div style={{color:'#aaa',fontSize:13,marginTop:2}}>Multijoueur — BDD complète ou quiz préenregistrés</div>
-            </div>
-            <span style={{marginLeft:'auto',color:'#a78bfa',fontSize:20}}>→</span>
-          </div>
+        <div style={S.mode(false)} onClick={()=>setView('social_setup')}>
+          <span style={{fontSize:32}}>🎮</span>
+          <div><div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>Mode Social</div><div style={{color:'#aaa',fontSize:13}}>Multijoueur — BDD ou quiz préenregistrés</div></div>
+          <span style={{marginLeft:'auto',color:'#a78bfa',fontSize:20}}>→</span>
         </div>
       </div>
     </div>
   );
 
-  // ── Duel setup ──
+  // ── DUEL SETUP ──
   if(view==='duel_setup') return(
-    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
-      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span>
-      </div>
-      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:14}}>
-        {/* Questions count */}
+    <div style={S.root}>
+      <div style={S.back}><button onClick={()=>setView('mode_pick')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span></div>
+      <div style={S.body}>
         <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Nombre de questions : <span style={{color:'#e74c3c'}}>{duelCount}</span></div>
-          <input type='range' min={10} max={100} step={5} value={duelCount} onChange={e=>setDuelCount(Number(e.target.value))}
-            style={{width:'100%',accentColor:'#e74c3c'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#60607a',marginTop:4}}><span>10</span><span>100</span></div>
+          <div style={{fontWeight:700,marginBottom:10}}>Questions : <span style={{color:'#e74c3c',fontWeight:900}}>{duelCount}</span></div>
+          <input type='range' min={10} max={100} step={5} value={duelCount} onChange={e=>setDuelCount(Number(e.target.value))} style={{width:'100%',accentColor:'#e74c3c'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:3}}><span>10</span><span>100</span></div>
         </div>
-        {/* Category */}
-        <div style={{fontWeight:700,fontSize:14,marginBottom:6}}>Catégorie :</div>
-        {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art']].map(([cat,emoji,label])=>(
-          <button key={cat}
-            style={{background:duelCat===cat?'rgba(231,76,60,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${duelCat===cat?'rgba(231,76,60,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'12px 18px',color:'#fff',cursor:'pointer',fontSize:14,fontWeight:duelCat===cat?800:400,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",textAlign:'left'}}
-            onClick={()=>setDuelCat(cat)}>
-            <span style={{fontSize:22}}>{emoji}</span><span>{label}</span>
+        <div style={{fontWeight:700,fontSize:14}}>Catégorie :</div>
+        {[['all','🎲','Tout mélangé'],['math','➗','Mathématiques'],['geo','🌍','Géographie'],['histoire','📜','Histoire'],
+          ['anglais','🇬🇧','Anglais'],['physique','⚛️','Physique'],['grammaire','📝','Grammaire'],
+          ['musique','🎵','Musique'],['cinema','🎬','Cinéma / Séries'],['sport','⚽','Sport'],['logique','🧩','Logique']].map(([cat,emoji,label])=>(
+          <button key={cat} style={{...S.mode(duelCat===cat),width:'100%',textAlign:'left'}} onClick={()=>setDuelCat(cat)}>
+            <span style={{fontSize:20}}>{emoji}</span><span style={{fontWeight:duelCat===cat?800:400}}>{label}</span>
             {duelCat===cat&&<span style={{marginLeft:'auto',color:'#e74c3c'}}>✓</span>}
           </button>
         ))}
-        {error&&<div style={{color:'#e74c3c',fontSize:13,textAlign:'center'}}>{error}</div>}
-        <button style={{background:'#e74c3c',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:8,fontFamily:"'Outfit',sans-serif",opacity:loading?0.6:1}}
-          disabled={loading}
-          onClick={async()=>{
-            setLoading(true);setError(null);
-            try{
-              const qs=await fetchQuizQuestions(duelCat,duelCount);
-              if(qs.length<3)throw new Error("Pas assez de questions en base ("+qs.length+") — ajoutes-en via DataBL !");
-              const dq={id:'duel-'+duelCat,title:'⚔️ Duel · '+duelCount+'Q',description:'Mode Duel',emoji:'⚔️',questions:qs};
-              setSelectedQuiz(dq);
-              const pin=await generateQuizPin();
-              const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:dq.title,status:'lobby',total_questions:dq.questions.length})});
-              if(!r2.ok){const e=await r2.text();throw new Error(e);}
-              setGamePin(pin);setView('host_game');
-            }catch(e){setError(e.message);}
-            setLoading(false);
-          }}>
-          {loading?'Chargement…':'🚀 Lancer le duel'}
-        </button>
+        {error&&<div style={S.err}>{error}</div>}
+        <button style={S.btn('#e74c3c',loading,true)} disabled={loading} onClick={async()=>{
+          setLoading(true);setError(null);
+          try{
+            const qs=await loadBDDQuestions(duelCount);
+            if(!qs||qs.length<3)throw new Error(`Pas assez de questions (${qs?.length||0}) — vérifiez la table quiz_questions`);
+            const quiz={title:'⚔️ Duel',emoji:'⚔️',questions:qs};
+            const pin=await createGame(quiz);
+            setHostQuiz(quiz);setGamePin(pin);setView('host_game');
+          }catch(e){setError(e.message);}
+          setLoading(false);
+        }}>{loading?'Chargement…':'🚀 Lancer le duel'}</button>
       </div>
     </div>
   );
 
-  // ── Social setup ──
+  // ── SOCIAL SETUP ──
   if(view==='social_setup') return(
-    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
-      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>🎮 Mode Social</span>
-      </div>
-      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:14}}>
-        {/* Source */}
-        <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Source des questions :</div>
+    <div style={S.root}>
+      <div style={S.back}><button onClick={()=>setView('mode_pick')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>🎮 Mode Social</span></div>
+      <div style={S.body}>
         <div style={{display:'flex',gap:10}}>
           {[['bdd','🗄️','Base de données'],['preset','📋','Quiz préenregistrés']].map(([src,emoji,label])=>(
-            <button key={src}
-              style={{flex:1,background:socialSrc===src?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialSrc===src?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 10px',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:socialSrc===src?800:400,display:'flex',flexDirection:'column',alignItems:'center',gap:6,fontFamily:"'Outfit',sans-serif"}}
-              onClick={()=>setSocialSrc(src)}>
+            <button key={src} style={{flex:1,background:socialSrc===src?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialSrc===src?'rgba(124,58,237,0.6)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 10px',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:socialSrc===src?800:400,display:'flex',flexDirection:'column',alignItems:'center',gap:6,fontFamily:"'Outfit',sans-serif"}} onClick={()=>setSocialSrc(src)}>
               <span style={{fontSize:24}}>{emoji}</span><span>{label}</span>
             </button>
           ))}
         </div>
 
-        {socialSrc==='bdd'&&(<>
-          {/* Questions count */}
+        {socialSrc==='bdd'&&<>
           <div style={{background:'rgba(255,255,255,0.05)',borderRadius:14,padding:'16px 18px'}}>
-            <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Questions : <span style={{color:'#a78bfa'}}>{socialCount}</span></div>
-            <input type='range' min={10} max={100} step={5} value={socialCount} onChange={e=>setSocialCount(Number(e.target.value))}
-              style={{width:'100%',accentColor:'#7c3aed'}}/>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#60607a',marginTop:4}}><span>10</span><span>100</span></div>
+            <div style={{fontWeight:700,marginBottom:10}}>Questions : <span style={{color:'#a78bfa',fontWeight:900}}>{socialCount}</span></div>
+            <input type='range' min={10} max={100} step={5} value={socialCount} onChange={e=>setSocialCount(Number(e.target.value))} style={{width:'100%',accentColor:'#7c3aed'}}/>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:3}}><span>10</span><span>100</span></div>
           </div>
-          {/* Category */}
-          <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Catégorie :</div>
-          {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art'],['pouis','🏆','Pouis Events',currentPlayer?.uid!=='louis-mar']].map(([cat,emoji,label,locked])=>{
-            if(locked)return null;
-            return(
-            <button key={cat}
-              style={{background:socialCat===cat?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${socialCat===cat?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'12px 18px',color:'#fff',cursor:'pointer',fontSize:14,fontWeight:socialCat===cat?800:400,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",textAlign:'left'}}
-              onClick={()=>setSocialCat(cat)}>
-              <span style={{fontSize:22}}>{emoji}</span><span>{label}</span>
-              {socialCat===cat&&<span style={{marginLeft:'auto',color:'#a78bfa'}}>✓</span>}
-            </button>);
-          })}
-          {error&&<div style={{color:'#e74c3c',fontSize:13}}>{error}</div>}
-          <button style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:4,fontFamily:"'Outfit',sans-serif",opacity:loading?0.6:1}}
-            disabled={loading}
-            onClick={async()=>{
-              setLoading(true);setError(null);
-              try{
-                const qs=await fetchQuizQuestions(socialCat,socialCount);
-                if(qs.length<3)throw new Error("Pas assez de questions ("+qs.length+")");
-                const sq={id:'social-'+socialCat,title:'🎮 Social · '+socialCount+'Q',description:'Mode Social',emoji:'🎮',questions:qs};
-                setSelectedQuiz(sq);
-                const pin=await generateQuizPin();
-                const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:sq.title,status:'lobby',total_questions:sq.questions.length})});
-                if(!r2.ok){const e=await r2.text();throw new Error(e);}
-                setGamePin(pin);setView('host_game');
-              }catch(e){setError(e.message);}
-              setLoading(false);
-            }}>
-            {loading?'Chargement…':'🚀 Créer la partie'}
-          </button>
-        </>)}
+          {error&&<div style={S.err}>{error}</div>}
+          <button style={S.btn('#7c3aed',loading,true)} disabled={loading} onClick={async()=>{
+            setLoading(true);setError(null);
+            try{
+              const qs=await loadBDDQuestions(socialCount);
+              if(!qs||qs.length<3)throw new Error(`Pas assez de questions (${qs?.length||0})`);
+              const quiz={title:'🎮 Social',emoji:'🎮',questions:qs};
+              const pin=await createGame(quiz);
+              setHostQuiz(quiz);setGamePin(pin);setView('host_game');
+            }catch(e){setError(e.message);}
+            setLoading(false);
+          }}>{loading?'Chargement…':'🚀 Créer la partie'}</button>
+        </>}
 
-        {socialSrc==='preset'&&(<>
-          <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>Choisir un quiz :</div>
-          {QUIZZES.map(q=>{
+        {socialSrc==='preset'&&<>
+          {QUIZ_PRESETS.map(q=>{
             const locked=q.id==='pouis-1'&&currentPlayer?.uid!=='louis-mar';
             return(
-            <div key={q.id}
-              style={{background:selectedQuiz?.id===q.id?'rgba(124,58,237,0.2)':'rgba(255,255,255,0.04)',border:`2px solid ${locked?'rgba(255,255,255,0.05)':selectedQuiz?.id===q.id?'rgba(124,58,237,0.7)':'rgba(255,255,255,0.08)'}`,borderRadius:14,padding:'14px 18px',cursor:locked?'not-allowed':'pointer',opacity:locked?0.3:1,display:'flex',alignItems:'center',gap:14}}
-              onClick={async()=>{
-                if(locked)return;
-                if(q._fromDB){
-                  const qs=await fetchPouisQuestions(50);
-                  setSelectedQuiz({...q,questions:qs});
-                } else {
-                  setSelectedQuiz(q);
-                }
-              }}>
-              <span style={{fontSize:28}}>{q.emoji}</span>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:14}}>{q.title}</div>
-                <div style={{color:'#aaa',fontSize:12}}>{q.description} · {q.questions.length} questions</div>
+              <div key={q.id} style={{...S.mode(selectedPreset?.id===q.id),opacity:locked?0.3:1,cursor:locked?'not-allowed':'pointer'}}
+                onClick={async()=>{
+                  if(locked)return;
+                  if(q._fromDB){
+                    const qs=await loadPouisQuestions(50);
+                    setSelectedPreset({...q,questions:qs||q.questions});
+                  }else setSelectedPreset(q);
+                }}>
+                <span style={{fontSize:26}}>{q.emoji}</span>
+                <div><div style={{fontWeight:700}}>{q.title}</div><div style={{color:'#aaa',fontSize:12}}>{q.description}</div></div>
+                {locked&&<span style={{marginLeft:'auto'}}>🔒</span>}
+                {!locked&&selectedPreset?.id===q.id&&<span style={{marginLeft:'auto',color:'#a78bfa'}}>✓</span>}
               </div>
-              {locked&&<span>🔒</span>}
-              {!locked&&selectedQuiz?.id===q.id&&<span style={{color:'#a78bfa',fontSize:18}}>✓</span>}
-            </div>);
+            );
           })}
-          {error&&<div style={{color:'#e74c3c',fontSize:13}}>{error}</div>}
-          <button style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'16px',fontSize:16,fontWeight:800,cursor:'pointer',marginTop:4,fontFamily:"'Outfit',sans-serif",opacity:(selectedQuiz&&!loading)?1:0.4}}
-            disabled={!selectedQuiz||loading} onClick={handleCreate}>
-            {loading?'Création…':'🚀 Créer la partie'}
-          </button>
-        </>)}
-      </div>
-    </div>
-  );
-
-  if(view==='duel_setup') return(
-    <div style={{minHeight:'100vh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'}}>
-      <div style={{width:'100%',maxWidth:600,padding:'24px 20px 0',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={()=>setView('host_pick')} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span>
-      </div>
-      <div style={{width:'100%',maxWidth:480,padding:'24px 20px',display:'flex',flexDirection:'column',gap:12}}>
-        <div style={{color:'#aaa',fontSize:13,marginBottom:4}}>20 questions aléatoires. Choisis la catégorie :</div>
-        {[['all','🎲','Tout mélangé'],['general','🧠','Culture générale'],['sport','⚽','Sport'],['culture','🎨','Culture & Art']].map(([cat,emoji,label])=>(
-          <button key={cat} style={{background:'rgba(231,76,60,0.1)',border:'2px solid rgba(231,76,60,0.3)',borderRadius:14,padding:'14px 20px',color:'#fff',cursor:'pointer',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',gap:12,fontFamily:"'Outfit',sans-serif",opacity:loading?0.5:1}}
-            disabled={loading}
-            onClick={async()=>{
-              setLoading(true);setError(null);
-              try{
-                const qs=await fetchQuizQuestions(cat,20);
-                if(qs.length<3)throw new Error("Pas assez de questions en base");
-                const dq={id:'duel-'+cat,title:'⚔️ Duel · '+label,description:'Mode Duel',emoji:'⚔️',questions:qs};
-                setSelectedQuiz(dq);
-                // Create the game directly
-                const pin=await generateQuizPin();
-                const r2=await fetch(`${SUPABASE_URL}/rest/v1/quiz_games`,{method:'POST',headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({pin,host_id:userId,host_username:username,quiz_title:dq.title,status:'lobby',total_questions:dq.questions.length})});
-                if(!r2.ok){const e=await r2.text();throw new Error('Insert: '+e);}
-                setGamePin(pin);setView('host_game');
-              }catch(e){setError(e.message);}
-              setLoading(false);
-            }}>
-            <span style={{fontSize:24}}>{emoji}</span>{label}
-            {loading&&<span style={{marginLeft:'auto',fontSize:12,color:'#aaa'}}>…</span>}
-          </button>
-        ))}
-        {error&&<div style={{color:'#e74c3c',fontSize:13,textAlign:'center',marginTop:8}}>{error}</div>}
+          {error&&<div style={S.err}>{error}</div>}
+          <button style={S.btn('#7c3aed',!selectedPreset||loading,true)} disabled={!selectedPreset||loading} onClick={async()=>{
+            setLoading(true);setError(null);
+            try{
+              const pin=await createGame(selectedPreset);
+              setHostQuiz(selectedPreset);setGamePin(pin);setView('host_game');
+            }catch(e){setError(e.message);}
+            setLoading(false);
+          }}>{loading?'Création…':'🚀 Créer la partie'}</button>
+        </>}
       </div>
     </div>
   );
 
   return null;
-}
-
-// ─── PUISSANCE 4 ──────────────────────────────────────────────────────────────
-const P4_COLS=7,P4_ROWS=6,P4_EMPTY=0,P4_RED=1,P4_YEL=2;
-const P4_C={0:'transparent',1:'#e74c3c',2:'#f1c40f'};
-
-function p4Win(board,col,row,player){
-  const dirs=[[1,0],[0,1],[1,1],[1,-1]];
-  for(const[dc,dr]of dirs){
-    let n=1;
-    for(let d=1;d<4;d++){const c=col+dc*d,r=row+dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)n++;else break;}
-    for(let d=1;d<4;d++){const c=col-dc*d,r=row-dr*d;if(c>=0&&c<P4_COLS&&r>=0&&r<P4_ROWS&&board[r][c]===player)n++;else break;}
-    if(n>=4)return true;
-  }return false;
-}
-function p4Drop(board,col,player){
-  for(let r=P4_ROWS-1;r>=0;r--){if(board[r][col]===P4_EMPTY){board[r][col]=player;return r;}}return -1;
-}
-function p4Empty(){return Array.from({length:P4_ROWS},()=>Array(P4_COLS).fill(P4_EMPTY));}
-
-// Store game state as JSON in quiz_games.quiz_title field (reuse existing table)
-// Format: "p4:${JSON}"
-async function p4Load(pin){
-  const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games?pin=eq.${pin}&select=*`,
-    {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-  const d=await r.json();
-  if(!d.length)return null;
-  const row=d[0];
-  return{
-    id:row.id,
-    state:{
-      board:JSON.parse(row.board),
-      turn:row.turn,
-      winner:row.winner,
-      hostName:row.host_name,
-      guestName:row.guest_name||'',
-      guestReady:!!(row.guest_name),
-    }
-  };
-}
-async function p4Save(id,state){
-  await fetch(`${SUPABASE_URL}/rest/v1/p4_games?id=eq.${id}`,{
-    method:'PATCH',
-    headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-    body:JSON.stringify({
-      board:JSON.stringify(state.board),
-      turn:state.turn,
-      winner:state.winner||null,
-      guest_name:state.guestName||null,
-    })
-  });
-}
-async function p4GenPin(){
-  for(let i=0;i<10;i++){
-    const pin='P'+String(Math.floor(1000+Math.random()*9000));
-    const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games?pin=eq.${pin}&select=pin`,
-      {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}});
-    const d=await r.json();if(!d.length)return pin;
-  }return 'P'+String(Math.floor(1000+Math.random()*9000));
-}
-
-function P4Board({board,myColor,turn,winner,onPlay}){
-  const m=useIsMobile();
-  const cs=m?46:58;
-  const gap=m?5:6;
-  const[hov,setHov]=React.useState(-1);
-  const canPlay=!winner&&turn===myColor;
-  return(
-    <div style={{background:'#1e2fa0',borderRadius:16,padding:10,display:'inline-block',boxShadow:'0 8px 40px rgba(0,0,0,.6)',userSelect:'none'}}>
-      {/* Drop buttons — always visible */}
-      <div style={{display:'flex',gap:gap,marginBottom:6}}>
-        {Array.from({length:P4_COLS},(_,c)=>(
-          <button key={c}
-            onClick={()=>canPlay&&onPlay(c)}
-            disabled={!canPlay}
-            style={{
-              width:cs,height:Math.round(cs*.55),
-              display:'flex',alignItems:'center',justifyContent:'center',
-              borderRadius:10,border:'none',
-              background:canPlay
-                ? hov===c
-                  ? P4_C[myColor]
-                  : P4_C[myColor]+'55'
-                : 'rgba(255,255,255,0.07)',
-              cursor:canPlay?'pointer':'not-allowed',
-              transition:'background .12s, transform .1s',
-              transform:hov===c&&canPlay?'scale(1.1)':'scale(1)',
-              fontSize:16,
-            }}
-            onMouseEnter={()=>setHov(c)}
-            onMouseLeave={()=>setHov(-1)}>
-            {canPlay&&<span style={{color:'#fff',fontWeight:900,fontSize:cs*.28,lineHeight:1}}>▼</span>}
-          </button>
-        ))}
-      </div>
-      {/* Grid */}
-      {board.map((row,r)=>(
-        <div key={r} style={{display:'flex',gap:gap,marginBottom:gap}}>
-          {row.map((cell,c)=>(
-            <div key={c} style={{
-              width:cs,height:cs,borderRadius:'50%',
-              background:P4_C[cell]||'#0d0d3a',
-              boxShadow:cell
-                ?`0 3px 10px ${P4_C[cell]}99, inset 0 -2px 4px rgba(0,0,0,.3)`
-                :'inset 0 3px 6px rgba(0,0,0,.5)',
-              transition:'background .18s',
-            }}/>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function P4Page({currentPlayer,onBack}){
-  const[view,setView]=React.useState('home');
-  const[pin,setPin]=React.useState('');
-  const[pinInput,setPinInput]=React.useState('');
-  const[isHost,setIsHost]=React.useState(false);
-  const[gameId,setGameId]=React.useState(null);
-  const[board,setBoard]=React.useState(p4Empty());
-  const[turn,setTurn]=React.useState(P4_RED);
-  const[winner,setWinner]=React.useState(null);
-  const[oppName,setOppName]=React.useState('');
-  const[oppReady,setOppReady]=React.useState(false);
-  const[loading,setLoading]=React.useState(false);
-  const[error,setError]=React.useState(null);
-  const pollRef=React.useRef(null);
-  const myColor=isHost?P4_RED:P4_YEL;
-  const userId=currentPlayer?.id;
-  const myName=currentPlayer?.display_name||currentPlayer?.name||'Joueur';
-
-  const initState=()=>({
-    board:p4Empty(),turn:P4_RED,winner:null,
-    hostName:myName,guestName:'',hostReady:true,guestReady:false
-  });
-
-  // Poll game state every 600ms
-  React.useEffect(()=>{
-    if(view!=='game'||!gameId)return;
-    const poll=async()=>{
-      try{
-        const g=await p4Load(pin);
-        if(!g)return;
-        const s=g.state;
-        setBoard(s.board||p4Empty());
-        setTurn(s.turn||P4_RED);
-        setWinner(s.winner||null);
-        if(isHost){setOppName(s.guestName||'');setOppReady(!!s.guestReady);}
-        else{setOppName(s.hostName||'');setOppReady(true);}
-      }catch(e){}
-    };
-    poll();
-    pollRef.current=setInterval(poll,600);
-    return()=>clearInterval(pollRef.current);
-  },[view,gameId,pin,isHost]);
-
-  const handleHost=async()=>{
-    setLoading(true);setError(null);
-    try{
-      const p=await p4GenPin();
-      const state=initState();
-      const r=await fetch(`${SUPABASE_URL}/rest/v1/p4_games`,{
-        method:'POST',
-        headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"},
-        body:JSON.stringify({pin:p,host_id:userId,host_name:myName,board:JSON.stringify(state.board),turn:P4_RED,winner:null})
-      });
-      if(!r.ok){const e=await r.text();throw new Error(e);}
-      const d=await r.json();
-      setPin(p);setIsHost(true);setGameId(d[0]?.id||null);setView('game');
-    }catch(e){setError('Erreur: '+e.message);}
-    setLoading(false);
-  };
-
-  const handleJoin=async()=>{
-    const p=pinInput.trim().toUpperCase();
-    if(p.length<3){setError('Code invalide');return;}
-    setLoading(true);setError(null);
-    try{
-      const g=await p4Load(p);
-      if(!g)throw new Error('Partie introuvable');
-      const s={...g.state,guestName:myName,guestReady:true};
-      await p4Save(g.id,s);
-      setPin(p);setIsHost(false);setGameId(g.id);
-      setBoard(s.board);setTurn(s.turn);setOppName(s.hostName);setOppReady(true);
-      setView('game');
-    }catch(e){setError(e.message);}
-    setLoading(false);
-  };
-
-  const playMove=async(col)=>{
-    if(winner||turn!==myColor||(!oppReady&&isHost))return;
-    try{
-      const g=await p4Load(pin);if(!g)return;
-      const s={...g.state};
-      const nb=s.board.map(r=>[...r]);
-      const row=p4Drop(nb,col,myColor);if(row<0)return;
-      const won=p4Win(nb,col,row,myColor);
-      const draw=!won&&nb[0].every(c=>c!==P4_EMPTY);
-      s.board=nb;s.turn=myColor===P4_RED?P4_YEL:P4_RED;
-      s.winner=won?myColor:draw?'draw':null;
-      await p4Save(g.id,s);
-      setBoard(nb.map(r=>[...r]));setTurn(s.turn);setWinner(s.winner);
-    }catch(e){}
-  };
-
-  const resetGame=async()=>{
-    try{
-      const g=await p4Load(pin);if(!g)return;
-      const s={...g.state,board:p4Empty(),turn:P4_RED,winner:null};
-      await p4Save(g.id,s);
-      setBoard(p4Empty());setTurn(P4_RED);setWinner(null);
-    }catch(e){}
-  };
-
-  const S={
-    root:{minHeight:'100vh',background:'#080812',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column',alignItems:'center'},
-    header:{width:'100%',padding:'16px 20px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #1a1a2e'},
-    card:{width:'100%',maxWidth:380,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:20,padding:'24px',marginTop:16},
-    input:{width:'100%',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:12,padding:'14px 18px',fontSize:22,fontWeight:700,color:'#fff',textAlign:'center',letterSpacing:8,outline:'none',boxSizing:'border-box',fontFamily:"'Outfit',sans-serif",textTransform:'uppercase'},
-    btn:(c,tc='#fff')=>({background:c,border:'none',borderRadius:14,padding:'14px',width:'100%',fontSize:16,fontWeight:700,color:tc,cursor:'pointer',marginTop:12,fontFamily:"'Outfit',sans-serif"}),
-  };
-
-  if(view==='home')return(
-    <div style={S.root}>
-      <div style={S.header}>
-        <button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:20}}>🔴 PUISSANCE 4</span>
-      </div>
-      <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'32px 20px',width:'100%',maxWidth:440}}>
-        <div style={{fontSize:60,margin:'0 0 8px'}}>🔴🟡</div>
-        <div style={{fontSize:22,fontWeight:900}}>1v1 en temps réel</div>
-        <div style={{color:'#aaa',fontSize:13,marginTop:6}}>Aligne 4 jetons avant ton adversaire</div>
-        <div style={S.card}>
-          <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>🎛️ Créer une partie</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Tu joues les 🔴 rouges</div>
-          <button style={S.btn('#e74c3c')} onClick={handleHost} disabled={loading}>{loading?'…':'Créer →'}</button>
-        </div>
-        <div style={{color:'#333',fontSize:14,marginTop:16}}>— ou —</div>
-        <div style={{...S.card,marginTop:8}}>
-          <div style={{fontWeight:800,fontSize:16,marginBottom:4}}>📱 Rejoindre</div>
-          <div style={{color:'#aaa',fontSize:13,marginBottom:12}}>Tu joues les 🟡 jaunes · Entre le code de l'hôte</div>
-          <input style={S.input} value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/[^A-Za-z0-9]/g,'').slice(0,5))} placeholder="CODE" onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>
-          {error&&<div style={{color:'#e74c3c',fontSize:12,marginTop:8,textAlign:'center'}}>{error}</div>}
-          <button style={{...S.btn('#f1c40f','#080812')}} onClick={handleJoin} disabled={loading}>{loading?'…':'Rejoindre →'}</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const myTurn=!winner&&turn===myColor&&(isHost?oppReady:true);
-  const winMsg=winner==='draw'?'Match nul !':(winner===myColor?'Tu as gagné ! 🎉':'Adversaire gagne 😔');
-  return(
-    <div style={S.root}>
-      <div style={S.header}>
-        <button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button>
-        <span style={{fontWeight:800,fontSize:18}}>🔴 PUISSANCE 4</span>
-        {isHost&&<div style={{marginLeft:'auto',background:'rgba(231,76,60,0.2)',border:'1px solid #e74c3c55',borderRadius:20,padding:'4px 16px',fontSize:15,fontWeight:900,letterSpacing:6,color:'#e74c3c'}}>{pin}</div>}
-      </div>
-      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',gap:12}}>
-        {isHost&&!oppReady&&!winner&&(
-          <div style={{textAlign:'center',color:'#aaa',fontSize:14,lineHeight:2}}>
-            En attente d'un adversaire…<br/>
-            <span style={{fontWeight:900,fontSize:32,color:'#e74c3c',letterSpacing:8}}>{pin}</span>
-          </div>
-        )}
-        {(oppReady||!isHost)&&!winner&&(
-          <>
-            <div style={{display:'flex',gap:20,alignItems:'center',fontSize:14}}>
-              <span style={{fontWeight:800,color:P4_C[myColor]}}>
-                {isHost?'Toi':oppName} {myColor===P4_RED?'🔴':'🟡'}
-              </span>
-              <span style={{color:'#555'}}>VS</span>
-              <span style={{fontWeight:800,color:P4_C[myColor===P4_RED?P4_YEL:P4_RED]}}>
-                {isHost?oppName:'Toi'} {myColor===P4_RED?'🟡':'🔴'}
-              </span>
-            </div>
-            <div style={{fontWeight:700,fontSize:14,color:myTurn?P4_C[myColor]:'#666'}}>
-              {myTurn?'▶ Ton tour !':'⏳ Tour adversaire…'}
-            </div>
-          </>
-        )}
-        {winner&&<div style={{fontWeight:900,fontSize:24,color:winner===myColor?'#2ecc71':winner==='draw'?'#f1c40f':'#e74c3c'}}>{winMsg}</div>}
-        <P4Board board={board} myColor={myColor} turn={turn} winner={winner} onPlay={playMove}/>
-        {winner&&(
-          <button onClick={resetGame} style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'12px 28px',fontSize:15,fontWeight:700,cursor:'pointer',marginTop:4}}>Rejouer</button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 
