@@ -6534,18 +6534,21 @@ function TournoiPage({currentPlayer,onBack}){
             {filtered.map(p=>{
               const isSelected=selected.some(s=>s.id===p.id);
               return(
-                <div key={p.id} onClick={()=>setSelected(s=>isSelected?s.filter(x=>x.id!==p.id):[...s,p])}
-                  style={{background:isSelected?"#f59e0b22":"#12121f",border:`2px solid ${isSelected?"#f59e0b":"#1e1e30"}`,borderRadius:4,padding:"10px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"all .1s"}}>
-                  <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0,border:`2px solid ${isSelected?"#f59e0b":"#2a2a40"}`}}>
-                    <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
-                  </div>
-                  <div style={{flex:1,overflow:"hidden"}}>
-                    <div style={{fontSize:9,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(p,PLAYERS).toUpperCase()}</div>
-                    {p.last_name&&<div style={{fontSize:7,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
-                    {p.tournoi_count>0&&<div style={{fontSize:8,color:"#f59e0b",marginTop:3,fontWeight:700}}>×{p.tournoi_count}</div>}
-                  </div>
-                </div>
-              );
+                 <div key={p.id}
+                   style={{background:isSelected?"#f59e0b22":"#12121f",border:`2px solid ${isSelected?"#f59e0b":"#1e1e30"}`,borderRadius:4,padding:"10px 8px",display:"flex",alignItems:"center",gap:8,transition:"all .1s",position:"relative"}}>
+                   <button onClick={e=>{e.stopPropagation();toggleFav(p.id);}} style={{position:"absolute",top:3,right:4,background:"none",border:"none",cursor:"pointer",fontSize:13,color:favs.includes(p.id)?"#f59e0b":"#2a2a40",padding:0,lineHeight:1,zIndex:2}}>{favs.includes(p.id)?"★":"☆"}</button>
+                   <div onClick={()=>setSelected(s=>isSelected?s.filter(x=>x.id!==p.id):[...s,p])} style={{display:"flex",alignItems:"center",gap:8,flex:1,cursor:"pointer"}}>
+                   <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:"#1e1e30",flexShrink:0,border:`2px solid ${isSelected?"#f59e0b":"#2a2a40"}`}}>
+                     <img src={p.photoUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>e.target.style.display="none"}/>
+                   </div>
+                   <div style={{flex:1,overflow:"hidden"}}>
+                     <div style={{fontSize:9,color:isSelected?"#f59e0b":"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(p,PLAYERS).toUpperCase()}</div>
+                     {p.last_name&&<div style={{fontSize:7,color:"#60607a",marginTop:2}}>{p.last_name.toUpperCase()}</div>}
+                     {p.tournoi_count>0&&<div style={{fontSize:8,color:"#f59e0b",marginTop:3,fontWeight:700}}>×{p.tournoi_count}</div>}
+                   </div>
+                   </div>
+                 </div>
+               );
             })}
           </div>
           <button onClick={launchTournoi} disabled={selected.length<2}
@@ -6952,7 +6955,7 @@ async function loadPouisQuestions(limit){
     return rows.sort(()=>Math.random()-.5).slice(0,limit).map(r=>({
       q:r.question,
       a:Array.isArray(r.answers)?r.answers:JSON.parse(r.answers||'[]'),
-      c:r.correct,t:r.time_limit||20
+      c:r.correct,t:r.time_limit||20,diff:r.difficulty||1,theme:r.theme||''
     }));
   }catch(e){throw e;}
 }
@@ -6981,6 +6984,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const[answersIn,setAnswersIn]=React.useState([]);
   const[quizTitle,setQuizTitle]=React.useState('');
   const[totalQ,setTotalQ]=React.useState(0);
+  const[countdown,setCountdown]=React.useState(0);
   const R=React.useRef({ch:null,quiz:null,idx:0,qStart:0,scores:{},answers:[],players:[],timer:null});
 
   const stopTimer=React.useCallback(()=>{clearInterval(R.current.timer);R.current.timer=null;},[]);
@@ -7015,6 +7019,7 @@ function useQuizGame({pin,userId,username,isHost}){
   const handleEvt=React.useCallback((evt,payload)=>{
     switch(evt){
       case 'GAME_START':setQuizTitle(payload.title);setTotalQ(payload.total);break;
+      case 'COUNTDOWN':setCountdown(payload.count);setPhase('countdown');break;
       case 'SHOW_QUESTION':{
         const{idx,q,a,c,t,diff=1,theme=''}=payload;
         setQuestion({idx,q,a,c,t,diff,theme});setMyAnswer(null);setResults(null);setAnswersIn([]);
@@ -7075,6 +7080,11 @@ function useQuizGame({pin,userId,username,isHost}){
   const hostSendQ=React.useCallback(async(idx)=>{
     if(!isHost||!R.current.quiz)return;
     const q=R.current.quiz.questions[idx];R.current.idx=idx;R.current.answers=[];setAnswersIn([]);
+    // 3-second countdown
+    await bcast('COUNTDOWN',{count:3});
+    setCountdown(3);setPhase('countdown');
+    await new Promise(res=>{let c=3;const t=setInterval(()=>{c--;setCountdown(c);if(c<=0){clearInterval(t);res();}},1000);});
+    setCountdown(0);
     await bcast('SHOW_QUESTION',{idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});
     setQuestion({idx,q:q.q,a:q.a,c:q.c,t:q.t,diff:q.diff||1,theme:q.theme||''});setMyAnswer(null);setResults(null);
     R.current.qStart=Date.now();setPhase('question');
@@ -7126,7 +7136,7 @@ function useQuizGame({pin,userId,username,isHost}){
     }
   },[myAnswer,phase,isHost,userId,username,bcast,hostReveal]);
 
-  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,
+  return{phase,players,question,timeLeft,myAnswer,results,finalScores,answersIn,quizTitle,totalQ,countdown,
     hostStart,hostSendQ,hostReveal,hostNext,playerAnswer};
 }
 
@@ -7201,6 +7211,12 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
     </div>
   );
 
+  if(phase==='countdown')return(
+    <div style={S.root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+      <div style={{fontSize:13,color:'#aaa'}}>Question {(question?.idx??R.current?.idx??0)+2} arrive…</div>
+      <div style={{fontSize:96,fontWeight:900,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,.5)',lineHeight:1}}>{countdown}</div>
+    </div></div>
+  );
   if(phase==='question'||phase==='results')return(
     <div style={S.root}>
       <div style={S.hdr}>
@@ -7210,6 +7226,7 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
           <span style={{background:'rgba(255,255,255,.07)',borderRadius:16,padding:'3px 10px',fontSize:12}}>{answersIn.length}/{players.length} ✓</span>
           {phase==='question'&&<button style={S.btn('#e67e22')} onClick={hostReveal}>Révéler</button>}
           {showRes&&<button style={S.btn('#7c3aed')} onClick={hostNext}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
+          <button style={{...S.btn('#555'),fontSize:11,padding:'6px 10px'}} onClick={onExit}>✕</button>
         </div>
       </div>
       <div style={{...S.body}}>
@@ -7270,7 +7287,7 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
 
 // ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
+  const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,countdown,playerAnswer}=
     useQuizGame({pin,userId,username,isHost:false});
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
@@ -7302,6 +7319,12 @@ function QuizPlayer({pin,userId,username,onExit}){
     </div>
   );
 
+  if(phase==='countdown')return(
+    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12}}>
+      <div style={{fontSize:13,color:'#aaa'}}>Prochaine question…</div>
+      <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 30px rgba(124,58,237,.4)',lineHeight:1}}>{countdown}</div>
+    </div></div>
+  );
   if(['question','answered','results'].includes(phase))return(
     <div style={root}>
       <div style={{padding:'10px 14px',borderBottom:'1px solid #1a1a2e'}}>
@@ -7682,8 +7705,8 @@ function P4Page({currentPlayer,onBack}){
   if(view==='home')return(<div style={S.root}><div style={S.hdr}><button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button><span style={{fontWeight:800,fontSize:20}}>🔴 PUISSANCE 4</span></div><div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'28px 20px',width:'100%',maxWidth:440}}><div style={{fontSize:56,margin:'0 0 6px'}}>🔴🟡</div><div style={{fontSize:20,fontWeight:900}}>1v1 en temps réel</div><div style={{color:'#aaa',fontSize:13,marginTop:4,marginBottom:8}}>Aligne 4 jetons avant ton adversaire</div><div style={S.card}><div style={{fontWeight:800,fontSize:15,marginBottom:4}}>🎛️ Créer une partie</div><div style={{color:'#aaa',fontSize:12,marginBottom:10}}>Tu joues les 🔴 rouges</div><button style={S.btn('#e74c3c')} onClick={handleHost} disabled={loading}>{loading?'…':'Créer →'}</button></div><div style={{color:'#333',fontSize:13,marginTop:14}}>— ou —</div><div style={{...S.card,marginTop:8}}><div style={{fontWeight:800,fontSize:15,marginBottom:4}}>📱 Rejoindre</div><div style={{color:'#aaa',fontSize:12,marginBottom:10}}>Tu joues les 🟡 jaunes</div><input style={S.input} value={pinInput} onChange={e=>setPinInput(e.target.value.replace(/[^A-Za-z0-9]/g,'').slice(0,5))} placeholder="CODE" onKeyDown={e=>e.key==='Enter'&&handleJoin()}/>{error&&<div style={{color:'#e74c3c',fontSize:12,marginTop:6,textAlign:'center'}}>{error}</div>}<button style={{...S.btn('#f1c40f','#080812')}} onClick={handleJoin} disabled={loading}>{loading?'…':'Rejoindre →'}</button></div></div></div>);
 
   const myTurn=!winner&&turn===myColor&&(isHost?oppReady:true);
-  const winMsg=winner==='draw'?'Match nul !':(winner===myColor?'Tu as gagné ! 🎉':'Adversaire gagne 😔');
-  return(<div style={S.root}><div style={S.hdr}><button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button><span style={{fontWeight:800,fontSize:18}}>🔴 PUISSANCE 4</span>{isHost&&<div style={{marginLeft:'auto',background:'rgba(231,76,60,0.2)',border:'1px solid #e74c3c55',borderRadius:20,padding:'4px 16px',fontSize:15,fontWeight:900,letterSpacing:6,color:'#e74c3c'}}>{pin}</div>}</div><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',gap:10}}>{isHost&&!oppReady&&!winner&&(<div style={{textAlign:'center',color:'#aaa',fontSize:14,lineHeight:2}}>En attente…<br/><span style={{fontWeight:900,fontSize:32,color:'#e74c3c',letterSpacing:8}}>{pin}</span></div>)}{(oppReady||!isHost)&&!winner&&(<><div style={{display:'flex',gap:20,alignItems:'center',fontSize:13}}><span style={{fontWeight:800,color:P4_C[myColor]}}>{isHost?'Toi':oppName} {myColor===P4_RED?'🔴':'🟡'}</span><span style={{color:'#555'}}>VS</span><span style={{fontWeight:800,color:P4_C[myColor===P4_RED?P4_YEL:P4_RED]}}>{isHost?oppName:'Toi'} {myColor===P4_RED?'🟡':'🔴'}</span></div><div style={{fontWeight:700,fontSize:13,color:myTurn?P4_C[myColor]:'#666'}}>{myTurn?'▶ Ton tour !':'⏳ Tour adversaire…'}</div></>)}{winner&&<div style={{fontWeight:900,fontSize:22,color:winner===myColor?'#2ecc71':winner==='draw'?'#f1c40f':'#e74c3c'}}>{winMsg}</div>}<P4Board board={board} myColor={myColor} turn={turn} winner={winner} onPlay={playMove}/>{winner&&<button onClick={resetGame} style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'11px 26px',fontSize:14,fontWeight:700,cursor:'pointer',marginTop:4}}>Rejouer</button>}</div></div>);
+  const winnerN=winner==='draw'?'draw':Number(winner);const winMsg=winnerN==='draw'?'Match nul !':(winnerN===myColor?'Tu as gagné ! 🎉':'Adversaire gagne 😔');
+  return(<div style={S.root}><div style={S.hdr}><button onClick={onBack} style={{background:'none',border:'none',color:'#aaa',fontSize:22,cursor:'pointer'}}>←</button><span style={{fontWeight:800,fontSize:18}}>🔴 PUISSANCE 4</span>{isHost&&<div style={{marginLeft:'auto',background:'rgba(231,76,60,0.2)',border:'1px solid #e74c3c55',borderRadius:20,padding:'4px 16px',fontSize:15,fontWeight:900,letterSpacing:6,color:'#e74c3c'}}>{pin}</div>}</div><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px',gap:10}}>{isHost&&!oppReady&&!winner&&(<div style={{textAlign:'center',color:'#aaa',fontSize:14,lineHeight:2}}>En attente…<br/><span style={{fontWeight:900,fontSize:32,color:'#e74c3c',letterSpacing:8}}>{pin}</span></div>)}{(oppReady||!isHost)&&!winner&&(<><div style={{display:'flex',gap:20,alignItems:'center',fontSize:13}}><span style={{fontWeight:800,color:P4_C[myColor]}}>{isHost?'Toi':oppName} {myColor===P4_RED?'🔴':'🟡'}</span><span style={{color:'#555'}}>VS</span><span style={{fontWeight:800,color:P4_C[myColor===P4_RED?P4_YEL:P4_RED]}}>{isHost?oppName:'Toi'} {myColor===P4_RED?'🟡':'🔴'}</span></div><div style={{fontWeight:700,fontSize:13,color:myTurn?P4_C[myColor]:'#666'}}>{myTurn?'▶ Ton tour !':'⏳ Tour adversaire…'}</div></>)}{winner&&<div style={{fontWeight:900,fontSize:22,color:winnerN===myColor?'#2ecc71':winnerN==='draw'?'#f1c40f':'#e74c3c'}}>{winMsg}</div>}<P4Board board={board} myColor={myColor} turn={turn} winner={winner} onPlay={playMove}/>{winner&&<div style={{display:'flex',gap:10,marginTop:4}}><button onClick={resetGame} style={{background:'#7c3aed',border:'none',color:'#fff',borderRadius:14,padding:'11px 22px',fontSize:14,fontWeight:700,cursor:'pointer'}}>Rejouer</button><button onClick={onBack} style={{background:'rgba(255,255,255,.08)',border:'none',color:'#aaa',borderRadius:14,padding:'11px 22px',fontSize:14,fontWeight:700,cursor:'pointer'}}>Menu</button></div>}</div></div>);
 }
 
 
