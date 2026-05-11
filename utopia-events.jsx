@@ -7024,7 +7024,7 @@ function DataBL({onBack,currentPlayer}){
 // ─── QUIZ DATA ────────────────────────────────────────────────────────────────
 async function fetchQuizQuestions(category, limit=20){
   // Fetch all matching questions then balance by theme + difficulty
-  const cat = category==='all'||!category ? '&category.neq=pouis' : `&category=eq.${category}`;
+  const cat = category==='all'||!category ? '&category=neq.pouis' : `&category=eq.${category}`;
   const r = await fetch(
     `${SUPABASE_URL}/rest/v1/quiz_questions?select=*${cat}&limit=1000`,
     {headers:{"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`}}
