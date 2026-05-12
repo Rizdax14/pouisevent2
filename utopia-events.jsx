@@ -917,7 +917,7 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
             </button>
           );
         })}
-        {saveError&&<div style={{width:'100%',background:'rgba(231,76,60,.2)',color:'#f87171',fontSize:10,padding:'4px 8px',borderRadius:6,marginBottom:4}}>{saveError}</div>}
+        {state.saveError&&<div style={{width:'100%',background:'rgba(231,76,60,.2)',color:'#f87171',fontSize:10,padding:'4px 8px',borderRadius:6,marginBottom:4}}>{state.saveError}</div>}
           <button onClick={()=>window.location.reload()} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
           <span style={{fontSize:18}}>↺</span>
           <span style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Reload</span>
@@ -7949,7 +7949,7 @@ function useTestState() {
     p4Finalists, setP4Finalists: v => upd('p4Finalists', setP4Finalists, v),
     p4ConsolResults, setP4ConsolResults: v => upd('p4ConsolResults', setP4ConsolResults, v),
     p4FinalRanking, setP4FinalRanking: v => upd('p4FinalRanking', setP4FinalRanking, v),
-    loaded, resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
+    loaded, saveError, resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
   };
 }
 
