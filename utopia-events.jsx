@@ -898,10 +898,10 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
     {id:"rankings",l:"Classements",ic:"🏆"},
     {id:"teams",l:"Équipes",ic:"⚡"},
   ];
-  const TEST_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+  const TEST_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
   const items=[
     ...baseItems,
-    ...(currentPlayer&&TEST_UIDS.includes(currentPlayer.uid)?[{id:"test",l:"TEST",ic:"⚡"}]:[]),
+
     currentPlayer?{id:"profile",l:"Profil",ic:"👤"}:{id:"profile",l:"Connexion",ic:"🔑"},
     ...(isAdmin?[{id:"admin",l:"Data",ic:"📊"}]:[]),
   ];
@@ -6640,7 +6640,7 @@ const BL_WHITE = "#f0f4f1";
 function MenuBL({onSection, currentPlayer, onLogout}){
   const m=useIsMobile();
   const isLouis=currentPlayer?.uid===ADMIN_UID;
-  const TEST_MENU_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+  const TEST_MENU_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     ...(TEST_MENU_UIDS.includes(currentPlayer?.uid||'')?[{id:"test",label:"TEST",icon:"⚡",desc:"Olympiades Test — 14 Mai",color:"#7c3aed",active:true}]:[]),
@@ -7740,420 +7740,948 @@ function P4Page({currentPlayer,onBack}){
 
 
 // ─── TEST EVENT PAGE ──────────────────────────────────────────────────────────
-const TEST_ADMINS_UIDS=['louis-mar','thisma-bru','salome-dev'];
-const TEST_DUOS=[
-  {uid1:'etienne-oll',name1:'Etienne',uid2:null,name2:'???'},
-  {uid1:'ilian-tif',name1:'Ilian',uid2:'lou-ann-del',name2:'Lou-Ann'},
-  {uid1:'louis-mar',name1:'Louis',uid2:'emma-gar',name2:'Emma G.'},
-  {uid1:'thomas-pey',name1:'Thomas',uid2:'lise-roc',name2:'Lise'},
-  {uid1:'samuel-oll',name1:'Samuel',uid2:'pauline-fic',name2:'Pauline'},
-  {uid1:'maxime-mar',name1:'Maxime',uid2:'romane-mic',name2:'Romane'},
-  {uid1:'solal-bru',name1:'Solal',uid2:null,name2:'???'},
-  {uid1:'nils-bra',name1:'Nils',uid2:'melyne-dar',name2:'Mélyne'},
-  {uid1:'nolan-mar',name1:'Nolan',uid2:'marie-ger',name2:'Marie'},
-  {uid1:'loan-bar',name1:'Loan',uid2:'emma-sao',name2:'Emma S.'},
-  {uid1:'salome-dev',name1:'Salomé',uid2:'thisma-bru',name2:'Thisma'},
-];
-const TEST_PHASES_DEF=[
-  {id:1,name:'Cercles Musicaux',icon:'🎵',time:'20h-20h30',format:'2v2'},
-  {id:2,name:'Béret',icon:'🪖',time:'20h30-21h',format:'2v2'},
-  {id:3,name:'Culture G',icon:'🧠',time:'22h-22h30',format:'2v2'},
-  {id:4,name:'Puissance 4',icon:'🔴',time:'22h30-23h',format:'1v1'},
+
+const TEST_DUOS = [
+  {id:0,uid1:'etienne-oll',name1:'Etienne',sex1:'M',uid2:'jeanne-roc',name2:'Jeanne',sex2:'F',color:'#e74c3c'},
+  {id:1,uid1:'ilian-tif',name1:'Ilian',sex1:'M',uid2:'lou-ann-del',name2:'Lou-Ann',sex2:'F',color:'#3498db'},
+  {id:2,uid1:'louis-mar',name1:'Louis',sex1:'M',uid2:'emma-gar',name2:'Emma G.',sex2:'F',color:'#2ecc71'},
+  {id:3,uid1:'thomas-pey',name1:'Thomas',sex1:'M',uid2:'lise-roc',name2:'Lise',sex2:'F',color:'#f39c12'},
+  {id:4,uid1:'samuel-oll',name1:'Samuel',sex1:'M',uid2:'pauline-fic',name2:'Pauline',sex2:'F',color:'#9b59b6'},
+  {id:5,uid1:'maxime-mar',name1:'Maxime',sex1:'M',uid2:'romane-mic',name2:'Romane',sex2:'F',color:'#1abc9c'},
+  {id:6,uid1:'solal-bru',name1:'Solal',sex1:'M',uid2:null,name2:'???',sex2:'F',color:'#e67e22'},
+  {id:7,uid1:'nils-bra',name1:'Nils',sex1:'M',uid2:'melyne-dar',name2:'Mélyne',sex2:'F',color:'#e91e63'},
+  {id:8,uid1:'nolan-mar',name1:'Nolan',sex1:'M',uid2:'marie-ger',name2:'Marie',sex2:'F',color:'#00bcd4'},
+  {id:9,uid1:'loan-bar',name1:'Loan',sex1:'M',uid2:'emma-sao',name2:'Emma S.',sex2:'F',color:'#f1c40f'},
+  {id:10,uid1:'salome-dev',name1:'Salomé',sex1:'F',uid2:'thisma-bru',name2:'Thisma',sex2:'F',color:'#607d8b'},
 ];
 const TEST_PTS_SCALE=[25,20,16,13,11,9,7,5,3,2,1];
+const TEST_ADMINS_LIST=['louis-mar','thisma-bru','salome-dev'];
 
-function computeTestGeneral(phases){
-  const totals={};
-  TEST_DUOS.forEach(d=>{totals[d.uid1]=0;});
-  phases.forEach(phase=>{
-    (phase.results||[]).forEach((r,i)=>{
-      const pts=TEST_PTS_SCALE[i]||0;
-      if(totals[r.uid1]!==undefined)totals[r.uid1]=(totals[r.uid1]||0)+pts;
-    });
-  });
-  return TEST_DUOS.map(d=>({...d,total:totals[d.uid1]||0})).sort((a,b)=>b.total-a.total);
+// Béret schedule (hardcoded for 10 duos, 2 tours x 10 matchs)
+// Tour 1 matchs 1-10, Tour 2 matchs 11-20
+// Round robin 10 players: fix duo9, rotate duo0-8
+const BERET_MATCHES = [
+  // Tour 1 - Hommes
+  {num:1,tour:1,type:'H',d1:0,d2:9},{num:2,tour:1,type:'H',d1:1,d2:8},
+  {num:3,tour:1,type:'H',d1:2,d2:7},{num:4,tour:1,type:'H',d1:3,d2:6},
+  {num:5,tour:1,type:'H',d1:4,d2:5},
+  // Tour 1 - Femmes
+  {num:6,tour:1,type:'F',d1:0,d2:9},{num:7,tour:1,type:'F',d1:1,d2:8},
+  {num:8,tour:1,type:'F',d1:2,d2:7},{num:9,tour:1,type:'F',d1:3,d2:6},
+  {num:10,tour:1,type:'F',d1:4,d2:5},
+  // Tour 2 - Hommes (rotation: [1,2,3,4,5,6,7,8,0] fix 9)
+  {num:11,tour:2,type:'H',d1:1,d2:9},{num:12,tour:2,type:'H',d1:2,d2:0},
+  {num:13,tour:2,type:'H',d1:3,d2:8},{num:14,tour:2,type:'H',d1:4,d2:7},
+  {num:15,tour:2,type:'H',d1:5,d2:6},
+  // Tour 2 - Femmes
+  {num:16,tour:2,type:'F',d1:1,d2:9},{num:17,tour:2,type:'F',d1:2,d2:0},
+  {num:18,tour:2,type:'F',d1:3,d2:8},{num:19,tour:2,type:'F',d1:4,d2:7},
+  {num:20,tour:2,type:'F',d1:5,d2:6},
+];
+// Each duo's 4 match numbers: [H_tour1, F_tour1, H_tour2, F_tour2]
+const BERET_DUO_MATCHES = {
+  0:[1,6,12,17], 1:[2,7,11,16], 2:[3,8,12,17], 3:[4,9,13,18],
+  4:[5,10,14,19], 5:[5,10,15,20], 6:[4,9,15,20], 7:[3,8,14,19],
+  8:[2,7,13,18], 9:[1,6,11,16],
+};
+// Finale round robin (4 teams): 3 rounds × 2 confrontations = 6 confrontations
+// Each confrontation = 1H + 1F match
+const BERET_FINALE_ROUNDS = [
+  [{conf:1,A:0,B:3},{conf:2,A:1,B:2}], // Round 1: team0vsTeam3, team1vsTeam2
+  [{conf:3,A:0,B:1},{conf:4,A:2,B:3}], // Round 2
+  [{conf:5,A:0,B:2},{conf:6,A:1,B:3}], // Round 3
+];
+
+// P4 groups (static assignment, can be reshuffled)
+const P4_GROUPS = [
+  {name:'A',color:'#e74c3c',duoIds:[0,1,2,3]},
+  {name:'B',color:'#3498db',duoIds:[4,5,6,7]},
+  {name:'C',color:'#2ecc71',duoIds:[8,9,10]},
+];
+
+function scoreDuo(rank1, rank2) {
+  const best = Math.min(rank1, rank2);
+  const worst = Math.max(rank1, rank2);
+  return (best * 2 + worst) / 3;
 }
 
-function TestArbitragePanel({phase,onSave}){
-  const[order,setOrder]=React.useState(
-    phase.results&&phase.results.length>0
-      ?phase.results.map(r=>r.uid1)
-      :TEST_DUOS.map(d=>d.uid1)
-  );
-  const moveUp=(i)=>{if(i===0)return;const n=[...order];[n[i-1],n[i]]=[n[i],n[i-1]];setOrder(n);};
-  const moveDown=(i)=>{if(i===order.length-1)return;const n=[...order];[n[i],n[i+1]]=[n[i+1],n[i]];setOrder(n);};
-  const save=()=>{
-    const results=order.map(uid1=>{const d=TEST_DUOS.find(d=>d.uid1===uid1);return{uid1,uid2:d?.uid2||null};});
-    onSave(results);
+function useTestState() {
+  const load = (key, def) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; } catch { return def; } };
+  const save = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
+
+  const [cerclesElim, setCerclesElim] = React.useState(() => load('test_cercles', []));
+  const [beretResults, setBeretResults] = React.useState(() => load('test_beret_results', {}));
+  const [beretFinalists, setBeretFinalists] = React.useState(() => load('test_beret_finalists', []));
+  const [beretFinaleResults, setBeretFinaleResults] = React.useState(() => load('test_beret_finale', {}));
+  const [beretFinalRanking, setBeretFinalRanking] = React.useState(() => load('test_beret_final_ranking', []));
+  const [cultureRanking, setCultureRanking] = React.useState(() => load('test_culture', []));
+  const [p4Results, setP4Results] = React.useState(() => load('test_p4', {}));
+  const [p4Finalists, setP4Finalists] = React.useState(() => load('test_p4_finalists', []));
+  const [p4ConsolResults, setP4ConsolResults] = React.useState(() => load('test_p4_consol', {}));
+
+  const upd = (key, setter, val) => { setter(val); save(key, val); };
+  return {
+    cerclesElim, setCerclesElim: v => upd('test_cercles', setCerclesElim, v),
+    beretResults, setBeretResults: v => upd('test_beret_results', setBeretResults, v),
+    beretFinalists, setBeretFinalists: v => upd('test_beret_finalists', setBeretFinalists, v),
+    beretFinaleResults, setBeretFinaleResults: v => upd('test_beret_finale', setBeretFinaleResults, v),
+    beretFinalRanking, setBeretFinalRanking: v => upd('test_beret_final_ranking', setBeretFinalRanking, v),
+    cultureRanking, setCultureRanking: v => upd('test_culture', setCultureRanking, v),
+    p4Results, setP4Results: v => upd('test_p4', setP4Results, v),
+    p4Finalists, setP4Finalists: v => upd('test_p4_finalists', setP4Finalists, v),
+    p4ConsolResults, setP4ConsolResults: v => upd('test_p4_consol', setP4ConsolResults, v),
   };
-  return(
-    <div style={{marginTop:16,background:'rgba(124,58,237,.08)',border:'1px solid rgba(124,58,237,.2)',borderRadius:12,padding:16}}>
-      <div style={{fontWeight:700,fontSize:13,color:'#a78bfa',marginBottom:12}}>📋 Ordre d'arrivée (1er en haut)</div>
-      {order.map((uid1,i)=>{
-        const duo=TEST_DUOS.find(d=>d.uid1===uid1);
-        return(
-          <div key={uid1} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,marginBottom:6,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)'}}>
-            <span style={{width:22,fontSize:13,textAlign:'center',color:i<3?'#ffd700':'#aaa'}}>{i+1}.</span>
-            <span style={{flex:1,fontSize:13,fontWeight:600}}>{duo?.name1||uid1} & {duo?.name2||'???'}</span>
-            <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>{TEST_PTS_SCALE[i]||0}pts</span>
-            <div style={{display:'flex',flexDirection:'column',gap:2}}>
-              <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:'none',border:'1px solid #2a2a40',color:i===0?'#333':'#aaa',borderRadius:4,padding:'1px 6px',cursor:i===0?'not-allowed':'pointer',fontSize:10}}>▲</button>
-              <button onClick={()=>moveDown(i)} disabled={i===order.length-1} style={{background:'none',border:'1px solid #2a2a40',color:i===order.length-1?'#333':'#aaa',borderRadius:4,padding:'1px 6px',cursor:i===order.length-1?'not-allowed':'pointer',fontSize:10}}>▼</button>
-            </div>
+}
+
+// ── Cercles Musicaux ──────────────────────────────────────────────────────────
+function CerclesPanel({isAdmin, state}) {
+  const {cerclesElim, setCerclesElim} = state;
+  const playingDuos = TEST_DUOS.filter(d => d.id !== 10);
+  const allPlayers = playingDuos.flatMap(d => [
+    {id: `${d.id}a`, name: d.name1, duoId: d.id, color: d.color},
+    {id: `${d.id}b`, name: d.name2, duoId: d.id, color: d.color},
+  ]);
+
+  const eliminated = cerclesElim;
+  const remaining = allPlayers.filter(p => !eliminated.includes(p.id));
+  const done = remaining.length <= 1;
+
+  const eliminate = (playerId) => {
+    setCerclesElim([...eliminated, playerId]);
+  };
+
+  const undo = () => {
+    setCerclesElim(eliminated.slice(0, -1));
+  };
+
+  // Compute rankings: eliminated[0] = last out (2nd), eliminated[end-1] = first out (20th)
+  // remaining[0] = winner (1st)
+  const playerRank = {};
+  const totalPlayers = allPlayers.length; // 20
+  if (done && remaining.length === 1) playerRank[remaining[0].id] = 1;
+  else if (remaining.length > 0) remaining.forEach(p => { playerRank[p.id] = null; });
+  // Eliminated: last eliminated = rank 2, first eliminated = rank 20
+  [...eliminated].reverse().forEach((pid, i) => { playerRank[pid] = i + 2; });
+
+  // Duo scores
+  const duoScores = playingDuos.map(d => {
+    const p1 = allPlayers.find(p => p.id === `${d.id}a`);
+    const p2 = allPlayers.find(p => p.id === `${d.id}b`);
+    const r1 = playerRank[p1.id], r2 = playerRank[p2.id];
+    const score = (r1 && r2) ? scoreDuo(r1, r2) : null;
+    return {...d, r1, r2, score};
+  }).sort((a,b) => (a.score??999) - (b.score??999));
+
+  const m = useIsMobile();
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+        <div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>🎵 Cercles Musicaux</div>
+        <div style={{fontSize:12,color:'#60607a'}}>{totalPlayers - eliminated.length} joueur{totalPlayers - eliminated.length > 1 ? 's' : ''} restant{totalPlayers - eliminated.length > 1 ? 's' : ''}</div>
+        {isAdmin && eliminated.length > 0 && <button onClick={undo} style={{marginLeft:'auto',background:'rgba(255,100,100,.15)',border:'1px solid rgba(255,100,100,.3)',color:'#f87171',borderRadius:8,padding:'4px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>↩ Annuler</button>}
+      </div>
+
+      {/* Salomé+Thisma 11ème d'office */}
+      <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:12,height:12,borderRadius:'50%',background:'#607d8b',flexShrink:0}}/>
+        <span style={{fontSize:13,fontWeight:600}}>Salomé & Thisma</span>
+        <span style={{marginLeft:'auto',fontSize:11,color:'#60607a'}}>11ème d'office</span>
+      </div>
+
+      {/* Admin: select eliminated */}
+      {isAdmin && !done && (
+        <div style={{background:'rgba(231,76,60,.08)',border:'1px solid rgba(231,76,60,.2)',borderRadius:12,padding:14,marginBottom:16}}>
+          <div style={{fontWeight:700,fontSize:13,color:'#e74c3c',marginBottom:10}}>
+            ❌ Tour {eliminated.length + 1} — Qui est éliminé ?
           </div>
-        );
-      })}
-      <button onClick={save} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:'pointer',marginTop:8,fontFamily:"'Outfit',sans-serif"}}>
-        ✓ Enregistrer
-      </button>
+          <div style={{display:'grid',gridTemplateColumns:m?'1fr 1fr':'repeat(4,1fr)',gap:6}}>
+            {remaining.map(p => {
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              return (
+                <button key={p.id} onClick={() => eliminate(p.id)}
+                  style={{background:`${duo.color}22`,border:`1px solid ${duo.color}55`,borderRadius:8,padding:'8px 6px',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif",textAlign:'center'}}>
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {done && <div style={{background:'rgba(39,174,96,.1)',border:'1px solid rgba(39,174,96,.3)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#2ecc71',fontWeight:700,textAlign:'center'}}>✓ Épreuve terminée !</div>}
+
+      {/* Ordre d'élimination */}
+      {eliminated.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,color:'#60607a',marginBottom:8}}>Ordre d'élimination (dernier éliminé → premier éliminé) :</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {[...eliminated].reverse().map((pid, i) => {
+              const p = allPlayers.find(x => x.id === pid);
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              const rank = i + 2;
+              return (
+                <span key={pid} style={{background:`${duo.color}22`,border:`1px solid ${duo.color}44`,borderRadius:20,padding:'3px 10px',fontSize:11,color:duo.color}}>
+                  {rank}. {p.name}
+                </span>
+              );
+            })}
+            {done && remaining[0] && (() => {
+              const p = remaining[0];
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              return <span key={p.id} style={{background:`${duo.color}44`,border:`2px solid ${duo.color}`,borderRadius:20,padding:'3px 10px',fontSize:11,fontWeight:700,color:duo.color}}>🏆 1. {p.name}</span>;
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Classement duos */}
+      {duoScores.some(d => d.score !== null) && (
+        <div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'#aaa'}}>Classement des duos</div>
+          {duoScores.map((d, i) => (
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.03)',border:`1px solid ${i===0?'rgba(255,215,0,.25)':d.color+'33'}`}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+              <span style={{width:22,fontSize:13,textAlign:'center',color:i===0?'#ffd700':'#aaa'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:600,fontSize:13}}>{d.name1} & {d.name2}</span>
+              {d.score !== null && (<>
+                <span style={{fontSize:11,color:'#555'}}>{d.r1 && d.name1} #{d.r1} / {d.name2} #{d.r2}</span>
+                <span style={{fontWeight:800,fontSize:12,color:d.color}}>{d.score.toFixed(2)}</span>
+              </>)}
+            </div>
+          ))}
+          {/* Duo 10 at bottom */}
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.05)',opacity:0.6}}>
+            <div style={{width:10,height:10,borderRadius:'50%',background:'#607d8b',flexShrink:0}}/>
+            <span style={{width:22,fontSize:13,textAlign:'center',color:'#555'}}>11.</span>
+            <span style={{flex:1,fontWeight:600,fontSize:13}}>Salomé & Thisma</span>
+            <span style={{fontSize:11,color:'#555'}}>d'office</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function TestEventPage({currentPlayer,nav,navBack}){
-  const m=useIsMobile();
-  const isAdmin=TEST_ADMINS_UIDS.includes(currentPlayer?.uid||'');
-  const[tab,setTab]=React.useState('general');
-  const[editing,setEditing]=React.useState(null);
-  const[phases,setPhases]=React.useState(()=>{
-    try{const s=localStorage.getItem('test_phases');return s?JSON.parse(s):TEST_PHASES_DEF.map(p=>({...p,results:[]}));}
-    catch{return TEST_PHASES_DEF.map(p=>({...p,results:[]}));}
-  });
-  const savePhases=(p)=>{setPhases(p);localStorage.setItem('test_phases',JSON.stringify(p));};
-  const setPhaseResults=(phaseId,results)=>savePhases(phases.map(p=>p.id===phaseId?{...p,results}:p));
-  const general=computeTestGeneral(phases);
-  const currentPhase=phases.find(p=>p.id===Number(tab.replace('phase','')));
-  const medals=['🥇','🥈','🥉'];
+// ── Béret ─────────────────────────────────────────────────────────────────────
+function BeretPanel({isAdmin, currentPlayer, state}) {
+  const {beretResults, setBeretResults, beretFinalists, setBeretFinalists,
+         beretFinaleResults, setBeretFinaleResults, beretFinalRanking, setBeretFinalRanking} = state;
+  const [view, setView] = React.useState('papers'); // papers|poule|finale|ranking
+  const isMyDuo = TEST_DUOS.find(d => d.uid1 === currentPlayer?.uid || d.uid2 === currentPlayer?.uid);
 
-  const tabStyle=(active)=>({
-    background:active?'rgba(124,58,237,.2)':'transparent',
-    border:'1px solid '+(active?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),
-    borderRadius:'10px 10px 0 0',padding:'8px 14px',
-    color:active?'#a78bfa':'#aaa',cursor:'pointer',fontSize:12,
-    fontWeight:active?700:400,fontFamily:"'Outfit',sans-serif",
-    whiteSpace:'nowrap',flexShrink:0,
-  });
+  const playingDuos = TEST_DUOS.filter(d => d.id !== 10);
 
-  const duoCard=(i,isMe)=>({
-    display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:12,marginBottom:8,
-    background:isMe?'rgba(124,58,237,.15)':i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.04)',
-    border:'1px solid '+(isMe?'#7c3aed':i===0?'rgba(255,215,0,.25)':'rgba(255,255,255,.06)'),
-  });
+  // Points de poule per duo
+  function poulePoints(duoId) {
+    let pts = 0;
+    BERET_MATCHES.forEach(m => {
+      if (m.d1 === duoId || m.d2 === duoId) {
+        const key = `m${m.num}`;
+        const w = beretResults[key];
+        if (w === 'duo1' && m.d1 === duoId) pts++;
+        if (w === 'duo2' && m.d2 === duoId) pts++;
+      }
+    });
+    return pts;
+  }
 
-  return(
+  const pouleRanking = [...playingDuos].map(d => ({...d, pts: poulePoints(d.id)}))
+    .sort((a,b) => b.pts - a.pts);
+
+  const setMatchResult = (matchNum, winner) => {
+    setBeretResults({...beretResults, [`m${matchNum}`]: winner});
+  };
+
+  const m = useIsMobile();
+
+  // Finale confrontation points
+  function finaleConfPts(duoId, confNums) {
+    let pts = 0;
+    confNums.forEach(cn => {
+      const hKey = `fH${cn}`, fKey = `fF${cn}`;
+      const conf = BERET_FINALE_ROUNDS.flat().find(c => c.conf === cn);
+      if (!conf) return;
+      const isA = beretFinalists[conf.A] === duoId;
+      const isB = beretFinalists[conf.B] === duoId;
+      if (!isA && !isB) return;
+      ['H','F'].forEach(type => {
+        const key = type === 'H' ? hKey : fKey;
+        const w = beretFinaleResults[key];
+        if (isA && w === 'A') pts++;
+        if (isB && w === 'B') pts++;
+      });
+    });
+    return pts;
+  }
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setView(id)} style={{background:view===id?'rgba(124,58,237,.2)':'transparent',border:'1px solid '+(view===id?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),borderRadius:'8px 8px 0 0',padding:'7px 12px',color:view===id?'#a78bfa':'#aaa',cursor:'pointer',fontSize:11,fontWeight:view===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto'}}>
+        {tabBtn('papers','📋 Feuilles')}
+        {tabBtn('poule','⚔️ Poules')}
+        {tabBtn('finale','🏆 Finale')}
+        {tabBtn('ranking','📊 Classement')}
+      </div>
+
+      {/* Salomé+Thisma 11ème */}
+      {view !== 'papers' && (
+        <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#607d8b'}}>
+          Salomé & Thisma — 11ème d'office
+        </div>
+      )}
+
+      {/* Papers */}
+      {view === 'papers' && (
+        <div>
+          <div style={{fontSize:13,color:'#aaa',marginBottom:16}}>Numéros de match pour chaque duo. Tour 1 : matchs 1-10 · Tour 2 : matchs 11-20</div>
+          {isAdmin ? (
+            <div>
+              {playingDuos.map(d => {
+                const nums = BERET_DUO_MATCHES[d.id] || [];
+                const [h1, f1, h2, f2] = nums;
+                return (
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:10,marginBottom:8,background:`${d.color}11`,border:`1px solid ${d.color}33`}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</div>
+                      <div style={{fontSize:11,color:'#60607a',marginTop:3}}>
+                        {d.name1} (H) : Match {h1} (T1) · Match {h2} (T2) &nbsp;|&nbsp; {d.name2} (F) : Match {f1} (T1) · Match {f2} (T2)
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:6}}>
+                      {nums.map(n => <span key={n} style={{background:`${d.color}33`,borderRadius:6,padding:'4px 8px',fontSize:13,fontWeight:800,color:d.color}}>{n}</span>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : isMyDuo ? (
+            <div style={{background:`${isMyDuo.color}11`,border:`2px solid ${isMyDuo.color}55`,borderRadius:14,padding:20,textAlign:'center'}}>
+              <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>{isMyDuo.name1} & {isMyDuo.name2}</div>
+              <div style={{fontSize:13,color:'#aaa',marginBottom:16}}>Vos numéros de match :</div>
+              <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+                {(BERET_DUO_MATCHES[isMyDuo.id]||[]).map((n,i) => (
+                  <div key={n} style={{textAlign:'center'}}>
+                    <div style={{fontSize:32,fontWeight:900,color:isMyDuo.color,background:`${isMyDuo.color}22`,borderRadius:12,padding:'12px 18px',minWidth:56}}>{n}</div>
+                    <div style={{fontSize:10,color:'#555',marginTop:4}}>T{i<2?1:2} {i%2===0?'H':'F'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 Résultats cachés</div>
+          )}
+        </div>
+      )}
+
+      {/* Poules */}
+      {view === 'poule' && (
+        <div>
+          {!isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              <div style={{fontWeight:700,fontSize:13,color:'#aaa',marginBottom:12}}>Saisir les résultats :</div>
+              {[1,2].map(tour => (
+                <div key={tour} style={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#7c3aed',marginBottom:8}}>Tour {tour}</div>
+                  {BERET_MATCHES.filter(m => m.tour === tour).sort((a,b)=>a.num-b.num).map(match => {
+                    const d1 = TEST_DUOS[match.d1], d2 = TEST_DUOS[match.d2];
+                    const p1name = match.type === 'H' ? d1.name1 : d1.name2;
+                    const p2name = match.type === 'H' ? d2.name1 : d2.name2;
+                    const key = `m${match.num}`;
+                    const w = beretResults[key];
+                    return (
+                      <div key={match.num} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:8,marginBottom:5,background:'rgba(255,255,255,.04)'}}>
+                        <span style={{fontSize:11,color:'#555',width:22,flexShrink:0}}>#{match.num}</span>
+                        <span style={{fontSize:10,color:match.type==='H'?'#3498db':'#e91e63',width:14,flexShrink:0}}>{match.type}</span>
+                        <button onClick={() => setMatchResult(match.num, 'duo1')}
+                          style={{flex:1,background:w==='duo1'?`${d1.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='duo1'?d1.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px 8px',color:w==='duo1'?d1.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='duo1'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                          {p1name} {w==='duo1'?'✓':''}
+                        </button>
+                        <span style={{fontSize:11,color:'#555'}}>vs</span>
+                        <button onClick={() => setMatchResult(match.num, 'duo2')}
+                          style={{flex:1,background:w==='duo2'?`${d2.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='duo2'?d2.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px 8px',color:w==='duo2'?d2.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='duo2'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                          {p2name} {w==='duo2'?'✓':''}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div style={{marginTop:16,fontWeight:700,fontSize:13,marginBottom:8}}>Classement poules :</div>
+              {pouleRanking.map((d,i) => (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:beretFinalists.includes(d.id)?`${d.color}22`:'rgba(255,255,255,.04)',border:`1px solid ${beretFinalists.includes(d.id)?d.color:'rgba(255,255,255,.06)'}`}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                  <span style={{width:18,fontSize:12,color:'#aaa'}}>{i+1}.</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                  <span style={{fontWeight:800,color:d.color}}>{d.pts} pts</span>
+                  <button onClick={() => {
+                    const f = beretFinalists.includes(d.id)
+                      ? beretFinalists.filter(x=>x!==d.id)
+                      : beretFinalists.length < 4 ? [...beretFinalists, d.id] : beretFinalists;
+                    setBeretFinalists(f);
+                  }} style={{background:beretFinalists.includes(d.id)?'#7c3aed':'rgba(255,255,255,.08)',border:'none',color:'#fff',borderRadius:6,padding:'4px 8px',fontSize:10,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                    {beretFinalists.includes(d.id)?'✓ Final.':'+ Final.'}
+                  </button>
+                </div>
+              ))}
+              <div style={{fontSize:11,color:'#60607a',marginTop:6}}>{beretFinalists.length}/4 équipes sélectionnées pour la finale</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Finale */}
+      {view === 'finale' && (
+        <div>
+          {beretFinalists.length < 4 && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>En attente de la sélection des 4 finalistes</div>}
+          {beretFinalists.length === 4 && !isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {beretFinalists.length === 4 && isAdmin && (
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'#aaa'}}>4 finalistes : {beretFinalists.map(id => TEST_DUOS[id]?.name1 + ' & ' + TEST_DUOS[id]?.name2).join(' · ')}</div>
+              {BERET_FINALE_ROUNDS.map((round, ri) => (
+                <div key={ri} style={{marginBottom:14}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#7c3aed',marginBottom:8}}>Round {ri+1}</div>
+                  {round.map(conf => {
+                    const dA = TEST_DUOS[beretFinalists[conf.A]];
+                    const dB = TEST_DUOS[beretFinalists[conf.B]];
+                    if (!dA || !dB) return null;
+                    return ['H','F'].map(type => {
+                      const key = `f${type}${conf.conf}`;
+                      const w = beretFinaleResults[key];
+                      const pA = type === 'H' ? dA.name1 : dA.name2;
+                      const pB = type === 'H' ? dB.name1 : dB.name2;
+                      return (
+                        <div key={key} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,marginBottom:4,background:'rgba(255,255,255,.04)'}}>
+                          <span style={{fontSize:10,color:type==='H'?'#3498db':'#e91e63',width:14}}>{type}</span>
+                          <button onClick={() => setBeretFinaleResults({...beretFinaleResults,[key]:'A'})}
+                            style={{flex:1,background:w==='A'?`${dA.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='A'?dA.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px',color:w==='A'?dA.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='A'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {pA} {w==='A'?'✓':''}
+                          </button>
+                          <span style={{fontSize:11,color:'#555'}}>vs</span>
+                          <button onClick={() => setBeretFinaleResults({...beretFinaleResults,[key]:'B'})}
+                            style={{flex:1,background:w==='B'?`${dB.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='B'?dB.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px',color:w==='B'?dB.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='B'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {pB} {w==='B'?'✓':''}
+                          </button>
+                        </div>
+                      );
+                    });
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Classement final */}
+      {view === 'ranking' && (
+        <div>
+          {!isAdmin && beretFinalRanking.length === 0 && <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              {/* Finale ranking */}
+              {beretFinalists.length === 4 && (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:13,color:'#aaa',marginBottom:8}}>Classement finale :</div>
+                  {(() => {
+                    const allConfs = BERET_FINALE_ROUNDS.flat().map(c => c.conf);
+                    const finalStats = beretFinalists.map((duoId, idx) => {
+                      const confs = BERET_FINALE_ROUNDS.flat()
+                        .filter(c => c.A === idx || c.B === idx)
+                        .map(c => c.conf);
+                      return {duoId, pts: finaleConfPts(duoId, confs)};
+                    }).sort((a,b) => b.pts - a.pts);
+                    return finalStats.map((fs, i) => {
+                      const d = TEST_DUOS[fs.duoId];
+                      if (!d) return null;
+                      return (
+                        <div key={fs.duoId} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:`${d.color}11`,border:`1px solid ${d.color}33`}}>
+                          <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                          <span style={{width:18,fontSize:12,color:'#aaa'}}>{i+1}.</span>
+                          <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                          <span style={{fontWeight:800,color:d.color}}>{fs.pts} pts</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+              {/* Consolation ranking */}
+              <div style={{marginBottom:8,fontWeight:700,fontSize:13,color:'#aaa'}}>Équipes éliminées en poules :</div>
+              {pouleRanking.filter(d => !beretFinalists.includes(d.id)).map((d,i) => (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:'rgba(255,255,255,.04)'}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                  <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                  <span style={{fontWeight:600,color:'#555'}}>{d.pts} pts</span>
+                </div>
+              ))}
+              {/* Admin validates */}
+              {beretFinalRanking.length > 0 && (
+                <div style={{marginTop:12,padding:'10px 14px',background:'rgba(39,174,96,.1)',border:'1px solid rgba(39,174,96,.3)',borderRadius:10,fontSize:12,color:'#2ecc71'}}>✓ Classement validé et pris en compte dans le général</div>
+              )}
+              <button onClick={() => {
+                const ranked = [...pouleRanking.map(d => d.id)];
+                setBeretFinalRanking(ranked);
+              }} style={{marginTop:12,width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                ✓ Valider le classement final
+              </button>
+            </div>
+          )}
+          {/* Show validated ranking to all */}
+          {beretFinalRanking.length > 0 && (
+            <div style={{marginTop:16}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:10,color:'#aaa'}}>Classement officiel :</div>
+              {beretFinalRanking.map((id, i) => {
+                const d = TEST_DUOS[id];
+                if (!d) return null;
+                return (
+                  <div key={id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.04)',border:`1px solid ${d.color}33`}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
+                    <span style={{fontSize:14,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+                    <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+                  </div>
+                );
+              })}
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,marginBottom:6,background:'rgba(255,255,255,.02)',opacity:0.5}}>
+                <div style={{width:10,height:10,borderRadius:'50%',background:'#607d8b'}}/>
+                <span style={{fontSize:14,width:26,textAlign:'center'}}>11.</span>
+                <span style={{flex:1,fontWeight:700,fontSize:13}}>Salomé & Thisma</span>
+                <span style={{fontSize:11,color:'#555'}}>d'office</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Culture G ─────────────────────────────────────────────────────────────────
+function CultureGPanel({isAdmin, currentPlayer, state}) {
+  const {cultureRanking, setCultureRanking} = state;
+  const [inputRanking, setInputRanking] = React.useState(
+    cultureRanking.length > 0 ? cultureRanking : []
+  );
+  const allPlayers = TEST_DUOS.flatMap(d => [
+    {id:`${d.id}a`,name:d.name1,duoId:d.id,color:d.color},
+    {id:`${d.id}b`,name:d.name2,duoId:d.id,color:d.color},
+  ]);
+  const [rankDrag, setRankDrag] = React.useState(
+    cultureRanking.length > 0 ? cultureRanking : allPlayers.map(p => p.id)
+  );
+
+  const moveUp = i => { if(i===0)return; const n=[...rankDrag];[n[i-1],n[i]]=[n[i],n[i-1]];setRankDrag(n); };
+  const moveDown = i => { if(i===rankDrag.length-1)return; const n=[...rankDrag];[n[i],n[i+1]]=[n[i+1],n[i]];setRankDrag(n); };
+
+  const duoScores = TEST_DUOS.map(d => {
+    if (cultureRanking.length === 0) return {...d, score: null, r1: null, r2: null};
+    const r1 = cultureRanking.findIndex(pid => pid === `${d.id}a`) + 1;
+    const r2 = cultureRanking.findIndex(pid => pid === `${d.id}b`) + 1;
+    if (!r1 || !r2) return {...d, score: null, r1: null, r2: null};
+    return {...d, r1, r2, score: scoreDuo(r1, r2)};
+  }).sort((a,b) => (a.score??999) - (b.score??999));
+
+  return (
+    <div>
+      {!isAdmin && cultureRanking.length === 0 && <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 En attente des résultats du LEVERCULQUIZ</div>}
+      {isAdmin && (
+        <div>
+          <div style={{fontWeight:700,fontSize:13,color:'#a78bfa',marginBottom:12}}>📋 Classement individuel LEVERCULQUIZ (1er en haut)</div>
+          <div style={{maxHeight:400,overflowY:'auto',marginBottom:12}}>
+            {rankDrag.map((pid, i) => {
+              const p = allPlayers.find(x => x.id === pid);
+              const duo = TEST_DUOS.find(d => d.id === p?.duoId);
+              return (
+                <div key={pid} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${duo?.color}11`,border:`1px solid ${duo?.color}22`}}>
+                  <span style={{width:22,fontSize:12,color:'#aaa',textAlign:'center'}}>{i+1}.</span>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:duo?.color,flexShrink:0}}/>
+                  <span style={{flex:1,fontSize:12,fontWeight:600}}>{p?.name}</span>
+                  <span style={{fontSize:10,color:'#555'}}>{duo?.name1 === p?.name ? duo?.name2 : duo?.name1}</span>
+                  <div style={{display:'flex',gap:2}}>
+                    <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:'none',border:'1px solid #2a2a40',color:i===0?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===0?'not-allowed':'pointer',fontSize:9}}>▲</button>
+                    <button onClick={()=>moveDown(i)} disabled={i===rankDrag.length-1} style={{background:'none',border:'1px solid #2a2a40',color:i===rankDrag.length-1?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===rankDrag.length-1?'not-allowed':'pointer',fontSize:9}}>▼</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => setCultureRanking(rankDrag)} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+            ✓ Valider le classement
+          </button>
+        </div>
+      )}
+      {cultureRanking.length > 0 && (
+        <div style={{marginTop:isAdmin?16:0}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:'#aaa'}}>Classement des duos</div>
+          {duoScores.map((d, i) => (
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.03)',border:`1px solid ${d.color}33`}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+              <span style={{fontSize:14,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+              {d.score !== null && <span style={{fontSize:11,color:'#555'}}>#{d.r1}/#{d.r2}</span>}
+              {d.score !== null && <span style={{fontWeight:800,fontSize:12,color:d.color}}>{d.score.toFixed(2)}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Puissance 4 ───────────────────────────────────────────────────────────────
+function P4Panel({isAdmin, state}) {
+  const {p4Results, setP4Results, p4Finalists, setP4Finalists, p4ConsolResults, setP4ConsolResults} = state;
+  const [view, setView] = React.useState('groups');
+
+  // Generate group matches (round robin per group)
+  function groupMatches(group) {
+    const duos = group.duoIds;
+    const matches = [];
+    for (let i = 0; i < duos.length; i++)
+      for (let j = i+1; j < duos.length; j++)
+        matches.push({d1: duos[i], d2: duos[j], group: group.name});
+    return matches;
+  }
+
+  function groupPoints(groupName, duoId) {
+    const group = P4_GROUPS.find(g => g.name === groupName);
+    if (!group) return 0;
+    const matches = groupMatches(group).filter(m => m.d1 === duoId || m.d2 === duoId);
+    return matches.reduce((pts, m) => {
+      const key = `g${groupName}_${m.d1}_${m.d2}`;
+      const w = p4Results[key];
+      if ((w === 'd1' && m.d1 === duoId) || (w === 'd2' && m.d2 === duoId)) return pts + 1;
+      return pts;
+    }, 0);
+  }
+
+  function groupRanking(group) {
+    return [...group.duoIds]
+      .map(id => ({id, pts: groupPoints(group.name, id)}))
+      .sort((a,b) => b.pts - a.pts);
+  }
+
+  // Finale round robin for 3 finalists
+  const finaleMatchups = p4Finalists.length === 3 ? [
+    {id:'f01',d1:p4Finalists[0],d2:p4Finalists[1]},
+    {id:'f02',d1:p4Finalists[0],d2:p4Finalists[2]},
+    {id:'f12',d1:p4Finalists[1],d2:p4Finalists[2]},
+  ] : [];
+
+  function finalePts(duoId) {
+    return finaleMatchups.reduce((pts, m) => {
+      const w = p4Results[m.id];
+      if ((w === 'd1' && m.d1 === duoId) || (w === 'd2' && m.d2 === duoId)) return pts + 1;
+      return pts;
+    }, 0);
+  }
+
+  // Consolation bracket: 8 teams, simple single elimination
+  // QF: 4 matches, SF: 2, Final + 3rd place: 2
+  function consolMatches() {
+    const consolDuos = TEST_DUOS.filter(d => !p4Finalists.includes(d.id)).map(d => d.id);
+    // QF seeding by group stage performance
+    return {
+      qf: [
+        {id:'cqf1',slot:'QF1',d1:consolDuos[0],d2:consolDuos[7]},
+        {id:'cqf2',slot:'QF2',d1:consolDuos[1],d2:consolDuos[6]},
+        {id:'cqf3',slot:'QF3',d1:consolDuos[2],d2:consolDuos[5]},
+        {id:'cqf4',slot:'QF4',d1:consolDuos[3],d2:consolDuos[4]},
+      ],
+      sf: [
+        {id:'csf1',slot:'SF1',prev:['cqf1','cqf2']},
+        {id:'csf2',slot:'SF2',prev:['cqf3','cqf4']},
+      ],
+      final: {id:'cfin',slot:'Finale Consol.',prev:['csf1','csf2']},
+      third: {id:'c3rd',slot:'3e/4e place',prev:['csf1','csf2'],losers:true},
+    };
+  }
+
+  const matchBtn = (key, d1id, d2id, winner, setter) => {
+    const d1 = TEST_DUOS[d1id], d2 = TEST_DUOS[d2id];
+    if (!d1 || !d2) return <div style={{color:'#555',fontSize:11}}>En attente...</div>;
+    const w = p4Results[key];
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <button onClick={() => setter({...p4Results,[key]:'d1'})}
+          style={{flex:1,background:w==='d1'?`${d1.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='d1'?d1.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'6px 8px',color:w==='d1'?d1.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='d1'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+          {d1.name1} & {d1.name2} {w==='d1'?'✓':''}
+        </button>
+        <span style={{color:'#555',fontSize:10}}>vs</span>
+        <button onClick={() => setter({...p4Results,[key]:'d2'})}
+          style={{flex:1,background:w==='d2'?`${d2.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='d2'?d2.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'6px 8px',color:w==='d2'?d2.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='d2'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+          {d2.name1} & {d2.name2} {w==='d2'?'✓':''}
+        </button>
+      </div>
+    );
+  };
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setView(id)} style={{background:view===id?'rgba(231,76,60,.2)':'transparent',border:'1px solid '+(view===id?'rgba(231,76,60,.5)':'rgba(255,255,255,.08)'),borderRadius:'8px 8px 0 0',padding:'7px 12px',color:view===id?'#e74c3c':'#aaa',cursor:'pointer',fontSize:11,fontWeight:view===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{fontSize:12,color:'#60607a',marginBottom:12}}>BO3 : Game1 joueur1 joue · Game2 joueur2 joue · Game3 les 2 communiquent</div>
+      <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto'}}>
+        {tabBtn('groups','🏟️ Groupes')}
+        {tabBtn('finale','🏆 Finale')}
+        {tabBtn('consol','🥊 Bracket')}
+      </div>
+
+      {view === 'groups' && (
+        <div>
+          {P4_GROUPS.map(group => {
+            const ranking = groupRanking(group);
+            const matches = groupMatches(group);
+            return (
+              <div key={group.name} style={{background:'rgba(255,255,255,.04)',border:`1px solid ${group.color}33`,borderRadius:12,padding:14,marginBottom:16}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <div style={{fontWeight:800,fontSize:14,color:group.color}}>Groupe {group.name}</div>
+                  <div style={{display:'flex',gap:6}}>
+                    {ranking.map((r, i) => {
+                      const d = TEST_DUOS[r.id];
+                      return <span key={r.id} style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:i===0?`${d.color}33`:'rgba(255,255,255,.06)',color:i===0?d.color:'#555',fontWeight:i===0?700:400}}>{d.name1}{i===0?` ★ ${r.pts}pts`:''}</span>;
+                    })}
+                  </div>
+                </div>
+                {isAdmin && matches.map(m => {
+                  const key = `g${group.name}_${m.d1}_${m.d2}`;
+                  return (
+                    <div key={key} style={{marginBottom:6}}>
+                      {matchBtn(key, m.d1, m.d2, p4Results[key], setP4Results)}
+                    </div>
+                  );
+                })}
+                {!isAdmin && (
+                  <div>
+                    {ranking.map((r, i) => {
+                      const d = TEST_DUOS[r.id];
+                      return (
+                        <div key={r.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${d.color}11`}}>
+                          <div style={{width:7,height:7,borderRadius:'50%',background:d.color}}/>
+                          <span style={{width:16,fontSize:11,color:'#aaa'}}>{i+1}.</span>
+                          <span style={{flex:1,fontSize:12,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                          <span style={{fontWeight:700,color:d.color}}>{r.pts}pts</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isAdmin && (
+                  <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,color:'#aaa'}}>Vainqueur → Finale :</span>
+                    <button onClick={() => {
+                      const winner = ranking[0]?.id;
+                      if (winner === undefined) return;
+                      const newF = p4Finalists.filter(id => !group.duoIds.includes(id));
+                      setP4Finalists([...newF, winner]);
+                    }} style={{background:'rgba(231,76,60,.2)',border:'1px solid rgba(231,76,60,.4)',color:'#e74c3c',borderRadius:8,padding:'4px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                      {p4Finalists.find(id => group.duoIds.includes(id)) != null
+                        ? '✓ ' + TEST_DUOS[p4Finalists.find(id => group.duoIds.includes(id))]?.name1 + ' sélectionné'
+                        : 'Sélectionner le vainqueur'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {view === 'finale' && (
+        <div>
+          {p4Finalists.length < 3 && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>En attente des 3 vainqueurs de groupes</div>}
+          {p4Finalists.length >= 3 && (
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'#aaa'}}>Finale round robin — 3 équipes : {p4Finalists.map(id => TEST_DUOS[id]?.name1).join(' · ')}</div>
+              {isAdmin && finaleMatchups.map(m => {
+                const d1 = TEST_DUOS[m.d1], d2 = TEST_DUOS[m.d2];
+                if (!d1 || !d2) return null;
+                return (
+                  <div key={m.id} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,color:'#555',marginBottom:3}}>BO3</div>
+                    {matchBtn(m.id, m.d1, m.d2, p4Results[m.id], setP4Results)}
+                  </div>
+                );
+              })}
+              {/* Classement finale */}
+              <div style={{marginTop:16,fontWeight:700,fontSize:13,color:'#aaa',marginBottom:8}}>Classement :</div>
+              {[...p4Finalists]
+                .map(id => ({id, pts: finalePts(id)}))
+                .sort((a,b) => b.pts - a.pts)
+                .map((r, i) => {
+                  const d = TEST_DUOS[r.id];
+                  if (!d) return null;
+                  return (
+                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':'rgba(205,127,50,.08)',border:`1px solid ${d.color}33`}}>
+                      <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
+                      <span style={{fontSize:16,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':'🥉'}</span>
+                      <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+                      <span style={{fontWeight:800,color:d.color}}>{r.pts} pts</span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'consol' && (
+        <div>
+          <div style={{fontSize:12,color:'#60607a',marginBottom:12}}>Bracket consolation — 8 équipes éliminées en poules</div>
+          {!isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              {['QF','SF','Final'].map(stage => (
+                <div key={stage} style={{marginBottom:14}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#e74c3c',marginBottom:8}}>{stage === 'QF' ? 'Quarts de finale' : stage === 'SF' ? 'Demi-finales' : 'Finale + 3e place'}</div>
+                  <div style={{color:'#555',fontSize:12}}>Géré par arbitre — notez les résultats sur papier</div>
+                </div>
+              ))}
+              <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:14}}>
+                <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'#aaa'}}>Classement consolation (4e-11e) :</div>
+                {TEST_DUOS.filter(d => !p4Finalists.includes(d.id)).map((d, i) => (
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${d.color}11`}}>
+                    <div style={{width:7,height:7,borderRadius:'50%',background:d.color}}/>
+                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                    <span style={{fontSize:11,color:'#555'}}>Position {i+4}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Classement Général ────────────────────────────────────────────────────────
+function computeTestGeneral(state) {
+  const pts = {};
+  TEST_DUOS.forEach(d => { pts[d.id] = 0; });
+
+  // Cercles Musicaux
+  const {cerclesElim, beretFinalRanking, cultureRanking, p4Results, p4Finalists} = state;
+  const allPlayers = TEST_DUOS.flatMap(d => [
+    {id:`${d.id}a`,duoId:d.id},{id:`${d.id}b`,duoId:d.id}
+  ]);
+  const totalPlayers = 20;
+  if (cerclesElim.length > 0) {
+    const remaining = allPlayers.filter(p => p.duoId !== 10 && !cerclesElim.includes(p.id));
+    const playerRank = {};
+    if (remaining.length === 1) playerRank[remaining[0].id] = 1;
+    [...cerclesElim].reverse().forEach((pid, i) => { playerRank[pid] = i + 2; });
+    const duoScores = TEST_DUOS.filter(d => d.id !== 10).map(d => {
+      const r1 = playerRank[`${d.id}a`], r2 = playerRank[`${d.id}b`];
+      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
+    }).filter(Boolean).sort((a,b) => a.score - b.score);
+    duoScores.forEach((d, i) => { pts[d.id] += TEST_PTS_SCALE[i] || 0; });
+    pts[10] += TEST_PTS_SCALE[10] || 0; // Salomé+Thisma = 11ème
+  }
+
+  // Béret
+  if (beretFinalRanking.length > 0) {
+    beretFinalRanking.forEach((id, i) => { pts[id] = (pts[id]||0) + (TEST_PTS_SCALE[i]||0); });
+    pts[10] += TEST_PTS_SCALE[10] || 0;
+  }
+
+  // Culture G
+  if (cultureRanking.length > 0) {
+    const duoScores = TEST_DUOS.map(d => {
+      const r1 = cultureRanking.findIndex(pid => pid === `${d.id}a`) + 1;
+      const r2 = cultureRanking.findIndex(pid => pid === `${d.id}b`) + 1;
+      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
+    }).filter(Boolean).sort((a,b) => a.score - b.score);
+    duoScores.forEach((d, i) => { pts[d.id] = (pts[d.id]||0) + (TEST_PTS_SCALE[i]||0); });
+  }
+
+  return TEST_DUOS.map(d => ({...d, total: pts[d.id]||0})).sort((a,b) => b.total - a.total);
+}
+
+// ── TestEventPage ─────────────────────────────────────────────────────────────
+function TestEventPage({currentPlayer, nav, navBack}) {
+  const m = useIsMobile();
+  const isAdmin = TEST_ADMINS_LIST.includes(currentPlayer?.uid || '');
+  const [tab, setTab] = React.useState('general');
+  const state = useTestState();
+  const general = computeTestGeneral(state);
+  const medals = ['🥇','🥈','🥉'];
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setTab(id)} style={{background:tab===id?'rgba(124,58,237,.2)':'transparent',border:'1px solid '+(tab===id?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),borderRadius:'10px 10px 0 0',padding:'8px 14px',color:tab===id?'#a78bfa':'#aaa',cursor:'pointer',fontSize:11,fontWeight:tab===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',flexShrink:0}}>
+      {label}
+    </button>
+  );
+
+  return (
     <div style={{minHeight:'100vh',background:'#080812',color:'#fff',fontFamily:"'Outfit',sans-serif"}}>
       {/* Header */}
-      <div style={{background:'rgba(124,58,237,.1)',borderBottom:'1px solid rgba(124,58,237,.2)',padding:m?'16px':'20px 32px'}}>
+      <div style={{background:'rgba(124,58,237,.1)',borderBottom:'1px solid rgba(124,58,237,.2)',padding:m?'14px 16px':'18px 28px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
           <div>
-            <div style={{fontSize:11,color:'#a78bfa',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>Olympiades Test · Mercredi 14 Mai 2025</div>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,letterSpacing:'.05em',lineHeight:1}}>
-              TEST <span style={{color:'#a78bfa'}}>OLYMPIADES</span>
-            </div>
-            <div style={{fontSize:12,color:'#60607a',marginTop:4}}>20h-23h · 4 phases · 11 duos · 20 joueurs</div>
+            <div style={{fontSize:10,color:'#a78bfa',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:3}}>Olympiades Test · Mercredi 14 Mai 2025</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?26:34,letterSpacing:'.05em',lineHeight:1}}>TEST <span style={{color:'#a78bfa'}}>OLYMPIADES</span></div>
+            <div style={{fontSize:11,color:'#60607a',marginTop:3}}>20h-23h · 4 phases · 11 duos</div>
           </div>
-          <div style={{fontSize:m?36:48}}>⚡</div>
+          <button onClick={navBack} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'6px 12px',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Menu</button>
         </div>
-        <div style={{display:'flex',gap:6,marginTop:12,flexWrap:'wrap'}}>
-          {TEST_PHASES_DEF.map(p=>(
-            <div key={p.id} style={{background:'rgba(255,255,255,.06)',borderRadius:20,padding:'4px 12px',fontSize:11,color:'#aaa'}}>
-              {p.icon} {p.name} · {p.time} · {p.format}
-            </div>
+        <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+          {[['🎵','Cercles Musicaux','20h-20h30'],['🪖','Béret','20h30-21h'],['🧠','Culture G','22h-22h30'],['🔴','Puissance 4','22h30-23h']].map(([ic,name,time]) => (
+            <div key={name} style={{background:'rgba(255,255,255,.06)',borderRadius:16,padding:'3px 10px',fontSize:10,color:'#aaa'}}>{ic} {name} · {time}</div>
           ))}
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{display:'flex',gap:6,padding:m?'10px 12px 0':'10px 24px 0',overflowX:'auto',borderBottom:'1px solid #1a1a2e'}}>
-        {[['general','🏆 Général'],...TEST_PHASES_DEF.map(p=>[`phase${p.id}`,`${p.icon} ${p.name}`])].map(([id,label])=>(
-          <button key={id} style={tabStyle(tab===id)} onClick={()=>{setTab(id);setEditing(null);}}>{label}</button>
-        ))}
+      <div style={{display:'flex',gap:5,padding:m?'10px 12px 0':'10px 20px 0',overflowX:'auto',borderBottom:'1px solid #1a1a2e'}}>
+        {tabBtn('general','🏆 Général')}
+        {tabBtn('cercles','🎵 Cercles')}
+        {tabBtn('beret','🪖 Béret')}
+        {tabBtn('culture','🧠 Culture G')}
+        {tabBtn('p4','🔴 P4')}
       </div>
 
       {/* Body */}
-      <div style={{padding:m?'16px':'24px 32px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
+      <div style={{padding:m?'14px':'20px 28px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
 
-        {/* Classement général */}
-        {tab==='general'&&(
+        {tab === 'general' && (
           <div>
-            <div style={{fontWeight:800,fontSize:16,marginBottom:16,color:'#a78bfa'}}>🏆 Classement général</div>
-            {general.map((duo,i)=>{
-              const isMe=duo.uid1===currentPlayer?.uid||duo.uid2===currentPlayer?.uid;
-              return(
-                <div key={duo.uid1} style={duoCard(i,isMe)}>
-                  <span style={{fontSize:20,width:28,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+            <div style={{fontWeight:800,fontSize:15,marginBottom:14,color:'#a78bfa'}}>🏆 Classement général</div>
+            {general.map((duo, i) => {
+              const isMe = duo.uid1 === currentPlayer?.uid || duo.uid2 === currentPlayer?.uid;
+              return (
+                <div key={duo.id} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',borderRadius:12,marginBottom:7,background:isMe?'rgba(124,58,237,.12)':i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.07)':i===2?'rgba(205,127,50,.07)':'rgba(255,255,255,.03)',border:`1px solid ${isMe?'#7c3aed':i===0?'rgba(255,215,0,.2)':duo.color+'22'}`}}>
+                  <div style={{width:10,height:10,borderRadius:'50%',background:duo.color,flexShrink:0}}/>
+                  <span style={{fontSize:18,width:28,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
                   <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14}}>{duo.name1} & {duo.name2}</div>
-                    <div style={{fontSize:11,color:'#555',marginTop:3,display:'flex',gap:10,flexWrap:'wrap'}}>
-                      {TEST_PHASES_DEF.map(ph=>{
-                        const r=phases.find(p=>p.id===ph.id)?.results;
-                        const pos=r?.findIndex(x=>x.uid1===duo.uid1);
-                        return pos!=null&&pos>=0?<span key={ph.id}>{ph.icon} {TEST_PTS_SCALE[pos]||0}pts</span>:null;
-                      })}
-                    </div>
+                    <div style={{fontWeight:700,fontSize:13}}>{duo.name1} & {duo.name2}</div>
                   </div>
-                  <span style={{fontWeight:900,fontSize:18,color:i===0?'#ffd700':isMe?'#a78bfa':'#fff'}}>{duo.total} pts</span>
+                  <span style={{fontWeight:900,fontSize:17,color:i===0?'#ffd700':isMe?'#a78bfa':duo.color}}>{duo.total} pts</span>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Phase detail */}
-        {tab.startsWith('phase')&&currentPhase&&(
-          <div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div>
-                <div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>{currentPhase.icon} {currentPhase.name}</div>
-                <div style={{fontSize:12,color:'#60607a'}}>{currentPhase.time} · {currentPhase.format}</div>
-              </div>
-              {isAdmin&&<button style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.4)',color:'#a78bfa',borderRadius:10,padding:'8px 14px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}} onClick={()=>setEditing(editing===currentPhase.id?null:currentPhase.id)}>
-                {editing===currentPhase.id?'✓ Fermer':'✏️ Arbitrer'}
-              </button>}
-            </div>
-
-            {currentPhase.results&&currentPhase.results.length>0?(
-              <div>
-                {currentPhase.results.map((r,i)=>{
-                  const duo=TEST_DUOS.find(d=>d.uid1===r.uid1);
-                  const isMe=r.uid1===currentPlayer?.uid||r.uid2===currentPlayer?.uid;
-                  return duo?(
-                    <div key={r.uid1} style={duoCard(i,isMe)}>
-                      <span style={{fontSize:18,width:26,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
-                      <span style={{flex:1,fontWeight:700,fontSize:13}}>{duo.name1} & {duo.name2}</span>
-                      <span style={{fontWeight:800,color:i===0?'#ffd700':'#fff'}}>{TEST_PTS_SCALE[i]||0} pts</span>
-                    </div>
-                  ):null;
-                })}
-              </div>
-            ):(
-              <div style={{textAlign:'center',padding:'48px 20px',color:'#404058',fontSize:13}}>
-                {isAdmin?'Clique sur ✏️ Arbitrer pour saisir les résultats':'En attente des résultats…'}
-              </div>
-            )}
-
-            {isAdmin&&editing===currentPhase.id&&(
-              <TestArbitragePanel phase={currentPhase} onSave={(results)=>{setPhaseResults(currentPhase.id,results);setEditing(null);}}/>
-            )}
-          </div>
-        )}
+        {tab === 'cercles' && <CerclesPanel isAdmin={isAdmin} state={state}/>}
+        {tab === 'beret' && <BeretPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {tab === 'culture' && <CultureGPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {tab === 'p4' && <P4Panel isAdmin={isAdmin} state={state}/>}
       </div>
     </div>
   );
 }
 
 
-export default function App(){
-  const [o2026Scores,setO2026Scores]=useState({});
-  const [o2026Assignments,setO2026Assignments]=useState({});
-
-  React.useEffect(()=>{
-    const loadAssignments=async()=>{
-      try{const{data}=await SUPABASE.from("o2026_assignments").select("*");if(data){const m={};data.forEach(row=>{m[`${row.team_id}_${row.epreuve_id}`]=row.player_ids||[];});setO2026Assignments(m);}}catch(e){}
-    };
-    const loadScores=async()=>{
-      try{const{data}=await SUPABASE.from("o2026_state").select("epreuve_id,data");if(data){const scores={};data.forEach(row=>{const d=row.data;if(d?.phase==="done"||d?.dragRankLocked||d?.dragRankCoefLocked||d?.flechetteDone||d?.tcDone||d?.biathlonFinalLocked||d?.dragRankFinalDone){scores[row.epreuve_id]=d;}});setO2026Scores(scores);}}catch(e){}
-    };
-    loadAssignments();loadScores();
-  },[]);
-
-  // section: "login" | "menu" | "events" | "profil-bl" | "dataBL"
-  const [section,setSection]=useState("login");
-
-  const [page,setPage]=useState(()=>{
-    try{const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));return h.page||"o2026";}
-    catch{return "o2026";}
-  });
-  const [sub,setSub]=useState(()=>{
-    try{const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));return h.sub||{};}
-    catch{return {};}
-  });
-  const [history,setHistory]=useState([]);
-  const [dbLoaded,setDbLoaded]=useState(false);
-  const [dbError,setDbError]=useState(null);
-  const [currentPlayer,setCurrentPlayer]=useState(null);
-
-  const isAdmin=currentPlayer?.uid===ADMIN_UID;
-
-  useEffect(()=>{
-    const l=document.createElement("link");l.href=FONT_URL;l.rel="stylesheet";document.head.appendChild(l);
-    loadFromSupabase();
-  },[]);
-
-  // Auto-login: restore session from localStorage only
-  useEffect(()=>{
-    if(!dbLoaded)return;
-    const tryAutoLogin=async()=>{
-      try{
-        // Version check - force reset if cached section could crash
-        const APP_VERSION = "v2.4";
-        if(localStorage.getItem("bl_app_version") !== APP_VERSION){
-          localStorage.setItem("bl_app_version", APP_VERSION);
-          localStorage.removeItem("bl_section");
-        }
-        const savedId=localStorage.getItem("bl_player_id");
-        const savedSection=localStorage.getItem("bl_section")||"menu";
-        if(savedId){
-          const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));
-          if(p){setCurrentPlayer(p);setSection(savedSection==="dataBL"&&p.uid!==ADMIN_UID?"menu":savedSection);return;}
-        }
-      }catch(e){}
-    };
-    tryAutoLogin();
-  },[dbLoaded]);
-
-  // Persist section to localStorage when it changes
-  useEffect(()=>{
-    if(section!=="login"&&currentPlayer){
-      localStorage.setItem("bl_section",section);
-      localStorage.setItem("bl_player_id",String(currentPlayer.id));
-    }
-  },[section,currentPlayer]);
-
-  async function loadFromSupabase(){
-    const timeout=setTimeout(()=>setDbLoaded(true), 2000);
-    try{
-      const [players,teams,ratings]=await Promise.all([
-        sbFetch("players","?select=*&order=name"),
-        sbFetch("teams","?select=*&order=name"),
-        sbFetch("ratings","?select=*"),
-      ]);
-      PLAYERS.length=0;
-      players.forEach(p=>PLAYERS.push({
-        id:p.id, uid:p.uid, name:p.name,
-        teamId:p.team_id||null,
-        t24:p.t24||null, t25:p.t25||null, teo:p.teo||null, t26:p.t26||null,
-        t24cap:p.t24cap||false, t25cap:p.t25cap||false, teocap:p.teocap||false, t26cap:p.t26cap||false,
-        sex:p.sex||"m", member_type:p.member_type||"non-membre", last_name:p.last_name||null,
-        display_name:p.display_name||null, tournoi_count:p.tournoi_count||0,
-        photoUrl:`/photos/${p.uid}.jpg`,
-      }));
-      const savedLogos=Object.fromEntries(TEAMS.map(t=>[t.id,{logoUrl:t.logoUrl,logoFile:t.logoFile,logo_color2:t.logo_color2}]));
-      TEAMS.length=0;
-      teams.forEach(t=>TEAMS.push({
-        id:t.id, name:t.name, color:t.color||"#E8B84B", color2:t.color2||null,
-        active:t.active!==false, logoUrl:savedLogos[t.id]?.logoUrl||null, logoFile:savedLogos[t.id]?.logoFile||null, logo_color2:t.logo_color2||false,
-        oldName:t.old_name||null, dissolvedName:t.dissolved_name||null,
-      }));
-      RATINGS.length=0;
-      ratings.forEach(r=>RATINGS.push({p:r.player_id, e:r.event_id, r:r.rating}));
-      clearTimeout(timeout);
-      setDbLoaded(true);
-    }catch(e){
-      clearTimeout(timeout);
-      setDbError(e.message);
-      setDbLoaded(true);
-    }
-  }
-
-  // Redirect unknown pages to o2026
-  React.useEffect(()=>{
-    const known=["events","eventDetail","rankings","playerDetail","epreuveO2026","teams","teamDetail","profile","admin","o2026"];
-    if(!known.includes(page))nav("o2026");
-  },[page]);
-
-  function writeHash(p,s){
-    try{window.location.hash=encodeURIComponent(JSON.stringify({page:p,sub:s}));}catch(e){}
-  }
-  function nav(p,s={}){
-    setHistory(h=>[...h,{page,sub}]);
-    setPage(p);setSub(s);writeHash(p,s);
-    try{window.scrollTo(0,0);}catch(e){}
-  }
-  function navBack(){
-    setHistory(h=>{
-      if(h.length===0)return h;
-      const prev=h[h.length-1];
-      setPage(prev.page);setSub(prev.sub);writeHash(prev.page,prev.sub);
-      try{window.scrollTo(0,0);}catch(e){}
-      return h.slice(0,-1);
-    });
-  }
-
-  // Loading screen
-  if(!dbLoaded) return(
-    <div style={{minHeight:"100vh",background:BL_GREEN,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
-      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:BL_WHITE,letterSpacing:"0.1em"}}>BIÈRE LEVERCULSEC</div>
-      <div style={{width:36,height:36,border:`3px solid #86c99e`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
-  // Login section
-  if(section==="login") return(
-    <LoginBL onLogin={(p)=>{setCurrentPlayer(p);setSection("menu");}} dbLoaded={dbLoaded}/>
-  );
-
-  // Menu BL
-  if(section==="menu") return(
-    <MenuBL currentPlayer={currentPlayer} onSection={(s)=>{
-      if(s==="profil") setSection("profil-bl");
-      else if(s==="dataBL") setSection("dataBL");
-      else if(s==="events"){setSection("events");}
-      else if(s==="games"){setSection("games");}
-      else if(s==="collection"){setSection("collection");}
-      else if(s==="test"){setSection("test");}
-    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
-  );
-
-  // Profil BL
-  if(section==="profil-bl") return(
-    <ProfilBL currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} onBack={()=>setSection("menu")}/>
-  );
-
-  // Data BL (Louis only)
-  if(section==="dataBL"&&(isAdmin||getOfficerRole(currentPlayer))) return(
-    <DataBL onBack={()=>setSection("menu")}/>
-  );
-
-  // Games section
-  if(section==="games") return(
-    <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
-  );
-
-  if(section==="test"){
-    const T_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
-    if(!currentPlayer||!T_UIDS.includes(currentPlayer.uid))return null;
-    return <TestEventPage currentPlayer={currentPlayer} nav={()=>{}} navBack={()=>setSection('menu')}/>;
-  }
-  if(section==="collection") return(
-    <CollectionPage currentPlayer={currentPlayer} onBack={()=>setSection("menu")}/>
-  );
-
-  if(section==="crackito") return(
-    <CrackitoColorsPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  );
-
-  if(section==="quiz") return <QuizPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  if(section==="p4") return <P4Page currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  if(section==="plappy") return(
-    <PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  );
-
-  if(section==="tournoi") return(
-    <TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
-  );
-
-  // Events section
-  return(
-    <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>
-      <style>{css}</style>
-      <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
-      {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
-      <div key={page+JSON.stringify(sub)} className="fade">
-        {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
-        {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
-        {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
-        {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
-        {page==="o2026"         &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
-        {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores}/>}
-        {page==="teams"         &&<TeamsPage nav={nav} navBack={navBack}/>}
-        {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
-        {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
-        {page==="admin"         &&<DataPage/>}
-        {page==="test"&&<TestEventPage currentPlayer={currentPlayer} nav={nav} navBack={navBack}/>}
-
-      </div>
-    </div>
-  );
-}
