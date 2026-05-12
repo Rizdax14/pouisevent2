@@ -7852,65 +7852,72 @@ function useTestState() {
   }, []);
 
   // Save full state to Supabase
-  const saveToSupabase = React.useCallback(async (patch) => {
+  // Use a ref to track current full state for upd
+  const stateRef = React.useRef({});
+  React.useEffect(() => {
+    stateRef.current = {cerclesElim,beretResults,beretFinalists,beretFinaleResults,
+      beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults};
+  });
+
+  const upd = async (key, setter, val) => {
+    setter(val);
+    const newState = {...stateRef.current, [key]: val};
     try {
-      const rows = await sbCollection('test_event_state', '?id=eq.1');
-      const current = (rows && rows[0] && rows[0].state) || {};
-      const merged = { ...current, ...patch };
       await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
         method: 'PATCH',
-        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ state: merged, updated_at: new Date().toISOString() })
+        headers: {"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+        body: JSON.stringify({state: newState, updated_at: new Date().toISOString()})
       });
-    } catch(e) { console.error('test save error', e); }
-  }, []);
-
-  const upd = (key, setter, val) => {
-    setter(val);
-    saveToSupabase({ [key]: val });
+    } catch(e) { console.error('save error',e); }
   };
+  // Save entire state to Supabase in one call
+  const saveFullState = async (newState) => {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
+        method: 'PATCH',
+        headers: {"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
+        body: JSON.stringify({state: newState, updated_at: new Date().toISOString()})
+      });
+    } catch(e) { console.error('save error',e); }
+  };
+
   const resetAll = async () => {
     setCerclesElim([]);setBeretResults({});setBeretFinalists([]);
     setBeretFinaleResults({});setBeretFinalRanking([]);setCultureRanking([]);
     setP4Results({});setP4Finalists([]);setP4ConsolResults({});
-    try {
-      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
-        method: 'PATCH',
-        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ state: {}, updated_at: new Date().toISOString() })
-      });
-    } catch(e) {}
+    await saveFullState({});
   };
 
-  const simulateCercles = () => {
-    // Randomly eliminate all 20 players one by one
-    const allP = TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[`${d.id}a`,`${d.id}b`]);
-    const shuffled = [...allP].sort(()=>Math.random()-.5);
-    const elim = shuffled.slice(1); // keep one survivor
-    setCerclesElim(v => { const n=elim; upd('test_cercles',setCerclesElim,n); return n; });
-    upd('test_cercles',setCerclesElim,elim);
+  const simulateCercles = async () => {
+    const allP=TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[`${d.id}a`,`${d.id}b`]);
+    const elim=[...allP].sort(()=>Math.random()-.5).slice(1);
+    setCerclesElim(elim);
+    await saveFullState({cerclesElim:elim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults});
   };
 
-  const simulateBeret = () => {
+  const simulateBeret = async () => {
     const res={};
-    BERET_MATCHES.forEach(m=>{ res[`m${m.num}`]=Math.random()>.5?'duo1':'duo2'; });
-    upd('test_beret_results',setBeretResults,res);
+    BERET_MATCHES.forEach(m=>{res[`m${m.num}`]=Math.random()>.5?'duo1':'duo2';});
+    setBeretResults(res);
+    await saveFullState({cerclesElim,beretResults:res,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults});
   };
 
-  const simulateCulture = () => {
-    const allP = TEST_DUOS.flatMap(d=>[`${d.id}a`,`${d.id}b`]);
-    const shuffled = [...allP].sort(()=>Math.random()-.5);
-    upd('test_culture',setCultureRanking,shuffled);
+  const simulateCulture = async () => {
+    const allP=TEST_DUOS.flatMap(d=>[`${d.id}a`,`${d.id}b`]);
+    const ranking=[...allP].sort(()=>Math.random()-.5);
+    setCultureRanking(ranking);
+    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking:ranking,p4Results,p4Finalists,p4ConsolResults});
   };
 
-  const simulateP4 = () => {
+  const simulateP4 = async () => {
     const res={};
     P4_GROUPS.forEach(g=>{
       res[`g${g.name}_SF1`]=Math.random()>.5?'d1':'d2';
       if(g.duoIds.length===4)res[`g${g.name}_SF2`]=Math.random()>.5?'d1':'d2';
       res[`g${g.name}_FIN`]=Math.random()>.5?'d1':'d2';
     });
-    upd('test_p4',setP4Results,res);
+    setP4Results(res);
+    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results:res,p4Finalists,p4ConsolResults});
   };
 
   return {
