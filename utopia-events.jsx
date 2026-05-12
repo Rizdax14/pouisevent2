@@ -8807,7 +8807,10 @@ function TestEventPage({currentPlayer, nav, navBack}) {
       {/* Body */}
       <div style={{padding:m?'14px':'20px 28px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
 
-        {!state.loaded && <div style={{textAlign:'center',padding:'40px',color:'#60607a',fontSize:13}}>⏳ Chargement…</div>}
+        {!state.loaded && <div style={{textAlign:'center',padding:'60px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
+          <div style={{width:32,height:32,border:'3px solid #7c3aed',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+          <div style={{color:'#60607a',fontSize:13}}>Chargement des résultats…</div>
+        </div>}
         {state.loaded && tab === 'general' && (
           <div>
             <div style={{fontWeight:800,fontSize:15,marginBottom:14,color:'#a78bfa'}}>🏆 Classement général</div>
@@ -8827,10 +8830,10 @@ function TestEventPage({currentPlayer, nav, navBack}) {
           </div>
         )}
 
-        {tab === 'cercles' && <CerclesPanel isAdmin={isAdmin} state={state}/>}
-        {tab === 'beret' && <BeretPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
-        {tab === 'culture' && <CultureGPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
-        {tab === 'p4' && <P4Panel isAdmin={isAdmin} state={state}/>}
+        {state.loaded && tab === 'cercles' && <CerclesPanel isAdmin={isAdmin} state={state}/>}
+        {state.loaded && tab === 'beret' && <BeretPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {state.loaded && tab === 'culture' && <CultureGPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {state.loaded && tab === 'p4' && <P4Panel isAdmin={isAdmin} state={state}/>}
       </div>
     </div>
   );
