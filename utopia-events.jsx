@@ -917,7 +917,8 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
             </button>
           );
         })}
-        <button onClick={()=>window.location.reload()} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
+        {saveError&&<div style={{width:'100%',background:'rgba(231,76,60,.2)',color:'#f87171',fontSize:10,padding:'4px 8px',borderRadius:6,marginBottom:4}}>{saveError}</div>}
+          <button onClick={()=>window.location.reload()} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:"#404058",fontFamily:"'Outfit',sans-serif"}}>
           <span style={{fontSize:18}}>↺</span>
           <span style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Reload</span>
         </button>
@@ -7854,29 +7855,47 @@ function useTestState() {
   }, []);
 
   // Save full state to Supabase
+  const [saveError, setSaveError] = React.useState(null);
+
   const upd = async (key, setter, val) => {
     setter(val);
-    // Read current state from Supabase, merge, write back
     try {
       const rows = await sbCollection('test_event_state', '?id=eq.1&select=state');
       const current = (rows && rows[0]?.state) || {};
       const merged = {...current, [key]: val};
-      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
+      const r = await fetch(`${SUPABASE_URL_C}/rest/v1/test_event_state?id=eq.1`, {
         method: 'PATCH',
-        headers: {"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-        body: JSON.stringify({state: merged, updated_at: new Date().toISOString()})
+        headers: {"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`,"Content-Type":"application/json"},
+        body: JSON.stringify({state: merged})
       });
-    } catch(e) { console.error('save error',e); }
+      if (!r.ok) {
+        const err = await r.text();
+        console.error('PATCH error', r.status, err);
+        setSaveError(`PATCH ${r.status}: ${err}`);
+      } else {
+        setSaveError(null);
+      }
+    } catch(e) {
+      console.error('upd error',e);
+      setSaveError(String(e));
+    }
   };
   // Save entire state to Supabase in one call
   const saveFullState = async (newState) => {
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
+      const r = await fetch(`${SUPABASE_URL_C}/rest/v1/test_event_state?id=eq.1`, {
         method: 'PATCH',
-        headers: {"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-        body: JSON.stringify({state: newState, updated_at: new Date().toISOString()})
+        headers: {"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`,"Content-Type":"application/json"},
+        body: JSON.stringify({state: newState})
       });
-    } catch(e) { console.error('save error',e); }
+      if (!r.ok) {
+        const err = await r.text();
+        console.error('saveFullState error', r.status, err);
+        setSaveError(`PATCH ${r.status}: ${err}`);
+      } else {
+        setSaveError(null);
+      }
+    } catch(e) { console.error('save error',e); setSaveError(String(e)); }
   };
 
   const resetAll = async () => {
