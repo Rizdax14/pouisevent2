@@ -7817,27 +7817,69 @@ function scoreDuo(rank1, rank2) {
 }
 
 function useTestState() {
-  const load = (key, def) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; } catch { return def; } };
-  const save = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
+  const [cerclesElim, setCerclesElim] = React.useState([]);
+  const [beretResults, setBeretResults] = React.useState({});
+  const [beretFinalists, setBeretFinalists] = React.useState([]);
+  const [beretFinaleResults, setBeretFinaleResults] = React.useState({});
+  const [beretFinalRanking, setBeretFinalRanking] = React.useState([]);
+  const [cultureRanking, setCultureRanking] = React.useState([]);
+  const [p4Results, setP4Results] = React.useState({});
+  const [p4Finalists, setP4Finalists] = React.useState([]);
+  const [p4ConsolResults, setP4ConsolResults] = React.useState({});
+  const [loaded, setLoaded] = React.useState(false);
 
-  const [cerclesElim, setCerclesElim] = React.useState(() => load('test_cercles', []));
-  const [beretResults, setBeretResults] = React.useState(() => load('test_beret_results', {}));
-  const [beretFinalists, setBeretFinalists] = React.useState(() => load('test_beret_finalists', []));
-  const [beretFinaleResults, setBeretFinaleResults] = React.useState(() => load('test_beret_finale', {}));
-  const [beretFinalRanking, setBeretFinalRanking] = React.useState(() => load('test_beret_final_ranking', []));
-  const [cultureRanking, setCultureRanking] = React.useState(() => load('test_culture', []));
-  const [p4Results, setP4Results] = React.useState(() => load('test_p4', {}));
-  const [p4Finalists, setP4Finalists] = React.useState(() => load('test_p4_finalists', []));
-  const [p4ConsolResults, setP4ConsolResults] = React.useState(() => load('test_p4_consol', {}));
+  // Load from Supabase on mount
+  React.useEffect(() => {
+    async function fetchState() {
+      try {
+        const rows = await sbCollection('test_event_state', '?id=eq.1');
+        if (rows && rows[0] && rows[0].state && Object.keys(rows[0].state).length > 0) {
+          const s = rows[0].state;
+          if (s.cerclesElim)       setCerclesElim(s.cerclesElim);
+          if (s.beretResults)      setBeretResults(s.beretResults);
+          if (s.beretFinalists)    setBeretFinalists(s.beretFinalists);
+          if (s.beretFinaleResults)setBeretFinaleResults(s.beretFinaleResults);
+          if (s.beretFinalRanking) setBeretFinalRanking(s.beretFinalRanking);
+          if (s.cultureRanking)    setCultureRanking(s.cultureRanking);
+          if (s.p4Results)         setP4Results(s.p4Results);
+          if (s.p4Finalists)       setP4Finalists(s.p4Finalists);
+          if (s.p4ConsolResults)   setP4ConsolResults(s.p4ConsolResults);
+        }
+      } catch(e) { console.error('test load error', e); }
+      setLoaded(true);
+    }
+    fetchState();
+  }, []);
 
-  const upd = (key, setter, val) => { setter(val); save(key, val); };
-  const resetAll = () => {
-    const keys=['test_cercles','test_beret_results','test_beret_finalists','test_beret_finale',
-                'test_beret_final_ranking','test_culture','test_p4','test_p4_finalists','test_p4_consol'];
-    keys.forEach(k=>localStorage.removeItem(k));
+  // Save full state to Supabase
+  const saveToSupabase = React.useCallback(async (patch) => {
+    try {
+      const rows = await sbCollection('test_event_state', '?id=eq.1');
+      const current = (rows && rows[0] && rows[0].state) || {};
+      const merged = { ...current, ...patch };
+      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
+        method: 'PATCH',
+        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ state: merged, updated_at: new Date().toISOString() })
+      });
+    } catch(e) { console.error('test save error', e); }
+  }, []);
+
+  const upd = (key, setter, val) => {
+    setter(val);
+    saveToSupabase({ [key]: val });
+  };
+  const resetAll = async () => {
     setCerclesElim([]);setBeretResults({});setBeretFinalists([]);
     setBeretFinaleResults({});setBeretFinalRanking([]);setCultureRanking([]);
     setP4Results({});setP4Finalists([]);setP4ConsolResults({});
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
+        method: 'PATCH',
+        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ state: {}, updated_at: new Date().toISOString() })
+      });
+    } catch(e) {}
   };
 
   const simulateCercles = () => {
@@ -7872,16 +7914,16 @@ function useTestState() {
   };
 
   return {
-    cerclesElim, setCerclesElim: v => upd('test_cercles', setCerclesElim, v),
-    beretResults, setBeretResults: v => upd('test_beret_results', setBeretResults, v),
-    beretFinalists, setBeretFinalists: v => upd('test_beret_finalists', setBeretFinalists, v),
-    beretFinaleResults, setBeretFinaleResults: v => upd('test_beret_finale', setBeretFinaleResults, v),
-    beretFinalRanking, setBeretFinalRanking: v => upd('test_beret_final_ranking', setBeretFinalRanking, v),
-    cultureRanking, setCultureRanking: v => upd('test_culture', setCultureRanking, v),
-    p4Results, setP4Results: v => upd('test_p4', setP4Results, v),
-    p4Finalists, setP4Finalists: v => upd('test_p4_finalists', setP4Finalists, v),
-    p4ConsolResults, setP4ConsolResults: v => upd('test_p4_consol', setP4ConsolResults, v),
-    resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
+    cerclesElim, setCerclesElim: v => upd('cerclesElim', setCerclesElim, v),
+    beretResults, setBeretResults: v => upd('beretResults', setBeretResults, v),
+    beretFinalists, setBeretFinalists: v => upd('beretFinalists', setBeretFinalists, v),
+    beretFinaleResults, setBeretFinaleResults: v => upd('beretFinaleResults', setBeretFinaleResults, v),
+    beretFinalRanking, setBeretFinalRanking: v => upd('beretFinalRanking', setBeretFinalRanking, v),
+    cultureRanking, setCultureRanking: v => upd('cultureRanking', setCultureRanking, v),
+    p4Results, setP4Results: v => upd('p4Results', setP4Results, v),
+    p4Finalists, setP4Finalists: v => upd('p4Finalists', setP4Finalists, v),
+    p4ConsolResults, setP4ConsolResults: v => upd('p4ConsolResults', setP4ConsolResults, v),
+    loaded, resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
   };
 }
 
@@ -8733,7 +8775,8 @@ function TestEventPage({currentPlayer, nav, navBack}) {
       {/* Body */}
       <div style={{padding:m?'14px':'20px 28px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
 
-        {tab === 'general' && (
+        {!state.loaded && <div style={{textAlign:'center',padding:'40px',color:'#60607a',fontSize:13}}>⏳ Chargement…</div>}
+        {state.loaded && tab === 'general' && (
           <div>
             <div style={{fontWeight:800,fontSize:15,marginBottom:14,color:'#a78bfa'}}>🏆 Classement général</div>
             {general.map((duo, i) => {
