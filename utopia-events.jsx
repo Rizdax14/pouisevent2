@@ -7826,6 +7826,7 @@ function useTestState() {
   const [p4Results, setP4Results] = React.useState({});
   const [p4Finalists, setP4Finalists] = React.useState([]);
   const [p4ConsolResults, setP4ConsolResults] = React.useState({});
+  const [p4FinalRanking, setP4FinalRanking] = React.useState([]);
   const [loaded, setLoaded] = React.useState(false);
 
   // Load from Supabase on mount
@@ -7844,6 +7845,7 @@ function useTestState() {
           if (s.p4Results)         setP4Results(s.p4Results);
           if (s.p4Finalists)       setP4Finalists(s.p4Finalists);
           if (s.p4ConsolResults)   setP4ConsolResults(s.p4ConsolResults);
+          if (s.p4FinalRanking)    setP4FinalRanking(s.p4FinalRanking);
         }
       } catch(e) { console.error('test load error', e); }
       setLoaded(true);
@@ -7856,7 +7858,7 @@ function useTestState() {
   const stateRef = React.useRef({});
   React.useEffect(() => {
     stateRef.current = {cerclesElim,beretResults,beretFinalists,beretFinaleResults,
-      beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults};
+      beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults,p4FinalRanking};
   });
 
   const upd = async (key, setter, val) => {
@@ -7892,21 +7894,21 @@ function useTestState() {
     const allP=TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[`${d.id}a`,`${d.id}b`]);
     const elim=[...allP].sort(()=>Math.random()-.5).slice(1);
     setCerclesElim(elim);
-    await saveFullState({cerclesElim:elim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults});
+    await saveFullState({cerclesElim:elim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults,p4FinalRanking});
   };
 
   const simulateBeret = async () => {
     const res={};
     BERET_MATCHES.forEach(m=>{res[`m${m.num}`]=Math.random()>.5?'duo1':'duo2';});
     setBeretResults(res);
-    await saveFullState({cerclesElim,beretResults:res,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults});
+    await saveFullState({cerclesElim,beretResults:res,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults,p4FinalRanking});
   };
 
   const simulateCulture = async () => {
     const allP=TEST_DUOS.flatMap(d=>[`${d.id}a`,`${d.id}b`]);
     const ranking=[...allP].sort(()=>Math.random()-.5);
     setCultureRanking(ranking);
-    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking:ranking,p4Results,p4Finalists,p4ConsolResults});
+    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking:ranking,p4Results,p4Finalists,p4ConsolResults,p4FinalRanking});
   };
 
   const simulateP4 = async () => {
@@ -7916,8 +7918,9 @@ function useTestState() {
       if(g.duoIds.length===4)res[`g${g.name}_SF2`]=Math.random()>.5?'d1':'d2';
       res[`g${g.name}_FIN`]=Math.random()>.5?'d1':'d2';
     });
-    setP4Results(res);
-    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results:res,p4Finalists,p4ConsolResults});
+    const fRank=[...TEST_DUOS.map(d=>d.id)].sort(()=>Math.random()-.5);
+    setP4Results(res);setP4FinalRanking(fRank);
+    await saveFullState({cerclesElim,beretResults,beretFinalists,beretFinaleResults,beretFinalRanking,cultureRanking,p4Results:res,p4Finalists,p4ConsolResults,p4FinalRanking:fRank});
   };
 
   return {
@@ -7930,6 +7933,7 @@ function useTestState() {
     p4Results, setP4Results: v => upd('p4Results', setP4Results, v),
     p4Finalists, setP4Finalists: v => upd('p4Finalists', setP4Finalists, v),
     p4ConsolResults, setP4ConsolResults: v => upd('p4ConsolResults', setP4ConsolResults, v),
+    p4FinalRanking, setP4FinalRanking: v => upd('p4FinalRanking', setP4FinalRanking, v),
     loaded, resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
   };
 }
@@ -8620,68 +8624,63 @@ function P4Panel({isAdmin, state}) {
         </div>
       )}
 
-      {view === 'finale' && (
+      {view === 'ranking' && (
         <div>
-          {p4Finalists.length < 3 && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>En attente des 3 vainqueurs de groupes</div>}
-          {p4Finalists.length >= 3 && (
+          <div style={{fontSize:12,color:'#60607a',marginBottom:16}}>L'arbitre saisit le classement final 1→11. Les points sont distribués automatiquement.</div>
+          {!isAdmin && state.p4FinalRanking && state.p4FinalRanking.length > 0 ? (
             <div>
-              <div style={{marginBottom:12,fontSize:13,color:'#aaa'}}>Finale round robin — 3 équipes : {p4Finalists.map(id => TEST_DUOS[id]?.name1).join(' · ')}</div>
-              {isAdmin && finaleMatchups.map(m => {
-                const d1 = TEST_DUOS[m.d1], d2 = TEST_DUOS[m.d2];
-                if (!d1 || !d2) return null;
+              {state.p4FinalRanking.map((duoId, i) => {
+                const d = TEST_DUOS[duoId];
+                if (!d) return null;
                 return (
-                  <div key={m.id} style={{marginBottom:8}}>
-                    <div style={{fontSize:10,color:'#555',marginBottom:3}}>BO3</div>
-                    {matchBtn(m.id, m.d1, m.d2, p4Results[m.id], setP4Results)}
+                  <div key={duoId} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.04)',border:`1px solid ${d.color}33`}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
+                    <span style={{fontSize:16,width:28,textAlign:'center'}}>{['🥇','🥈','🥉'][i]||`${i+1}.`}</span>
+                    <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+                    <span style={{fontWeight:800,color:d.color,fontSize:13}}>{TEST_PTS_SCALE[i]||0} pts</span>
                   </div>
                 );
               })}
-              {/* Classement finale */}
-              <div style={{marginTop:16,fontWeight:700,fontSize:13,color:'#aaa',marginBottom:8}}>Classement :</div>
-              {[...p4Finalists]
-                .map(id => ({id, pts: finalePts(id)}))
-                .sort((a,b) => b.pts - a.pts)
-                .map((r, i) => {
-                  const d = TEST_DUOS[r.id];
-                  if (!d) return null;
-                  return (
-                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':'rgba(205,127,50,.08)',border:`1px solid ${d.color}33`}}>
-                      <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
-                      <span style={{fontSize:16,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':'🥉'}</span>
-                      <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
-                      <span style={{fontWeight:800,color:d.color}}>{r.pts} pts</span>
-                    </div>
-                  );
-                })}
             </div>
-          )}
-        </div>
-      )}
-
-      {view === 'consol' && (
-        <div>
-          <div style={{fontSize:12,color:'#60607a',marginBottom:12}}>Bracket consolation — 8 équipes éliminées en poules</div>
-          {!isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
-          {isAdmin && (
-            <div>
-              {['QF','SF','Final'].map(stage => (
-                <div key={stage} style={{marginBottom:14}}>
-                  <div style={{fontWeight:700,fontSize:12,color:'#e74c3c',marginBottom:8}}>{stage === 'QF' ? 'Quarts de finale' : stage === 'SF' ? 'Demi-finales' : 'Finale + 3e place'}</div>
-                  <div style={{color:'#555',fontSize:12}}>Géré par arbitre — notez les résultats sur papier</div>
+          ) : !isAdmin ? (
+            <div style={{textAlign:'center',color:'#60607a',padding:'40px',fontSize:13}}>🔒 En attente de l'arbitre</div>
+          ) : null}
+          {isAdmin && (() => {
+            const [rankOrder, setRankOrder] = React.useState(
+              state.p4FinalRanking && state.p4FinalRanking.length > 0
+                ? state.p4FinalRanking
+                : TEST_DUOS.map(d => d.id)
+            );
+            const moveUp = i => { if(i===0)return; const n=[...rankOrder];[n[i-1],n[i]]=[n[i],n[i-1]];setRankOrder(n); };
+            const moveDown = i => { if(i===rankOrder.length-1)return; const n=[...rankOrder];[n[i],n[i+1]]=[n[i+1],n[i]];setRankOrder(n); };
+            return (
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:'#e74c3c',marginBottom:10}}>📋 Classement final P4 (1er en haut)</div>
+                <div style={{maxHeight:500,overflowY:'auto',marginBottom:12}}>
+                  {rankOrder.map((duoId, i) => {
+                    const d = TEST_DUOS[duoId];
+                    if (!d) return null;
+                    return (
+                      <div key={duoId} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:8,marginBottom:5,background:`${d.color}11`,border:`1px solid ${d.color}22`}}>
+                        <div style={{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+                        <span style={{width:22,fontSize:12,color:i<3?'#ffd700':'#aaa',textAlign:'center'}}>{i+1}.</span>
+                        <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                        <span style={{fontSize:12,color:d.color,fontWeight:700}}>{TEST_PTS_SCALE[i]||0}pts</span>
+                        <div style={{display:'flex',gap:2}}>
+                          <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:'none',border:'1px solid #2a2a40',color:i===0?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===0?'not-allowed':'pointer',fontSize:9}}>▲</button>
+                          <button onClick={()=>moveDown(i)} disabled={i===rankOrder.length-1} style={{background:'none',border:'1px solid #2a2a40',color:i===rankOrder.length-1?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===rankOrder.length-1?'not-allowed':'pointer',fontSize:9}}>▼</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-              <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:14}}>
-                <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'#aaa'}}>Classement consolation (4e-11e) :</div>
-                {TEST_DUOS.filter(d => !p4Finalists.includes(d.id)).map((d, i) => (
-                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${d.color}11`}}>
-                    <div style={{width:7,height:7,borderRadius:'50%',background:d.color}}/>
-                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{d.name1} & {d.name2}</span>
-                    <span style={{fontSize:11,color:'#555'}}>Position {i+4}</span>
-                  </div>
-                ))}
+                <button onClick={() => state.setP4FinalRanking(rankOrder)}
+                  style={{width:'100%',background:'#e74c3c',border:'none',color:'#fff',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                  ✓ Valider le classement P4
+                </button>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>
@@ -8689,46 +8688,57 @@ function P4Panel({isAdmin, state}) {
 }
 
 // ── Classement Général ────────────────────────────────────────────────────────
-function computeTestGeneral(state) {
-  const pts = {};
-  TEST_DUOS.forEach(d => { pts[d.id] = 0; });
-
-  // Cercles Musicaux
-  const {cerclesElim, beretFinalRanking, cultureRanking, p4Results, p4Finalists} = state;
-  const allPlayers = TEST_DUOS.flatMap(d => [
+function getCerclesRanking(state) {
+  if (!state.cerclesElim || state.cerclesElim.length === 0) return [];
+  const allP = TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[
     {id:`${d.id}a`,duoId:d.id},{id:`${d.id}b`,duoId:d.id}
   ]);
-  const totalPlayers = 20;
-  if (cerclesElim.length > 0) {
-    const remaining = allPlayers.filter(p => p.duoId !== 10 && !cerclesElim.includes(p.id));
-    const playerRank = {};
-    if (remaining.length === 1) playerRank[remaining[0].id] = 1;
-    [...cerclesElim].reverse().forEach((pid, i) => { playerRank[pid] = i + 2; });
-    const duoScores = TEST_DUOS.filter(d => d.id !== 10).map(d => {
-      const r1 = playerRank[`${d.id}a`], r2 = playerRank[`${d.id}b`];
-      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
-    }).filter(Boolean).sort((a,b) => a.score - b.score);
-    duoScores.forEach((d, i) => { pts[d.id] += TEST_PTS_SCALE[i] || 0; });
-    pts[10] += TEST_PTS_SCALE[10] || 0; // Salomé+Thisma = 11ème
-  }
+  const remaining = allP.filter(p=>!state.cerclesElim.includes(p.id));
+  const playerRank = {};
+  if (remaining.length === 1) playerRank[remaining[0].id] = 1;
+  [...state.cerclesElim].reverse().forEach((pid,i)=>{ playerRank[pid] = i+2; });
+  const duoScores = TEST_DUOS.filter(d=>d.id!==10).map(d=>{
+    const r1=playerRank[`${d.id}a`], r2=playerRank[`${d.id}b`];
+    return (r1&&r2) ? {id:d.id, score:scoreDuo(r1,r2)} : null;
+  }).filter(Boolean).sort((a,b)=>a.score-b.score);
+  // Append Salomé+Thisma as 11th
+  return [...duoScores.map(d=>d.id), 10];
+}
 
-  // Béret
-  if (beretFinalRanking.length > 0) {
-    beretFinalRanking.forEach((id, i) => { pts[id] = (pts[id]||0) + (TEST_PTS_SCALE[i]||0); });
-    pts[10] += TEST_PTS_SCALE[10] || 0;
-  }
+function getCultureRanking(state) {
+  if (!state.cultureRanking || state.cultureRanking.length === 0) return [];
+  const allP = TEST_DUOS.flatMap(d=>[{id:`${d.id}a`,duoId:d.id},{id:`${d.id}b`,duoId:d.id}]);
+  const duoScores = TEST_DUOS.map(d=>{
+    const r1=state.cultureRanking.findIndex(pid=>pid===`${d.id}a`)+1;
+    const r2=state.cultureRanking.findIndex(pid=>pid===`${d.id}b`)+1;
+    return (r1>0&&r2>0) ? {id:d.id, score:scoreDuo(r1,r2)} : null;
+  }).filter(Boolean).sort((a,b)=>a.score-b.score);
+  return duoScores.map(d=>d.id);
+}
 
-  // Culture G
-  if (cultureRanking.length > 0) {
-    const duoScores = TEST_DUOS.map(d => {
-      const r1 = cultureRanking.findIndex(pid => pid === `${d.id}a`) + 1;
-      const r2 = cultureRanking.findIndex(pid => pid === `${d.id}b`) + 1;
-      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
-    }).filter(Boolean).sort((a,b) => a.score - b.score);
-    duoScores.forEach((d, i) => { pts[d.id] = (pts[d.id]||0) + (TEST_PTS_SCALE[i]||0); });
-  }
+function getP4Ranking(state) {
+  if (!state.p4FinalRanking || state.p4FinalRanking.length === 0) return [];
+  return state.p4FinalRanking;
+}
 
-  return TEST_DUOS.map(d => ({...d, total: pts[d.id]||0})).sort((a,b) => b.total - a.total);
+function computeTestGeneral(state) {
+  const pts = {};
+  TEST_DUOS.forEach(d=>{ pts[d.id]=0; });
+
+  const cerclesRanking = getCerclesRanking(state);
+  const beretRanking = state.beretFinalRanking || [];
+  const cultureRanking = getCultureRanking(state);
+  const p4Ranking = getP4Ranking(state);
+
+  [cerclesRanking, beretRanking, cultureRanking, p4Ranking].forEach(ranking => {
+    if (ranking.length > 0) {
+      ranking.forEach((duoId, i) => {
+        if (pts[duoId] !== undefined) pts[duoId] += TEST_PTS_SCALE[i] || 0;
+      });
+    }
+  });
+
+  return TEST_DUOS.map(d=>({...d, total:pts[d.id]||0})).sort((a,b)=>b.total-a.total);
 }
 
 // ── TestEventPage ─────────────────────────────────────────────────────────────
@@ -8758,8 +8768,8 @@ function TestEventPage({currentPlayer, nav, navBack}) {
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
           <button onClick={()=>window.location.reload()} style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🔄 Reload</button>
-          <button onClick={()=>{if(window.confirm('Simuler tous les résultats ?')){state.simulateCercles();state.simulateBeret();state.simulateCulture();state.simulateP4();}}} style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.4)',color:'#a78bfa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🎲 Simuler</button>
-          <button onClick={()=>{if(window.confirm('Remettre à zéro ?'))state.resetAll();}} style={{background:'rgba(231,76,60,.1)',border:'1px solid rgba(231,76,60,.3)',color:'#f87171',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
+          {currentPlayer?.uid==='louis-mar'&&<button onClick={()=>{if(window.confirm('Simuler tous les résultats ?')){state.simulateCercles();state.simulateBeret();state.simulateCulture();state.simulateP4();}}} style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.4)',color:'#a78bfa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🎲 Simuler</button>}
+          {currentPlayer?.uid==='louis-mar'&&<button onClick={()=>{if(window.confirm('Remettre à zéro ?'))state.resetAll();}} style={{background:'rgba(231,76,60,.1)',border:'1px solid rgba(231,76,60,.3)',color:'#f87171',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>}
           <button onClick={navBack} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Menu</button>
         </div>
         </div>
