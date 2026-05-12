@@ -7942,3 +7942,126 @@ function useTestState() {
 }
 
 
+
+export default function App(){
+  const [page,setPage]=React.useState(()=>{
+    try{const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));return h.page||"o2026";}
+    catch{return "o2026";}
+  });
+  const [sub,setSub]=React.useState(()=>{
+    try{const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));return h.sub||{};}
+    catch{return {};}
+  });
+  const [history,setHistory]=React.useState([]);
+  const [currentPlayer,setCurrentPlayer]=React.useState(null);
+  const [section,setSection]=React.useState("login");
+  const [dbLoaded,setDbLoaded]=React.useState(false);
+  const [dbError,setDbError]=React.useState(false);
+  const [o2026Scores,setO2026Scores]=React.useState({});
+  const [o2026Assignments,setO2026Assignments]=React.useState({});
+
+  const isAdmin=currentPlayer?.uid===ADMIN_UID;
+
+  function writeHash(p,s){try{window.location.hash=encodeURIComponent(JSON.stringify({page:p,sub:s||{}}));}catch(e){}}
+
+  React.useEffect(()=>{
+    const tryAutoLogin=async()=>{
+      try{
+        const savedId=localStorage.getItem("bl_player_id");
+        const savedSection=localStorage.getItem("bl_section")||"menu";
+        if(savedId){const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));if(p){setCurrentPlayer(p);setSection(savedSection==="dataBL"&&p.uid!==ADMIN_UID?"menu":savedSection);return;}}
+      }catch(e){}
+    };
+    tryAutoLogin();
+  },[dbLoaded]);
+
+  React.useEffect(()=>{
+    if(section!=="login"&&currentPlayer){localStorage.setItem("bl_section",section);localStorage.setItem("bl_player_id",String(currentPlayer.id));}
+  },[section,currentPlayer]);
+
+  async function loadFromSupabase(){
+    const timeout=setTimeout(()=>setDbLoaded(true),2000);
+    try{
+      const [players,teams,ratings]=await Promise.all([
+        sbFetch("players","?select=*&order=name"),
+        sbFetch("teams","?select=*&order=name"),
+        sbFetch("ratings","?select=*"),
+      ]);
+      PLAYERS.length=0;
+      players.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,last_name:p.last_name,display_name:p.display_name,sex:p.sex,photoUrl:p.photo_url,teamId:p.team_id,t24:p.t24,t25:p.t25,t26:p.t26,pin:p.pin,tournoi_count:p.tournoi_count||0}));
+      teams.forEach(t=>{const existing=TEAMS.find(x=>x.id===t.id);if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;}});
+      ratings.forEach(r=>{const p=PLAYERS.find(x=>x.id===r.player_id);if(p)p.rating=r.rating;});
+      clearTimeout(timeout);setDbLoaded(true);
+    }catch(e){clearTimeout(timeout);setDbError(true);setDbLoaded(true);}
+  }
+
+  React.useEffect(()=>{loadFromSupabase();},[]);
+
+  function nav(p,s={}){setHistory(h=>[...h,{page,sub}]);setPage(p);setSub(s);writeHash(p,s);try{window.scrollTo(0,0);}catch(e){}}
+  function navBack(){setHistory(h=>{if(h.length===0)return h;const prev=h[h.length-1];setPage(prev.page);setSub(prev.sub);writeHash(prev.page,prev.sub);try{window.scrollTo(0,0);}catch(e){}return h.slice(0,-1);});}
+
+  if(!dbLoaded)return(
+    <div style={{minHeight:"100vh",background:BL_GREEN,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:BL_WHITE,letterSpacing:"0.1em"}}>BIÈRE LEVERCULSEC</div>
+      <div style={{width:36,height:36,border:`3px solid #86c99e`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  if(section==="login")return(<LoginBL onLogin={(p)=>{setCurrentPlayer(p);setSection("menu");}} dbLoaded={dbLoaded}/>);
+
+  if(section==="menu")return(
+    <MenuBL currentPlayer={currentPlayer} onSection={(s)=>{
+      if(s==="profil")setSection("profil-bl");
+      else if(s==="dataBL")setSection("dataBL");
+      else if(s==="events")setSection("events");
+      else if(s==="games")setSection("games");
+      else if(s==="collection")setSection("collection");
+      else if(s==="test")setSection("test");
+    }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
+  );
+
+  if(section==="profil-bl")return(<ProfilBL currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} onBack={()=>setSection("menu")}/>);
+  if(section==="dataBL"&&(isAdmin||getOfficerRole(currentPlayer)))return(<DataBL onBack={()=>setSection("menu")}/>);
+  if(section==="games")return(<GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>);
+  if(section==="collection")return(<CollectionPage currentPlayer={currentPlayer} onBack={()=>setSection("menu")}/>);
+  if(section==="crackito")return(<CrackitoColorsPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
+  if(section==="quiz")return <QuizPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
+  if(section==="p4")return <P4Page currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
+  if(section==="plappy")return(<PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
+  if(section==="tournoi")return(<TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
+  if(section==="test"){
+    const T_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+    if(!currentPlayer||!T_UIDS.includes(currentPlayer.uid))return null;
+    return <TestEventPage currentPlayer={currentPlayer} nav={nav} navBack={()=>setSection("menu")}/>;
+  }
+
+  const css=`
+    .fade{animation:fadeIn .25s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    *{box-sizing:border-box}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+  `;
+  return(
+    <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>
+      <style>{css}</style>
+      <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>setSection("menu")}/>
+      {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
+      <div key={page+JSON.stringify(sub)} className="fade">
+        {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
+        {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
+        {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
+        {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
+        {page==="o2026"         &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
+        {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores}/>}
+        {page==="teams"         &&<TeamsPage nav={nav} navBack={navBack}/>}
+        {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
+        {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
+        {page==="admin"         &&<DataPage/>}
+        {page==="test"&&<TestEventPage currentPlayer={currentPlayer} nav={nav} navBack={navBack}/>}
+      </div>
+    </div>
+  );
+}
