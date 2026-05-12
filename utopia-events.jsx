@@ -898,12 +898,14 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
     {id:"rankings",l:"Classements",ic:"🏆"},
     {id:"teams",l:"Équipes",ic:"⚡"},
   ];
+  const TEST_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
   const items=[
     ...baseItems,
+    ...(currentPlayer&&TEST_UIDS.includes(currentPlayer.uid)?[{id:"test",l:"TEST",ic:"⚡"}]:[]),
     currentPlayer?{id:"profile",l:"Profil",ic:"👤"}:{id:"profile",l:"Connexion",ic:"🔑"},
     ...(isAdmin?[{id:"admin",l:"Data",ic:"📊"}]:[]),
   ];
-  const map={home:"home",events:"events",eventDetail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026"};
+  const map={home:"home",events:"events",eventDetail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026",test:"test"};
   if(m){
     return(
       <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"#0d0d1c",borderTop:"1px solid #1e1e30",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>
@@ -7735,6 +7737,210 @@ function P4Page({currentPlayer,onBack}){
 }
 
 
+// ─── TEST EVENT PAGE ──────────────────────────────────────────────────────────
+const TEST_ADMINS_UIDS=['louis-mar','thisma-bru','salome-dev'];
+const TEST_DUOS=[
+  {uid1:'etienne-oll',name1:'Etienne',uid2:null,name2:'???'},
+  {uid1:'ilian-tif',name1:'Ilian',uid2:'lou-ann-del',name2:'Lou-Ann'},
+  {uid1:'louis-mar',name1:'Louis',uid2:'emma-gar',name2:'Emma G.'},
+  {uid1:'thomas-pey',name1:'Thomas',uid2:'lise-roc',name2:'Lise'},
+  {uid1:'samuel-oll',name1:'Samuel',uid2:'pauline-fic',name2:'Pauline'},
+  {uid1:'maxime-mar',name1:'Maxime',uid2:'romane-mic',name2:'Romane'},
+  {uid1:'solal-bru',name1:'Solal',uid2:null,name2:'???'},
+  {uid1:'nils-bra',name1:'Nils',uid2:'melyne-dar',name2:'Mélyne'},
+  {uid1:'nolan-mar',name1:'Nolan',uid2:'marie-ger',name2:'Marie'},
+  {uid1:'loan-bar',name1:'Loan',uid2:'emma-sao',name2:'Emma S.'},
+  {uid1:'salome-dev',name1:'Salomé',uid2:'thisma-bru',name2:'Thisma'},
+];
+const TEST_PHASES_DEF=[
+  {id:1,name:'Cercles Musicaux',icon:'🎵',time:'20h-20h30',format:'2v2'},
+  {id:2,name:'Béret',icon:'🪖',time:'20h30-21h',format:'2v2'},
+  {id:3,name:'Culture G',icon:'🧠',time:'22h-22h30',format:'2v2'},
+  {id:4,name:'Puissance 4',icon:'🔴',time:'22h30-23h',format:'1v1'},
+];
+const TEST_PTS_SCALE=[25,20,16,13,11,9,7,5,3,2,1];
+
+function computeTestGeneral(phases){
+  const totals={};
+  TEST_DUOS.forEach(d=>{totals[d.uid1]=0;});
+  phases.forEach(phase=>{
+    (phase.results||[]).forEach((r,i)=>{
+      const pts=TEST_PTS_SCALE[i]||0;
+      if(totals[r.uid1]!==undefined)totals[r.uid1]=(totals[r.uid1]||0)+pts;
+    });
+  });
+  return TEST_DUOS.map(d=>({...d,total:totals[d.uid1]||0})).sort((a,b)=>b.total-a.total);
+}
+
+function TestArbitragePanel({phase,onSave}){
+  const[order,setOrder]=React.useState(
+    phase.results&&phase.results.length>0
+      ?phase.results.map(r=>r.uid1)
+      :TEST_DUOS.map(d=>d.uid1)
+  );
+  const moveUp=(i)=>{if(i===0)return;const n=[...order];[n[i-1],n[i]]=[n[i],n[i-1]];setOrder(n);};
+  const moveDown=(i)=>{if(i===order.length-1)return;const n=[...order];[n[i],n[i+1]]=[n[i+1],n[i]];setOrder(n);};
+  const save=()=>{
+    const results=order.map(uid1=>{const d=TEST_DUOS.find(d=>d.uid1===uid1);return{uid1,uid2:d?.uid2||null};});
+    onSave(results);
+  };
+  return(
+    <div style={{marginTop:16,background:'rgba(124,58,237,.08)',border:'1px solid rgba(124,58,237,.2)',borderRadius:12,padding:16}}>
+      <div style={{fontWeight:700,fontSize:13,color:'#a78bfa',marginBottom:12}}>📋 Ordre d'arrivée (1er en haut)</div>
+      {order.map((uid1,i)=>{
+        const duo=TEST_DUOS.find(d=>d.uid1===uid1);
+        return(
+          <div key={uid1} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,marginBottom:6,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)'}}>
+            <span style={{width:22,fontSize:13,textAlign:'center',color:i<3?'#ffd700':'#aaa'}}>{i+1}.</span>
+            <span style={{flex:1,fontSize:13,fontWeight:600}}>{duo?.name1||uid1} & {duo?.name2||'???'}</span>
+            <span style={{fontSize:12,color:'#7c3aed',fontWeight:700}}>{TEST_PTS_SCALE[i]||0}pts</span>
+            <div style={{display:'flex',flexDirection:'column',gap:2}}>
+              <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:'none',border:'1px solid #2a2a40',color:i===0?'#333':'#aaa',borderRadius:4,padding:'1px 6px',cursor:i===0?'not-allowed':'pointer',fontSize:10}}>▲</button>
+              <button onClick={()=>moveDown(i)} disabled={i===order.length-1} style={{background:'none',border:'1px solid #2a2a40',color:i===order.length-1?'#333':'#aaa',borderRadius:4,padding:'1px 6px',cursor:i===order.length-1?'not-allowed':'pointer',fontSize:10}}>▼</button>
+            </div>
+          </div>
+        );
+      })}
+      <button onClick={save} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:'pointer',marginTop:8,fontFamily:"'Outfit',sans-serif"}}>
+        ✓ Enregistrer
+      </button>
+    </div>
+  );
+}
+
+function TestEventPage({currentPlayer,nav,navBack}){
+  const m=useIsMobile();
+  const isAdmin=TEST_ADMINS_UIDS.includes(currentPlayer?.uid||'');
+  const[tab,setTab]=React.useState('general');
+  const[editing,setEditing]=React.useState(null);
+  const[phases,setPhases]=React.useState(()=>{
+    try{const s=localStorage.getItem('test_phases');return s?JSON.parse(s):TEST_PHASES_DEF.map(p=>({...p,results:[]}));}
+    catch{return TEST_PHASES_DEF.map(p=>({...p,results:[]}));}
+  });
+  const savePhases=(p)=>{setPhases(p);localStorage.setItem('test_phases',JSON.stringify(p));};
+  const setPhaseResults=(phaseId,results)=>savePhases(phases.map(p=>p.id===phaseId?{...p,results}:p));
+  const general=computeTestGeneral(phases);
+  const currentPhase=phases.find(p=>p.id===Number(tab.replace('phase','')));
+  const medals=['🥇','🥈','🥉'];
+
+  const tabStyle=(active)=>({
+    background:active?'rgba(124,58,237,.2)':'transparent',
+    border:'1px solid '+(active?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),
+    borderRadius:'10px 10px 0 0',padding:'8px 14px',
+    color:active?'#a78bfa':'#aaa',cursor:'pointer',fontSize:12,
+    fontWeight:active?700:400,fontFamily:"'Outfit',sans-serif",
+    whiteSpace:'nowrap',flexShrink:0,
+  });
+
+  const duoCard=(i,isMe)=>({
+    display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:12,marginBottom:8,
+    background:isMe?'rgba(124,58,237,.15)':i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.04)',
+    border:'1px solid '+(isMe?'#7c3aed':i===0?'rgba(255,215,0,.25)':'rgba(255,255,255,.06)'),
+  });
+
+  return(
+    <div style={{minHeight:'100vh',background:'#080812',color:'#fff',fontFamily:"'Outfit',sans-serif"}}>
+      {/* Header */}
+      <div style={{background:'rgba(124,58,237,.1)',borderBottom:'1px solid rgba(124,58,237,.2)',padding:m?'16px':'20px 32px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontSize:11,color:'#a78bfa',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>Olympiades Test · Mercredi 14 Mai 2025</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:36,letterSpacing:'.05em',lineHeight:1}}>
+              TEST <span style={{color:'#a78bfa'}}>OLYMPIADES</span>
+            </div>
+            <div style={{fontSize:12,color:'#60607a',marginTop:4}}>20h-23h · 4 phases · 11 duos · 20 joueurs</div>
+          </div>
+          <div style={{fontSize:m?36:48}}>⚡</div>
+        </div>
+        <div style={{display:'flex',gap:6,marginTop:12,flexWrap:'wrap'}}>
+          {TEST_PHASES_DEF.map(p=>(
+            <div key={p.id} style={{background:'rgba(255,255,255,.06)',borderRadius:20,padding:'4px 12px',fontSize:11,color:'#aaa'}}>
+              {p.icon} {p.name} · {p.time} · {p.format}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:'flex',gap:6,padding:m?'10px 12px 0':'10px 24px 0',overflowX:'auto',borderBottom:'1px solid #1a1a2e'}}>
+        {[['general','🏆 Général'],...TEST_PHASES_DEF.map(p=>[`phase${p.id}`,`${p.icon} ${p.name}`])].map(([id,label])=>(
+          <button key={id} style={tabStyle(tab===id)} onClick={()=>{setTab(id);setEditing(null);}}>{label}</button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div style={{padding:m?'16px':'24px 32px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
+
+        {/* Classement général */}
+        {tab==='general'&&(
+          <div>
+            <div style={{fontWeight:800,fontSize:16,marginBottom:16,color:'#a78bfa'}}>🏆 Classement général</div>
+            {general.map((duo,i)=>{
+              const isMe=duo.uid1===currentPlayer?.uid||duo.uid2===currentPlayer?.uid;
+              return(
+                <div key={duo.uid1} style={duoCard(i,isMe)}>
+                  <span style={{fontSize:20,width:28,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:14}}>{duo.name1} & {duo.name2}</div>
+                    <div style={{fontSize:11,color:'#555',marginTop:3,display:'flex',gap:10,flexWrap:'wrap'}}>
+                      {TEST_PHASES_DEF.map(ph=>{
+                        const r=phases.find(p=>p.id===ph.id)?.results;
+                        const pos=r?.findIndex(x=>x.uid1===duo.uid1);
+                        return pos!=null&&pos>=0?<span key={ph.id}>{ph.icon} {TEST_PTS_SCALE[pos]||0}pts</span>:null;
+                      })}
+                    </div>
+                  </div>
+                  <span style={{fontWeight:900,fontSize:18,color:i===0?'#ffd700':isMe?'#a78bfa':'#fff'}}>{duo.total} pts</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Phase detail */}
+        {tab.startsWith('phase')&&currentPhase&&(
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div>
+                <div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>{currentPhase.icon} {currentPhase.name}</div>
+                <div style={{fontSize:12,color:'#60607a'}}>{currentPhase.time} · {currentPhase.format}</div>
+              </div>
+              {isAdmin&&<button style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.4)',color:'#a78bfa',borderRadius:10,padding:'8px 14px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}} onClick={()=>setEditing(editing===currentPhase.id?null:currentPhase.id)}>
+                {editing===currentPhase.id?'✓ Fermer':'✏️ Arbitrer'}
+              </button>}
+            </div>
+
+            {currentPhase.results&&currentPhase.results.length>0?(
+              <div>
+                {currentPhase.results.map((r,i)=>{
+                  const duo=TEST_DUOS.find(d=>d.uid1===r.uid1);
+                  const isMe=r.uid1===currentPlayer?.uid||r.uid2===currentPlayer?.uid;
+                  return duo?(
+                    <div key={r.uid1} style={duoCard(i,isMe)}>
+                      <span style={{fontSize:18,width:26,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+                      <span style={{flex:1,fontWeight:700,fontSize:13}}>{duo.name1} & {duo.name2}</span>
+                      <span style={{fontWeight:800,color:i===0?'#ffd700':'#fff'}}>{TEST_PTS_SCALE[i]||0} pts</span>
+                    </div>
+                  ):null;
+                })}
+              </div>
+            ):(
+              <div style={{textAlign:'center',padding:'48px 20px',color:'#404058',fontSize:13}}>
+                {isAdmin?'Clique sur ✏️ Arbitrer pour saisir les résultats':'En attente des résultats…'}
+              </div>
+            )}
+
+            {isAdmin&&editing===currentPhase.id&&(
+              <TestArbitragePanel phase={currentPhase} onSave={(results)=>{setPhaseResults(currentPhase.id,results);setEditing(null);}}/>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 export default function App(){
   const [o2026Scores,setO2026Scores]=useState({});
   const [o2026Assignments,setO2026Assignments]=useState({});
@@ -7937,6 +8143,7 @@ export default function App(){
         {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
         {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
         {page==="admin"         &&<DataPage/>}
+        {page==="test"&&<TestEventPage currentPlayer={currentPlayer} nav={nav} navBack={navBack}/>}
 
       </div>
     </div>
