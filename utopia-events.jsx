@@ -7854,21 +7854,17 @@ function useTestState() {
   }, []);
 
   // Save full state to Supabase
-  // Use a ref to track current full state for upd
-  const stateRef = React.useRef({});
-  React.useEffect(() => {
-    stateRef.current = {cerclesElim,beretResults,beretFinalists,beretFinaleResults,
-      beretFinalRanking,cultureRanking,p4Results,p4Finalists,p4ConsolResults,p4FinalRanking};
-  });
-
   const upd = async (key, setter, val) => {
     setter(val);
-    const newState = {...stateRef.current, [key]: val};
+    // Read current state from Supabase, merge, write back
     try {
+      const rows = await sbCollection('test_event_state', '?id=eq.1&select=state');
+      const current = (rows && rows[0]?.state) || {};
+      const merged = {...current, [key]: val};
       await fetch(`${SUPABASE_URL}/rest/v1/test_event_state?id=eq.1`, {
         method: 'PATCH',
         headers: {"apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"},
-        body: JSON.stringify({state: newState, updated_at: new Date().toISOString()})
+        body: JSON.stringify({state: merged, updated_at: new Date().toISOString()})
       });
     } catch(e) { console.error('save error',e); }
   };
