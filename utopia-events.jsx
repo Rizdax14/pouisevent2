@@ -6640,8 +6640,10 @@ const BL_WHITE = "#f0f4f1";
 function MenuBL({onSection, currentPlayer, onLogout}){
   const m=useIsMobile();
   const isLouis=currentPlayer?.uid===ADMIN_UID;
+  const TEST_MENU_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
+    ...(TEST_MENU_UIDS.includes(currentPlayer?.uid||'')?[{id:"test",label:"TEST",icon:"⚡",desc:"Olympiades Test — 14 Mai",color:"#7c3aed",active:true}]:[]),
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
     {id:"collection",label:"Collection",icon:"🃏",desc:(isLouis||getOfficerRole(currentPlayer))?"Packs · Albums · Bourse":"Bientôt disponible",color:"#22d3ee",active:!!(isLouis||getOfficerRole(currentPlayer))},
@@ -8090,6 +8092,7 @@ export default function App(){
       else if(s==="events"){setSection("events");}
       else if(s==="games"){setSection("games");}
       else if(s==="collection"){setSection("collection");}
+      else if(s==="test"){setSection("test");}
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
@@ -8108,6 +8111,11 @@ export default function App(){
     <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
   );
 
+  if(section==="test"){
+    const T_UIDS=['etienne-oll','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+    if(!currentPlayer||!T_UIDS.includes(currentPlayer.uid))return null;
+    return <TestEventPage currentPlayer={currentPlayer} nav={()=>{}} navBack={()=>setSection('menu')}/>;
+  }
   if(section==="collection") return(
     <CollectionPage currentPlayer={currentPlayer} onBack={()=>setSection("menu")}/>
   );
