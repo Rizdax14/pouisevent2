@@ -7861,12 +7861,6 @@ function useTestState() {
   // Initial load
   React.useEffect(() => { fetchAll(); }, []);
 
-  // Poll every 5s
-  React.useEffect(() => {
-    const t = setInterval(fetchAll, 5000);
-    return () => clearInterval(t);
-  }, []);
-
   // Save a single épreuve row
   const save = async (key, state) => {
     try {
