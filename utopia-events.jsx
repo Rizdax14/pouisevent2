@@ -7760,29 +7760,40 @@ const TEST_ADMINS_LIST=['louis-mar','thisma-bru','salome-dev'];
 // Béret schedule (hardcoded for 10 duos, 2 tours x 10 matchs)
 // Tour 1 matchs 1-10, Tour 2 matchs 11-20
 // Round robin 10 players: fix duo9, rotate duo0-8
-const BERET_MATCHES = [
-  // Tour 1 - Hommes
-  {num:1,tour:1,type:'H',d1:0,d2:9},{num:2,tour:1,type:'H',d1:1,d2:8},
-  {num:3,tour:1,type:'H',d1:2,d2:7},{num:4,tour:1,type:'H',d1:3,d2:6},
-  {num:5,tour:1,type:'H',d1:4,d2:5},
-  // Tour 1 - Femmes
-  {num:6,tour:1,type:'F',d1:0,d2:9},{num:7,tour:1,type:'F',d1:1,d2:8},
-  {num:8,tour:1,type:'F',d1:2,d2:7},{num:9,tour:1,type:'F',d1:3,d2:6},
-  {num:10,tour:1,type:'F',d1:4,d2:5},
-  // Tour 2 - Hommes (rotation: [1,2,3,4,5,6,7,8,0] fix 9)
-  {num:11,tour:2,type:'H',d1:1,d2:9},{num:12,tour:2,type:'H',d1:2,d2:0},
-  {num:13,tour:2,type:'H',d1:3,d2:8},{num:14,tour:2,type:'H',d1:4,d2:7},
-  {num:15,tour:2,type:'H',d1:5,d2:6},
-  // Tour 2 - Femmes
-  {num:16,tour:2,type:'F',d1:1,d2:9},{num:17,tour:2,type:'F',d1:2,d2:0},
-  {num:18,tour:2,type:'F',d1:3,d2:8},{num:19,tour:2,type:'F',d1:4,d2:7},
-  {num:20,tour:2,type:'F',d1:5,d2:6},
+const BERET_MATCHES=[
+  {num:1,tour:1,type:'H',d1:0,d2:8},
+  {num:2,tour:1,type:'H',d1:1,d2:7},
+  {num:3,tour:1,type:'H',d1:2,d2:6},
+  {num:4,tour:1,type:'H',d1:3,d2:5},
+  {num:5,tour:1,type:'H',d1:4,d2:9},
+  {num:6,tour:1,type:'F',d1:1,d2:2},
+  {num:7,tour:1,type:'F',d1:0,d2:3},
+  {num:8,tour:1,type:'F',d1:4,d2:8},
+  {num:9,tour:1,type:'F',d1:5,d2:7},
+  {num:10,tour:1,type:'F',d1:6,d2:9},
+  {num:11,tour:2,type:'H',d1:0,d2:1},
+  {num:12,tour:2,type:'H',d1:2,d2:8},
+  {num:13,tour:2,type:'H',d1:3,d2:7},
+  {num:14,tour:2,type:'H',d1:4,d2:6},
+  {num:15,tour:2,type:'H',d1:5,d2:9},
+  {num:16,tour:2,type:'F',d1:2,d2:3},
+  {num:17,tour:2,type:'F',d1:1,d2:4},
+  {num:18,tour:2,type:'F',d1:0,d2:5},
+  {num:19,tour:2,type:'F',d1:6,d2:8},
+  {num:20,tour:2,type:'F',d1:7,d2:9},
 ];
 // Each duo's 4 match numbers: [H_tour1, F_tour1, H_tour2, F_tour2]
-const BERET_DUO_MATCHES = {
-  0:[1,6,12,17], 1:[2,7,11,16], 2:[3,8,12,17], 3:[4,9,13,18],
-  4:[5,10,14,19], 5:[5,10,15,20], 6:[4,9,15,20], 7:[3,8,14,19],
-  8:[2,7,13,18], 9:[1,6,11,16],
+const BERET_DUO_MATCHES={
+  0:[1,7,11,18],
+  1:[2,6,11,17],
+  2:[3,6,12,16],
+  3:[4,7,13,16],
+  4:[5,8,14,17],
+  5:[4,9,15,18],
+  6:[3,10,14,19],
+  7:[2,9,13,20],
+  8:[1,8,12,19],
+  9:[5,10,15,20],
 };
 // Finale round robin (4 teams): 3 rounds × 2 confrontations = 6 confrontations
 // Each confrontation = 1H + 1F match
@@ -7820,6 +7831,46 @@ function useTestState() {
   const [p4ConsolResults, setP4ConsolResults] = React.useState(() => load('test_p4_consol', {}));
 
   const upd = (key, setter, val) => { setter(val); save(key, val); };
+  const resetAll = () => {
+    const keys=['test_cercles','test_beret_results','test_beret_finalists','test_beret_finale',
+                'test_beret_final_ranking','test_culture','test_p4','test_p4_finalists','test_p4_consol'];
+    keys.forEach(k=>localStorage.removeItem(k));
+    setCerclesElim([]);setBeretResults({});setBeretFinalists([]);
+    setBeretFinaleResults({});setBeretFinalRanking([]);setCultureRanking([]);
+    setP4Results({});setP4Finalists([]);setP4ConsolResults({});
+  };
+
+  const simulateCercles = () => {
+    // Randomly eliminate all 20 players one by one
+    const allP = TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[`${d.id}a`,`${d.id}b`]);
+    const shuffled = [...allP].sort(()=>Math.random()-.5);
+    const elim = shuffled.slice(1); // keep one survivor
+    setCerclesElim(v => { const n=elim; upd('test_cercles',setCerclesElim,n); return n; });
+    upd('test_cercles',setCerclesElim,elim);
+  };
+
+  const simulateBeret = () => {
+    const res={};
+    BERET_MATCHES.forEach(m=>{ res[`m${m.num}`]=Math.random()>.5?'duo1':'duo2'; });
+    upd('test_beret_results',setBeretResults,res);
+  };
+
+  const simulateCulture = () => {
+    const allP = TEST_DUOS.flatMap(d=>[`${d.id}a`,`${d.id}b`]);
+    const shuffled = [...allP].sort(()=>Math.random()-.5);
+    upd('test_culture',setCultureRanking,shuffled);
+  };
+
+  const simulateP4 = () => {
+    const res={};
+    P4_GROUPS.forEach(g=>{
+      res[`g${g.name}_SF1`]=Math.random()>.5?'d1':'d2';
+      if(g.duoIds.length===4)res[`g${g.name}_SF2`]=Math.random()>.5?'d1':'d2';
+      res[`g${g.name}_FIN`]=Math.random()>.5?'d1':'d2';
+    });
+    upd('test_p4',setP4Results,res);
+  };
+
   return {
     cerclesElim, setCerclesElim: v => upd('test_cercles', setCerclesElim, v),
     beretResults, setBeretResults: v => upd('test_beret_results', setBeretResults, v),
@@ -7830,6 +7881,7 @@ function useTestState() {
     p4Results, setP4Results: v => upd('test_p4', setP4Results, v),
     p4Finalists, setP4Finalists: v => upd('test_p4_finalists', setP4Finalists, v),
     p4ConsolResults, setP4ConsolResults: v => upd('test_p4_consol', setP4ConsolResults, v),
+    resetAll, simulateCercles, simulateBeret, simulateCulture, simulateP4,
   };
 }
 
@@ -8364,9 +8416,20 @@ function P4Panel({isAdmin, state}) {
   }
 
   function groupRanking(group) {
-    return [...group.duoIds]
-      .map(id => ({id, pts: groupPoints(group.name, id)}))
-      .sort((a,b) => b.pts - a.pts);
+    const duos=group.duoIds;
+    const sf1Key=`g${group.name}_SF1`;const sf2Key=`g${group.name}_SF2`;const finKey=`g${group.name}_FIN`;
+    const sf1W=p4Results[sf1Key];const sf2W=p4Results[sf2Key];const finW=p4Results[finKey];
+    const sf1Win=sf1W==='d1'?duos[0]:sf1W==='d2'?duos[1]:null;
+    const sf2Win=duos.length===4?(sf2W==='d1'?duos[2]:sf2W==='d2'?duos[3]:null):duos[2];
+    const winner=finW==='d1'?sf1Win:finW==='d2'?sf2Win:null;
+    // Sort: winner first, then by how far they got
+    return [...duos].map(id=>({
+      id,
+      rank: id===winner?1:
+            (id===sf1Win||id===sf2Win)?2:
+            (sf1W&&id===(sf1W==='d1'?duos[1]:duos[0]))||
+            (sf2W&&duos.length===4&&id===(sf2W==='d1'?duos[3]:duos[2]))?3:4
+    })).sort((a,b)=>a.rank-b.rank);
   }
 
   // Finale round robin for 3 finalists
@@ -8455,14 +8518,23 @@ function P4Panel({isAdmin, state}) {
                     })}
                   </div>
                 </div>
-                {isAdmin && matches.map(m => {
-                  const key = `g${group.name}_${m.d1}_${m.d2}`;
-                  return (
-                    <div key={key} style={{marginBottom:6}}>
-                      {matchBtn(key, m.d1, m.d2, p4Results[key], setP4Results)}
-                    </div>
-                  );
-                })}
+                {isAdmin && (()=>{
+                  // Bracket: SF1 (duo0 vs duo1), SF2 (duo2 vs duo3 or bye), Final
+                  const duos=group.duoIds;
+                  const sf1Key=`g${group.name}_SF1`;const sf2Key=`g${group.name}_SF2`;const finKey=`g${group.name}_FIN`;
+                  const sf1W=p4Results[sf1Key];const sf2W=p4Results[sf2Key];const finW=p4Results[finKey];
+                  const sf1Win=sf1W==='d1'?duos[0]:sf1W==='d2'?duos[1]:null;
+                  const sf2Win=duos.length===4?(sf2W==='d1'?duos[2]:sf2W==='d2'?duos[3]:null):duos[2];
+                  return(<div>
+                    <div style={{fontSize:11,color:'#7c3aed',fontWeight:700,marginBottom:6}}>Demi-finales</div>
+                    <div style={{marginBottom:6}}><div style={{fontSize:10,color:'#555',marginBottom:3}}>SF1</div>{matchBtn(sf1Key,duos[0],duos[1],sf1W,setP4Results)}</div>
+                    {duos.length===4&&<div style={{marginBottom:10}}><div style={{fontSize:10,color:'#555',marginBottom:3}}>SF2</div>{matchBtn(sf2Key,duos[2],duos[3],sf2W,setP4Results)}</div>}
+                    <div style={{fontSize:11,color:'#7c3aed',fontWeight:700,marginBottom:6}}>Finale</div>
+                    {sf1Win!==null&&sf2Win!==null
+                      ?<div>{matchBtn(finKey,sf1Win,sf2Win,finW,setP4Results)}</div>
+                      :<div style={{color:'#555',fontSize:11}}>En attente des demi-finales...</div>}
+                  </div>);
+                })()}
                 {!isAdmin && (
                   <div>
                     {ranking.map((r, i) => {
@@ -8635,7 +8707,12 @@ function TestEventPage({currentPlayer, nav, navBack}) {
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?26:34,letterSpacing:'.05em',lineHeight:1}}>TEST <span style={{color:'#a78bfa'}}>OLYMPIADES</span></div>
             <div style={{fontSize:11,color:'#60607a',marginTop:3}}>20h-23h · 4 phases · 11 duos</div>
           </div>
-          <button onClick={navBack} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'6px 12px',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Menu</button>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
+          <button onClick={()=>window.location.reload()} style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🔄 Reload</button>
+          <button onClick={()=>{if(window.confirm('Simuler tous les résultats ?')){state.simulateCercles();state.simulateBeret();state.simulateCulture();state.simulateP4();}}} style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.4)',color:'#a78bfa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🎲 Simuler</button>
+          <button onClick={()=>{if(window.confirm('Remettre à zéro ?'))state.resetAll();}} style={{background:'rgba(231,76,60,.1)',border:'1px solid rgba(231,76,60,.3)',color:'#f87171',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
+          <button onClick={navBack} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'5px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Menu</button>
+        </div>
         </div>
         <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
           {[['🎵','Cercles Musicaux','20h-20h30'],['🪖','Béret','20h30-21h'],['🧠','Culture G','22h-22h30'],['🔴','Puissance 4','22h30-23h']].map(([ic,name,time]) => (
