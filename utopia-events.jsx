@@ -7158,11 +7158,7 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
   const doStart=async()=>{
     setStarted(true);
     await hostStart(quiz);
-    bcast('COUNTDOWN',{count:3});
-    setCdCount(3);
-    let c=3;
-    const tick=()=>{c--;setCdCount(c);bcast('COUNTDOWN',{count:c});if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(0);}};
-    setTimeout(tick,1000);
+    hostSendQ(0); // Q1 immédiate, pas de décompte
   };
 
   const S={
@@ -7232,10 +7228,9 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
           {showRes&&<button style={S.btn('#7c3aed')} onClick={()=>{
   if(qIdx+1>=totalQ){hostNext();}
   else{
-    bcast('COUNTDOWN',{count:3});
     setCdCount(3);
     let c=3;
-    const tick=()=>{c--;setCdCount(c);bcast('COUNTDOWN',{count:c});if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(qIdx+1);}};
+    const tick=()=>{c--;setCdCount(c);if(c>0)setTimeout(tick,1000);else{setCdCount(0);hostSendQ(qIdx+1);}};
     setTimeout(tick,1000);
   }
 }}>{qIdx+1>=totalQ?'🏁 Fin':'Suivant →'}</button>}
