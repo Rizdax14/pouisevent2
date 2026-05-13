@@ -8053,3 +8053,805 @@ export default function App(){
     </div>
   );
 }
+function getCerclesRanking(state) {
+  if (!state.cerclesElim || state.cerclesElim.length === 0) return [];
+  const allP = TEST_DUOS.filter(d=>d.id!==10).flatMap(d=>[
+    {id:`${d.id}a`,duoId:d.id},{id:`${d.id}b`,duoId:d.id}
+  ]);
+  const remaining = allP.filter(p=>!state.cerclesElim.includes(p.id));
+  const playerRank = {};
+  if (remaining.length === 1) playerRank[remaining[0].id] = 1;
+  [...state.cerclesElim].reverse().forEach((pid,i)=>{ playerRank[pid] = i+2; });
+  const duoScores = TEST_DUOS.filter(d=>d.id!==10).map(d=>{
+    const r1=playerRank[`${d.id}a`], r2=playerRank[`${d.id}b`];
+    return (r1&&r2) ? {id:d.id, score:scoreDuo(r1,r2)} : null;
+  }).filter(Boolean).sort((a,b)=>a.score-b.score);
+  return [...duoScores.map(d=>d.id), 10];
+}
+function getCultureRanking(state) {
+  if (!state.cultureRanking || state.cultureRanking.length === 0) return [];
+  const duoScores = TEST_DUOS.map(d=>{
+    const r1=state.cultureRanking.findIndex(pid=>pid===`${d.id}a`)+1;
+    const r2=state.cultureRanking.findIndex(pid=>pid===`${d.id}b`)+1;
+    return (r1>0&&r2>0) ? {id:d.id, score:scoreDuo(r1,r2)} : null;
+  }).filter(Boolean).sort((a,b)=>a.score-b.score);
+  return duoScores.map(d=>d.id);
+}
+
+function CerclesPanel({isAdmin, state}) {
+  const {cerclesElim, setCerclesElim} = state;
+  const playingDuos = TEST_DUOS.filter(d => d.id !== 10);
+  const allPlayers = playingDuos.flatMap(d => [
+    {id: `${d.id}a`, name: d.name1, duoId: d.id, color: d.color},
+    {id: `${d.id}b`, name: d.name2, duoId: d.id, color: d.color},
+  ]);
+
+  const eliminated = cerclesElim;
+  const remaining = allPlayers.filter(p => !eliminated.includes(p.id));
+  const done = remaining.length <= 1;
+
+  const eliminate = (playerId) => {
+    setCerclesElim([...eliminated, playerId]);
+  };
+
+  const undo = () => {
+    setCerclesElim(eliminated.slice(0, -1));
+  };
+
+  // Compute rankings: eliminated[0] = last out (2nd), eliminated[end-1] = first out (20th)
+  // remaining[0] = winner (1st)
+  const playerRank = {};
+  const totalPlayers = allPlayers.length; // 20
+  if (done && remaining.length === 1) playerRank[remaining[0].id] = 1;
+  else if (remaining.length > 0) remaining.forEach(p => { playerRank[p.id] = null; });
+  // Eliminated: last eliminated = rank 2, first eliminated = rank 20
+  [...eliminated].reverse().forEach((pid, i) => { playerRank[pid] = i + 2; });
+
+  // Duo scores
+  const duoScores = playingDuos.map(d => {
+    const p1 = allPlayers.find(p => p.id === `${d.id}a`);
+    const p2 = allPlayers.find(p => p.id === `${d.id}b`);
+    const r1 = playerRank[p1.id], r2 = playerRank[p2.id];
+    const score = (r1 && r2) ? scoreDuo(r1, r2) : null;
+    return {...d, r1, r2, score};
+  }).sort((a,b) => (a.score??999) - (b.score??999));
+
+  const m = useIsMobile();
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+        <div style={{fontWeight:800,fontSize:16,color:'#a78bfa'}}>🎵 Cercles Musicaux</div>
+        <div style={{fontSize:12,color:'#60607a'}}>{totalPlayers - eliminated.length} joueur{totalPlayers - eliminated.length > 1 ? 's' : ''} restant{totalPlayers - eliminated.length > 1 ? 's' : ''}</div>
+        {isAdmin && eliminated.length > 0 && <button onClick={undo} style={{marginLeft:'auto',background:'rgba(255,100,100,.15)',border:'1px solid rgba(255,100,100,.3)',color:'#f87171',borderRadius:8,padding:'4px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>↩ Annuler</button>}
+      </div>
+
+      {/* Salomé+Thisma 11ème d'office */}
+      <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:'10px 14px',marginBottom:16,display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:12,height:12,borderRadius:'50%',background:'#607d8b',flexShrink:0}}/>
+        <span style={{fontSize:13,fontWeight:600}}>Salomé & Thisma</span>
+        <span style={{marginLeft:'auto',fontSize:11,color:'#60607a'}}>11ème d'office</span>
+      </div>
+
+      {/* Admin: select eliminated */}
+      {isAdmin && !done && (
+        <div style={{background:'rgba(231,76,60,.08)',border:'1px solid rgba(231,76,60,.2)',borderRadius:12,padding:14,marginBottom:16}}>
+          <div style={{fontWeight:700,fontSize:13,color:'#e74c3c',marginBottom:10}}>
+            ❌ Tour {eliminated.length + 1} — Qui est éliminé ?
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:m?'1fr 1fr':'repeat(4,1fr)',gap:6}}>
+            {remaining.map(p => {
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              return (
+                <button key={p.id} onClick={() => eliminate(p.id)}
+                  style={{background:`${duo.color}22`,border:`1px solid ${duo.color}55`,borderRadius:8,padding:'8px 6px',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'Outfit',sans-serif",textAlign:'center'}}>
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {done && <div style={{background:'rgba(39,174,96,.1)',border:'1px solid rgba(39,174,96,.3)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#2ecc71',fontWeight:700,textAlign:'center'}}>✓ Épreuve terminée !</div>}
+
+      {/* Ordre d'élimination */}
+      {eliminated.length > 0 && (
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:12,color:'#60607a',marginBottom:8}}>Ordre d'élimination (dernier éliminé → premier éliminé) :</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {[...eliminated].reverse().map((pid, i) => {
+              const p = allPlayers.find(x => x.id === pid);
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              const rank = i + 2;
+              return (
+                <span key={pid} style={{background:`${duo.color}22`,border:`1px solid ${duo.color}44`,borderRadius:20,padding:'3px 10px',fontSize:11,color:duo.color}}>
+                  {rank}. {p.name}
+                </span>
+              );
+            })}
+            {done && remaining[0] && (() => {
+              const p = remaining[0];
+              const duo = TEST_DUOS.find(d => d.id === p.duoId);
+              return <span key={p.id} style={{background:`${duo.color}44`,border:`2px solid ${duo.color}`,borderRadius:20,padding:'3px 10px',fontSize:11,fontWeight:700,color:duo.color}}>🏆 1. {p.name}</span>;
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Classement duos */}
+      {duoScores.some(d => d.score !== null) && (
+        <div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:'#aaa'}}>Classement des duos</div>
+          {duoScores.map((d, i) => (
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.03)',border:`1px solid ${i===0?'rgba(255,215,0,.25)':d.color+'33'}`}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+              <span style={{width:22,fontSize:13,textAlign:'center',color:i===0?'#ffd700':'#aaa'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:600,fontSize:13}}>{d.name1} & {d.name2}</span>
+              {d.score !== null && (<>
+                <span style={{fontSize:11,color:'#555'}}>{d.r1 && d.name1} #{d.r1} / {d.name2} #{d.r2}</span>
+                <span style={{fontWeight:800,fontSize:12,color:d.color}}>{d.score.toFixed(2)}</span>
+              </>)}
+            </div>
+          ))}
+          {/* Duo 10 at bottom */}
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.05)',opacity:0.6}}>
+            <div style={{width:10,height:10,borderRadius:'50%',background:'#607d8b',flexShrink:0}}/>
+            <span style={{width:22,fontSize:13,textAlign:'center',color:'#555'}}>11.</span>
+            <span style={{flex:1,fontWeight:600,fontSize:13}}>Salomé & Thisma</span>
+            <span style={{fontSize:11,color:'#555'}}>d'office</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Béret ─────────────────────────────────────────────────────────────────────
+function BeretPanel({isAdmin, currentPlayer, state}) {
+  const {beretResults, setBeretResults, beretFinalists, setBeretFinalists,
+         beretFinaleResults, setBeretFinaleResults, beretFinalRanking, setBeretFinalRanking} = state;
+  const [view, setView] = React.useState('papers'); // papers|poule|finale|ranking
+  const isMyDuo = TEST_DUOS.find(d => d.uid1 === currentPlayer?.uid || d.uid2 === currentPlayer?.uid);
+
+  const playingDuos = TEST_DUOS.filter(d => d.id !== 10);
+
+  // Points de poule per duo
+  function poulePoints(duoId) {
+    let pts = 0;
+    BERET_MATCHES.forEach(m => {
+      if (m.d1 === duoId || m.d2 === duoId) {
+        const key = `m${m.num}`;
+        const w = beretResults[key];
+        if (w === 'duo1' && m.d1 === duoId) pts++;
+        if (w === 'duo2' && m.d2 === duoId) pts++;
+      }
+    });
+    return pts;
+  }
+
+  const pouleRanking = [...playingDuos].map(d => ({...d, pts: poulePoints(d.id)}))
+    .sort((a,b) => b.pts - a.pts);
+
+  const setMatchResult = (matchNum, winner) => {
+    setBeretResults({...beretResults, [`m${matchNum}`]: winner});
+  };
+
+  const m = useIsMobile();
+
+  // Finale confrontation points
+  function finaleConfPts(duoId, confNums) {
+    let pts = 0;
+    confNums.forEach(cn => {
+      const hKey = `fH${cn}`, fKey = `fF${cn}`;
+      const conf = BERET_FINALE_ROUNDS.flat().find(c => c.conf === cn);
+      if (!conf) return;
+      const isA = beretFinalists[conf.A] === duoId;
+      const isB = beretFinalists[conf.B] === duoId;
+      if (!isA && !isB) return;
+      ['H','F'].forEach(type => {
+        const key = type === 'H' ? hKey : fKey;
+        const w = beretFinaleResults[key];
+        if (isA && w === 'A') pts++;
+        if (isB && w === 'B') pts++;
+      });
+    });
+    return pts;
+  }
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setView(id)} style={{background:view===id?'rgba(124,58,237,.2)':'transparent',border:'1px solid '+(view===id?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),borderRadius:'8px 8px 0 0',padding:'7px 12px',color:view===id?'#a78bfa':'#aaa',cursor:'pointer',fontSize:11,fontWeight:view===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto'}}>
+        {tabBtn('papers','📋 Feuilles')}
+        {tabBtn('poule','⚔️ Poules')}
+        {tabBtn('finale','🏆 Finale')}
+        {tabBtn('ranking','📊 Classement')}
+      </div>
+
+      {/* Salomé+Thisma 11ème */}
+      {view !== 'papers' && (
+        <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'#607d8b'}}>
+          Salomé & Thisma — 11ème d'office
+        </div>
+      )}
+
+      {/* Papers */}
+      {view === 'papers' && (
+        <div>
+          <div style={{fontSize:13,color:'#aaa',marginBottom:16}}>Numéros de match pour chaque duo. Tour 1 : matchs 1-10 · Tour 2 : matchs 11-20</div>
+          {isAdmin ? (
+            <div>
+              {playingDuos.map(d => {
+                const nums = BERET_DUO_MATCHES[d.id] || [];
+                const [h1, f1, h2, f2] = nums;
+                return (
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:10,marginBottom:8,background:`${d.color}11`,border:`1px solid ${d.color}33`}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</div>
+                      <div style={{fontSize:11,color:'#60607a',marginTop:3}}>
+                        {d.name1} (H) : Match {h1} (T1) · Match {h2} (T2) &nbsp;|&nbsp; {d.name2} (F) : Match {f1} (T1) · Match {f2} (T2)
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:6}}>
+                      {nums.map(n => <span key={n} style={{background:`${d.color}33`,borderRadius:6,padding:'4px 8px',fontSize:13,fontWeight:800,color:d.color}}>{n}</span>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : isMyDuo ? (
+            <div style={{background:`${isMyDuo.color}11`,border:`2px solid ${isMyDuo.color}55`,borderRadius:14,padding:20,textAlign:'center'}}>
+              <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>{isMyDuo.name1} & {isMyDuo.name2}</div>
+              <div style={{fontSize:13,color:'#aaa',marginBottom:16}}>Vos numéros de match :</div>
+              <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+                {(BERET_DUO_MATCHES[isMyDuo.id]||[]).map((n,i) => (
+                  <div key={n} style={{textAlign:'center'}}>
+                    <div style={{fontSize:32,fontWeight:900,color:isMyDuo.color,background:`${isMyDuo.color}22`,borderRadius:12,padding:'12px 18px',minWidth:56}}>{n}</div>
+                    <div style={{fontSize:10,color:'#555',marginTop:4}}>T{i<2?1:2} {i%2===0?'H':'F'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 Résultats cachés</div>
+          )}
+        </div>
+      )}
+
+      {/* Poules */}
+      {view === 'poule' && (
+        <div>
+          {!isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              <div style={{fontWeight:700,fontSize:13,color:'#aaa',marginBottom:12}}>Saisir les résultats :</div>
+              {[1,2].map(tour => (
+                <div key={tour} style={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#7c3aed',marginBottom:8}}>Tour {tour}</div>
+                  {BERET_MATCHES.filter(m => m.tour === tour).sort((a,b)=>a.num-b.num).map(match => {
+                    const d1 = TEST_DUOS[match.d1], d2 = TEST_DUOS[match.d2];
+                    const p1name = match.type === 'H' ? d1.name1 : d1.name2;
+                    const p2name = match.type === 'H' ? d2.name1 : d2.name2;
+                    const key = `m${match.num}`;
+                    const w = beretResults[key];
+                    return (
+                      <div key={match.num} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:8,marginBottom:5,background:'rgba(255,255,255,.04)'}}>
+                        <span style={{fontSize:11,color:'#555',width:22,flexShrink:0}}>#{match.num}</span>
+                        <span style={{fontSize:10,color:match.type==='H'?'#3498db':'#e91e63',width:14,flexShrink:0}}>{match.type}</span>
+                        <button onClick={() => setMatchResult(match.num, 'duo1')}
+                          style={{flex:1,background:w==='duo1'?`${d1.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='duo1'?d1.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px 8px',color:w==='duo1'?d1.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='duo1'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                          {p1name} {w==='duo1'?'✓':''}
+                        </button>
+                        <span style={{fontSize:11,color:'#555'}}>vs</span>
+                        <button onClick={() => setMatchResult(match.num, 'duo2')}
+                          style={{flex:1,background:w==='duo2'?`${d2.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='duo2'?d2.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px 8px',color:w==='duo2'?d2.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='duo2'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                          {p2name} {w==='duo2'?'✓':''}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div style={{marginTop:16,fontWeight:700,fontSize:13,marginBottom:8}}>Classement poules :</div>
+              {pouleRanking.map((d,i) => (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:beretFinalists.includes(d.id)?`${d.color}22`:'rgba(255,255,255,.04)',border:`1px solid ${beretFinalists.includes(d.id)?d.color:'rgba(255,255,255,.06)'}`}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                  <span style={{width:18,fontSize:12,color:'#aaa'}}>{i+1}.</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                  <span style={{fontWeight:800,color:d.color}}>{d.pts} pts</span>
+                  <button onClick={() => {
+                    const f = beretFinalists.includes(d.id)
+                      ? beretFinalists.filter(x=>x!==d.id)
+                      : beretFinalists.length < 4 ? [...beretFinalists, d.id] : beretFinalists;
+                    setBeretFinalists(f);
+                  }} style={{background:beretFinalists.includes(d.id)?'#7c3aed':'rgba(255,255,255,.08)',border:'none',color:'#fff',borderRadius:6,padding:'4px 8px',fontSize:10,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                    {beretFinalists.includes(d.id)?'✓ Final.':'+ Final.'}
+                  </button>
+                </div>
+              ))}
+              <div style={{fontSize:11,color:'#60607a',marginTop:6}}>{beretFinalists.length}/4 équipes sélectionnées pour la finale</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Finale */}
+      {view === 'finale' && (
+        <div>
+          {beretFinalists.length < 4 && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>En attente de la sélection des 4 finalistes</div>}
+          {beretFinalists.length === 4 && !isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {beretFinalists.length === 4 && isAdmin && (
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'#aaa'}}>4 finalistes : {beretFinalists.map(id => TEST_DUOS[id]?.name1 + ' & ' + TEST_DUOS[id]?.name2).join(' · ')}</div>
+              {BERET_FINALE_ROUNDS.map((round, ri) => (
+                <div key={ri} style={{marginBottom:14}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#7c3aed',marginBottom:8}}>Round {ri+1}</div>
+                  {round.map(conf => {
+                    const dA = TEST_DUOS[beretFinalists[conf.A]];
+                    const dB = TEST_DUOS[beretFinalists[conf.B]];
+                    if (!dA || !dB) return null;
+                    return ['H','F'].map(type => {
+                      const key = `f${type}${conf.conf}`;
+                      const w = beretFinaleResults[key];
+                      const pA = type === 'H' ? dA.name1 : dA.name2;
+                      const pB = type === 'H' ? dB.name1 : dB.name2;
+                      return (
+                        <div key={key} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,marginBottom:4,background:'rgba(255,255,255,.04)'}}>
+                          <span style={{fontSize:10,color:type==='H'?'#3498db':'#e91e63',width:14}}>{type}</span>
+                          <button onClick={() => setBeretFinaleResults({...beretFinaleResults,[key]:'A'})}
+                            style={{flex:1,background:w==='A'?`${dA.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='A'?dA.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px',color:w==='A'?dA.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='A'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {pA} {w==='A'?'✓':''}
+                          </button>
+                          <span style={{fontSize:11,color:'#555'}}>vs</span>
+                          <button onClick={() => setBeretFinaleResults({...beretFinaleResults,[key]:'B'})}
+                            style={{flex:1,background:w==='B'?`${dB.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='B'?dB.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'5px',color:w==='B'?dB.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='B'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {pB} {w==='B'?'✓':''}
+                          </button>
+                        </div>
+                      );
+                    });
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Classement final */}
+      {view === 'ranking' && (
+        <div>
+          {!isAdmin && beretFinalRanking.length === 0 && <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              {/* Finale ranking */}
+              {beretFinalists.length === 4 && (
+                <div style={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:13,color:'#aaa',marginBottom:8}}>Classement finale :</div>
+                  {(() => {
+                    const allConfs = BERET_FINALE_ROUNDS.flat().map(c => c.conf);
+                    const finalStats = beretFinalists.map((duoId, idx) => {
+                      const confs = BERET_FINALE_ROUNDS.flat()
+                        .filter(c => c.A === idx || c.B === idx)
+                        .map(c => c.conf);
+                      return {duoId, pts: finaleConfPts(duoId, confs)};
+                    }).sort((a,b) => b.pts - a.pts);
+                    return finalStats.map((fs, i) => {
+                      const d = TEST_DUOS[fs.duoId];
+                      if (!d) return null;
+                      return (
+                        <div key={fs.duoId} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:`${d.color}11`,border:`1px solid ${d.color}33`}}>
+                          <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                          <span style={{width:18,fontSize:12,color:'#aaa'}}>{i+1}.</span>
+                          <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                          <span style={{fontWeight:800,color:d.color}}>{fs.pts} pts</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+              {/* Consolation ranking */}
+              <div style={{marginBottom:8,fontWeight:700,fontSize:13,color:'#aaa'}}>Équipes éliminées en poules :</div>
+              {pouleRanking.filter(d => !beretFinalists.includes(d.id)).map((d,i) => (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,marginBottom:5,background:'rgba(255,255,255,.04)'}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:d.color}}/>
+                  <span style={{flex:1,fontSize:13,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                  <span style={{fontWeight:600,color:'#555'}}>{d.pts} pts</span>
+                </div>
+              ))}
+              {/* Admin validates */}
+              {beretFinalRanking.length > 0 && (
+                <div style={{marginTop:12,padding:'10px 14px',background:'rgba(39,174,96,.1)',border:'1px solid rgba(39,174,96,.3)',borderRadius:10,fontSize:12,color:'#2ecc71'}}>✓ Classement validé et pris en compte dans le général</div>
+              )}
+              <button onClick={() => {
+                const ranked = [...pouleRanking.map(d => d.id)];
+                setBeretFinalRanking(ranked);
+              }} style={{marginTop:12,width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                ✓ Valider le classement final
+              </button>
+            </div>
+          )}
+          {/* Show validated ranking to all */}
+          {beretFinalRanking.length > 0 && (
+            <div style={{marginTop:16}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:10,color:'#aaa'}}>Classement officiel :</div>
+              {beretFinalRanking.map((id, i) => {
+                const d = TEST_DUOS[id];
+                if (!d) return null;
+                return (
+                  <div key={id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.04)',border:`1px solid ${d.color}33`}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
+                    <span style={{fontSize:14,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+                    <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+                  </div>
+                );
+              })}
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,marginBottom:6,background:'rgba(255,255,255,.02)',opacity:0.5}}>
+                <div style={{width:10,height:10,borderRadius:'50%',background:'#607d8b'}}/>
+                <span style={{fontSize:14,width:26,textAlign:'center'}}>11.</span>
+                <span style={{flex:1,fontWeight:700,fontSize:13}}>Salomé & Thisma</span>
+                <span style={{fontSize:11,color:'#555'}}>d'office</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Culture G ─────────────────────────────────────────────────────────────────
+function CultureGPanel({isAdmin, currentPlayer, state}) {
+  const {cultureRanking, setCultureRanking} = state;
+  const [inputRanking, setInputRanking] = React.useState(
+    cultureRanking.length > 0 ? cultureRanking : []
+  );
+  const allPlayers = TEST_DUOS.flatMap(d => [
+    {id:`${d.id}a`,name:d.name1,duoId:d.id,color:d.color},
+    {id:`${d.id}b`,name:d.name2,duoId:d.id,color:d.color},
+  ]);
+  const [rankDrag, setRankDrag] = React.useState(
+    cultureRanking.length > 0 ? cultureRanking : allPlayers.map(p => p.id)
+  );
+
+  const moveUp = i => { if(i===0)return; const n=[...rankDrag];[n[i-1],n[i]]=[n[i],n[i-1]];setRankDrag(n); };
+  const moveDown = i => { if(i===rankDrag.length-1)return; const n=[...rankDrag];[n[i],n[i+1]]=[n[i+1],n[i]];setRankDrag(n); };
+
+  const duoScores = TEST_DUOS.map(d => {
+    if (cultureRanking.length === 0) return {...d, score: null, r1: null, r2: null};
+    const r1 = cultureRanking.findIndex(pid => pid === `${d.id}a`) + 1;
+    const r2 = cultureRanking.findIndex(pid => pid === `${d.id}b`) + 1;
+    if (!r1 || !r2) return {...d, score: null, r1: null, r2: null};
+    return {...d, r1, r2, score: scoreDuo(r1, r2)};
+  }).sort((a,b) => (a.score??999) - (b.score??999));
+
+  return (
+    <div>
+      {!isAdmin && cultureRanking.length === 0 && <div style={{textAlign:'center',color:'#60607a',padding:'40px 20px',fontSize:13}}>🔒 En attente des résultats du LEVERCULQUIZ</div>}
+      {isAdmin && (
+        <div>
+          <div style={{fontWeight:700,fontSize:13,color:'#a78bfa',marginBottom:12}}>📋 Classement individuel LEVERCULQUIZ (1er en haut)</div>
+          <div style={{maxHeight:400,overflowY:'auto',marginBottom:12}}>
+            {rankDrag.map((pid, i) => {
+              const p = allPlayers.find(x => x.id === pid);
+              const duo = TEST_DUOS.find(d => d.id === p?.duoId);
+              return (
+                <div key={pid} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${duo?.color}11`,border:`1px solid ${duo?.color}22`}}>
+                  <span style={{width:22,fontSize:12,color:'#aaa',textAlign:'center'}}>{i+1}.</span>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:duo?.color,flexShrink:0}}/>
+                  <span style={{flex:1,fontSize:12,fontWeight:600}}>{p?.name}</span>
+                  <span style={{fontSize:10,color:'#555'}}>{duo?.name1 === p?.name ? duo?.name2 : duo?.name1}</span>
+                  <div style={{display:'flex',gap:2}}>
+                    <button onClick={()=>moveUp(i)} disabled={i===0} style={{background:'none',border:'1px solid #2a2a40',color:i===0?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===0?'not-allowed':'pointer',fontSize:9}}>▲</button>
+                    <button onClick={()=>moveDown(i)} disabled={i===rankDrag.length-1} style={{background:'none',border:'1px solid #2a2a40',color:i===rankDrag.length-1?'#333':'#aaa',borderRadius:3,padding:'1px 5px',cursor:i===rankDrag.length-1?'not-allowed':'pointer',fontSize:9}}>▼</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => setCultureRanking(rankDrag)} style={{width:'100%',background:'#7c3aed',border:'none',color:'#fff',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+            ✓ Valider le classement
+          </button>
+        </div>
+      )}
+      {cultureRanking.length > 0 && (
+        <div style={{marginTop:isAdmin?16:0}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:'#aaa'}}>Classement des duos</div>
+          {duoScores.map((d, i) => (
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':i===2?'rgba(205,127,50,.08)':'rgba(255,255,255,.03)',border:`1px solid ${d.color}33`}}>
+              <div style={{width:10,height:10,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+              <span style={{fontSize:14,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+              <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+              {d.score !== null && <span style={{fontSize:11,color:'#555'}}>#{d.r1}/#{d.r2}</span>}
+              {d.score !== null && <span style={{fontWeight:800,fontSize:12,color:d.color}}>{d.score.toFixed(2)}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Puissance 4 ───────────────────────────────────────────────────────────────
+function P4Panel({isAdmin, state}) {
+  const {p4Results, setP4Results, p4Finalists, setP4Finalists, p4ConsolResults, setP4ConsolResults} = state;
+  const [view, setView] = React.useState('groups');
+
+  // Generate group matches (round robin per group)
+  function groupMatches(group) {
+    const duos = group.duoIds;
+    const matches = [];
+    for (let i = 0; i < duos.length; i++)
+      for (let j = i+1; j < duos.length; j++)
+        matches.push({d1: duos[i], d2: duos[j], group: group.name});
+    return matches;
+  }
+
+  function groupPoints(groupName, duoId) {
+    const group = P4_GROUPS.find(g => g.name === groupName);
+    if (!group) return 0;
+    const matches = groupMatches(group).filter(m => m.d1 === duoId || m.d2 === duoId);
+    return matches.reduce((pts, m) => {
+      const key = `g${groupName}_${m.d1}_${m.d2}`;
+      const w = p4Results[key];
+      if ((w === 'd1' && m.d1 === duoId) || (w === 'd2' && m.d2 === duoId)) return pts + 1;
+      return pts;
+    }, 0);
+  }
+
+  function groupRanking(group) {
+    return [...group.duoIds]
+      .map(id => ({id, pts: groupPoints(group.name, id)}))
+      .sort((a,b) => b.pts - a.pts);
+  }
+
+  // Finale round robin for 3 finalists
+  const finaleMatchups = p4Finalists.length === 3 ? [
+    {id:'f01',d1:p4Finalists[0],d2:p4Finalists[1]},
+    {id:'f02',d1:p4Finalists[0],d2:p4Finalists[2]},
+    {id:'f12',d1:p4Finalists[1],d2:p4Finalists[2]},
+  ] : [];
+
+  function finalePts(duoId) {
+    return finaleMatchups.reduce((pts, m) => {
+      const w = p4Results[m.id];
+      if ((w === 'd1' && m.d1 === duoId) || (w === 'd2' && m.d2 === duoId)) return pts + 1;
+      return pts;
+    }, 0);
+  }
+
+  // Consolation bracket: 8 teams, simple single elimination
+  // QF: 4 matches, SF: 2, Final + 3rd place: 2
+  function consolMatches() {
+    const consolDuos = TEST_DUOS.filter(d => !p4Finalists.includes(d.id)).map(d => d.id);
+    // QF seeding by group stage performance
+    return {
+      qf: [
+        {id:'cqf1',slot:'QF1',d1:consolDuos[0],d2:consolDuos[7]},
+        {id:'cqf2',slot:'QF2',d1:consolDuos[1],d2:consolDuos[6]},
+        {id:'cqf3',slot:'QF3',d1:consolDuos[2],d2:consolDuos[5]},
+        {id:'cqf4',slot:'QF4',d1:consolDuos[3],d2:consolDuos[4]},
+      ],
+      sf: [
+        {id:'csf1',slot:'SF1',prev:['cqf1','cqf2']},
+        {id:'csf2',slot:'SF2',prev:['cqf3','cqf4']},
+      ],
+      final: {id:'cfin',slot:'Finale Consol.',prev:['csf1','csf2']},
+      third: {id:'c3rd',slot:'3e/4e place',prev:['csf1','csf2'],losers:true},
+    };
+  }
+
+  const matchBtn = (key, d1id, d2id, winner, setter) => {
+    const d1 = TEST_DUOS[d1id], d2 = TEST_DUOS[d2id];
+    if (!d1 || !d2) return <div style={{color:'#555',fontSize:11}}>En attente...</div>;
+    const w = p4Results[key];
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <button onClick={() => setter({...p4Results,[key]:'d1'})}
+          style={{flex:1,background:w==='d1'?`${d1.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='d1'?d1.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'6px 8px',color:w==='d1'?d1.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='d1'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+          {d1.name1} & {d1.name2} {w==='d1'?'✓':''}
+        </button>
+        <span style={{color:'#555',fontSize:10}}>vs</span>
+        <button onClick={() => setter({...p4Results,[key]:'d2'})}
+          style={{flex:1,background:w==='d2'?`${d2.color}33`:'rgba(255,255,255,.04)',border:`1px solid ${w==='d2'?d2.color:'rgba(255,255,255,.1)'}`,borderRadius:6,padding:'6px 8px',color:w==='d2'?d2.color:'#aaa',cursor:'pointer',fontSize:11,fontWeight:w==='d2'?700:400,fontFamily:"'Outfit',sans-serif"}}>
+          {d2.name1} & {d2.name2} {w==='d2'?'✓':''}
+        </button>
+      </div>
+    );
+  };
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setView(id)} style={{background:view===id?'rgba(231,76,60,.2)':'transparent',border:'1px solid '+(view===id?'rgba(231,76,60,.5)':'rgba(255,255,255,.08)'),borderRadius:'8px 8px 0 0',padding:'7px 12px',color:view===id?'#e74c3c':'#aaa',cursor:'pointer',fontSize:11,fontWeight:view===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap'}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{fontSize:12,color:'#60607a',marginBottom:12}}>BO3 : Game1 joueur1 joue · Game2 joueur2 joue · Game3 les 2 communiquent</div>
+      <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto'}}>
+        {tabBtn('groups','🏟️ Groupes')}
+        {tabBtn('finale','🏆 Finale')}
+        {tabBtn('consol','🥊 Bracket')}
+      </div>
+
+      {view === 'groups' && (
+        <div>
+          {P4_GROUPS.map(group => {
+            const ranking = groupRanking(group);
+            const matches = groupMatches(group);
+            return (
+              <div key={group.name} style={{background:'rgba(255,255,255,.04)',border:`1px solid ${group.color}33`,borderRadius:12,padding:14,marginBottom:16}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <div style={{fontWeight:800,fontSize:14,color:group.color}}>Groupe {group.name}</div>
+                  <div style={{display:'flex',gap:6}}>
+                    {ranking.map((r, i) => {
+                      const d = TEST_DUOS[r.id];
+                      return <span key={r.id} style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:i===0?`${d.color}33`:'rgba(255,255,255,.06)',color:i===0?d.color:'#555',fontWeight:i===0?700:400}}>{d.name1}{i===0?` ★ ${r.pts}pts`:''}</span>;
+                    })}
+                  </div>
+                </div>
+                {isAdmin && matches.map(m => {
+                  const key = `g${group.name}_${m.d1}_${m.d2}`;
+                  return (
+                    <div key={key} style={{marginBottom:6}}>
+                      {matchBtn(key, m.d1, m.d2, p4Results[key], setP4Results)}
+                    </div>
+                  );
+                })}
+                {!isAdmin && (
+                  <div>
+                    {ranking.map((r, i) => {
+                      const d = TEST_DUOS[r.id];
+                      return (
+                        <div key={r.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${d.color}11`}}>
+                          <div style={{width:7,height:7,borderRadius:'50%',background:d.color}}/>
+                          <span style={{width:16,fontSize:11,color:'#aaa'}}>{i+1}.</span>
+                          <span style={{flex:1,fontSize:12,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                          <span style={{fontWeight:700,color:d.color}}>{r.pts}pts</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isAdmin && (
+                  <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,color:'#aaa'}}>Vainqueur → Finale :</span>
+                    <button onClick={() => {
+                      const winner = ranking[0]?.id;
+                      if (winner === undefined) return;
+                      const newF = p4Finalists.filter(id => !group.duoIds.includes(id));
+                      setP4Finalists([...newF, winner]);
+                    }} style={{background:'rgba(231,76,60,.2)',border:'1px solid rgba(231,76,60,.4)',color:'#e74c3c',borderRadius:8,padding:'4px 10px',fontSize:11,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>
+                      {p4Finalists.find(id => group.duoIds.includes(id)) != null
+                        ? '✓ ' + TEST_DUOS[p4Finalists.find(id => group.duoIds.includes(id))]?.name1 + ' sélectionné'
+                        : 'Sélectionner le vainqueur'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {view === 'finale' && (
+        <div>
+          {p4Finalists.length < 3 && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>En attente des 3 vainqueurs de groupes</div>}
+          {p4Finalists.length >= 3 && (
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'#aaa'}}>Finale round robin — 3 équipes : {p4Finalists.map(id => TEST_DUOS[id]?.name1).join(' · ')}</div>
+              {isAdmin && finaleMatchups.map(m => {
+                const d1 = TEST_DUOS[m.d1], d2 = TEST_DUOS[m.d2];
+                if (!d1 || !d2) return null;
+                return (
+                  <div key={m.id} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,color:'#555',marginBottom:3}}>BO3</div>
+                    {matchBtn(m.id, m.d1, m.d2, p4Results[m.id], setP4Results)}
+                  </div>
+                );
+              })}
+              {/* Classement finale */}
+              <div style={{marginTop:16,fontWeight:700,fontSize:13,color:'#aaa',marginBottom:8}}>Classement :</div>
+              {[...p4Finalists]
+                .map(id => ({id, pts: finalePts(id)}))
+                .sort((a,b) => b.pts - a.pts)
+                .map((r, i) => {
+                  const d = TEST_DUOS[r.id];
+                  if (!d) return null;
+                  return (
+                    <div key={r.id} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',borderRadius:10,marginBottom:6,background:i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.08)':'rgba(205,127,50,.08)',border:`1px solid ${d.color}33`}}>
+                      <div style={{width:10,height:10,borderRadius:'50%',background:d.color}}/>
+                      <span style={{fontSize:16,width:26,textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':'🥉'}</span>
+                      <span style={{flex:1,fontWeight:700,fontSize:13}}>{d.name1} & {d.name2}</span>
+                      <span style={{fontWeight:800,color:d.color}}>{r.pts} pts</span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'consol' && (
+        <div>
+          <div style={{fontSize:12,color:'#60607a',marginBottom:12}}>Bracket consolation — 8 équipes éliminées en poules</div>
+          {!isAdmin && <div style={{textAlign:'center',color:'#60607a',padding:'30px 20px',fontSize:13}}>🔒 En attente de l'arbitre</div>}
+          {isAdmin && (
+            <div>
+              {['QF','SF','Final'].map(stage => (
+                <div key={stage} style={{marginBottom:14}}>
+                  <div style={{fontWeight:700,fontSize:12,color:'#e74c3c',marginBottom:8}}>{stage === 'QF' ? 'Quarts de finale' : stage === 'SF' ? 'Demi-finales' : 'Finale + 3e place'}</div>
+                  <div style={{color:'#555',fontSize:12}}>Géré par arbitre — notez les résultats sur papier</div>
+                </div>
+              ))}
+              <div style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:10,padding:14}}>
+                <div style={{fontWeight:700,fontSize:12,marginBottom:8,color:'#aaa'}}>Classement consolation (4e-11e) :</div>
+                {TEST_DUOS.filter(d => !p4Finalists.includes(d.id)).map((d, i) => (
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:7,marginBottom:4,background:`${d.color}11`}}>
+                    <div style={{width:7,height:7,borderRadius:'50%',background:d.color}}/>
+                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{d.name1} & {d.name2}</span>
+                    <span style={{fontSize:11,color:'#555'}}>Position {i+4}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Classement Général ────────────────────────────────────────────────────────
+function computeTestGeneral(state) {
+  const pts = {};
+  TEST_DUOS.forEach(d => { pts[d.id] = 0; });
+
+  // Cercles Musicaux
+  const {cerclesElim, beretFinalRanking, cultureRanking, p4Results, p4Finalists} = state;
+  const allPlayers = TEST_DUOS.flatMap(d => [
+    {id:`${d.id}a`,duoId:d.id},{id:`${d.id}b`,duoId:d.id}
+  ]);
+  const totalPlayers = 20;
+  if (cerclesElim.length > 0) {
+    const remaining = allPlayers.filter(p => p.duoId !== 10 && !cerclesElim.includes(p.id));
+    const playerRank = {};
+    if (remaining.length === 1) playerRank[remaining[0].id] = 1;
+    [...cerclesElim].reverse().forEach((pid, i) => { playerRank[pid] = i + 2; });
+    const duoScores = TEST_DUOS.filter(d => d.id !== 10).map(d => {
+      const r1 = playerRank[`${d.id}a`], r2 = playerRank[`${d.id}b`];
+      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
+    }).filter(Boolean).sort((a,b) => a.score - b.score);
+    duoScores.forEach((d, i) => { pts[d.id] += TEST_PTS_SCALE[i] || 0; });
+    pts[10] += TEST_PTS_SCALE[10] || 0; // Salomé+Thisma = 11ème
+  }
+
+  // Béret
+  if (beretFinalRanking.length > 0) {
+    beretFinalRanking.forEach((id, i) => { pts[id] = (pts[id]||0) + (TEST_PTS_SCALE[i]||0); });
+    pts[10] += TEST_PTS_SCALE[10] || 0;
+  }
+
+  // Culture G
+  if (cultureRanking.length > 0) {
+    const duoScores = TEST_DUOS.map(d => {
+      const r1 = cultureRanking.findIndex(pid => pid === `${d.id}a`) + 1;
+      const r2 = cultureRanking.findIndex(pid => pid === `${d.id}b`) + 1;
+      return r1 && r2 ? {id: d.id, score: scoreDuo(r1, r2)} : null;
+    }).filter(Boolean).sort((a,b) => a.score - b.score);
+    duoScores.forEach((d, i) => { pts[d.id] = (pts[d.id]||0) + (TEST_PTS_SCALE[i]||0); });
+  }
+
+  return TEST_DUOS.map(d => ({...d, total: pts[d.id]||0})).sort((a,b) => b.total - a.total);
+}
+
+// ── TestEventPage ─────────────────────────────────────────────────────────────
