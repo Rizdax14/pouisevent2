@@ -898,7 +898,7 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
     {id:"rankings",l:"Classements",ic:"🏆"},
     {id:"teams",l:"Équipes",ic:"⚡"},
   ];
-  const TEST_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+  const TEST_UIDS=['louis-mar'];
   const items=[
     ...baseItems,
 
