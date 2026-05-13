@@ -8850,3 +8850,78 @@ function computeTestGeneral(state) {
 }
 
 // ── TestEventPage ─────────────────────────────────────────────────────────────
+
+
+function TestEventPage({currentPlayer, nav, navBack}) {
+  const m = useIsMobile();
+  const isAdmin = TEST_ADMINS_LIST.includes(currentPlayer?.uid || '');
+  const [tab, setTab] = React.useState('general');
+  const state = useTestState();
+  const general = computeTestGeneral(state);
+  const medals = ['🥇','🥈','🥉'];
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setTab(id)} style={{background:tab===id?'rgba(124,58,237,.2)':'transparent',border:'1px solid '+(tab===id?'rgba(124,58,237,.5)':'rgba(255,255,255,.08)'),borderRadius:'10px 10px 0 0',padding:'8px 14px',color:tab===id?'#a78bfa':'#aaa',cursor:'pointer',fontSize:11,fontWeight:tab===id?700:400,fontFamily:"'Outfit',sans-serif",whiteSpace:'nowrap',flexShrink:0}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',background:'#080812',color:'#fff',fontFamily:"'Outfit',sans-serif"}}>
+      {/* Header */}
+      <div style={{background:'rgba(124,58,237,.1)',borderBottom:'1px solid rgba(124,58,237,.2)',padding:m?'14px 16px':'18px 28px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontSize:10,color:'#a78bfa',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:3}}>Olympiades Test · Mercredi 14 Mai 2025</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?26:34,letterSpacing:'.05em',lineHeight:1}}>TEST <span style={{color:'#a78bfa'}}>OLYMPIADES</span></div>
+            <div style={{fontSize:11,color:'#60607a',marginTop:3}}>20h-23h · 4 phases · 11 duos</div>
+          </div>
+          <button onClick={navBack} style={{background:'none',border:'1px solid rgba(255,255,255,.15)',color:'#aaa',borderRadius:8,padding:'6px 12px',fontSize:12,cursor:'pointer',fontFamily:"'Outfit',sans-serif"}}>← Menu</button>
+        </div>
+        <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+          {[['🎵','Cercles Musicaux','20h-20h30'],['🪖','Béret','20h30-21h'],['🧠','Culture G','22h-22h30'],['🔴','Puissance 4','22h30-23h']].map(([ic,name,time]) => (
+            <div key={name} style={{background:'rgba(255,255,255,.06)',borderRadius:16,padding:'3px 10px',fontSize:10,color:'#aaa'}}>{ic} {name} · {time}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:'flex',gap:5,padding:m?'10px 12px 0':'10px 20px 0',overflowX:'auto',borderBottom:'1px solid #1a1a2e'}}>
+        {tabBtn('general','🏆 Général')}
+        {tabBtn('cercles','🎵 Cercles')}
+        {tabBtn('beret','🪖 Béret')}
+        {tabBtn('culture','🧠 Culture G')}
+        {tabBtn('p4','🔴 P4')}
+      </div>
+
+      {/* Body */}
+      <div style={{padding:m?'14px':'20px 28px',maxWidth:680,margin:'0 auto',paddingBottom:100}}>
+
+        {tab === 'general' && (
+          <div>
+            <div style={{fontWeight:800,fontSize:15,marginBottom:14,color:'#a78bfa'}}>🏆 Classement général</div>
+            {general.map((duo, i) => {
+              const isMe = duo.uid1 === currentPlayer?.uid || duo.uid2 === currentPlayer?.uid;
+              return (
+                <div key={duo.id} style={{display:'flex',alignItems:'center',gap:10,padding:'11px 14px',borderRadius:12,marginBottom:7,background:isMe?'rgba(124,58,237,.12)':i===0?'rgba(255,215,0,.1)':i===1?'rgba(192,192,192,.07)':i===2?'rgba(205,127,50,.07)':'rgba(255,255,255,.03)',border:`1px solid ${isMe?'#7c3aed':i===0?'rgba(255,215,0,.2)':duo.color+'22'}`}}>
+                  <div style={{width:10,height:10,borderRadius:'50%',background:duo.color,flexShrink:0}}/>
+                  <span style={{fontSize:18,width:28,textAlign:'center'}}>{medals[i]||`${i+1}.`}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{duo.name1} & {duo.name2}</div>
+                  </div>
+                  <span style={{fontWeight:900,fontSize:17,color:i===0?'#ffd700':isMe?'#a78bfa':duo.color}}>{duo.total} pts</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'cercles' && <CerclesPanel isAdmin={isAdmin} state={state}/>}
+        {tab === 'beret' && <BeretPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {tab === 'culture' && <CultureGPanel isAdmin={isAdmin} currentPlayer={currentPlayer} state={state}/>}
+        {tab === 'p4' && <P4Panel isAdmin={isAdmin} state={state}/>}
+      </div>
+    </div>
+  );
+}
+
