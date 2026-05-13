@@ -6641,7 +6641,7 @@ const BL_WHITE = "#f0f4f1";
 function MenuBL({onSection, currentPlayer, onLogout}){
   const m=useIsMobile();
   const isLouis=currentPlayer?.uid===ADMIN_UID;
-  const TEST_MENU_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+  const TEST_MENU_UIDS=['louis-mar'];
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     ...(TEST_MENU_UIDS.includes(currentPlayer?.uid||'')?[{id:"test",label:"TEST",icon:"⚡",desc:"Olympiades Test — 14 Mai",color:"#7c3aed",active:true}]:[]),
@@ -7031,7 +7031,7 @@ function useQuizGame({pin,userId,username,isHost}){
           R.current.qStart=Date.now();R.current.answers=[];setPhase('question');
           startTimer(t,()=>{ if(isHost)hostReveal(); else setPhase('answered'); });
         };
-        if(!isHost&&onCountdown){onCountdown(3,applyQ);}else{applyQ();}
+        applyQ();
         break;}
       case 'PLAYER_ANSWER':
         if(isHost){
@@ -7311,14 +7311,8 @@ function QuizHost({pin,userId,username,quiz,onExit,hostPlays=true}){
 
 // ─── QuizPlayer ───────────────────────────────────────────────────────────────
 function QuizPlayer({pin,userId,username,onExit}){
-  const[playerCd,setPlayerCd]=React.useState(0);
-  const handlePlayerCd=React.useCallback((n,onDone)=>{
-    setPlayerCd(n);let c=n;
-    const tick=()=>{c--;setPlayerCd(c);if(c>0)setTimeout(tick,1000);else{setPlayerCd(0);onDone();}};
-    setTimeout(tick,1000);
-  },[]);
   const{phase,players,question,timeLeft,myAnswer,results,finalScores,quizTitle,totalQ,playerAnswer}=
-    useQuizGame({pin,userId,username,isHost:false,onCountdown:handlePlayerCd});
+    useQuizGame({pin,userId,username,isHost:false,onCountdown:null});
   const qIdx=question?.idx??0,tRatio=question?(timeLeft/question.t):0;
   const showRes=phase==='results';
 
@@ -7334,12 +7328,6 @@ function QuizPlayer({pin,userId,username,onExit}){
 
   const root={minHeight:'100dvh',background:'#0d0d1a',color:'#fff',fontFamily:"'Outfit',sans-serif",display:'flex',flexDirection:'column'};
 
-  if(playerCd>0)return(
-    <div style={root}><div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-      <div style={{fontSize:14,color:'#aaa',fontFamily:"'Outfit',sans-serif"}}>Prochaine question…</div>
-      <div style={{fontSize:88,fontWeight:900,color:'#7c3aed',textShadow:'0 0 40px rgba(124,58,237,.5)',lineHeight:1,transition:'all .2s'}}>{playerCd}</div>
-    </div></div>
-  );
   if(phase==='lobby')return(
     <div style={root}>
       <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',padding:'32px 20px',gap:18}}>
@@ -8031,7 +8019,7 @@ export default function App(){
   if(section==="plappy")return(<PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
   if(section==="tournoi")return(<TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
   if(section==="test"){
-    const T_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+    const T_UIDS=['louis-mar'];
     if(!currentPlayer||!T_UIDS.includes(currentPlayer.uid))return null;
     return <TestEventPage currentPlayer={currentPlayer} nav={nav} navBack={()=>setSection("menu")}/>;
   }
