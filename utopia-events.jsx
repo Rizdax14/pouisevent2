@@ -2123,6 +2123,11 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           if(d.tcDone&&d.tcResultats&&d.tcTeams?.length){
             // simplified: winner of fin gets 25pts etc
           }
+          // basket
+          if(d.ranked?.length){
+            d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(pts[r.pos-1]||0);});
+          }
+          // beret_o2026 (also uses ranked)
         });
 
         const hasAny=Object.values(totals).some(v=>v>0);
@@ -2157,12 +2162,12 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {O2026_EPREUVES.map(ep=>(
           <div key={ep.id} onClick={()=>nav("epreuveO2026",{epreuveId:ep.id})}
-            style={{background:"#0d0d1c",border:`1px solid ${ep.color}33`,borderRadius:12,padding:m?14:18,cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"all .2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=ep.color+"88";e.currentTarget.style.transform="translateX(4px)";}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=ep.color+"33";e.currentTarget.style.transform="translateX(0)";}}>
-            <div style={{width:44,height:44,borderRadius:10,background:ep.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>{ep.emoji}</div>
+            style={{background:"#0d0d1c",border:`1px solid ${ep.color||O2026_PHASE_COLORS[ep.phase]||'#888'}33`,borderRadius:12,padding:m?14:18,cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"all .2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"88";e.currentTarget.style.transform="translateX(4px)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"33";e.currentTarget.style.transform="translateX(0)";}}>
+            <div style={{width:44,height:44,borderRadius:10,background:(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>{ep.emoji}</div>
             <div style={{flex:1}}>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?18:22,color:ep.color}}>PHASE {ep.phase} — {ep.nom}</div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?18:22,color:ep.color||O2026_PHASE_COLORS[ep.phase]||'#888'}}>PHASE {ep.phase} — {ep.nom}</div>
               <div style={{fontSize:11,color:"#60607a",marginTop:2}}>{ep.horaire} · {ep.format}</div>
             </div>
             <span style={{color:"#404058",fontSize:18}}>›</span>
@@ -7684,7 +7689,7 @@ export default function App(){
       players.forEach(p=>PLAYERS.push({
         id:p.id,uid:p.uid,name:p.name,last_name:p.last_name,
         display_name:p.display_name,sex:p.sex,
-        photoUrl:p.photo_url,teamId:p.team_id,
+        photoUrl:p.photo_url||(p.uid?`/photos/${p.uid}.jpg`:null),teamId:p.team_id,
         t24:p.t24,t25:p.t25,t26:p.t26,pin:p.pin,
         tournoi_count:p.tournoi_count||0,
       }));
