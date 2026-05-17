@@ -7676,40 +7676,25 @@ export default function App(){
         sbFetch("teams","?select=*&order=name"),
         sbFetch("ratings","?select=*"),
       ]);
-      // Merge: update existing players from Supabase, preserve static t26cap if Supabase has null
-      const sbById={};players.forEach(p=>{sbById[p.id]=p;});
-      PLAYERS.forEach(pl=>{
-        const p=sbById[pl.id];if(!p)return;
-        pl.name=p.name||pl.name;pl.last_name=p.last_name||pl.last_name;
-        pl.display_name=p.display_name||pl.display_name;pl.sex=p.sex||pl.sex;
-        pl.photoUrl=`/photos/${p.uid}.jpg`;pl.teamId=p.team_id!==undefined?p.team_id:pl.teamId;
-        pl.t26=p.t26!==undefined?p.t26:pl.t26;
-        pl.t26cap=p.t26cap!=null?p.t26cap:pl.t26cap;
-        pl.t25=p.t25!==undefined?p.t25:pl.t25;pl.t24=p.t24!==undefined?p.t24:pl.t24;
-        pl.t24cap=p.t24cap!=null?p.t24cap:pl.t24cap;
-        pl.t25cap=p.t25cap!=null?p.t25cap:pl.t25cap;
-        pl.pin=p.pin||pl.pin;pl.tournoi_count=p.tournoi_count||0;
-        pl.member_type=p.member_type||pl.member_type;
-      });
-      // Add new players from Supabase not in static array
-      players.forEach(p=>{
-        if(!PLAYERS.find(pl=>pl.id===p.id)){
-          PLAYERS.push({id:p.id,uid:p.uid,name:p.name,last_name:p.last_name||null,
-            display_name:p.display_name||null,sex:p.sex||"m",photoUrl:`/photos/${p.uid}.jpg`,
-            teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,t26:p.t26||null,
-            t24cap:p.t24cap||false,t25cap:p.t25cap||false,t26cap:p.t26cap||false,
-            pin:p.pin||null,tournoi_count:p.tournoi_count||0,member_type:p.member_type||"non-membre"});
-        }
-      });
+      // Rebuild PLAYERS from Supabase (simple, like original)
+      PLAYERS.length=0;
+      players.forEach(p=>PLAYERS.push({
+        id:p.id,uid:p.uid,name:p.name,last_name:p.last_name||null,
+        display_name:p.display_name||null,sex:p.sex||"m",
+        photoUrl:`/photos/${p.uid}.jpg`,
+        teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,
+        t26:p.t26||null,t24cap:!!p.t24cap,t25cap:!!p.t25cap,teocap:!!p.teocap,
+        t26cap:!!p.t26cap,pin:p.pin||null,tournoi_count:p.tournoi_count||0,
+        member_type:p.member_type||"non-membre",rating:null,
+      }));
       teams.forEach(t=>{
         const existing=TEAMS.find(x=>x.id===t.id);
         if(existing){
-          existing.name=t.name||existing.name;
-          existing.color=t.color||existing.color;
-          existing.color2=t.color2||existing.color2;
-          if(t.active!==undefined)existing.active=t.active;
-        } else {
-          TEAMS.push({id:t.id,name:t.name||`Équipe ${t.id}`,color:t.color||"#666",color2:t.color2||null,active:t.active!==false,logoUrl:t.logo_url||null,logoFile:null});
+          if(t.name)existing.name=t.name;
+          if(t.color)existing.color=t.color;
+          if(t.color2)existing.color2=t.color2;
+        } else if(t.active!==false){
+          TEAMS.push({id:t.id,name:t.name||`Équipe ${t.id}`,color:t.color||"#666",color2:t.color2||null,active:true,logoUrl:null,logoFile:null});
         }
       });
       ratings.forEach(r=>{
