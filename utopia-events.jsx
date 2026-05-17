@@ -82,6 +82,7 @@ const TEAMS = [
   {id:21,name:"RICARD OG",color:"#F5FC00",color2:"#132FA8",active:true,logoUrl:null,logoFile:"RICARD OG.svg"},
   {id:24,name:"D.E.O",color:"#1d1d1b",color2:"#FFFFFF",active:true,logoUrl:null,logoFile:"DEO.svg"},
   {id:23,name:"BLACKFIRE",color:"#FF4500",color2:"#1a1a1a",active:true,logoUrl:null,logoFile:"BLACKFIRE.svg"},
+  {id:25,name:"Rhum'arquables",color:"#8B4513",color2:"#F4A460",active:true,logoUrl:null,logoFile:"RHUM_ARQUABLES.svg"},
 ];
 
 const PLAYERS = [
@@ -1936,6 +1937,8 @@ const BERET_O2026_TEAM_MATCHES={
   14:[1,14,18,31,35,48,52,63,69,78],15:[8,16,24,32,40,48,56,64,72,80],
 };
 
+const O2026_PHASE_COLORS={1:"#3b82f6",2:"#f59e0b",3:"#10b981",4:"#8b5cf6",5:"#ef4444",6:"#06b6d4",7:"#f97316"};
+
 const O2026_POINTS=[25,22,20,18,16,14,12,10,8,7,6,5,4,3,2,1];
 
 // Fake teams for testing only (not in Supabase)
@@ -1979,7 +1982,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
       <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`,borderRadius:2,marginBottom:18}}/>
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:8}}>
         <div>
-          <div style={{fontSize:11,color:ac,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>Olympiade</div>
+          <div style={{background:`${O2026_PHASE_COLORS[ep.phase]||ac}22`,color:O2026_PHASE_COLORS[ep.phase]||ac,borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>Phase {ep.phase}</div>
           <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?42:64,lineHeight:1}}>O<span style={{color:ac}}>2026</span></h1>
           <div style={{marginTop:8,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg width="'+(m?160:220)+'" height="'+(m?55:75)+'" style="max-height:'+(m?55:75)+'px" ')}}/>
         </div>
@@ -2284,6 +2287,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [biathlonLose,setBiathlonLose]=useState([]);
   // Tir à la corde - 16-team bracket
   const [tcResultats,setTcResultats]=useState({});
+  const [basketScores,setBasketScores]=useState({});
+  const [beretO2026Results,setBeretO2026Results]=useState({});
   const [tcTeams,setTcTeams]=useState([]); // shuffled team order for bracket
   const [editTC,setEditTC]=useState(null);
   const [tcScoreA,setTcScoreA]=useState("");
@@ -2303,7 +2308,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2341,6 +2346,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.biathlonLose?.length)setBiathlonLose(d.biathlonLose);
     if(d.biathlonFinalLocked!==undefined)setBiathlonFinalLocked(d.biathlonFinalLocked);
     if(d.tcResultats)setTcResultats(d.tcResultats);
+    if(d.basketScores)setBasketScores(d.basketScores);
+    if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.tcTeams?.length)setTcTeams(d.tcTeams);
     if(d.tcDone!==undefined)setTcDone(d.tcDone);
   }
@@ -2376,7 +2383,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
      flechettePhase,flechetteWin,flechetteLose,flechetteDone,
      biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
      biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-     tcResultats,tcTeams,tcDone]);
+     tcResultats,tcTeams,tcDone,basketScores,beretO2026Results]);
 
   // ── Init ────────────────────────────────────────────────────────
   React.useEffect(()=>{
@@ -2400,6 +2407,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       setBiathlonRace1([...tIds].slice(0,8));
       setBiathlonRace2([...tIds].slice(8,16));
     }
+    if(scoreType==="basket")setBasketScores(d?.basketScores||{});
+    if(scoreType==="beret_o2026")setBeretO2026Results(d?.beretO2026Results||{});
     if(scoreType==="bracket_direct"&&Object.keys(tcResultats).length===0){
       // 16 teams, 8 R1 matches
     }
@@ -3231,6 +3240,95 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
           })()}
 
           {/* ── Biathlon */}
+          {/* ── Basket */}
+          {scoreType==="basket"&&(
+            <div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BASKET — SAISIE DES SCORES</div>
+              <div style={{fontSize:12,color:"#60607a",marginBottom:12}}>2 essais de 1m30 par joueur — classement par somme de paniers</div>
+              {getO2026ActiveTeams().map(t=>{
+                const sc=basketScores[t.id]||{e1:"",e2:""};
+                const total=((parseInt(sc.e1)||0)+(parseInt(sc.e2)||0));
+                return(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:"rgba(255,255,255,0.04)"}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:t.color||ac,flexShrink:0}}/>
+                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{t.name}</span>
+                    <input type="number" min="0" max="30" placeholder="E1" value={sc.e1}
+                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e1:e.target.value}}))}
+                      style={{width:48,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
+                    <span style={{color:"#555",fontSize:11}}>+</span>
+                    <input type="number" min="0" max="30" placeholder="E2" value={sc.e2}
+                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e2:e.target.value}}))}
+                      style={{width:48,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
+                    <span style={{width:32,fontWeight:700,fontSize:12,color:ac,textAlign:"center"}}>{total}</span>
+                  </div>
+                );
+              })}
+              <button onClick={()=>{
+                const ranked=[...getO2026ActiveTeams()]
+                  .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
+                  .sort((a,b)=>b.total-a.total)
+                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
+                setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
+              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>
+                ✓ Valider le classement Basket
+              </button>
+            </div>
+          )}
+
+          {/* ── Béret O2026 */}
+          {scoreType==="beret_o2026"&&(
+            <div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BÉRET — 5 TOURS × 16 MATCHS</div>
+              {[1,2,3,4,5].map(tour=>(
+                <div key={tour} style={{marginBottom:16,background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"12px 14px"}}>
+                  <div style={{fontWeight:700,fontSize:12,color:ac,marginBottom:8}}>Tour {tour}</div>
+                  <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:6}}>
+                    {BERET_O2026_MATCHES.filter(mx=>mx.tour===tour).map(mx=>{
+                      const teams=getO2026ActiveTeams();
+                      const t1=teams[mx.d1]||{name:`Éq.${mx.d1+1}`,color:"#666"};
+                      const t2=teams[mx.d2]||{name:`Éq.${mx.d2+1}`,color:"#666"};
+                      const key=`m${mx.num}`;
+                      const w=beretO2026Results[key];
+                      return(
+                        <div key={mx.num} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:6,background:"rgba(255,255,255,0.03)"}}>
+                          <span style={{fontSize:10,color:mx.type==="H"?"#3b82f6":"#ec4899",width:12}}>{mx.type}</span>
+                          <span style={{fontSize:10,color:"#555",width:20}}>#{mx.num}</span>
+                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d1"}))}
+                            style={{flex:1,background:w==="d1"?t1.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d1"?t1.color:"rgba(255,255,255,0.1)"}`,borderRadius:5,padding:"4px 6px",color:w==="d1"?t1.color:"#aaa",cursor:"pointer",fontSize:10,fontWeight:w==="d1"?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {t1.name} {w==="d1"?"✓":""}
+                          </button>
+                          <span style={{color:"#333",fontSize:10}}>vs</span>
+                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d2"}))}
+                            style={{flex:1,background:w==="d2"?t2.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d2"?t2.color:"rgba(255,255,255,0.1)"}`,borderRadius:5,padding:"4px 6px",color:w==="d2"?t2.color:"#aaa",cursor:"pointer",fontSize:10,fontWeight:w==="d2"?700:400,fontFamily:"'Outfit',sans-serif"}}>
+                            {t2.name} {w==="d2"?"✓":""}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <button onClick={()=>{
+                const teams=getO2026ActiveTeams();
+                const scores={};
+                teams.forEach(t=>scores[t.id]=0);
+                BERET_O2026_MATCHES.forEach(mx=>{
+                  const w=beretO2026Results[`m${mx.num}`];
+                  const t1=teams[mx.d1],t2=teams[mx.d2];
+                  if(w==="d1"&&t1)scores[t1.id]++;
+                  if(w==="d2"&&t2)scores[t2.id]++;
+                });
+                const ranked=[...teams].map(t=>({...t,wins:scores[t.id]||0}))
+                  .sort((a,b)=>b.wins-a.wins)
+                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
+                setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
+              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"'Outfit',sans-serif"}}>
+                ✓ Valider le classement Béret
+              </button>
+            </div>
+          )}
+
+
           {scoreType==="biathlon"&&(
             <>
               <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14,marginBottom:14}}>
@@ -7592,7 +7690,8 @@ export default function App(){
       }));
       teams.forEach(t=>{
         const existing=TEAMS.find(x=>x.id===t.id);
-        if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;}
+        if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;existing.active=t.active!==undefined?t.active:existing.active;}
+        else if(t.active){TEAMS.push({id:t.id,name:t.name,color:t.color||"#666",color2:t.color2||null,active:true,logoUrl:t.logo_url||null,logoFile:null});}
       });
       ratings.forEach(r=>{
         const p=PLAYERS.find(x=>x.id===r.player_id);
