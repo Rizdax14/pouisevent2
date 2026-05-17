@@ -7748,14 +7748,21 @@ export default function App(){
       try{
         const savedId=localStorage.getItem("bl_player_id");
         const savedSection=localStorage.getItem("bl_section")||"menu";
-        if(savedId){const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));if(p){setCurrentPlayer(p);setSection(savedSection==="dataBL"&&p.uid!==ADMIN_UID?"menu":savedSection);return;}}
+        if(savedId){const p=PLAYERS.find(pl=>pl.id===parseInt(savedId));if(p){
+            const cleanSect=['menu','profil-bl','games','quiz','p4','plappy','tournoi','crackito'].includes(savedSection)?savedSection:'menu';
+            setCurrentPlayer(p);setSection(cleanSect);return;
+          }}
       }catch(e){}
     };
     tryAutoLogin();
   },[dbLoaded]);
 
   React.useEffect(()=>{
-    if(section!=="login"&&currentPlayer){localStorage.setItem("bl_section",section);localStorage.setItem("bl_player_id",String(currentPlayer.id));}
+    if(section!=="login"&&currentPlayer){
+      const saveableSection=['menu','profil-bl','games','quiz','p4','plappy','tournoi','crackito'].includes(section)?section:'menu';
+      localStorage.setItem("bl_section",saveableSection);
+      localStorage.setItem("bl_player_id",String(currentPlayer.id));
+    }
   },[section,currentPlayer]);
 
   async function loadFromSupabase(){
