@@ -2319,6 +2319,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       setBiathlonRace1([...tIds].slice(0,8));
       setBiathlonRace2([...tIds].slice(8,16));
     }
+    if(scoreType==="basket")setBasketScores(d?.basketScores||{});
+    if(scoreType==="beret_o2026")setBeretO2026Results(d?.beretO2026Results||{});
     if(scoreType==="bracket_direct"&&Object.keys(tcResultats).length===0){
       // 16 teams, 8 R1 matches
     }
@@ -3282,12 +3284,12 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                           <span style={{fontSize:9,color:"#444",width:18,flexShrink:0}}>#{mx.num}</span>
                           <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d1"}))}
                             style={{flex:1,background:w==="d1"?t1.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d1"?t1.color:"rgba(255,255,255,0.1)"}`,borderRadius:4,padding:"3px 5px",color:w==="d1"?t1.color:"#888",cursor:"pointer",fontSize:9,fontWeight:w==="d1"?700:400,fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                            {(()=>{const p=PLAYERS.filter(pl=>pl.t26===t1.id&&pl.sex===mx.type)[0];return p?`${p.name} (${t1.name.slice(0,6)})`:(t1.name.slice(0,10));})()}{w==="d1"?" ✓":""}
+                            {(()=>{const p=PLAYERS.filter(pl=>pl.t26===t1.id&&(mx.type==='H'?pl.sex==='M':pl.sex==='F'))[0];return p?`${p.name} (${t1.name.slice(0,6)})`:(t1.name.slice(0,10));})()}{w==="d1"?" ✓":""}
                           </button>
                           <span style={{color:"#333",fontSize:9,flexShrink:0}}>v</span>
                           <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d2"}))}
                             style={{flex:1,background:w==="d2"?t2.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d2"?t2.color:"rgba(255,255,255,0.1)"}`,borderRadius:4,padding:"3px 5px",color:w==="d2"?t2.color:"#888",cursor:"pointer",fontSize:9,fontWeight:w==="d2"?700:400,fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                            {(()=>{const p=PLAYERS.filter(pl=>pl.t26===t2.id&&pl.sex===mx.type)[0];return p?`${p.name} (${t2.name.slice(0,6)})`:(t2.name.slice(0,10));})()}{w==="d2"?" ✓":""}
+                            {(()=>{const p=PLAYERS.filter(pl=>pl.t26===t2.id&&(mx.type==='H'?pl.sex==='M':pl.sex==='F'))[0];return p?`${p.name} (${t2.name.slice(0,6)})`:(t2.name.slice(0,10));})()}{w==="d2"?" ✓":""}
                           </button>
                         </div>
                       );
@@ -3655,8 +3657,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 return(
                   <div key={t.id} style={{background:"#13131f",borderRadius:8,padding:"10px 12px",borderLeft:`3px solid ${t.color}`}}>
                     <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:t.color,marginBottom:6}}>#{idx+1} — {t.name}</div>
-                    <div style={{fontSize:11,color:"#aaa",marginBottom:2}}>♂ {h?.name||"?"} {h?.last_name||""}</div>
-                    <div style={{fontSize:11,color:"#aaa"}}>♀ {f?.name||"?"} {f?.last_name||""}</div>
+                    <div style={{fontSize:11,color:"#aaa",marginBottom:2}}>♂ {h?.display_name||h?.name||"?"}</div>
+                    <div style={{fontSize:11,color:"#aaa"}}>♀ {f?.display_name||f?.name||"?"}</div>
                   </div>
                 );
               })}
