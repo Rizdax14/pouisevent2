@@ -7634,6 +7634,7 @@ export default function App(){
   const [currentPlayer,setCurrentPlayer]=React.useState(null);
   const [section,setSection]=React.useState("login");
   const [dbLoaded,setDbLoaded]=React.useState(false);
+  const [dbVersion,setDbVersion]=React.useState(0);
   const [dbError,setDbError]=React.useState(false);
   const [o2026Scores,setO2026Scores]=React.useState({});
   const [o2026Assignments,setO2026Assignments]=React.useState({});
@@ -7698,7 +7699,8 @@ export default function App(){
       });
       clearTimeout(timeout);
       // Refresh currentPlayer with Supabase data (t26cap, etc.)
-      setCurrentPlayer(prev=>prev?PLAYERS.find(p=>p.id===prev.id)||prev:null);
+      setCurrentPlayer(prev=>prev?{...(PLAYERS.find(p=>p.id===prev.id)||prev)}:null);
+      setDbVersion(v=>v+1);
       setDbLoaded(true);
     }catch(e){
       clearTimeout(timeout);
@@ -7792,7 +7794,7 @@ export default function App(){
       <style>{css}</style>
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
-      <div key={page+JSON.stringify(sub)} className="fade">
+      <div key={page+JSON.stringify(sub)+dbVersion} className="fade">
         {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
