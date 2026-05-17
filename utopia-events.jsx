@@ -4767,6 +4767,9 @@ function DataPage(){
     setSaving(true);
     try{
       await sbUpdate("teams",{id:team.id},{color:team.color,color2:team.color2,name:team.name,logo_color2:team.logo_color2||false});
+      // Update global TEAMS array so changes are visible everywhere without reload
+      const existing=TEAMS.find(t=>t.id===team.id);
+      if(existing){existing.color=team.color;existing.color2=team.color2;existing.name=team.name;}
       setMsg({type:"success",text:`${team.name} mis à jour`});
       setEditTeam(null);
       await loadData();
@@ -7671,12 +7674,14 @@ export default function App(){
   async function loadFromSupabase(){
     const timeout=setTimeout(()=>setDbLoaded(true), 2000);
     try{
-      const [players,teams,ratings,assignments]=await Promise.all([
+      const [players,teams,ratings]=await Promise.all([
         sbFetch("players","?select=*&order=name"),
         sbFetch("teams","?select=*&order=name"),
         sbFetch("ratings","?select=*"),
-        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids"),
       ]);
+      // Load assignments separately (non-blocking)
+      let assignments=[];
+      try{assignments=await sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids");}catch(e){console.warn("assignments load failed",e);}
       // Rebuild PLAYERS from Supabase (simple, like original)
       PLAYERS.length=0;
       players.forEach(p=>PLAYERS.push({
