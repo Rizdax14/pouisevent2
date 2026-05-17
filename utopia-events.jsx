@@ -7722,6 +7722,20 @@ function scoreDuo(rank1, rank2) {
   return (best * 2 + worst) / 3;
 }
 
+class ErrorBoundary extends React.Component{
+  constructor(p){super(p);this.state={err:null};}
+  static getDerivedStateFromError(e){return{err:e};}
+  render(){
+    if(this.state.err)return(
+      <div style={{padding:32,color:'#e74c3c',fontFamily:"'Outfit',sans-serif",background:'#080810',minHeight:'100vh'}}>
+        <h2>Erreur Events</h2>
+        <pre style={{fontSize:12,color:'#aaa',whiteSpace:'pre-wrap'}}>{String(this.state.err)}</pre>
+        <pre style={{fontSize:11,color:'#555',whiteSpace:'pre-wrap'}}>{this.state.err?.stack?.slice(0,500)}</pre>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 export default function App(){
   const [page,setPage]=React.useState(()=>{
     try{const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));return h.page||"o2026";}
@@ -7837,7 +7851,7 @@ export default function App(){
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>setSection("menu")}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
       <div key={page+JSON.stringify(sub)} className="fade">
-        {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
+        {page==="events"        &&<ErrorBoundary><EventsPage nav={nav} navBack={navBack}/></ErrorBoundary>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
         {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
