@@ -3352,7 +3352,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── STARTLIST for "tout le monde" epreuves ─────────────── */}
-      {["cultureg","marathonH","marathonF","bowling","mathsprint","cercles","puzzlerun"].includes(ep.id)&&(
+      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","molky","puissance4","beerpong"].includes(ep.id)&&(
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
@@ -7671,10 +7671,11 @@ export default function App(){
   async function loadFromSupabase(){
     const timeout=setTimeout(()=>setDbLoaded(true), 2000);
     try{
-      const [players,teams,ratings]=await Promise.all([
+      const [players,teams,ratings,assignments]=await Promise.all([
         sbFetch("players","?select=*&order=name"),
         sbFetch("teams","?select=*&order=name"),
         sbFetch("ratings","?select=*"),
+        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids"),
       ]);
       // Rebuild PLAYERS from Supabase (simple, like original)
       PLAYERS.length=0;
@@ -7701,6 +7702,12 @@ export default function App(){
         const p=PLAYERS.find(x=>x.id===r.player_id);
         if(p)p.rating=r.rating;
       });
+      // Build assignments map: key = "teamId_epreuveId" → player_ids array
+      const assignMap={};
+      assignments.forEach(a=>{
+        assignMap[`${a.team_id}_${a.epreuve_id}`]=a.player_ids||[];
+      });
+      setO2026Assignments(assignMap);
       clearTimeout(timeout);
       // Refresh currentPlayer with Supabase data (t26cap, etc.)
       setCurrentPlayer(prev=>prev?{...(PLAYERS.find(p=>p.id===prev.id)||prev)}:null);
