@@ -7697,6 +7697,8 @@ export default function App(){
         if(p)p.rating=r.rating;
       });
       clearTimeout(timeout);
+      // Refresh currentPlayer with Supabase data (t26cap, etc.)
+      setCurrentPlayer(prev=>prev?PLAYERS.find(p=>p.id===prev.id)||prev:null);
       setDbLoaded(true);
     }catch(e){
       clearTimeout(timeout);
