@@ -898,14 +898,12 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
     {id:"rankings",l:"Classements",ic:"🏆"},
     {id:"teams",l:"Équipes",ic:"⚡"},
   ];
-  const TEST_UIDS=['louis-mar'];
   const items=[
     ...baseItems,
-
     currentPlayer?{id:"profile",l:"Profil",ic:"👤"}:{id:"profile",l:"Connexion",ic:"🔑"},
     ...(isAdmin?[{id:"admin",l:"Data",ic:"📊"}]:[]),
   ];
-  const map={home:"home",events:"events",eventDetail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026",test:"test"};
+  const map={home:"home",events:"events",eventDetail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026"};
   if(m){
     return(
       <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"#0d0d1c",borderTop:"1px solid #1e1e30",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>
@@ -7797,8 +7795,7 @@ export default function App(){
       else if(s==="dataBL")setSection("dataBL");
       else if(s==="events"){setSection("events");setPage("events");}
       else if(s==="games")setSection("games");
-      else if(s==="collection")setSection("collection");
-      else if(s==="test")setSection("test");
+
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
