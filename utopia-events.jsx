@@ -2320,8 +2320,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       setBiathlonRace1([...tIds].slice(0,8));
       setBiathlonRace2([...tIds].slice(8,16));
     }
-    if(scoreType==="basket")setBasketScores(d?.basketScores||{});
-    if(scoreType==="beret_o2026")setBeretO2026Results(d?.beretO2026Results||{});
+    // basketScores and beretO2026Results are restored via applySnapshot
     if(scoreType==="bracket_direct"&&Object.keys(tcResultats).length===0){
       // 16 teams, 8 R1 matches
     }
