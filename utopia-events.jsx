@@ -2031,6 +2031,10 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           if(d.tcDone&&d.tcResultats&&d.tcTeams?.length){
             // simplified: winner of fin gets 25pts etc
           }
+          // basket & beret
+          if(d.ranked?.length){
+            d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(pts[r.pos-1]||0);});
+          }
         });
 
         const hasAny=Object.values(totals).some(v=>v>0);
@@ -2195,6 +2199,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [biathlonLose,setBiathlonLose]=useState([]);
   // Tir à la corde - 16-team bracket
   const [tcResultats,setTcResultats]=useState({});
+  const [basketScores,setBasketScores]=useState({});
+  const [beretO2026Results,setBeretO2026Results]=useState({});
   const [tcTeams,setTcTeams]=useState([]); // shuffled team order for bracket
   const [editTC,setEditTC]=useState(null);
   const [tcScoreA,setTcScoreA]=useState("");
@@ -2214,7 +2220,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2252,6 +2258,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.biathlonLose?.length)setBiathlonLose(d.biathlonLose);
     if(d.biathlonFinalLocked!==undefined)setBiathlonFinalLocked(d.biathlonFinalLocked);
     if(d.tcResultats)setTcResultats(d.tcResultats);
+    if(d.basketScores)setBasketScores(d.basketScores);
+    if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.tcTeams?.length)setTcTeams(d.tcTeams);
     if(d.tcDone!==undefined)setTcDone(d.tcDone);
   }
@@ -2287,7 +2295,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
      flechettePhase,flechetteWin,flechetteLose,flechetteDone,
      biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
      biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-     tcResultats,tcTeams,tcDone]);
+     tcResultats,tcTeams,tcDone,basketScores,beretO2026Results]);
 
   // ── Init ────────────────────────────────────────────────────────
   React.useEffect(()=>{
@@ -3194,6 +3202,90 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 </div>
               )}
             </>
+          )}
+
+          {/* ── Basket */}
+          {scoreType==="basket"&&(
+            <div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BASKET — SAISIE DES SCORES</div>
+              <div style={{fontSize:12,color:"#60607a",marginBottom:12}}>2 essais de 1m30 par joueur — score = somme des paniers</div>
+              {getO2026ActiveTeams().map(t=>{
+                const sc=basketScores[t.id]||{e1:"",e2:""};
+                const total=(parseInt(sc.e1)||0)+(parseInt(sc.e2)||0);
+                return(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:"rgba(255,255,255,0.04)"}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:t.color||ac,flexShrink:0}}/>
+                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{t.name}</span>
+                    <input type="number" min="0" max="30" placeholder="E1" value={sc.e1}
+                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e1:e.target.value}}))}
+                      style={{width:44,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
+                    <span style={{color:"#555",fontSize:11}}>+</span>
+                    <input type="number" min="0" max="30" placeholder="E2" value={sc.e2}
+                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e2:e.target.value}}))}
+                      style={{width:44,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
+                    <span style={{width:28,fontWeight:700,fontSize:12,color:ac,textAlign:"center"}}>{total}</span>
+                  </div>
+                );
+              })}
+              {isAdmin&&<button onClick={()=>{
+                const ranked=[...getO2026ActiveTeams()]
+                  .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
+                  .sort((a,b)=>b.total-a.total)
+                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
+                setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
+              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Basket</button>}
+            </div>
+          )}
+
+          {/* ── Béret O2026 */}
+          {scoreType==="beret_o2026"&&(
+            <div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BÉRET — 5 TOURS × 16 MATCHS</div>
+              {[1,2,3,4,5].map(tour=>(
+                <div key={tour} style={{marginBottom:14,background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontWeight:700,fontSize:12,color:ac,marginBottom:8}}>Tour {tour}</div>
+                  <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:5}}>
+                    {BERET_O2026_MATCHES.filter(mx=>mx.tour===tour).map(mx=>{
+                      const teams=getO2026ActiveTeams();
+                      const t1=teams[mx.d1]||{name:`Éq.${mx.d1+1}`,color:"#666"};
+                      const t2=teams[mx.d2]||{name:`Éq.${mx.d2+1}`,color:"#666"};
+                      const key=`m${mx.num}`;
+                      const w=beretO2026Results[key];
+                      return(
+                        <div key={mx.num} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 7px",borderRadius:6,background:"rgba(255,255,255,0.03)"}}>
+                          <span style={{fontSize:9,color:mx.type==="H"?"#3b82f6":"#ec4899",width:10,flexShrink:0}}>{mx.type}</span>
+                          <span style={{fontSize:9,color:"#444",width:18,flexShrink:0}}>#{mx.num}</span>
+                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d1"}))}
+                            style={{flex:1,background:w==="d1"?t1.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d1"?t1.color:"rgba(255,255,255,0.1)"}`,borderRadius:4,padding:"3px 5px",color:w==="d1"?t1.color:"#888",cursor:"pointer",fontSize:9,fontWeight:w==="d1"?700:400,fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            {t1.name.slice(0,10)}{w==="d1"?" ✓":""}
+                          </button>
+                          <span style={{color:"#333",fontSize:9,flexShrink:0}}>v</span>
+                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d2"}))}
+                            style={{flex:1,background:w==="d2"?t2.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d2"?t2.color:"rgba(255,255,255,0.1)"}`,borderRadius:4,padding:"3px 5px",color:w==="d2"?t2.color:"#888",cursor:"pointer",fontSize:9,fontWeight:w==="d2"?700:400,fontFamily:"'Outfit',sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            {t2.name.slice(0,10)}{w==="d2"?" ✓":""}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {isAdmin&&<button onClick={()=>{
+                const teams=getO2026ActiveTeams();
+                const wins={};
+                teams.forEach(t=>wins[t.id]=0);
+                BERET_O2026_MATCHES.forEach(mx=>{
+                  const w=beretO2026Results[`m${mx.num}`];
+                  const t1=teams[mx.d1],t2=teams[mx.d2];
+                  if(w==="d1"&&t1)wins[t1.id]++;
+                  if(w==="d2"&&t2)wins[t2.id]++;
+                });
+                const ranked=[...teams].map(t=>({...t,wins:wins[t.id]||0}))
+                  .sort((a,b)=>b.wins-a.wins)
+                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
+                setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
+              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Béret</button>}
+            </div>
           )}
         </div>
       )}
