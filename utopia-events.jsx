@@ -7800,7 +7800,7 @@ export default function App(){
     <MenuBL currentPlayer={currentPlayer} onSection={(s)=>{
       if(s==="profil")setSection("profil-bl");
       else if(s==="dataBL")setSection("dataBL");
-      else if(s==="events")setSection("events");
+      else if(s==="events"){setSection("events");setPage("events");}
       else if(s==="games")setSection("games");
 
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
@@ -7815,15 +7815,7 @@ export default function App(){
   if(section==="p4")return <P4Page currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
   if(section==="plappy")return(<PlappyPirdPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
   if(section==="tournoi")return(<TournoiPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>);
-  if(section==="events")return(
-    <div style={{minHeight:"100vh",background:"#080810",color:"#eeeef5",fontFamily:"'Outfit',sans-serif"}}>
-      <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px 20px",borderBottom:"1px solid #1e1e30",background:"#0d0d1c"}}>
-        <button onClick={()=>setSection("menu")} style={{background:"none",border:"none",color:"#aaa",fontSize:22,cursor:"pointer"}}>←</button>
-        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,letterSpacing:"0.05em",color:"#E8B84B"}}>ÉVÉNEMENTS</span>
-      </div>
-      <EventsPage nav={nav} navBack={()=>setSection("events")}/>
-    </div>
-  );
+
 
 
   const css=`
