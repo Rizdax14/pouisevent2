@@ -82,7 +82,6 @@ const TEAMS = [
   {id:21,name:"RICARD OG",color:"#F5FC00",color2:"#132FA8",active:true,logoUrl:null,logoFile:"RICARD OG.svg"},
   {id:24,name:"D.E.O",color:"#1d1d1b",color2:"#FFFFFF",active:true,logoUrl:null,logoFile:"DEO.svg"},
   {id:23,name:"BLACKFIRE",color:"#FF4500",color2:"#1a1a1a",active:true,logoUrl:null,logoFile:"BLACKFIRE.svg"},
-  {id:25,name:"Rhum'arquables",color:"#8B4513",color2:"#F4A460",active:true,logoUrl:null,logoFile:"RHUM_ARQUABLES.svg"},
 ];
 
 const PLAYERS = [
@@ -1817,127 +1816,36 @@ function RankingsPage({nav}){
 const PHASE_COLOR={1:"#E84D9B",2:"#3b82f6",3:"#f97316",4:"#ef4444",5:"#22c55e",6:"#8b5cf6",7:"#06b6d4"};
 
 const O2026_EPREUVES = [
-  {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",nbJoueurs:6,
-    lieuImg:"/lieux/bp.png",
-    regles:["Deux équipes s'affrontent sur un terrain divisé en deux zones.","Les joueurs visent les adversaires avec des balles pour les éliminer.","Un joueur touché est éliminé sauf s'il attrape la balle.","L'équipe qui élimine tous les adversaires gagne."],
-    notesSpeciales:[],groupes:4,scoreType:"victoire"},
-  {id:"balle_folle",phase:2,nom:"La Balle Folle",emoji:"🏃",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,
-    lieuImg:null,
-    regles:["3 rôles par équipe : sprinteur, lanceur et receveur.","Au top : le sprinteur va chercher la balle et la donne au lanceur.","Le lanceur doit l'envoyer avec précision au receveur, qui ne peut pas sortir de son cerceau.","Une fois la balle dans la main du receveur, c'est gagné pour l'équipe la plus rapide.","Si l'équipe rate le lancé, le sprinteur doit aller récupérer la balle."],
-    notesSpeciales:[{titre:"📊 Format",texte:"4 poules de 4 équipes (round-robin), puis brackets."}],groupes:4,scoreType:"victoire"},
-  {id:"football",phase:2,nom:"Football",emoji:"⚽",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,
-    lieuImg:"/lieux/football.png",
-    regles:["Matchs 3v3 sur terrain réduit.","Victoire = 1 point, défaite = 0 point, match nul = 0.5 point.","Temps de jeu selon le planning arbitre."],
-    notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct. Si toujours égalité : nombre de buts marqués puis encaissés."}],groupes:4,scoreType:"victoire"},
-  {id:"marathonH",phase:3,nom:"Marathon Hommes",emoji:"🏃‍♂️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,
-    lieuImg:"/lieux/marathon.png",
-    regles:["Un tour entier du complexe à faire (environ 1km).","Tous les hommes courent en même temps — classement par ordre d'arrivée.","Chaque joueur rapporte des points à son équipe selon son classement."],
-    notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
-  {id:"marathonF",phase:3,nom:"Marathon Femmes",emoji:"🏃‍♀️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,
-    lieuImg:"/lieux/marathon.png",
-    regles:["Un tour entier du complexe à faire (environ 1km).","Toutes les femmes courent en même temps — classement par ordre d'arrivée.","Chaque joueur rapporte des points à son équipe selon son classement."],
-    notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
-  {id:"cultureg",phase:4,nom:"Culture G",emoji:"🧠",horaire:"14H - 15H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,
-    lieuImg:"/lieux/cultureg.png",
-    regles:["Quiz de culture générale — chaque joueur répond individuellement.","Classement par score décroissant.","Points rapportés à l'équipe selon le classement individuel."],
-    notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
-  {id:"molky",phase:4,nom:"Mölky",emoji:"🪵",horaire:"14H - 15H",format:"1V1 — Groupe (drag & drop par groupe)",nbJoueurs:1,
-    lieuImg:"/lieux/molky.png",
-    regles:["But : atteindre exactement 50 points. Le premier qualifié va dans le groupe des 1ers, etc."],
-    notesSpeciales:[{titre:"📐 Règles additionnelles",texte:"Checkpoint à 25 pts. Si le score dépasse 50, on revient à 25."}],
-    groupes:0,scoreType:"drag_rank_group"},
-  {id:"beret",phase:4,nom:"Béret",emoji:"🎓",horaire:"14H - 15H",format:"2V2 — 5 tours × 16 matchs",nbJoueurs:2,
-    lieuImg:null,
-    regles:["16 équipes mixtes (1H + 1F).","5 tours de 16 matchs (8 matchs H + 8 matchs F par tour).","Sur chaque tour, le garçon et la fille d'une même équipe n'affrontent jamais la même équipe.","Chaque équipe joue 10 matchs au total (5H + 5F).","Score = total de victoires (max 10).","Classement final par nombre de victoires."],
-    notesSpeciales:[],groupes:0,scoreType:"beret_o2026"},
-  {id:"puzzlerun",phase:4,nom:"Puzzle & Run",emoji:"🧩",horaire:"14H - 15H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,
-    lieuImg:"/lieux/puzzlerun.png",
-    regles:["Carte avec 10 endroits — à chaque endroit se trouve un sac avec votre nom d'équipe.","Un joueur court chercher les sacs pendant que l'autre attend au point de départ.","Une fois tous les sacs ramenés, assembler le puzzle.","L'équipe qui finit son puzzle en premier gagne."],
-    notesSpeciales:[{titre:"⚠️ Attention",texte:"Quand vous ramenez un sac, l'arbitre vous donne 10 secondes de pénalité si le sac n'est pas le vôtre."}],groupes:0,scoreType:"drag_rank"},
-  {id:"puissance4",phase:5,nom:"Puissance 4",emoji:"🔴",horaire:"15H - 16H",format:"1V1 — Poule + Arbre",nbJoueurs:1,
-    lieuImg:"/lieux/puissance4.png",
-    regles:["Match en 1 manche."],
-    notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],
-    groupes:4,scoreType:"victoire"},
-  {id:"basket",phase:5,nom:"Basket",emoji:"🏀",horaire:"15H - 16H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,
-    lieuImg:null,
-    regles:["Chaque joueur tire 2 fois 1m30.","Score = somme des paniers réussis sur les 2 essais.","Classement par score décroissant."],
-    notesSpeciales:[],groupes:0,scoreType:"basket"},
-  {id:"cercles",phase:5,nom:"Cercles Musical",emoji:"⭕",horaire:"15H - 16H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,
-    lieuImg:"/lieux/cercles.png",
-    regles:["Principe des chaises musicales — 3 cercles : extérieur (15 cerceaux), central (tourner autour), intérieur (plus de cerceaux).","La musique s'arrête — les joueurs doivent être dans un cerceau.","Classement par ordre d'élimination."],
-    notesSpeciales:[{titre:"📊 Score d'équipe",texte:"Coef 2 pour le meilleur joueur, coef 1 pour l'autre."}],groupes:0,scoreType:"drag_rank_coef"},
-  {id:"beerpong",phase:5,nom:"Beer Pong",emoji:"🏓",horaire:"15H - 16H",format:"2V2 — Groupe + Arbre",nbJoueurs:2,
-    lieuImg:"/lieux/beerpong.png",
-    regles:["Match 2v2 Beer Pong.","Victoire = 1 point, défaite = 0 point."],
-    notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité : résultat du match direct."}],groupes:4,scoreType:"victoire"},
-  {id:"tircorde",phase:6,nom:"Tir à la Corde",emoji:"🪢",horaire:"16H - 16H30",format:"4V4 — Bracket direct",nbJoueurs:4,
-    lieuImg:"/lieux/tircorde.png",
-    regles:["Bracket direct — matchs au meilleur des 3 manches.","D'abord un 2v2 filles, puis 2v2 garçons, puis 2v2 mixte si départage nécessaire."],
-    notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Biathlon Relais ne peuvent pas participer."}],
-    groupes:0,scoreType:"bracket_direct"},
-  {id:"biathlon",phase:7,nom:"Biathlon Relais",emoji:"🎯",horaire:"16H30 - 17H",format:"4V4 — 2 courses",nbJoueurs:4,
-    lieuImg:"/lieux/biathlon.png",
-    regles:["2 courses de 8 équipes chacune — classement par ordre d'arrivée (drag & drop).","Les 4 premiers de chaque course s'affrontent en finale."],
-    notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Tir à la Corde ne peuvent pas participer."}],
-    groupes:0,scoreType:"biathlon"},
+  {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",nbJoueurs:6,color:"#3b82f6",lieuImg:"/lieux/bp.png",regles:["Deux équipes s'affrontent sur un terrain divisé en deux zones.","Les joueurs visent les adversaires avec des balles pour les éliminer.","Un joueur touché est éliminé sauf s'il attrape la balle.","L'équipe qui élimine tous les adversaires gagne."],notesSpeciales:[],groupes:4,scoreType:"victoire"},
+  {id:"balle_folle",phase:2,nom:"La Balle Folle",emoji:"🏃",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,color:"#f59e0b",lieuImg:null,regles:["3 rôles par équipe : sprinteur, lanceur et receveur.","Au top : le sprinteur va chercher la balle et la donne au lanceur.","Le lanceur doit l'envoyer avec précision au receveur, qui ne peut pas sortir de son cerceau.","Une fois la balle dans la main du receveur, c'est gagné pour l'équipe la plus rapide.","Si l'équipe rate le lancé, le sprinteur doit aller récupérer la balle."],notesSpeciales:[{titre:"📊 Format",texte:"4 poules de 4 équipes (round-robin), puis brackets."}],groupes:4,scoreType:"victoire"},
+  {id:"football",phase:2,nom:"Football",emoji:"⚽",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,color:"#f59e0b",lieuImg:"/lieux/football.png",regles:["Matchs 3v3 sur terrain réduit.","Victoire = 1 point, défaite = 0 point, match nul = 0.5 point."],notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],groupes:4,scoreType:"victoire"},
+  {id:"marathonH",phase:3,nom:"Marathon Hommes",emoji:"🏃‍♂️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#10b981",lieuImg:"/lieux/marathon.png",regles:["Un tour entier du complexe à faire (environ 1km).","Tous les hommes courent en même temps — classement par ordre d'arrivée."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
+  {id:"marathonF",phase:3,nom:"Marathon Femmes",emoji:"🏃‍♀️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#10b981",lieuImg:"/lieux/marathon.png",regles:["Un tour entier du complexe à faire (environ 1km).","Toutes les femmes courent en même temps — classement par ordre d'arrivée."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
+  {id:"cultureg",phase:4,nom:"Culture G",emoji:"🧠",horaire:"14H - 15H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#8b5cf6",lieuImg:"/lieux/cultureg.png",regles:["Quiz de culture générale — chaque joueur répond individuellement.","Classement par score décroissant."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
+  {id:"molky",phase:4,nom:"Mölky",emoji:"🪵",horaire:"14H - 15H",format:"1V1 — Groupe (drag & drop par groupe)",nbJoueurs:1,color:"#8b5cf6",lieuImg:"/lieux/molky.png",regles:["But : atteindre exactement 50 points."],notesSpeciales:[{titre:"📐 Règles additionnelles",texte:"Checkpoint à 25 pts. Si le score dépasse 50, on revient à 25."}],groupes:0,scoreType:"drag_rank_group"},
+  {id:"beret",phase:4,nom:"Béret",emoji:"🎓",horaire:"14H - 15H",format:"2V2 — 5 tours × 16 matchs",nbJoueurs:2,color:"#8b5cf6",lieuImg:null,regles:["16 équipes mixtes (1H + 1F).","5 tours de 16 matchs (8 matchs H + 8 matchs F par tour).","Sur chaque tour, le garçon et la fille d'une même équipe n'affrontent jamais la même équipe.","Score = total de victoires (max 10)."],notesSpeciales:[],groupes:0,scoreType:"beret_o2026"},
+  {id:"puzzlerun",phase:4,nom:"Puzzle & Run",emoji:"🧩",horaire:"14H - 15H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,color:"#8b5cf6",lieuImg:"/lieux/puzzlerun.png",regles:["Carte avec 10 endroits.","Une fois tous les sacs ramenés, assembler le puzzle.","L'équipe qui finit son puzzle en premier gagne."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
+  {id:"puissance4",phase:5,nom:"Puissance 4",emoji:"🔴",horaire:"15H - 16H",format:"1V1 — Poule + Arbre",nbJoueurs:1,color:"#ef4444",lieuImg:"/lieux/puissance4.png",regles:["Match en 1 manche."],notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],groupes:4,scoreType:"victoire"},
+  {id:"basket",phase:5,nom:"Basket",emoji:"🏀",horaire:"15H - 16H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#ef4444",lieuImg:null,regles:["Chaque joueur tire 2 fois 1m30.","Score = somme des paniers réussis sur les 2 essais.","Classement par score décroissant."],notesSpeciales:[],groupes:0,scoreType:"basket"},
+  {id:"cercles",phase:5,nom:"Cercles Musical",emoji:"⭕",horaire:"15H - 16H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,color:"#ef4444",lieuImg:"/lieux/cercles.png",regles:["Principe des chaises musicales.","Classement par ordre d'élimination."],notesSpeciales:[{titre:"📊 Score d'équipe",texte:"Coef 2 pour le meilleur joueur, coef 1 pour l'autre."}],groupes:0,scoreType:"drag_rank_coef"},
+  {id:"beerpong",phase:5,nom:"Beer Pong",emoji:"🏓",horaire:"15H - 16H",format:"2V2 — Groupe + Arbre",nbJoueurs:2,color:"#ef4444",lieuImg:"/lieux/beerpong.png",regles:["Match 2v2 Beer Pong.","Victoire = 1 point, défaite = 0 point."],notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité : résultat du match direct."}],groupes:4,scoreType:"victoire"},
+  {id:"tircorde",phase:6,nom:"Tir à la Corde",emoji:"🪢",horaire:"16H - 16H30",format:"4V4 — Bracket direct",nbJoueurs:4,color:"#06b6d4",lieuImg:"/lieux/tircorde.png",regles:["Bracket direct — matchs au meilleur des 3 manches."],notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Biathlon Relais ne peuvent pas participer."}],groupes:0,scoreType:"bracket_direct"},
+  {id:"biathlon",phase:7,nom:"Biathlon Relais",emoji:"🎯",horaire:"16H30 - 17H",format:"4V4 — 2 courses",nbJoueurs:4,color:"#f97316",lieuImg:"/lieux/biathlon.png",regles:["2 courses de 8 équipes chacune — classement par ordre d'arrivée (drag & drop)."],notesSpeciales:[{titre:"⚠️ Restriction",texte:"Les joueurs du Tir à la Corde ne peuvent pas participer."}],groupes:0,scoreType:"biathlon"},
 ];
 
 
 const BERET_O2026_MATCHES=[
-  {num:1,tour:1,type:'H',d1:0,d2:14},{num:2,tour:1,type:'H',d1:1,d2:13},
-  {num:3,tour:1,type:'H',d1:2,d2:12},{num:4,tour:1,type:'H',d1:3,d2:11},
-  {num:5,tour:1,type:'H',d1:4,d2:10},{num:6,tour:1,type:'H',d1:5,d2:9},
-  {num:7,tour:1,type:'H',d1:6,d2:8},{num:8,tour:1,type:'H',d1:7,d2:15},
-  {num:9,tour:1,type:'F',d1:4,d2:5},{num:10,tour:1,type:'F',d1:3,d2:6},
-  {num:11,tour:1,type:'F',d1:2,d2:7},{num:12,tour:1,type:'F',d1:1,d2:8},
-  {num:13,tour:1,type:'F',d1:0,d2:9},{num:14,tour:1,type:'F',d1:10,d2:14},
-  {num:15,tour:1,type:'F',d1:11,d2:13},{num:16,tour:1,type:'F',d1:12,d2:15},
-  {num:17,tour:2,type:'H',d1:0,d2:1},{num:18,tour:2,type:'H',d1:2,d2:14},
-  {num:19,tour:2,type:'H',d1:3,d2:13},{num:20,tour:2,type:'H',d1:4,d2:12},
-  {num:21,tour:2,type:'H',d1:5,d2:11},{num:22,tour:2,type:'H',d1:6,d2:10},
-  {num:23,tour:2,type:'H',d1:7,d2:9},{num:24,tour:2,type:'H',d1:8,d2:15},
-  {num:25,tour:2,type:'F',d1:5,d2:6},{num:26,tour:2,type:'F',d1:4,d2:7},
-  {num:27,tour:2,type:'F',d1:3,d2:8},{num:28,tour:2,type:'F',d1:2,d2:9},
-  {num:29,tour:2,type:'F',d1:1,d2:10},{num:30,tour:2,type:'F',d1:0,d2:11},
-  {num:31,tour:2,type:'F',d1:12,d2:14},{num:32,tour:2,type:'F',d1:13,d2:15},
-  {num:33,tour:3,type:'H',d1:1,d2:2},{num:34,tour:3,type:'H',d1:0,d2:3},
-  {num:35,tour:3,type:'H',d1:4,d2:14},{num:36,tour:3,type:'H',d1:5,d2:13},
-  {num:37,tour:3,type:'H',d1:6,d2:12},{num:38,tour:3,type:'H',d1:7,d2:11},
-  {num:39,tour:3,type:'H',d1:8,d2:10},{num:40,tour:3,type:'H',d1:9,d2:15},
-  {num:41,tour:3,type:'F',d1:6,d2:7},{num:42,tour:3,type:'F',d1:5,d2:8},
-  {num:43,tour:3,type:'F',d1:4,d2:9},{num:44,tour:3,type:'F',d1:3,d2:10},
-  {num:45,tour:3,type:'F',d1:2,d2:11},{num:46,tour:3,type:'F',d1:1,d2:12},
-  {num:47,tour:3,type:'F',d1:0,d2:13},{num:48,tour:3,type:'F',d1:14,d2:15},
-  {num:49,tour:4,type:'H',d1:2,d2:3},{num:50,tour:4,type:'H',d1:1,d2:4},
-  {num:51,tour:4,type:'H',d1:0,d2:5},{num:52,tour:4,type:'H',d1:6,d2:14},
-  {num:53,tour:4,type:'H',d1:7,d2:13},{num:54,tour:4,type:'H',d1:8,d2:12},
-  {num:55,tour:4,type:'H',d1:9,d2:11},{num:56,tour:4,type:'H',d1:10,d2:15},
-  {num:57,tour:4,type:'F',d1:7,d2:8},{num:58,tour:4,type:'F',d1:6,d2:9},
-  {num:59,tour:4,type:'F',d1:5,d2:10},{num:60,tour:4,type:'F',d1:4,d2:11},
-  {num:61,tour:4,type:'F',d1:3,d2:12},{num:62,tour:4,type:'F',d1:2,d2:13},
-  {num:63,tour:4,type:'F',d1:1,d2:14},{num:64,tour:4,type:'F',d1:0,d2:15},
-  {num:65,tour:5,type:'H',d1:3,d2:4},{num:66,tour:5,type:'H',d1:2,d2:5},
-  {num:67,tour:5,type:'H',d1:1,d2:6},{num:68,tour:5,type:'H',d1:0,d2:7},
-  {num:69,tour:5,type:'H',d1:8,d2:14},{num:70,tour:5,type:'H',d1:9,d2:13},
-  {num:71,tour:5,type:'H',d1:10,d2:12},{num:72,tour:5,type:'H',d1:11,d2:15},
-  {num:73,tour:5,type:'F',d1:8,d2:9},{num:74,tour:5,type:'F',d1:7,d2:10},
-  {num:75,tour:5,type:'F',d1:6,d2:11},{num:76,tour:5,type:'F',d1:5,d2:12},
-  {num:77,tour:5,type:'F',d1:4,d2:13},{num:78,tour:5,type:'F',d1:3,d2:14},
-  {num:79,tour:5,type:'F',d1:0,d2:2},{num:80,tour:5,type:'F',d1:1,d2:15},
+  {num:1,tour:1,type:'H',d1:0,d2:14},{num:2,tour:1,type:'H',d1:1,d2:13},{num:3,tour:1,type:'H',d1:2,d2:12},{num:4,tour:1,type:'H',d1:3,d2:11},{num:5,tour:1,type:'H',d1:4,d2:10},{num:6,tour:1,type:'H',d1:5,d2:9},{num:7,tour:1,type:'H',d1:6,d2:8},{num:8,tour:1,type:'H',d1:7,d2:15},
+  {num:9,tour:1,type:'F',d1:4,d2:5},{num:10,tour:1,type:'F',d1:3,d2:6},{num:11,tour:1,type:'F',d1:2,d2:7},{num:12,tour:1,type:'F',d1:1,d2:8},{num:13,tour:1,type:'F',d1:0,d2:9},{num:14,tour:1,type:'F',d1:10,d2:14},{num:15,tour:1,type:'F',d1:11,d2:13},{num:16,tour:1,type:'F',d1:12,d2:15},
+  {num:17,tour:2,type:'H',d1:0,d2:1},{num:18,tour:2,type:'H',d1:2,d2:14},{num:19,tour:2,type:'H',d1:3,d2:13},{num:20,tour:2,type:'H',d1:4,d2:12},{num:21,tour:2,type:'H',d1:5,d2:11},{num:22,tour:2,type:'H',d1:6,d2:10},{num:23,tour:2,type:'H',d1:7,d2:9},{num:24,tour:2,type:'H',d1:8,d2:15},
+  {num:25,tour:2,type:'F',d1:5,d2:6},{num:26,tour:2,type:'F',d1:4,d2:7},{num:27,tour:2,type:'F',d1:3,d2:8},{num:28,tour:2,type:'F',d1:2,d2:9},{num:29,tour:2,type:'F',d1:1,d2:10},{num:30,tour:2,type:'F',d1:0,d2:11},{num:31,tour:2,type:'F',d1:12,d2:14},{num:32,tour:2,type:'F',d1:13,d2:15},
+  {num:33,tour:3,type:'H',d1:1,d2:2},{num:34,tour:3,type:'H',d1:0,d2:3},{num:35,tour:3,type:'H',d1:4,d2:14},{num:36,tour:3,type:'H',d1:5,d2:13},{num:37,tour:3,type:'H',d1:6,d2:12},{num:38,tour:3,type:'H',d1:7,d2:11},{num:39,tour:3,type:'H',d1:8,d2:10},{num:40,tour:3,type:'H',d1:9,d2:15},
+  {num:41,tour:3,type:'F',d1:6,d2:7},{num:42,tour:3,type:'F',d1:5,d2:8},{num:43,tour:3,type:'F',d1:4,d2:9},{num:44,tour:3,type:'F',d1:3,d2:10},{num:45,tour:3,type:'F',d1:2,d2:11},{num:46,tour:3,type:'F',d1:1,d2:12},{num:47,tour:3,type:'F',d1:0,d2:13},{num:48,tour:3,type:'F',d1:14,d2:15},
+  {num:49,tour:4,type:'H',d1:2,d2:3},{num:50,tour:4,type:'H',d1:1,d2:4},{num:51,tour:4,type:'H',d1:0,d2:5},{num:52,tour:4,type:'H',d1:6,d2:14},{num:53,tour:4,type:'H',d1:7,d2:13},{num:54,tour:4,type:'H',d1:8,d2:12},{num:55,tour:4,type:'H',d1:9,d2:11},{num:56,tour:4,type:'H',d1:10,d2:15},
+  {num:57,tour:4,type:'F',d1:7,d2:8},{num:58,tour:4,type:'F',d1:6,d2:9},{num:59,tour:4,type:'F',d1:5,d2:10},{num:60,tour:4,type:'F',d1:4,d2:11},{num:61,tour:4,type:'F',d1:3,d2:12},{num:62,tour:4,type:'F',d1:2,d2:13},{num:63,tour:4,type:'F',d1:1,d2:14},{num:64,tour:4,type:'F',d1:0,d2:15},
+  {num:65,tour:5,type:'H',d1:3,d2:4},{num:66,tour:5,type:'H',d1:2,d2:5},{num:67,tour:5,type:'H',d1:1,d2:6},{num:68,tour:5,type:'H',d1:0,d2:7},{num:69,tour:5,type:'H',d1:8,d2:14},{num:70,tour:5,type:'H',d1:9,d2:13},{num:71,tour:5,type:'H',d1:10,d2:12},{num:72,tour:5,type:'H',d1:11,d2:15},
+  {num:73,tour:5,type:'F',d1:8,d2:9},{num:74,tour:5,type:'F',d1:7,d2:10},{num:75,tour:5,type:'F',d1:6,d2:11},{num:76,tour:5,type:'F',d1:5,d2:12},{num:77,tour:5,type:'F',d1:4,d2:13},{num:78,tour:5,type:'F',d1:3,d2:14},{num:79,tour:5,type:'F',d1:0,d2:2},{num:80,tour:5,type:'F',d1:1,d2:15},
 ];
-const BERET_O2026_TEAM_MATCHES={
-  0:[1,13,17,30,34,47,51,64,68,79],1:[2,12,17,29,33,46,50,63,67,80],
-  2:[3,11,18,28,33,45,49,62,66,79],3:[4,10,19,27,34,44,49,61,65,78],
-  4:[5,9,20,26,35,43,50,60,65,77],5:[6,9,21,25,36,42,51,59,66,76],
-  6:[7,10,22,25,37,41,52,58,67,75],7:[8,11,23,26,38,41,53,57,68,74],
-  8:[7,12,24,27,39,42,54,57,69,73],9:[6,13,23,28,40,43,55,58,70,73],
-  10:[5,14,22,29,39,44,56,59,71,74],11:[4,15,21,30,38,45,55,60,72,75],
-  12:[3,16,20,31,37,46,54,61,71,76],13:[2,15,19,32,36,47,53,62,70,77],
-  14:[1,14,18,31,35,48,52,63,69,78],15:[8,16,24,32,40,48,56,64,72,80],
-};
-
-const O2026_PHASE_COLORS={1:"#3b82f6",2:"#f59e0b",3:"#10b981",4:"#8b5cf6",5:"#ef4444",6:"#06b6d4",7:"#f97316"};
 
 const O2026_POINTS=[25,22,20,18,16,14,12,10,8,7,6,5,4,3,2,1];
 
@@ -1982,7 +1890,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
       <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`,borderRadius:2,marginBottom:18}}/>
       <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:8}}>
         <div>
-          <div style={{background:`${O2026_PHASE_COLORS[ep.phase]||ac}22`,color:O2026_PHASE_COLORS[ep.phase]||ac,borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>Phase {ep.phase}</div>
+          <div style={{fontSize:11,color:ac,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>Olympiade</div>
           <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?42:64,lineHeight:1}}>O<span style={{color:ac}}>2026</span></h1>
           <div style={{marginTop:8,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg width="'+(m?160:220)+'" height="'+(m?55:75)+'" style="max-height:'+(m?55:75)+'px" ')}}/>
         </div>
@@ -2123,11 +2031,6 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           if(d.tcDone&&d.tcResultats&&d.tcTeams?.length){
             // simplified: winner of fin gets 25pts etc
           }
-          // basket
-          if(d.ranked?.length){
-            d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(pts[r.pos-1]||0);});
-          }
-          // beret_o2026 (also uses ranked)
         });
 
         const hasAny=Object.values(totals).some(v=>v>0);
@@ -2162,12 +2065,12 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {O2026_EPREUVES.map(ep=>(
           <div key={ep.id} onClick={()=>nav("epreuveO2026",{epreuveId:ep.id})}
-            style={{background:"#0d0d1c",border:`1px solid ${ep.color||O2026_PHASE_COLORS[ep.phase]||'#888'}33`,borderRadius:12,padding:m?14:18,cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"all .2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"88";e.currentTarget.style.transform="translateX(4px)";}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"33";e.currentTarget.style.transform="translateX(0)";}}>
-            <div style={{width:44,height:44,borderRadius:10,background:(ep.color||O2026_PHASE_COLORS[ep.phase]||'#888')+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>{ep.emoji}</div>
+            style={{background:"#0d0d1c",border:`1px solid ${ep.color}33`,borderRadius:12,padding:m?14:18,cursor:"pointer",display:"flex",alignItems:"center",gap:14,transition:"all .2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=ep.color+"88";e.currentTarget.style.transform="translateX(4px)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=ep.color+"33";e.currentTarget.style.transform="translateX(0)";}}>
+            <div style={{width:44,height:44,borderRadius:10,background:ep.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>{ep.emoji}</div>
             <div style={{flex:1}}>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?18:22,color:ep.color||O2026_PHASE_COLORS[ep.phase]||'#888'}}>PHASE {ep.phase} — {ep.nom}</div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?18:22,color:ep.color}}>PHASE {ep.phase} — {ep.nom}</div>
               <div style={{fontSize:11,color:"#60607a",marginTop:2}}>{ep.horaire} · {ep.format}</div>
             </div>
             <span style={{color:"#404058",fontSize:18}}>›</span>
@@ -2292,8 +2195,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [biathlonLose,setBiathlonLose]=useState([]);
   // Tir à la corde - 16-team bracket
   const [tcResultats,setTcResultats]=useState({});
-  const [basketScores,setBasketScores]=useState({});
-  const [beretO2026Results,setBeretO2026Results]=useState({});
   const [tcTeams,setTcTeams]=useState([]); // shuffled team order for bracket
   const [editTC,setEditTC]=useState(null);
   const [tcScoreA,setTcScoreA]=useState("");
@@ -2313,7 +2214,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results};
+      tcResultats,tcTeams,tcDone};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2351,8 +2252,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.biathlonLose?.length)setBiathlonLose(d.biathlonLose);
     if(d.biathlonFinalLocked!==undefined)setBiathlonFinalLocked(d.biathlonFinalLocked);
     if(d.tcResultats)setTcResultats(d.tcResultats);
-    if(d.basketScores)setBasketScores(d.basketScores);
-    if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.tcTeams?.length)setTcTeams(d.tcTeams);
     if(d.tcDone!==undefined)setTcDone(d.tcDone);
   }
@@ -2388,7 +2287,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
      flechettePhase,flechetteWin,flechetteLose,flechetteDone,
      biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
      biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-     tcResultats,tcTeams,tcDone,basketScores,beretO2026Results]);
+     tcResultats,tcTeams,tcDone]);
 
   // ── Init ────────────────────────────────────────────────────────
   React.useEffect(()=>{
@@ -2412,8 +2311,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       setBiathlonRace1([...tIds].slice(0,8));
       setBiathlonRace2([...tIds].slice(8,16));
     }
-    if(scoreType==="basket")setBasketScores(d?.basketScores||{});
-    if(scoreType==="beret_o2026")setBeretO2026Results(d?.beretO2026Results||{});
     if(scoreType==="bracket_direct"&&Object.keys(tcResultats).length===0){
       // 16 teams, 8 R1 matches
     }
@@ -3245,95 +3142,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
           })()}
 
           {/* ── Biathlon */}
-          {/* ── Basket */}
-          {scoreType==="basket"&&(
-            <div>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BASKET — SAISIE DES SCORES</div>
-              <div style={{fontSize:12,color:"#60607a",marginBottom:12}}>2 essais de 1m30 par joueur — classement par somme de paniers</div>
-              {getO2026ActiveTeams().map(t=>{
-                const sc=basketScores[t.id]||{e1:"",e2:""};
-                const total=((parseInt(sc.e1)||0)+(parseInt(sc.e2)||0));
-                return(
-                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:"rgba(255,255,255,0.04)"}}>
-                    <div style={{width:10,height:10,borderRadius:"50%",background:t.color||ac,flexShrink:0}}/>
-                    <span style={{flex:1,fontSize:12,fontWeight:600}}>{t.name}</span>
-                    <input type="number" min="0" max="30" placeholder="E1" value={sc.e1}
-                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e1:e.target.value}}))}
-                      style={{width:48,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
-                    <span style={{color:"#555",fontSize:11}}>+</span>
-                    <input type="number" min="0" max="30" placeholder="E2" value={sc.e2}
-                      onChange={e=>setBasketScores(prev=>({...prev,[t.id]:{...sc,e2:e.target.value}}))}
-                      style={{width:48,background:"#1a1a2e",border:"1px solid #2a2a40",borderRadius:6,padding:"4px 6px",color:"#fff",fontSize:12,textAlign:"center"}}/>
-                    <span style={{width:32,fontWeight:700,fontSize:12,color:ac,textAlign:"center"}}>{total}</span>
-                  </div>
-                );
-              })}
-              <button onClick={()=>{
-                const ranked=[...getO2026ActiveTeams()]
-                  .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
-                  .sort((a,b)=>b.total-a.total)
-                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
-                setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
-              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>
-                ✓ Valider le classement Basket
-              </button>
-            </div>
-          )}
-
-          {/* ── Béret O2026 */}
-          {scoreType==="beret_o2026"&&(
-            <div>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12,letterSpacing:"0.05em"}}>BÉRET — 5 TOURS × 16 MATCHS</div>
-              {[1,2,3,4,5].map(tour=>(
-                <div key={tour} style={{marginBottom:16,background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"12px 14px"}}>
-                  <div style={{fontWeight:700,fontSize:12,color:ac,marginBottom:8}}>Tour {tour}</div>
-                  <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:6}}>
-                    {BERET_O2026_MATCHES.filter(mx=>mx.tour===tour).map(mx=>{
-                      const teams=getO2026ActiveTeams();
-                      const t1=teams[mx.d1]||{name:`Éq.${mx.d1+1}`,color:"#666"};
-                      const t2=teams[mx.d2]||{name:`Éq.${mx.d2+1}`,color:"#666"};
-                      const key=`m${mx.num}`;
-                      const w=beretO2026Results[key];
-                      return(
-                        <div key={mx.num} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",borderRadius:6,background:"rgba(255,255,255,0.03)"}}>
-                          <span style={{fontSize:10,color:mx.type==="H"?"#3b82f6":"#ec4899",width:12}}>{mx.type}</span>
-                          <span style={{fontSize:10,color:"#555",width:20}}>#{mx.num}</span>
-                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d1"}))}
-                            style={{flex:1,background:w==="d1"?t1.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d1"?t1.color:"rgba(255,255,255,0.1)"}`,borderRadius:5,padding:"4px 6px",color:w==="d1"?t1.color:"#aaa",cursor:"pointer",fontSize:10,fontWeight:w==="d1"?700:400,fontFamily:"'Outfit',sans-serif"}}>
-                            {t1.name} {w==="d1"?"✓":""}
-                          </button>
-                          <span style={{color:"#333",fontSize:10}}>vs</span>
-                          <button onClick={()=>setBeretO2026Results(prev=>({...prev,[key]:"d2"}))}
-                            style={{flex:1,background:w==="d2"?t2.color+"33":"rgba(255,255,255,0.04)",border:`1px solid ${w==="d2"?t2.color:"rgba(255,255,255,0.1)"}`,borderRadius:5,padding:"4px 6px",color:w==="d2"?t2.color:"#aaa",cursor:"pointer",fontSize:10,fontWeight:w==="d2"?700:400,fontFamily:"'Outfit',sans-serif"}}>
-                            {t2.name} {w==="d2"?"✓":""}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              <button onClick={()=>{
-                const teams=getO2026ActiveTeams();
-                const scores={};
-                teams.forEach(t=>scores[t.id]=0);
-                BERET_O2026_MATCHES.forEach(mx=>{
-                  const w=beretO2026Results[`m${mx.num}`];
-                  const t1=teams[mx.d1],t2=teams[mx.d2];
-                  if(w==="d1"&&t1)scores[t1.id]++;
-                  if(w==="d2"&&t2)scores[t2.id]++;
-                });
-                const ranked=[...teams].map(t=>({...t,wins:scores[t.id]||0}))
-                  .sort((a,b)=>b.wins-a.wins)
-                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
-                setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
-              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"'Outfit',sans-serif"}}>
-                ✓ Valider le classement Béret
-              </button>
-            </div>
-          )}
-
-
           {scoreType==="biathlon"&&(
             <>
               <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:14,marginBottom:14}}>
@@ -6464,7 +6272,8 @@ const BL_WHITE = "#f0f4f1";
 function MenuBL({onSection, currentPlayer, onLogout}){
   const m=useIsMobile();
   const isLouis=currentPlayer?.uid===ADMIN_UID;
-    const cards=[
+  const TEST_MENU_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao','thisma-bru','salome-dev'];
+  const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
     {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
@@ -7626,7 +7435,6 @@ function scoreDuo(rank1, rank2) {
   return (best * 2 + worst) / 3;
 }
 
-
 export default function App(){
   const [page,setPage]=React.useState(()=>{
     try{
@@ -7689,14 +7497,13 @@ export default function App(){
       players.forEach(p=>PLAYERS.push({
         id:p.id,uid:p.uid,name:p.name,last_name:p.last_name,
         display_name:p.display_name,sex:p.sex,
-        photoUrl:p.photo_url||(p.uid?`/photos/${p.uid}.jpg`:null),teamId:p.team_id,
+        photoUrl:p.photo_url,teamId:p.team_id,
         t24:p.t24,t25:p.t25,t26:p.t26,pin:p.pin,
         tournoi_count:p.tournoi_count||0,
       }));
       teams.forEach(t=>{
         const existing=TEAMS.find(x=>x.id===t.id);
-        if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;existing.active=t.active!==undefined?t.active:existing.active;}
-        else if(t.active){TEAMS.push({id:t.id,name:t.name,color:t.color||"#666",color2:t.color2||null,active:true,logoUrl:t.logo_url||null,logoFile:null});}
+        if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;}
       });
       ratings.forEach(r=>{
         const p=PLAYERS.find(x=>x.id===r.player_id);
