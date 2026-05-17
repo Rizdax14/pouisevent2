@@ -11,6 +11,7 @@ const _sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function sbFetch(table, params="") {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
+    cache: "no-store",
     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Accept": "application/json" }
   });
   if (!r.ok) throw new Error(`${table} ${r.status}: ${await r.text()}`);
@@ -5459,6 +5460,7 @@ const SUPABASE_KEY_C = SUPABASE_KEY;
 
 async function sbCollection(table, params=""){
   const r = await fetch(`${SUPABASE_URL_C}/rest/v1/${table}${params}`,{
+    cache:"no-store",
     headers:{"apikey":SUPABASE_KEY_C,"Authorization":`Bearer ${SUPABASE_KEY_C}`}
   });
   if(!r.ok) throw new Error(await r.text());
