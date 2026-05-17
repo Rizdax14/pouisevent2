@@ -3227,13 +3227,26 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 );
               })}
-              {isAdmin&&<button onClick={()=>{
+              {isLouis&&<button onClick={()=>{
                 const ranked=[...getO2026ActiveTeams()]
                   .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
                   .sort((a,b)=>b.total-a.total)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
                 setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
               }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Basket</button>}
+              {o2026Scores?.basket?.ranked?.length>0&&(
+                <div style={{marginTop:12}}>
+                  <div style={{fontSize:11,color:"#60607a",marginBottom:8}}>Classement actuel :</div>
+                  {o2026Scores.basket.ranked.slice(0,5).map((r,i)=>{
+                    const t=getO2026Team(r.teamId)||{};
+                    return <div key={r.teamId} style={{display:"flex",gap:8,alignItems:"center",padding:"4px 0",fontSize:11}}>
+                      <span style={{color:"#555",width:20}}>{i+1}.</span>
+                      <span style={{flex:1,color:"#aaa"}}>{t.name}</span>
+                      <span style={{fontWeight:700,color:ac}}>{r.pts}pts</span>
+                    </div>;
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -3270,7 +3283,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 </div>
               ))}
-              {isAdmin&&<button onClick={()=>{
+              {isLouis&&<button onClick={()=>{
                 const teams=getO2026ActiveTeams();
                 const wins={};
                 teams.forEach(t=>wins[t.id]=0);
