@@ -7497,14 +7497,21 @@ export default function App(){
       players.forEach(p=>PLAYERS.push({
         id:p.id,uid:p.uid,name:p.name,last_name:p.last_name,
         display_name:p.display_name,sex:p.sex,
-        photoUrl:p.photo_url,teamId:p.team_id,
+        photoUrl:`/photos/${p.uid}.jpg`,teamId:p.team_id,
         t24:p.t24,t25:p.t25,t26:p.t26,pin:p.pin,
         tournoi_count:p.tournoi_count||0,
       }));
       teams.forEach(t=>{
         const existing=TEAMS.find(x=>x.id===t.id);
-        if(existing){existing.color=t.color||existing.color;existing.color2=t.color2||existing.color2;}
-      });
+        if(existing){
+          if(t.name)existing.name=t.name;
+          if(t.color)existing.color=t.color;
+          if(t.color2)existing.color2=t.color2;
+          if(t.active!==undefined)existing.active=t.active;
+        } else {
+          TEAMS.push({id:t.id,name:t.name||`Équipe ${t.id}`,color:t.color||"#666",color2:t.color2||null,active:t.active!==false,logoUrl:t.logo_url||null,logoFile:null});
+        }
+      });;
       ratings.forEach(r=>{
         const p=PLAYERS.find(x=>x.id===r.player_id);
         if(p)p.rating=r.rating;
