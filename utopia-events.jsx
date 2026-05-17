@@ -7818,6 +7818,11 @@ export default function App(){
 
 
 
+  // Sync page with section for events
+  React.useEffect(()=>{
+    if(section==="events" && page!=="events" && page!=="eventDetail" && page!=="playerDetail" && page!=="teamDetail") setPage("events");
+  },[section]);
+
   const css=`
     .fade{animation:fadeIn .25s ease;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
