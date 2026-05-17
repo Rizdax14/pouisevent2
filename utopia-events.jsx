@@ -3237,19 +3237,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
                 setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
               }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Basket</button>}
-              {o2026Scores?.basket?.ranked?.length>0&&(
-                <div style={{marginTop:12}}>
-                  <div style={{fontSize:11,color:"#60607a",marginBottom:8}}>Classement actuel :</div>
-                  {o2026Scores.basket.ranked.slice(0,5).map((r,i)=>{
-                    const t=getO2026Team(r.teamId)||{};
-                    return <div key={r.teamId} style={{display:"flex",gap:8,alignItems:"center",padding:"4px 0",fontSize:11}}>
-                      <span style={{color:"#555",width:20}}>{i+1}.</span>
-                      <span style={{flex:1,color:"#aaa"}}>{t.name}</span>
-                      <span style={{fontWeight:700,color:ac}}>{r.pts}pts</span>
-                    </div>;
-                  })}
-                </div>
-              )}
+
             </div>
           )}
 
@@ -3626,65 +3614,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         </div>
       )}
 
-      {/* ── Basket classement */}
-      {scoreType==="basket"&&o2026Scores?.basket?.ranked?.length>0&&(
-        <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:16}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>CLASSEMENT BASKET</div>
-            <span style={{fontSize:10,color:"#34d399"}}>✅ Validé</span>
-          </div>
-          {o2026Scores.basket.ranked.map((r,i)=>{const t=getO2026Team(r.teamId);const sc=o2026Scores.basket.basketScores?.[r.teamId]||{};return(
-            <div key={r.teamId} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid #13131f"}}>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:15,color:i===0?"#E8B84B":i===1?"#C0C0C0":i===2?"#CD7F32":"#404058",width:32,textAlign:"center"}}>{i+1}</span>
-              <div style={{width:8,height:8,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
-              <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?14:17,color:t?.color||"#aaa"}}>{t?.name}</span>
-              <span style={{fontSize:11,color:"#555",marginRight:8}}>{(parseInt(sc.e1)||0)+(parseInt(sc.e2)||0)} paniers</span>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B"}}>{r.pts}pts</span>
-            </div>
-          );})}
-        </div>
-      )}
+
 
       {/* ── Béret classement + startlist */}
-      {scoreType==="beret_o2026"&&(
-        <div>
-          {/* Startlist : duos de chaque équipe */}
-          <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:16}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:12}}>DUOS PAR ÉQUIPE</div>
-            <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:8}}>
-              {getO2026ActiveTeams().map((t,idx)=>{
-                const h=PLAYERS.filter(p=>p.t26===t.id&&p.sex==="M")[0];
-                const f=PLAYERS.filter(p=>p.t26===t.id&&p.sex==="F")[0];
-                return(
-                  <div key={t.id} style={{background:"#13131f",borderRadius:8,padding:"10px 12px",borderLeft:`3px solid ${t.color}`}}>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:t.color,marginBottom:6}}>#{idx+1} — {t.name}</div>
-                    <div style={{fontSize:11,color:"#aaa",marginBottom:2}}>♂ {h?.display_name||h?.name||"?"}</div>
-                    <div style={{fontSize:11,color:"#aaa"}}>♀ {f?.display_name||f?.name||"?"}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {/* Classement si validé */}
-          {o2026Scores?.beret?.ranked?.length>0&&(
-            <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:16}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>CLASSEMENT BÉRET</div>
-                <span style={{fontSize:10,color:"#34d399"}}>✅ Validé</span>
-              </div>
-              {o2026Scores.beret.ranked.map((r,i)=>{const t=getO2026Team(r.teamId);return(
-                <div key={r.teamId} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid #13131f"}}>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:15,color:i===0?"#E8B84B":i===1?"#C0C0C0":i===2?"#CD7F32":"#404058",width:32,textAlign:"center"}}>{i+1}</span>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
-                  <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?14:17,color:t?.color||"#aaa"}}>{t?.name}</span>
-                  <span style={{fontSize:11,color:"#555",marginRight:8}}>{r.wins} vic.</span>
-                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B"}}>{r.pts}pts</span>
-                </div>
-              );})}
-            </div>
-          )}
-        </div>
-      )}
+
 
 
       {/* ── GROUPS PUBLIC VIEW (round-robin) ─────────────────────── */}
