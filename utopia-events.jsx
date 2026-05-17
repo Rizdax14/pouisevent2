@@ -11,9 +11,9 @@ const _sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function sbFetch(table, params="") {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Accept": "application/json" }
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(`${table} ${r.status}: ${await r.text()}`);
   return r.json();
 }
 
@@ -7709,7 +7709,7 @@ export default function App(){
         } else {
           TEAMS.push({id:t.id,name:t.name||`Équipe ${t.id}`,color:t.color||"#666",color2:t.color2||null,active:t.active!==false,logoUrl:t.logo_url||null,logoFile:null});
         }
-      });;
+      });
       ratings.forEach(r=>{
         const p=PLAYERS.find(x=>x.id===r.player_id);
         if(p)p.rating=r.rating;
@@ -7720,6 +7720,7 @@ export default function App(){
       setDbVersion(v=>v+1);
       setDbLoaded(true);
     }catch(e){
+      console.error('loadFromSupabase error:', e);
       clearTimeout(timeout);
       setDbError(true);
       setDbLoaded(true);
