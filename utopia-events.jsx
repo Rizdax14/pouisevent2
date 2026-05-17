@@ -7680,10 +7680,10 @@ export default function App(){
         const p=sbById[pl.id];if(!p)return;
         pl.name=p.name||pl.name;pl.last_name=p.last_name||pl.last_name;
         pl.display_name=p.display_name||pl.display_name;pl.sex=p.sex||pl.sex;
-        pl.photoUrl=`/photos/${p.uid}.jpg`;pl.teamId=p.team_id||pl.teamId;
-        pl.t26=p.t26!=null?p.t26:pl.t26;
+        pl.photoUrl=`/photos/${p.uid}.jpg`;pl.teamId=p.team_id!==undefined?p.team_id:pl.teamId;
+        pl.t26=p.t26!==undefined?p.t26:pl.t26;
         pl.t26cap=p.t26cap!=null?p.t26cap:pl.t26cap;
-        pl.t25=p.t25!=null?p.t25:pl.t25;pl.t24=p.t24!=null?p.t24:pl.t24;
+        pl.t25=p.t25!==undefined?p.t25:pl.t25;pl.t24=p.t24!==undefined?p.t24:pl.t24;
         pl.t24cap=p.t24cap!=null?p.t24cap:pl.t24cap;
         pl.t25cap=p.t25cap!=null?p.t25cap:pl.t25cap;
         pl.pin=p.pin||pl.pin;pl.tournoi_count=p.tournoi_count||0;
@@ -7702,9 +7702,9 @@ export default function App(){
       teams.forEach(t=>{
         const existing=TEAMS.find(x=>x.id===t.id);
         if(existing){
-          if(t.name)existing.name=t.name;
-          if(t.color)existing.color=t.color;
-          if(t.color2)existing.color2=t.color2;
+          existing.name=t.name||existing.name;
+          existing.color=t.color||existing.color;
+          existing.color2=t.color2||existing.color2;
           if(t.active!==undefined)existing.active=t.active;
         } else {
           TEAMS.push({id:t.id,name:t.name||`Équipe ${t.id}`,color:t.color||"#666",color2:t.color2||null,active:t.active!==false,logoUrl:t.logo_url||null,logoFile:null});
