@@ -1836,17 +1836,30 @@ const O2026_EPREUVES = [
 
 
 const BERET_O2026_MATCHES=[
-  {num:1,tour:1,type:'H',d1:0,d2:14},{num:2,tour:1,type:'H',d1:1,d2:13},{num:3,tour:1,type:'H',d1:2,d2:12},{num:4,tour:1,type:'H',d1:3,d2:11},{num:5,tour:1,type:'H',d1:4,d2:10},{num:6,tour:1,type:'H',d1:5,d2:9},{num:7,tour:1,type:'H',d1:6,d2:8},{num:8,tour:1,type:'H',d1:7,d2:15},
-  {num:9,tour:1,type:'F',d1:4,d2:5},{num:10,tour:1,type:'F',d1:3,d2:6},{num:11,tour:1,type:'F',d1:2,d2:7},{num:12,tour:1,type:'F',d1:1,d2:8},{num:13,tour:1,type:'F',d1:0,d2:9},{num:14,tour:1,type:'F',d1:10,d2:14},{num:15,tour:1,type:'F',d1:11,d2:13},{num:16,tour:1,type:'F',d1:12,d2:15},
-  {num:17,tour:2,type:'H',d1:0,d2:1},{num:18,tour:2,type:'H',d1:2,d2:14},{num:19,tour:2,type:'H',d1:3,d2:13},{num:20,tour:2,type:'H',d1:4,d2:12},{num:21,tour:2,type:'H',d1:5,d2:11},{num:22,tour:2,type:'H',d1:6,d2:10},{num:23,tour:2,type:'H',d1:7,d2:9},{num:24,tour:2,type:'H',d1:8,d2:15},
-  {num:25,tour:2,type:'F',d1:5,d2:6},{num:26,tour:2,type:'F',d1:4,d2:7},{num:27,tour:2,type:'F',d1:3,d2:8},{num:28,tour:2,type:'F',d1:2,d2:9},{num:29,tour:2,type:'F',d1:1,d2:10},{num:30,tour:2,type:'F',d1:0,d2:11},{num:31,tour:2,type:'F',d1:12,d2:14},{num:32,tour:2,type:'F',d1:13,d2:15},
-  {num:33,tour:3,type:'H',d1:1,d2:2},{num:34,tour:3,type:'H',d1:0,d2:3},{num:35,tour:3,type:'H',d1:4,d2:14},{num:36,tour:3,type:'H',d1:5,d2:13},{num:37,tour:3,type:'H',d1:6,d2:12},{num:38,tour:3,type:'H',d1:7,d2:11},{num:39,tour:3,type:'H',d1:8,d2:10},{num:40,tour:3,type:'H',d1:9,d2:15},
-  {num:41,tour:3,type:'F',d1:6,d2:7},{num:42,tour:3,type:'F',d1:5,d2:8},{num:43,tour:3,type:'F',d1:4,d2:9},{num:44,tour:3,type:'F',d1:3,d2:10},{num:45,tour:3,type:'F',d1:2,d2:11},{num:46,tour:3,type:'F',d1:1,d2:12},{num:47,tour:3,type:'F',d1:0,d2:13},{num:48,tour:3,type:'F',d1:14,d2:15},
-  {num:49,tour:4,type:'H',d1:2,d2:3},{num:50,tour:4,type:'H',d1:1,d2:4},{num:51,tour:4,type:'H',d1:0,d2:5},{num:52,tour:4,type:'H',d1:6,d2:14},{num:53,tour:4,type:'H',d1:7,d2:13},{num:54,tour:4,type:'H',d1:8,d2:12},{num:55,tour:4,type:'H',d1:9,d2:11},{num:56,tour:4,type:'H',d1:10,d2:15},
-  {num:57,tour:4,type:'F',d1:7,d2:8},{num:58,tour:4,type:'F',d1:6,d2:9},{num:59,tour:4,type:'F',d1:5,d2:10},{num:60,tour:4,type:'F',d1:4,d2:11},{num:61,tour:4,type:'F',d1:3,d2:12},{num:62,tour:4,type:'F',d1:2,d2:13},{num:63,tour:4,type:'F',d1:1,d2:14},{num:64,tour:4,type:'F',d1:0,d2:15},
-  {num:65,tour:5,type:'H',d1:3,d2:4},{num:66,tour:5,type:'H',d1:2,d2:5},{num:67,tour:5,type:'H',d1:1,d2:6},{num:68,tour:5,type:'H',d1:0,d2:7},{num:69,tour:5,type:'H',d1:8,d2:14},{num:70,tour:5,type:'H',d1:9,d2:13},{num:71,tour:5,type:'H',d1:10,d2:12},{num:72,tour:5,type:'H',d1:11,d2:15},
-  {num:73,tour:5,type:'F',d1:8,d2:9},{num:74,tour:5,type:'F',d1:7,d2:10},{num:75,tour:5,type:'F',d1:6,d2:11},{num:76,tour:5,type:'F',d1:5,d2:12},{num:77,tour:5,type:'F',d1:4,d2:13},{num:78,tour:5,type:'F',d1:3,d2:14},{num:79,tour:5,type:'F',d1:0,d2:2},{num:80,tour:5,type:'F',d1:1,d2:15},
+  {num:1,tour:1,type:'H',d1:0,d2:8},{num:2,tour:1,type:'H',d1:1,d2:9},{num:3,tour:1,type:'H',d1:2,d2:10},{num:4,tour:1,type:'H',d1:3,d2:11},{num:5,tour:1,type:'H',d1:4,d2:12},{num:6,tour:1,type:'H',d1:5,d2:13},{num:7,tour:1,type:'H',d1:6,d2:14},{num:8,tour:1,type:'H',d1:7,d2:15},{num:9,tour:1,type:'F',d1:0,d2:10},{num:10,tour:1,type:'F',d1:1,d2:11},{num:11,tour:1,type:'F',d1:4,d2:14},{num:12,tour:1,type:'F',d1:5,d2:15},{num:13,tour:1,type:'F',d1:2,d2:8},{num:14,tour:1,type:'F',d1:3,d2:9},{num:15,tour:1,type:'F',d1:6,d2:12},{num:16,tour:1,type:'F',d1:7,d2:13},
+  {num:17,tour:2,type:'H',d1:0,d2:6},{num:18,tour:2,type:'H',d1:1,d2:7},{num:19,tour:2,type:'H',d1:4,d2:10},{num:20,tour:2,type:'H',d1:5,d2:11},{num:21,tour:2,type:'H',d1:2,d2:12},{num:22,tour:2,type:'H',d1:3,d2:13},{num:23,tour:2,type:'H',d1:8,d2:14},{num:24,tour:2,type:'H',d1:9,d2:15},{num:25,tour:2,type:'F',d1:0,d2:7},{num:26,tour:2,type:'F',d1:1,d2:10},{num:27,tour:2,type:'F',d1:2,d2:9},{num:28,tour:2,type:'F',d1:3,d2:12},{num:29,tour:2,type:'F',d1:4,d2:11},{num:30,tour:2,type:'F',d1:5,d2:14},{num:31,tour:2,type:'F',d1:6,d2:13},{num:32,tour:2,type:'F',d1:8,d2:15},
+  {num:33,tour:3,type:'H',d1:0,d2:10},{num:34,tour:3,type:'H',d1:1,d2:11},{num:35,tour:3,type:'H',d1:4,d2:14},{num:36,tour:3,type:'H',d1:5,d2:15},{num:37,tour:3,type:'H',d1:2,d2:8},{num:38,tour:3,type:'H',d1:3,d2:9},{num:39,tour:3,type:'H',d1:6,d2:12},{num:40,tour:3,type:'H',d1:7,d2:13},{num:41,tour:3,type:'F',d1:0,d2:9},{num:42,tour:3,type:'F',d1:1,d2:8},{num:43,tour:3,type:'F',d1:2,d2:11},{num:44,tour:3,type:'F',d1:3,d2:10},{num:45,tour:3,type:'F',d1:4,d2:13},{num:46,tour:3,type:'F',d1:5,d2:12},{num:47,tour:3,type:'F',d1:6,d2:15},{num:48,tour:3,type:'F',d1:7,d2:14},
+  {num:49,tour:4,type:'H',d1:0,d2:7},{num:50,tour:4,type:'H',d1:1,d2:10},{num:51,tour:4,type:'H',d1:2,d2:9},{num:52,tour:4,type:'H',d1:3,d2:12},{num:53,tour:4,type:'H',d1:4,d2:11},{num:54,tour:4,type:'H',d1:5,d2:14},{num:55,tour:4,type:'H',d1:6,d2:13},{num:56,tour:4,type:'H',d1:8,d2:15},{num:57,tour:4,type:'F',d1:0,d2:8},{num:58,tour:4,type:'F',d1:1,d2:9},{num:59,tour:4,type:'F',d1:2,d2:10},{num:60,tour:4,type:'F',d1:3,d2:11},{num:61,tour:4,type:'F',d1:4,d2:12},{num:62,tour:4,type:'F',d1:5,d2:13},{num:63,tour:4,type:'F',d1:6,d2:14},{num:64,tour:4,type:'F',d1:7,d2:15},
+  {num:65,tour:5,type:'H',d1:0,d2:9},{num:66,tour:5,type:'H',d1:1,d2:8},{num:67,tour:5,type:'H',d1:2,d2:11},{num:68,tour:5,type:'H',d1:3,d2:10},{num:69,tour:5,type:'H',d1:4,d2:13},{num:70,tour:5,type:'H',d1:5,d2:12},{num:71,tour:5,type:'H',d1:6,d2:15},{num:72,tour:5,type:'H',d1:7,d2:14},{num:73,tour:5,type:'F',d1:0,d2:6},{num:74,tour:5,type:'F',d1:1,d2:7},{num:75,tour:5,type:'F',d1:4,d2:10},{num:76,tour:5,type:'F',d1:5,d2:11},{num:77,tour:5,type:'F',d1:2,d2:12},{num:78,tour:5,type:'F',d1:3,d2:13},{num:79,tour:5,type:'F',d1:8,d2:14},{num:80,tour:5,type:'F',d1:9,d2:15}
 ];
+const BERET_O2026_TEAM_MATCHES={
+  0:{H:[1, 17, 33, 49, 65],F:[9, 25, 41, 57, 73]},
+  1:{H:[2, 18, 34, 50, 66],F:[10, 26, 42, 58, 74]},
+  2:{H:[3, 21, 37, 51, 67],F:[13, 27, 43, 59, 77]},
+  3:{H:[4, 22, 38, 52, 68],F:[14, 28, 44, 60, 78]},
+  4:{H:[5, 19, 35, 53, 69],F:[11, 29, 45, 61, 75]},
+  5:{H:[6, 20, 36, 54, 70],F:[12, 30, 46, 62, 76]},
+  6:{H:[7, 17, 39, 55, 71],F:[15, 31, 47, 63, 73]},
+  7:{H:[8, 18, 40, 49, 72],F:[16, 25, 48, 64, 74]},
+  8:{H:[1, 23, 37, 56, 66],F:[13, 32, 42, 57, 79]},
+  9:{H:[2, 24, 38, 51, 65],F:[14, 27, 41, 58, 80]},
+  10:{H:[3, 19, 33, 50, 68],F:[9, 26, 44, 59, 75]},
+  11:{H:[4, 20, 34, 53, 67],F:[10, 29, 43, 60, 76]},
+  12:{H:[5, 21, 39, 52, 70],F:[15, 28, 46, 61, 77]},
+  13:{H:[6, 22, 40, 55, 69],F:[16, 31, 45, 62, 78]},
+  14:{H:[7, 23, 35, 54, 72],F:[11, 30, 48, 63, 79]},
+  15:{H:[8, 24, 36, 56, 71],F:[12, 32, 47, 64, 80]}
+};
 
 const O2026_POINTS=[25,22,20,18,16,14,12,10,8,7,6,5,4,3,2,1];
 
@@ -3252,6 +3265,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                     <div key={t.id} style={{textAlign:"center",background:`${t.color}22`,borderRadius:6,padding:"6px 4px",border:`1px solid ${t.color}44`}}>
                       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:t.color}}>{idx+1}</div>
                       <div style={{fontSize:8,color:"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
+                      <div style={{fontSize:7,color:"#3b82f6",marginTop:2}}>H:{(BERET_O2026_TEAM_MATCHES[idx]?.H||[]).join(',')}</div>
+                      <div style={{fontSize:7,color:"#ec4899"}}>F:{(BERET_O2026_TEAM_MATCHES[idx]?.F||[]).join(',')}</div>
                     </div>
                   ))}
                 </div>
