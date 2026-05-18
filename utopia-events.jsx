@@ -2235,7 +2235,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -3339,6 +3339,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   .sort((a,b)=>b.wins-a.wins)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
                 setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
+                alert(`Classement Béret validé ✓\n${ranked.slice(0,3).map((r,i)=>`${i+1}. ${teams.find(t=>t.id===r.teamId)?.name} (${r.wins} vic.)`).join('\n')}`);
               }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Béret</button>}
             </div>
           )}
@@ -3379,7 +3380,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── STARTLIST for "tout le monde" epreuves ─────────────── */}
-      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","molky","puissance4","beerpong"].includes(ep.id)&&(
+      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","beret","molky","puissance4","beerpong"].includes(ep.id)&&(
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
