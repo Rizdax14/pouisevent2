@@ -22,15 +22,30 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="utopia-events.js?v=20260519184957"></script>
-  <script>if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister()));}</script><script>
-    // Unregister all service workers (cleanup broken SW)
+  <script src="utopia-events.js?v=20260519190348"></script>
+  <script>
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.getRegistrations().then(regs=>{
-        regs.forEach(r=>r.unregister());
-        console.log('SW unregistered');
+      window.addEventListener('load',()=>{
+        navigator.serviceWorker.register('/sw.js').then(reg=>{
+          // Check for updates immediately
+          reg.update();
+          // If a new SW is waiting, activate it right away
+          reg.addEventListener('updatefound',()=>{
+            const newSW=reg.installing;
+            newSW.addEventListener('statechange',()=>{
+              if(newSW.state==='installed'&&navigator.serviceWorker.controller){
+                // New version available — reload to get fresh content
+                window.location.reload();
+              }
+            });
+          });
+        });
+        // If controller changes (new SW took over), reload
+        navigator.serviceWorker.addEventListener('controllerchange',()=>{
+          window.location.reload();
+        });
       });
     }
-    </script>
+  </script>
 </body>
 </html>

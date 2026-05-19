@@ -4434,8 +4434,8 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
     if(newPin!==newPin2){setPinMsg({t:"error",m:"Les PIN ne correspondent pas"});return;}
     setSaving(true);
     try{
-      await sbUpdate("players",{id:currentPlayer.id},{pin:newPin});
-      // Update local player too
+      const {error}=await SUPABASE.from("players").update({pin:newPin}).eq("id",currentPlayer.id);
+      if(error)throw new Error(error.message);
       const p=PLAYERS.find(x=>x.id===currentPlayer.id);
       if(p)p.pin=newPin;
       setCurrentPlayer(prev=>prev?{...prev,pin:newPin}:null);
