@@ -21,7 +21,7 @@ async function sbFetch(table, params="") {
 async function sbInsert(table, data) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: "POST",
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" },
     body: JSON.stringify(data)
   });
   if (!r.ok) throw new Error(await r.text());
@@ -4434,14 +4434,17 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
     if(newPin!==newPin2){setPinMsg({t:"error",m:"Les PIN ne correspondent pas"});return;}
     setSaving(true);
     try{
-      const {error}=await SUPABASE.from("players").update({pin:newPin}).eq("id",currentPlayer.id);
-      if(error)throw new Error(error.message);
-      const p=PLAYERS.find(x=>x.id===currentPlayer.id);
-      if(p)p.pin=newPin;
-      setCurrentPlayer(prev=>prev?{...prev,pin:newPin}:null);
+      // Check uniqueness only among players with same initial
+      const myInitial=currentPlayer.name.charAt(0).toUpperCase();
+      const sameInitialIds=PLAYERS.filter(p=>p.name.toUpperCase().startsWith(myInitial)&&p.id!==currentPlayer.id).map(p=>p.id);
+      if(sameInitialIds.length>0){
+        const existing=await sbFetch("players",`?pin=eq.${encodeURIComponent(newPin)}&id=in.(${sameInitialIds.join(",")})&select=id`);
+        if(existing&&existing.length>0){setPinMsg({t:"error",m:"Ce PIN est déjà utilisé par quelqu'un avec la même initiale"});setSaving(false);return;}
+      }
+      await sbUpdate("players",{id:currentPlayer.id},{pin:newPin});
       setPinMsg({t:"success",m:"PIN changé ✓"});
       setNewPin("");setNewPin2("");
-    }catch(e){console.error("PIN update failed:",e);setPinMsg({t:"error",m:e.message});}
+    }catch(e){setPinMsg({t:"error",m:e.message});}
     setSaving(false);
   }
 
