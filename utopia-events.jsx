@@ -2153,7 +2153,7 @@ function DragRankList({items,onReorder,getLabel,getColor,getKey,compact,locked})
 }
 
 // ─── EPREUVE O2026 PAGE ───────────────────────────────
-function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,setO2026Scores}){
+function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,setO2026Scores,o2026Scores}){
   const m=useIsMobile();
   const ep=O2026_EPREUVES.find(e=>e.id===epreuveId);
   if(!ep)return null;
@@ -2216,7 +2216,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [tcResultats,setTcResultats]=useState({});
   const [basketScores,setBasketScores]=useState({});
   const [beretO2026Results,setBeretO2026Results]=useState({});
-  const [beretPositions,setBeretPositions]=useState([...Array(16).keys()]); // pos→teamIdx
+  const [beretPositions,setBeretPositions]=useState([...Array(16).keys()]);
+  const [beretRanked,setBeretRanked]=useState([]); // pos→teamIdx
   const [tcTeams,setTcTeams]=useState([]); // shuffled team order for bracket
   const [editTC,setEditTC]=useState(null);
   const [tcScoreA,setTcScoreA]=useState("");
@@ -2236,7 +2237,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2277,7 +2278,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.basketScores)setBasketScores(d.basketScores);
     if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.beretPositions)setBeretPositions(d.beretPositions);
-    if(d.beretRanked?.length)setO2026Scores(prev=>({...prev,beret:{ranked:d.beretRanked,beretO2026Results:d.beretO2026Results||{}}}));
+    if(d.beretRanked?.length){setBeretRanked(d.beretRanked);setO2026Scores(prev=>({...prev,beret:{ranked:d.beretRanked,beretO2026Results:d.beretO2026Results||{}}}));}
     if(d.tcTeams?.length)setTcTeams(d.tcTeams);
     if(d.tcDone!==undefined)setTcDone(d.tcDone);
   }
@@ -3277,7 +3278,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 }} style={{flex:1,background:"#1e1e30",border:"1px solid #2a2a40",color:"#aaa",borderRadius:8,padding:"7px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
                   🔀 Tirage positions
                 </button>
-                <button onClick={()=>{setBeretO2026Results({});setO2026Scores(prev=>{const n={...prev};delete n.beret;return n;});}} style={{flex:1,background:"#1e1e30",border:"1px solid #2a2a40",color:"#aaa",borderRadius:8,padding:"7px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
+                <button onClick={()=>{setBeretO2026Results({});setBeretRanked([]);setO2026Scores(prev=>{const n={...prev};delete n.beret;return n;});}} style={{flex:1,background:"#1e1e30",border:"1px solid #2a2a40",color:"#aaa",borderRadius:8,padding:"7px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
                   🗑 Reset
                 </button>
               </div>
@@ -3341,8 +3342,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   .sort((a,b)=>b.wins-a.wins)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
                 setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
-                // Save to Supabase so it persists
-                SUPABASE.from("o2026_state").upsert({epreuve_id:"beret",data:{...getStateSnapshot(),beretRanked:ranked},updated_by:"louis"}).then(()=>{}).catch(()=>{});
+                setBeretRanked(ranked);
+
               }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:8,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Béret</button>}
             </div>
           )}
@@ -3350,13 +3351,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── Beret classement public */}
-      {scoreType==="beret_o2026"&&o2026Scores?.beret?.ranked?.length>0&&(
+      {scoreType==="beret_o2026"&&beretRanked?.length>0&&(
         <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>CLASSEMENT BÉRET</div>
             <span style={{fontSize:10,color:"#34d399"}}>✅ Validé</span>
           </div>
-          {o2026Scores.beret.ranked.map((r,i)=>{
+          {beretRanked.map((r,i)=>{
             const t=getO2026Team(r.teamId);
             return(
               <div key={r.teamId} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<o2026Scores.beret.ranked.length-1?"1px solid #13131f":"none"}}>
@@ -7825,7 +7826,7 @@ export default function App(){
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
         {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
         {page==="o2026"         &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
-        {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores}/>}
+        {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores} o2026Scores={o2026Scores}/>}
         {page==="teams"         &&<TeamsPage nav={nav} navBack={navBack}/>}
         {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
         {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
