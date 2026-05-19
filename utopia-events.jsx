@@ -1963,7 +1963,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
             ranking.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
           }
           // bracket finals (BP, beer pong, football, overcooked, puissance4)
-          if(d.phase==="done"&&d.bracketResultats&&d.groupes){
+          if(d.ranked?.length){d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);}); } else if(d.phase==="done"&&d.bracketResultats&&d.groupes){
             const br=d.bracketResultats;
             const gs=d.groupes;
             // Compute standings per group from saved resultats
