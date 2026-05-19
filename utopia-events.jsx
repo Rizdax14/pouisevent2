@@ -4434,14 +4434,11 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
     if(newPin!==newPin2){setPinMsg({t:"error",m:"Les PIN ne correspondent pas"});return;}
     setSaving(true);
     try{
-      // Check uniqueness only among players with same initial
-      const myInitial=currentPlayer.name.charAt(0).toUpperCase();
-      const sameInitialIds=PLAYERS.filter(p=>p.name.toUpperCase().startsWith(myInitial)&&p.id!==currentPlayer.id).map(p=>p.id);
-      if(sameInitialIds.length>0){
-        const existing=await sbFetch("players",`?pin=eq.${encodeURIComponent(newPin)}&id=in.(${sameInitialIds.join(",")})&select=id`);
-        if(existing&&existing.length>0){setPinMsg({t:"error",m:"Ce PIN est déjà utilisé par quelqu'un avec la même initiale"});setSaving(false);return;}
-      }
       await sbUpdate("players",{id:currentPlayer.id},{pin:newPin});
+      // Update local player too
+      const p=PLAYERS.find(x=>x.id===currentPlayer.id);
+      if(p)p.pin=newPin;
+      setCurrentPlayer(prev=>prev?{...prev,pin:newPin}:null);
       setPinMsg({t:"success",m:"PIN changé ✓"});
       setNewPin("");setNewPin2("");
     }catch(e){setPinMsg({t:"error",m:e.message});}
@@ -6624,7 +6621,7 @@ function DataBL({onBack}){
       setNewP({name:"",uid:"",sex:"m",team_id:""});
       // Reload
       const fresh=await sbFetch("players","?select=*&order=name");
-      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",last_name:p.last_name||null,display_name:p.display_name||null,photoUrl:`/photos/${p.uid}.jpg`}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
+      if(fresh){PLAYERS.length=0;fresh.forEach(p=>PLAYERS.push({id:p.id,uid:p.uid,name:p.name,teamId:p.team_id||null,t24:p.t24||null,t25:p.t25||null,teo:p.teo||null,t26:p.t26||null,t24cap:p.t24cap||false,t25cap:p.t25cap||false,teocap:p.teocap||false,t26cap:p.t26cap||false,sex:p.sex||"m",member_type:p.member_type||"non-membre",last_name:p.last_name||null,display_name:p.display_name||null,photoUrl:`/photos/${p.uid}.jpg`,pin:p.pin||null}));setPlayers([...PLAYERS].filter(p=>p.uid).sort((a,b)=>a.name.localeCompare(b.name)));}
     }catch(e){setMsg({t:"error",m:e.message});}
     setSaving(false);
   }
