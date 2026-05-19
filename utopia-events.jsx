@@ -21,7 +21,7 @@ async function sbFetch(table, params="") {
 async function sbInsert(table, data) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: "POST",
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" },
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
     body: JSON.stringify(data)
   });
   if (!r.ok) throw new Error(await r.text());
@@ -4441,7 +4441,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
       setCurrentPlayer(prev=>prev?{...prev,pin:newPin}:null);
       setPinMsg({t:"success",m:"PIN changé ✓"});
       setNewPin("");setNewPin2("");
-    }catch(e){setPinMsg({t:"error",m:e.message});}
+    }catch(e){console.error("PIN update failed:",e);setPinMsg({t:"error",m:e.message});}
     setSaving(false);
   }
 
