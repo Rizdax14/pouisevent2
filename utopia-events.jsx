@@ -9,13 +9,17 @@ const SUPABASE = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY)||{
 
 const _sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function sbFetch(table, params="") {
+async function sbFetch(table, params="", opts={}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${params}`, {
     cache: "no-store",
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Accept": "application/json" }
+    method: opts.method||"GET",
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Accept": "application/json", "Content-Type": "application/json" },
+    body: opts.body||undefined,
   });
   if (!r.ok) throw new Error(`${table} ${r.status}: ${await r.text()}`);
-  return r.json();
+  if(r.status===204)return null;
+  const txt=await r.text();
+  return txt?JSON.parse(txt):null;
 }
 
 async function sbInsert(table, data) {
@@ -4441,9 +4445,8 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
         const existing=await sbFetch("players",`?pin=eq.${encodeURIComponent(newPin)}&id=in.(${sameInitialIds.join(",")})&select=id`);
         if(existing&&existing.length>0){setPinMsg({t:"error",m:"Ce PIN est déjà utilisé par quelqu'un avec la même initiale"});setSaving(false);return;}
       }
-      await sbUpdate("players",{id:currentPlayer.id},{pin:newPin});
-      setPinMsg({t:"success",m:"PIN changé ✓"});
-      setNewPin("");setNewPin2("");
+      await sbFetch("players",`?id=eq.${currentPlayer.id}`,{method:"PATCH",body:JSON.stringify({pin:newPin})});
+      setPinMsg({t:"success",m:"PIN changé ✓"});setNewPin("");setNewPin2("");
     }catch(e){setPinMsg({t:"error",m:e.message});}
     setSaving(false);
   }
