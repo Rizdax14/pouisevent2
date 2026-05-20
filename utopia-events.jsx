@@ -3198,7 +3198,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                       </div>
                     ))}
                   </div>
-                  <button onClick={()=>{setBiathlonFinalLocked(true);const ranked=[...biathlonWin,...biathlonLose].map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}} disabled={biathlonFinalLocked||biathlonWin.length===0} style={BTN(biathlonFinalLocked?"#404058":"#34d399")}>
+                  <button onClick={()=>{if(biathlonFinalLocked){setBiathlonFinalLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setBiathlonFinalLocked(true);const ranked=[...biathlonWin,...biathlonLose].map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={biathlonWin.length===0} style={BTN(biathlonFinalLocked?"#404058":"#34d399")}>
                     {biathlonFinalLocked?"✅ Classement officiel":"📋 Valider le classement final"}
                   </button>
                 </div>
