@@ -6908,7 +6908,7 @@ function scoreDuo(rank1, rank2) {
   return (best * 2 + worst) / 3;
 }
 
-export default function App(){
+function App(){
   const [page,setPage]=React.useState(()=>{
     try{
       const h=JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
