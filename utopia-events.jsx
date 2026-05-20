@@ -2199,7 +2199,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     setO2026Scores(prev=>({...prev,[ep.id]:{...getStateSnapshot(),ranked}}));
     setEpreuveValidated(true);
     // Save directly to Supabase immediately (don't wait for debounce)
-    SUPABASE.from("o2026_state").upsert({epreuve_id:ep.id,data:{...getStateSnapshot(),ranked},updated_by:"louis"}).catch(()=>{});
+    SUPABASE.from("o2026_state").upsert({epreuve_id:ep.id,data:{...getStateSnapshot(),ranked},updated_by:"louis"},{onConflict:"epreuve_id"}).then(({error})=>{if(error)console.error("validate upsert failed:",error);else console.log("ranked saved for",ep.id,ranked.length,"teams");}).catch(e=>console.error("validate upsert error:",e));
   }
 
   function getStateSnapshot(){
@@ -2564,9 +2564,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     // Not assigned yet: show placeholder by sex based on epreuve nbJoueurs
     const nbH=ep.nbJoueurs>=2?1:(ep.nbJoueurs===1?1:0);
     const nbF=ep.nbJoueurs>=2?1:0;
+    const teamName=getO2026Team(teamId)?.name||"";
     const placeholders=[];
-    for(let i=0;i<nbH;i++)placeholders.push({id:-1-i,name:"H",display_name:"H - CAO",sex:"M",t26:teamId,isPlaceholder:true});
-    for(let i=0;i<nbF;i++)placeholders.push({id:-10-i,name:"F",display_name:"F - CAO",sex:"F",t26:teamId,isPlaceholder:true});
+    for(let i=0;i<nbH;i++)placeholders.push({id:-1-i,name:"H",display_name:`H — ${teamName}`,sex:"M",t26:teamId,isPlaceholder:true});
+    for(let i=0;i<nbF;i++)placeholders.push({id:-10-i,name:"F",display_name:`F — ${teamName}`,sex:"F",t26:teamId,isPlaceholder:true});
     return placeholders;
   }
   const hasGroupes=hasGroupFormat&&Object.values(groupes).some(g=>g.length>0);
@@ -7665,7 +7666,8 @@ export default function App(){
         const allStates=await sbFetch("o2026_state","?select=epreuve_id,data");
         const scores={};
         allStates.forEach(row=>{
-          if(row.data)scores[row.epreuve_id]=row.data;
+          if(row.data){scores[row.epreuve_id]=row.data;}
+          if(row.data?.ranked?.length)console.log("loaded ranked for",row.epreuve_id,":",row.data.ranked.length,"teams");
         });
         // Restore beretRanked properly
         if(scores.beret?.beretRanked?.length){
