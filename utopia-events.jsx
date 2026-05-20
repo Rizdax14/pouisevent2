@@ -4340,6 +4340,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
   const [newPin2,setNewPin2]=useState("");
   const [pinMsg,setPinMsg]=useState(null);
   const [saving,setSaving]=useState(false);
+  const [validErrors,setValidErrors]=useState([]);
 
   const S={background:"#13131f",border:"1px solid #1e1e30",borderRadius:8,padding:"10px 14px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",width:"100%",boxSizing:"border-box"};
   const BTN=(c="#E8B84B")=>({background:c,color:c==="#E8B84B"?"#080810":"#fff",border:"none",borderRadius:10,padding:"12px",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",width:"100%"});
@@ -4436,22 +4437,90 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
           const team=getTeam(player.t26);
           const roster=PLAYERS.filter(p=>p.t26===player.t26);
           const tc=team?.color||"#E8B84B";
+          const sex=p=>(p.sex||"m");
+          const boys=roster.filter(p=>sex(p)==="m");
+          const girls=roster.filter(p=>sex(p)==="f");
 
           const phases=[...new Set(O2026_EPREUVES.map(e=>e.phase))].sort();
           const getAssigned=(epId)=>(o2026Assignments||{})[`${player.t26}_${epId}`]||[];
-          const allAssigned=new Set(O2026_EPREUVES.flatMap(e=>getAssigned(e.id)));
+
+          // Validated state
+          const isValidated=!!((o2026Assignments||{})[`${player.t26}___validated`]?.length);
 
           // Count epreuves per player
           const playerCount={};
           roster.forEach(p=>{playerCount[p.id]=0;});
           O2026_EPREUVES.forEach(e=>{getAssigned(e.id).forEach(pid=>{if(playerCount[pid]!==undefined)playerCount[pid]++;});});
 
-          // TC / Biathlon constraint: everyone must be in at least one
           const tcIds=getAssigned("tircorde"),bioIds=getAssigned("biathlon");
           const inTcOrBio=new Set([...tcIds,...bioIds]);
-          const missingTcBio=roster.filter(p=>!inTcOrBio.has(p.id));
+
+          // Sex limits per epreuve (max of each gender allowed)
+          const SEX_MAX={
+            bp:{maxH:5,maxF:5},
+            beret:{maxH:1,maxF:1},
+            cercles:{maxH:1,maxF:1},
+            tircorde:{maxH:2,maxF:2},
+            biathlon:{maxH:2,maxF:2},
+          };
+
+          // Epreuve rule descriptions
+          const EP_RULES={
+            bp:"6 joueurs · min 1H + 1F",
+            balle_folle:"3 joueurs",
+            football:"3 joueurs",
+            marathonH:"1 garçon",
+            marathonF:"1 fille",
+            cultureg:"1 joueur",
+            molky:"1 joueur",
+            beret:"1 garçon + 1 fille",
+            puzzlerun:"2 joueurs",
+            puissance4:"1 joueur",
+            basket:"1 joueur",
+            cercles:"1 garçon + 1 fille",
+            beerpong:"2 joueurs",
+            tircorde:"2 garçons + 2 filles",
+            biathlon:"2 garçons + 2 filles",
+          };
+
+          // ── Validation function ──
+          function validateTeam(){
+            const errs=[];
+            // Team composition
+            if(roster.length<6)errs.push(`Équipe incomplète : ${roster.length} joueurs (min 6)`);
+            if(roster.length>8)errs.push(`Trop de joueurs : ${roster.length} (max 8)`);
+            if(boys.length<2)errs.push(`Pas assez de garçons : ${boys.length} (min 2)`);
+            if(girls.length<2)errs.push(`Pas assez de filles : ${girls.length} (min 2)`);
+            // Per-epreuve
+            const epRules={
+              bp:{count:6,minH:1,minF:1},balle_folle:{count:3},football:{count:3},
+              marathonH:{count:1,onlyH:true},marathonF:{count:1,onlyF:true},
+              cultureg:{count:1},molky:{count:1},beret:{count:2,minH:1,minF:1},
+              puzzlerun:{count:2},puissance4:{count:1},basket:{count:1},
+              cercles:{count:2,minH:1,minF:1},beerpong:{count:2},
+              tircorde:{count:4,minH:2,minF:2},biathlon:{count:4,minH:2,minF:2},
+            };
+            for(const [epId,rule] of Object.entries(epRules)){
+              const ep=O2026_EPREUVES.find(e=>e.id===epId);
+              const assigned=getAssigned(epId);
+              const ps=assigned.map(id=>roster.find(p=>p.id===id)).filter(Boolean);
+              const h=ps.filter(p=>sex(p)==="m").length;
+              const f=ps.filter(p=>sex(p)==="f").length;
+              const name=ep?.nom||epId;
+              if(assigned.length!==rule.count)errs.push(`${name} : ${assigned.length}/${rule.count} joueurs`);
+              if(rule.minH&&h<rule.minH)errs.push(`${name} : manque ${rule.minH-h} garçon(s)`);
+              if(rule.minF&&f<rule.minF)errs.push(`${name} : manque ${rule.minF-f} fille(s)`);
+              if(rule.onlyH&&ps.some(p=>sex(p)==="f"))errs.push(`${name} : réservé aux garçons`);
+              if(rule.onlyF&&ps.some(p=>sex(p)==="m"))errs.push(`${name} : réservé aux filles`);
+            }
+            // TC/Biathlon : everyone in at least one
+            const missing=roster.filter(p=>!inTcOrBio.has(p.id));
+            if(missing.length>0)errs.push(`TC/Biathlon : ${missing.map(p=>getDisplayName(p,PLAYERS)).join(", ")} non assigné(s)`);
+            return errs;
+          }
 
           async function saveAssignment(epreuveId, playerIds){
+            if(isValidated)return;
             const key=`${player.t26}_${epreuveId}`;
             setO2026Assignments(a=>({...a,[key]:playerIds}));
             try{
@@ -4462,45 +4531,74 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
             }catch(e){console.error("save assignment",e);}
           }
 
+          async function handleValidate(){
+            const errs=validateTeam();
+            if(errs.length>0){setValidErrors(errs);return;}
+            setValidErrors([]);
+            const key=`${player.t26}___validated`;
+            setO2026Assignments(a=>({...a,[key]:[1]}));
+            try{
+              await SUPABASE.from("o2026_assignments").upsert(
+                {team_id:player.t26, epreuve_id:"___validated", player_ids:[1]},
+                {onConflict:"team_id,epreuve_id"}
+              );
+            }catch(e){console.error("validate",e);}
+          }
+
+          async function handleUnvalidate(){
+            const key=`${player.t26}___validated`;
+            setO2026Assignments(a=>({...a,[key]:[]}));
+            setValidErrors([]);
+            try{
+              await SUPABASE.from("o2026_assignments").upsert(
+                {team_id:player.t26, epreuve_id:"___validated", player_ids:[]},
+                {onConflict:"team_id,epreuve_id"}
+              );
+            }catch(e){console.error("unvalidate",e);}
+          }
+
           return(
             <div style={{background:"#0d0d1c",border:`1px solid ${tc}44`,borderRadius:12,padding:20,marginBottom:16}}>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:tc,marginBottom:4}}>⚔️ ESPACE CAPITAINE</div>
-              <div style={{fontSize:11,color:"#60607a",marginBottom:20}}>Assigne les joueurs de <strong style={{color:tc}}>{team?.name}</strong> aux épreuves.</div>
+              <div style={{fontSize:11,color:"#60607a",marginBottom:16}}>Assigne les joueurs de <strong style={{color:tc}}>{team?.name}</strong> aux épreuves.</div>
 
               {/* Player epreuve counter */}
               <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
                 {roster.map(p=>{
                   const count=playerCount[p.id]||0;
-                  const isInTcBio=inTcOrBio.has(p.id);
+                  const isIn=inTcOrBio.has(p.id);
                   return(
                     <div key={p.id} style={{background:"#13131f",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
                       <div style={{width:6,height:6,borderRadius:"50%",background:tc,flexShrink:0}}/>
                       <span style={{fontSize:11,color:"#cccce0"}}>{getDisplayName(p,PLAYERS)}</span>
+                      <span style={{fontSize:10,color:sex(p)==="f"?"#f472b6":"#60a5fa"}}>{sex(p)==="f"?"F":"H"}</span>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:count>=3?"#34d399":count>=1?"#E8B84B":"#404058"}}>{count} épr.</span>
-                      {!isInTcBio&&<span style={{fontSize:8,color:"#ef4444"}}>⚠️TC/Bio</span>}
+                      {!isIn&&<span style={{fontSize:8,color:"#ef4444"}}>⚠ TC/Bio</span>}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Tir à la Corde / Biathlon constraint warning */}
-              {(()=>{
-                const boys=roster.filter(p=>p.sex==="m"||!p.sex);
-                const girls=roster.filter(p=>p.sex==="f");
-                const tcKey=`${player.t26}_tircorde`,bioKey=`${player.t26}_biathlon`;
-                const tcIds=(o2026Assignments||{})[tcKey]||[];
-                const bioIds=(o2026Assignments||{})[bioKey]||[];
-                const assignedBoth=[...new Set([...tcIds,...bioIds])];
-                const missing=roster.filter(p=>!assignedBoth.includes(p.id));
-                if(missing.length>0)return(
-                  <div style={{background:"#ef444420",border:"1px solid #ef444444",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#ef4444"}}>
-                    ⚠️ Tous les joueurs doivent participer à Tir à la corde OU Biathlon Relais. Manquants : {missing.map(p=>p.name).join(", ")}
-                  </div>
-                );
-                return null;
-              })()}
+              {/* Validation errors */}
+              {validErrors.length>0&&(
+                <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#ef4444",marginBottom:8}}>❌ ERREURS À CORRIGER</div>
+                  {validErrors.map((e,i)=>(
+                    <div key={i} style={{fontSize:12,color:"#fca5a5",marginBottom:4}}>• {e}</div>
+                  ))}
+                </div>
+              )}
 
-              {phases.map(phase=>(
+              {/* Validated banner */}
+              {isValidated&&(
+                <div style={{background:"#22c55e15",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>✅</span>
+                  <span style={{fontSize:13,color:"#22c55e",fontWeight:600}}>Inscription validée !</span>
+                </div>
+              )}
+
+              {/* Epreuves */}
+              {!isValidated&&phases.map(phase=>(
                 <div key={phase} style={{marginBottom:20}}>
                   <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:tc,borderBottom:`1px solid ${tc}22`,paddingBottom:6,marginBottom:12}}>
                     PHASE {phase}
@@ -4510,36 +4608,36 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                     const assigned=(o2026Assignments||{})[key]||[];
                     const fmt=ep.format||"";
                     const maxMatch=fmt.match(/(\d+)V\d+/);
-                    const maxPlayers=maxMatch?parseInt(maxMatch[1]):roster.length;
-                    // Sex filter for gendered events
+                    const maxPlayers=maxMatch?parseInt(maxMatch[1]):ep.nbJoueurs||roster.length;
                     const needsSex=ep.id==="marathonH"?"m":ep.id==="marathonF"?"f":null;
-                    // TC/Biathlon gender slot constraint
-                    const isTcBio=ep.id==="tircorde"||ep.id==="biathlon"||ep.id==="cercles"||ep.id==="puzzlerun";
-                    const assignedMen=assigned.filter(pid=>{const p=roster.find(r=>r.id===pid);return (p?.sex||"m")==="m";});
-                    const assignedWomen=assigned.filter(pid=>{const p=roster.find(r=>r.id===pid);return (p?.sex||"m")==="f";});
-                    const maxMen=isTcBio?2:maxPlayers,maxWomen=isTcBio?2:maxPlayers;
-                    // Players used in same phase in OTHER epreuves
+                    const sexLim=SEX_MAX[ep.id]||null;
+                    const assignedMen=assigned.filter(pid=>{const p=roster.find(r=>r.id===pid);return sex(p||{})==="m";});
+                    const assignedWomen=assigned.filter(pid=>{const p=roster.find(r=>r.id===pid);return sex(p||{})==="f";});
                     const usedInPhase=new Set(O2026_EPREUVES
                       .filter(e=>e.phase===ep.phase&&e.id!==ep.id)
                       .flatMap(e=>getAssigned(e.id)));
                     const available=roster.filter(p=>{
                       if(assigned.includes(p.id))return false;
-                      if(needsSex&&(p.sex||"m")!==needsSex)return false;
+                      if(needsSex&&sex(p)!==needsSex)return false;
+                      if(sexLim){
+                        if(sex(p)==="m"&&assignedMen.length>=sexLim.maxH)return false;
+                        if(sex(p)==="f"&&assignedWomen.length>=sexLim.maxF)return false;
+                      }
                       return true;
                     });
 
                     return(
                       <div key={ep.id} style={{background:"#13131f",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                           <span style={{fontSize:16}}>{ep.emoji}</span>
                           <div style={{flex:1}}>
                             <div style={{fontSize:13,fontWeight:600,color:"#eeeef5"}}>{ep.nom}</div>
-                            <div style={{fontSize:10,color:"#60607a"}}>{ep.format} · max {maxPlayers === roster.length ? "tous" : maxPlayers+" joueurs"}</div>
+                            <div style={{fontSize:10,color:"#60607a"}}>{EP_RULES[ep.id]||ep.format}</div>
                           </div>
-                          {assigned.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {assigned.length}</span>}
+                          {assigned.length>0&&assigned.length>=maxPlayers&&<span style={{fontSize:10,color:"#34d399"}}>✓ Complet</span>}
                         </div>
 
-                        {/* Assigned players */}
+                        {/* Assigned */}
                         {assigned.length>0&&(
                           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
                             {assigned.map(pid=>{
@@ -4554,40 +4652,60 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                           </div>
                         )}
 
-                        {/* Available players */}
+                        {/* Available */}
                         {assigned.length<maxPlayers&&(
                           <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                             {available.map(p=>{
-                              const isUsedPhase=usedInPhase.has(p.id);
-                              const pSex=p.sex||"m";
-                              const genderFull=isTcBio&&((pSex==="m"&&assignedMen.length>=maxMen)||(pSex==="f"&&assignedWomen.length>=maxWomen));
-                              const disabled=isUsedPhase||genderFull;
+                              const disabled=usedInPhase.has(p.id);
                               return(
                                 <div key={p.id}
                                   onClick={()=>!disabled&&saveAssignment(ep.id,[...assigned,p.id])}
-                                  style={{background:disabled?"#13131f":"#1e1e30",borderRadius:20,padding:"4px 10px",fontSize:11,
-                                    color:disabled?"#2a2a40":"#60607a",cursor:disabled?"not-allowed":"pointer",
-                                    border:`1px solid ${disabled?"#1e1e30":"#2a2a40"}`,
-                                    textDecoration:disabled?"line-through":"none",opacity:disabled?0.5:1}}
-                                  title={isUsedPhase?`${getDisplayName(p,PLAYERS)} joue déjà dans cette phase`:genderFull?`Places ${pSex==="m"?"hommes":"femmes"} complètes`:""}>
-                                  {disabled?"":"+ "}{getDisplayName(p,PLAYERS)}
-                                  {isUsedPhase&&<span style={{fontSize:8,marginLeft:3}}>Ph.{ep.phase}</span>}
+                                  style={{background:disabled?"transparent":"#1e1e30",borderRadius:20,padding:"4px 10px",fontSize:11,
+                                    color:disabled?"#2a2a40":"#60607a",cursor:disabled?"default":"pointer",
+                                    border:`1px solid ${disabled?"transparent":"#2a2a40"}`,
+                                    opacity:disabled?0.4:1}}>
+                                  {disabled?"":"+  "}{getDisplayName(p,PLAYERS)}
+                                  <span style={{fontSize:9,marginLeft:3,color:sex(p)==="f"?"#f472b6":"#60a5fa"}}>{sex(p)==="f"?"F":"H"}</span>
+                                  {disabled&&<span style={{fontSize:8,marginLeft:2}}>Ph.{ep.phase}</span>}
                                 </div>
                               );
                             })}
                           </div>
-                        )}
-                        {assigned.length>=maxPlayers&&(
-                          <div style={{fontSize:10,color:"#34d399"}}>✓ Complet</div>
                         )}
                       </div>
                     );
                   })}
                 </div>
               ))}
+
+              {/* Validated read-only summary */}
+              {isValidated&&(
+                <div style={{opacity:0.6,fontSize:11,color:"#60607a",marginBottom:12}}>
+                  {O2026_EPREUVES.map(ep=>{
+                    const assigned=getAssigned(ep.id);
+                    if(!assigned.length)return null;
+                    return(
+                      <div key={ep.id} style={{marginBottom:4}}>
+                        <span style={{color:"#34d399"}}>{ep.emoji} {ep.nom}</span>
+                        {" → "}{assigned.map(id=>getDisplayName(PLAYERS.find(p=>p.id===id),PLAYERS)).join(", ")}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Validate / Unvalidate button */}
+              <button
+                onClick={isValidated?handleUnvalidate:handleValidate}
+                style={{width:"100%",padding:"14px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,
+                  background:isValidated?"#1e1e30":"#22c55e",
+                  color:isValidated?"#60607a":"#fff"}}>
+                {isValidated?"✏️ Modifier l'équipe":"✅ Valider l'inscription"}
+              </button>
             </div>
           );
         })()}
+
       </div>
     );
   }
