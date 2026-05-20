@@ -2888,7 +2888,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <div style={{fontSize:11,color:"#60607a",marginBottom:8}}>32 participants (2 par équipe)</div>
               <DragRankList compact items={dragRankCoef} onReorder={setDragRankCoef} locked={dragRankCoefLocked}
                 getKey={s=>`${s.teamId}-${s.slot}`}
-                getLabel={s=>{const t=getO2026Team(s.teamId);const sl=s.slot===0?"H":"F";return`${sl} — ${t?.name||"?"}`;}}
+                getLabel={s=>{const t=getO2026Team(s.teamId);const sl=s.slot===0?"H":"F";const pids=(o2026Assignments||{})[`${s.teamId}_cercles`]||[];const pid=pids[s.slot];const p=pid?PLAYERS.find(pl=>pl.id===pid):null;return p?`${getDisplayName(p,PLAYERS)} (${t?.name||"?"})`:`${sl} — ${t?.name||"?"}`;}}
                 getColor={s=>getO2026Team(s.teamId)?.color||"#60607a"}/>
               {dragRankCoef.length>0&&(
                 <div style={{marginTop:12,borderTop:"1px solid #1e1e30",paddingTop:12}}>
