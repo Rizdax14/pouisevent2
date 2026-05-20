@@ -1926,43 +1926,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
 
         Object.entries(o2026Scores||{}).forEach(([epId,d])=>{
           if(!d)return;
-          // drag_rank types
-          if(d.dragRankLocked&&d.dragRank?.length){
-            d.dragRank.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
-          }
-          // drag_rank_2 / math sprint
-          if((d.dragRankLocked||d.dragRank2Locked)&&d.dragRank&&d.dragRank2){
-            const tIds=d.dragRank;
-            const sorted=[...tIds].sort((a,b)=>{
-              const p1a=d.dragRank.indexOf(a)+1||99,p2a=d.dragRank2.indexOf(a)+1||99;
-              const p1b=d.dragRank.indexOf(b)+1||99,p2b=d.dragRank2.indexOf(b)+1||99;
-              return ((p1a+p2a)/2)-((p1b+p2b)/2);
-            });
-            sorted.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
-          }
-          // drag_rank_coef / cercles
-          if(d.dragRankCoefLocked&&d.dragRankCoef?.length){
-            // Group by team, apply coef
-            const teamScores={};
-            d.dragRankCoef.forEach((s,i)=>{
-              if(!teamScores[s.teamId])teamScores[s.teamId]=[];
-              teamScores[s.teamId].push(i+1);
-            });
-            const sorted=teams.slice().sort((a,b)=>{
-              const pA=teamScores[a.id]||[99,99];const pB=teamScores[b.id]||[99,99];
-              const sA=(Math.min(...pA)*2+Math.max(...pA))/3;
-              const sB=(Math.min(...pB)*2+Math.max(...pB))/3;
-              return sA-sB;
-            });
-            sorted.forEach((t,i)=>{if(totals[t.id]!==undefined)totals[t.id]+=(pts[i]||0);});
-          }
-          // drag_rank_group / molky
-          if(d.dragRankFinalDone&&d.dragRankFinal){
-            const ranking=[];
-            [1,2,3,4].forEach(gid=>{(d.dragRankFinal[gid]||[]).forEach(tid=>{ranking.push(tid);});});
-            ranking.forEach((tid,i)=>{if(totals[tid]!==undefined)totals[tid]+=(pts[i]||0);});
-          }
-          // bracket finals (BP, beer pong, football, overcooked, puissance4)
+          // All scoring: use ranked array set by validateClassement
           if(d.ranked?.length){d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);}); } else if(d.phase==="done"&&d.bracketResultats&&d.groupes){
             const br=d.bracketResultats;
             const gs=d.groupes;
@@ -2600,7 +2564,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     const key=`${teamId}_${ep.id}`;
     const assigned=(o2026Assignments||{})[key];
     if(assigned&&assigned.length>0)return assigned.map(id=>PLAYERS.find(p=>p.id===id)).filter(Boolean);
-    return []; // Don't show all players if cap hasn't assigned yet
+    // Not assigned yet: show placeholder by sex based on epreuve nbJoueurs
+    const nbH=ep.nbJoueurs>=2?1:(ep.nbJoueurs===1?1:0);
+    const nbF=ep.nbJoueurs>=2?1:0;
+    const placeholders=[];
+    for(let i=0;i<nbH;i++)placeholders.push({id:-1-i,name:"H",display_name:"H - CAO",sex:"M",t26:teamId,isPlaceholder:true});
+    for(let i=0;i<nbF;i++)placeholders.push({id:-10-i,name:"F",display_name:"F - CAO",sex:"F",t26:teamId,isPlaceholder:true});
+    return placeholders;
   }
   const hasGroupes=hasGroupFormat&&Object.values(groupes).some(g=>g.length>0);
   const hasMiniGroupes=isMiniB&&Object.values(groupes).some(g=>g.length>0);
@@ -2866,7 +2836,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                 <button onClick={simulateDragRank} style={BTN("#404058")}>🎲 Simuler le classement</button>
-                <button onClick={()=>{setDragRankLocked(true);if(dragRank.length>0){const ranked=dragRank.map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={dragRankLocked||dragRank.length===0} style={BTN(dragRankLocked?"#404058":"#34d399")}>
+                <button onClick={()=>{if(dragRankLocked){setDragRankLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setDragRankLocked(true);if(dragRank.length>0){const ranked=dragRank.map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}}} disabled={dragRank.length===0} style={BTN(dragRankLocked?"#404058":"#34d399")}>
                   {dragRankLocked?"✅ Classement officiel":"📋 Valider le classement officiel"}
                 </button>
               </div>
@@ -3264,8 +3234,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
                   .sort((a,b)=>b.total-a.total)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
+                validateClassement(ranked.map(r=>({...r,pts:O2026_POINTS[r.pos-1]||0})));
                 setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
-                validateClassement(ranked);
               }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Basket</button>}
 
             </div>
