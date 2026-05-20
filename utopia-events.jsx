@@ -2013,15 +2013,9 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           if(d.tcDone&&d.tcResultats&&d.tcTeams?.length){
             // simplified: winner of fin gets 25pts etc
           }
-          // basket & beret (check ranked or beretRanked)
-          const rankedData=d.ranked||d.beretRanked;
-          if(rankedData?.length){
-            rankedData.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(pts[r.pos-1]||0);});
-          }
+
         });
 
-        const hasAny=Object.values(totals).some(v=>v>0);
-        if(!hasAny)return null;
 
         const ranked=teams.sort((a,b)=>totals[b.id]-totals[a.id]);
         return(
@@ -2212,7 +2206,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,epreuveValidated};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,epreuveValidated,ranked:epreuveValidated?o2026Scores?.[ep.id]?.ranked:undefined};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2887,7 +2881,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                 <button onClick={simulateCercles} style={BTN("#404058")}>🎲 Simuler le classement</button>
-                <button onClick={()=>{setDragRankCoefLocked(true);const allT=getO2026ActiveTeams();const teamSc={};dragRankCoef.forEach((s,i)=>{if(!teamSc[s.teamId])teamSc[s.teamId]=[];teamSc[s.teamId].push(i+1);});const ranked=allT.slice().sort((a,b)=>{const pA=teamSc[a.id]||[99,99];const pB=teamSc[b.id]||[99,99];const sA=(Math.min(...pA)*2+Math.max(...pA))/3;const sB=(Math.min(...pB)*2+Math.max(...pB))/3;return sA-sB;}).map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}} disabled={dragRankCoefLocked||dragRankCoef.length===0} style={BTN(dragRankCoefLocked?"#404058":"#34d399")}>
+                <button onClick={()=>{if(dragRankCoefLocked){setDragRankCoefLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setDragRankCoefLocked(true);const allT=getO2026ActiveTeams();const teamSc={};dragRankCoef.forEach((s,i)=>{if(!teamSc[s.teamId])teamSc[s.teamId]=[];teamSc[s.teamId].push(i+1);});const ranked=allT.slice().sort((a,b)=>{const pA=teamSc[a.id]||[99,99];const pB=teamSc[b.id]||[99,99];const sA=(Math.min(...pA)*2+Math.max(...pA))/3;const sB=(Math.min(...pB)*2+Math.max(...pB))/3;return sA-sB;}).map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={dragRankCoef.length===0} style={BTN(dragRankCoefLocked?"#404058":"#34d399")}>
                   {dragRankCoefLocked?"✅ Validé":"📋 Valider & calculer classement"}
                 </button>
               </div>
@@ -3229,14 +3223,16 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 );
               })}
-              {isLouis&&<button onClick={()=>{
+              {isLouis&&(<div style={{display:"flex",gap:8,marginTop:12}}>
+              <button onClick={()=>{setBasketScores({});setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}} style={{flex:1,background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
+              <button onClick={()=>{
                 const ranked=[...getO2026ActiveTeams()]
                   .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
                   .sort((a,b)=>b.total-a.total)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));
-                validateClassement(ranked.map(r=>({...r,pts:O2026_POINTS[r.pos-1]||0})));
-                setO2026Scores(prev=>({...prev,basket:{ranked,basketScores}}));
-              }} style={{width:"100%",background:ac,border:"none",color:"#fff",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:"pointer",marginTop:12,fontFamily:"'Outfit',sans-serif"}}>✓ Valider le classement Basket</button>}
+                validateClassement(ranked);
+              }} style={{flex:2,background:ac,border:"none",color:"#fff",borderRadius:8,padding:"8px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>✓ Valider Basket</button>
+              </div>)}
 
             </div>
           )}
@@ -3469,48 +3465,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B"}}>{pts} pts</span>
             </div>
           );})}
-        </div>
-      )}
-
-      {scoreType==="drag_rank_group"&&Object.values(dragRankGroups).some(g=>g.length>0)&&(
-        <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>GROUPES</div>
-            <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/><span style={{fontSize:10,color:"#34d399"}}>En direct</span></div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:Object.values(dragRankFinal).some(g=>g.length>0)?14:0}}>
-            {[1,2,3,4].map(gid=>(
-              <div key={gid} style={{background:"#13131f",borderRadius:8,padding:"10px 12px"}}>
-                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:ac,marginBottom:6}}>GROUPE {gid}</div>
-                {(dragRankGroups[gid]||[]).map((tid,i)=>{const t=getO2026Team(tid);return(
-                  <div key={tid} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:i===0?"#E8B84B":i===1?"#aaa":i===2?"#c87533":"#404058",width:16}}>{i+1}</span>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
-                    <span style={{flex:1,fontSize:10,color:t?.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?.name}</span>
-                  </div>
-                );})}
-              </div>
-            ))}
-          </div>
-          {Object.values(dragRankFinal).some(g=>g.length>0)&&(
-            <>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:"#E8B84B",marginBottom:10}}>PHASE FINALE</div>
-              <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
-                {[1,2,3,4].map(gid=>(
-                  <div key={gid} style={{background:"#13131f",borderRadius:8,padding:"10px 12px"}}>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:ac,marginBottom:6}}>FINALE {gid}ÈME</div>
-                    {(dragRankFinal[gid]||[]).map((tid,i)=>{const t=getO2026Team(tid);return(
-                      <div key={tid} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:i===0?"#E8B84B":i===1?"#aaa":i===2?"#c87533":"#404058",width:16}}>{i+1}</span>
-                        <div style={{width:6,height:6,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
-                        <span style={{flex:1,fontSize:10,color:t?.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t?.name}</span>
-                      </div>
-                    );})}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
       {scoreType==="drag_rank_group"&&Object.values(dragRankGroups).some(g=>g.length>0)&&(
