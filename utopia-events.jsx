@@ -3759,9 +3759,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
-      {phase==="done"&&isLouis&&(<div style={{marginBottom:12}}>
+      {phase==="done"&&isLouis&&(<div style={{marginBottom:12,display:"flex",gap:8}}>
+        {epreuveValidated&&<button onClick={()=>{validatedRankedRef.current=null;setEpreuveValidated(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}} style={{background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px 12px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>}
         <button onClick={()=>validateClassement(getFinalRanking())} disabled={epreuveValidated}
-          style={{width:"100%",background:epreuveValidated?"#1e2e1e":"#34d399",border:"none",color:"#080810",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:epreuveValidated?"default":"pointer",fontFamily:"'Outfit',sans-serif"}}>
+          style={{flex:1,background:epreuveValidated?"#1e2e1e":"#34d399",border:"none",color:epreuveValidated?"#555":"#080810",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:epreuveValidated?"default":"pointer",fontFamily:"'Outfit',sans-serif"}}>
           {epreuveValidated?"✅ Classement validé":"✓ Valider le classement officiel"}
         </button>
       </div>)}
