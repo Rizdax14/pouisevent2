@@ -1259,6 +1259,39 @@ function EventsPage({nav,navBack}){
             </div>
           );
         })}
+        {/* O2026 inline card */}
+        {(()=>{
+          const ac="#E8342A";
+          const o2026Teams=TEAMS.filter(t=>t.active);
+          return(
+            <div key="o2026" style={{background:"#0d0d1c",border:`1px solid ${ac}33`,borderRadius:12,overflow:"hidden",cursor:"default",transition:"transform .2s,border-color .2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=ac+"77";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=ac+"33";}}>
+              <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`}}/>
+              <div style={{padding:m?14:22}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                  <div>
+                    <Badge color={ac}>Olympiades</Badge>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:34,marginTop:8,lineHeight:1}}>Olympiade 2026</div>
+                    <div style={{color:ac,fontFamily:"'Bebas Neue',sans-serif",fontSize:18}}>eO2026</div>
+                  </div>
+                  <div style={{textAlign:"right",color:"#60607a",fontSize:11,lineHeight:1.8}}>
+                    <div>2026</div>
+                    <div>{o2026Teams.length} équipes</div>
+                  </div>
+                </div>
+                <p style={{color:"#60607a",fontSize:12,lineHeight:1.6,marginBottom:14}}>Épreuves sportives et ludiques — classement par équipes et individuel.</p>
+                <div style={{display:"flex",gap:6}}>
+                  {o2026Teams.slice(0,3).map((t,i)=>(
+                    <div key={t.id} style={{flex:1,background:"#13131f",borderRadius:8,padding:"7px 10px",display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontSize:13}}>{["🥇","🥈","🥉"][i]}</span>
+                      <div style={{width:3,height:16,background:t.color,borderRadius:2}}/>
+                      <div style={{fontSize:11,fontWeight:600,color:t.color}}>{t.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -1787,24 +1820,23 @@ function RankingsPage({nav}){
           {teamRanks.length===0&&<p style={{color:"#60607a",fontSize:13}}>Aucun rating équipe disponible.</p>}
           {teamRanks.length>0&&(
             <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,overflowX:"auto"}}>
-              <div style={{display:"grid",gridTemplateColumns:m?"28px 1fr 72px":`44px 1fr ${teamEvShow.map(()=>"76px").join(" ")} 72px`,gap:6,padding:"9px 14px",background:"#13131f",borderBottom:"1px solid #1e1e30",fontSize:10,color:"#60607a",textTransform:"uppercase",minWidth:m?0:400}}>
+              <div style={{display:"grid",gridTemplateColumns:`30px 1fr ${teamEvShow.map(()=>"60px").join(" ")} 60px`,gap:4,padding:"9px 14px",background:"#13131f",borderBottom:"1px solid #1e1e30",fontSize:10,color:"#60607a",textTransform:"uppercase",overflowX:"auto"}}>
                 <span>#</span><span>Équipe</span>
-                {m?<span style={{textAlign:"right"}}>Moy.</span>:<>{teamEvShow.map(e=>(<span key={e.id} style={{textAlign:"center"}}>{e.edition}</span>))}<span style={{textAlign:"right"}}>Moy.</span></>}
+                {teamEvShow.map(e=>(<span key={e.id} style={{textAlign:"center"}}>{e.edition}</span>))}
+                <span style={{textAlign:"right"}}>Moy.</span>
               </div>
               {teamRanks.map((r,i)=>{
                 if(!r||!r.team)return null;
                 return(
-                  <div key={r.team.id} onClick={()=>nav("teamDetail",{teamId:r.team.id})} style={{display:"grid",gridTemplateColumns:m?"28px 1fr 72px":`44px 1fr ${teamEvShow.map(()=>"76px").join(" ")} 72px`,gap:6,padding:"9px 14px",alignItems:"center",borderBottom:i<teamRanks.length-1?"1px solid #1e1e30":"none",cursor:"pointer",transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <div key={r.team.id} onClick={()=>nav("teamDetail",{teamId:r.team.id})} style={{display:"grid",gridTemplateColumns:`30px 1fr ${teamEvShow.map(()=>"60px").join(" ")} 60px`,gap:4,padding:"9px 14px",alignItems:"center",borderBottom:i<teamRanks.length-1?"1px solid #1e1e30":"none",cursor:"pointer",transition:"background .15s",overflowX:"auto"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <span style={{color:i<3?"#E8B84B":"#60607a",fontWeight:700,fontSize:13}}>{i+1}</span>
-                    <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-                      <div style={{width:3,height:24,background:r.team.color,borderRadius:2}}/>
-                      <span style={{fontWeight:500,fontSize:13,color:r.inactive?"#60607a":"#eeeef5"}}>{r.team.name}</span>
-                      {r.inactive&&<Badge color="#404058">Inactive</Badge>}
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <div style={{width:3,height:24,background:r.team.color,borderRadius:2,flexShrink:0}}/>
+                      <span style={{fontWeight:500,fontSize:m?11:13,color:r.inactive?"#60607a":"#eeeef5"}}>{r.team.name}</span>
+                      {r.inactive&&!m&&<Badge color="#404058">Inactive</Badge>}
                     </div>
-                    {m?<span style={{textAlign:"right",fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:r.team.color}}>{r.avg.toFixed(2)}</span>:<>
-                      {teamEvShow.map(ev=>{const v=getTeamEventRating(getTeamAllIds(r.team.id),ev);const c=!v?"#404058":v>=1.8?"#E8B84B":v>=1.6?"#34d399":"#60a5fa";return(<span key={ev.id} style={{textAlign:"center",fontWeight:600,fontSize:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})}
-                      <span style={{textAlign:"right",fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:r.team.color}}>{r.avg.toFixed(2)}</span>
-                    </>}
+                    {teamEvShow.map(ev=>{const v=getTeamEventRating(getTeamAllIds(r.team.id),ev);const c=!v?"#404058":v>=1.8?"#E8B84B":v>=1.6?"#34d399":"#60a5fa";return(<span key={ev.id} style={{textAlign:"center",fontWeight:600,fontSize:m?10:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})}
+                    <span style={{textAlign:"right",fontFamily:"'Bebas Neue',sans-serif",fontSize:m?16:20,color:r.team.color}}>{r.avg.toFixed(2)}</span>
                   </div>
                 );
               })}
@@ -2033,7 +2065,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           const avg=count>0?totalPts/count:0;
           const rating=count>0?Math.max(0,1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7))):0;
           return{player:p,epCount:count,avg:Math.round(avg*10)/10,rating:Math.round(rating*100)/100};
-        }).filter(p=>p.epCount>0||finishedEpIds.length===0).sort((a,b)=>b.rating-a.rating||b.avg-a.avg);
+        }).sort((a,b)=>b.rating-a.rating||b.avg-a.avg||a.player.name.localeCompare(b.player.name));
 
         // Tab state + pagination
         const [rankTab,setRankTab]=React.useState("equipes");
@@ -2083,9 +2115,10 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
             {rankTab==="individuel"&&(
               <>
                 {/* Header */}
-                <div style={{display:"grid",gridTemplateColumns:"30px 1fr 50px 50px 60px",gap:6,padding:"4px 0 8px",borderBottom:"1px solid #1e1e30",marginBottom:4}}>
+                <div style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,padding:"4px 0 8px",borderBottom:"1px solid #1e1e30",marginBottom:4}}>
                   <span/>
                   <span style={{fontSize:9,color:"#404058",fontWeight:600}}>JOUEUR</span>
+                  <span style={{fontSize:9,color:"#404058",fontWeight:600}}>ÉQUIPE</span>
                   <span style={{fontSize:9,color:"#404058",textAlign:"center",fontWeight:600}}>ÉPR.</span>
                   <span style={{fontSize:9,color:"#404058",textAlign:"center",fontWeight:600}}>MOY.</span>
                   <span style={{fontSize:9,color:"#E8B84B",textAlign:"right",fontWeight:600}}>RATING</span>
@@ -2095,15 +2128,13 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
                   const rank=globalOffset+i;
                   const team=getTeam(d.player.t26);
                   return(
-                    <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 50px 50px 60px",gap:6,alignItems:"center",padding:"7px 0",borderBottom:i<indivSlice.length-1?"1px solid #0d0d1c":"none"}}>
+                    <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,alignItems:"center",padding:"7px 0",borderBottom:i<indivSlice.length-1?"1px solid #0d0d1c":"none"}}>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:rank<3?18:13,color:rank===0?"#E8B84B":rank===1?"#aaaaaa":rank===2?"#c87533":"#404058",textAlign:"center"}}>{rank+1}</span>
-                      <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
-                        {team&&<div style={{width:6,height:6,borderRadius:"50%",background:team.color,flexShrink:0}}/>}
-                        <span style={{fontSize:m?11:12,color:"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
-                      </div>
+                      <span style={{fontSize:m?11:12,color:"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
+                      <span style={{fontSize:10,color:team?.color||"#404058",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team?.name||"—"}</span>
                       <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.epCount}</span>
-                      <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg}</span>
-                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B",textAlign:"right"}}>{d.rating}</span>
+                      <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg||"—"}</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:d.rating>0?"#E8B84B":"#404058",textAlign:"right"}}>{d.rating>0?d.rating:"—"}</span>
                     </div>
                   );
                 })}
@@ -4519,15 +4550,13 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
             const [resetDone,setResetDone]=React.useState(false);
             async function doReset(){
               try{
-                const rows=await sbFetch("players",`?id=eq.${player.id}&pin=eq.${encodeURIComponent(resetPin)}&select=id`);
+                const rows=await sbFetch("players",`?uid=eq.louis-mar&pin=eq.${encodeURIComponent(resetPin)}&select=id`);
                 if(!rows||!rows.length){setResetErr(true);setResetPin("");return;}
-                // Delete all o2026_state rows
-                await sbFetch("o2026_state","",{method:"DELETE"});
-                // Clear local state
+                await sbFetch("o2026_state","",{method:"DELETE",headers:{"Prefer":"return=minimal"}});
                 if(setO2026Scores)setO2026Scores({});
                 setResetStep("idle");setResetPin("");setResetErr(false);setResetDone(true);
                 setTimeout(()=>setResetDone(false),3000);
-              }catch(e){setResetErr(true);setResetPin("");}
+              }catch(e){console.error("reset error",e);setResetErr(true);setResetPin("");}
             }
             return(
               <div style={{marginTop:12,borderTop:"1px solid #1e1e30",paddingTop:12}}>
@@ -6856,8 +6885,7 @@ function QuizPage({currentPlayer,onBack}){
   const[loading,setLoading]=React.useState(false);
   const[error,setError]=React.useState(null);
   const ALL_T=QUIZ_THEMES.map(t=>t[0]);
-  const[duelThemes,setDuelThemes]=React.useState(ALL_T);
-  const[duelCount,setDuelCount]=React.useState(20);
+
   const[socialSrc,setSocialSrc]=React.useState('bdd');
   const[socialThemes,setSocialThemes]=React.useState(ALL_T);
   const[socialCount,setSocialCount]=React.useState(20);
@@ -6940,11 +6968,6 @@ function QuizPage({currentPlayer,onBack}){
     <div style={S.root}>
       <div style={S.back}><button onClick={()=>setView('home')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>Choisir un mode</span></div>
       <div style={S.body}>
-        <button style={S.mode(false)} onClick={()=>setView('duel_setup')}>
-          <span style={{fontSize:30}}>⚔️</span>
-          <div><div style={{fontWeight:800,fontSize:15,color:'#e74c3c'}}>Mode Duel</div><div style={{color:'#aaa',fontSize:12}}>1v1 — questions de la BDD</div></div>
-          <span style={{marginLeft:'auto',color:'#e74c3c'}}>→</span>
-        </button>
         <button style={S.mode(false)} onClick={()=>setView('social_setup')}>
           <span style={{fontSize:30}}>🎮</span>
           <div><div style={{fontWeight:800,fontSize:15,color:'#a78bfa'}}>Mode Social</div><div style={{color:'#aaa',fontSize:12}}>Multijoueur — BDD ou quiz préenregistrés</div></div>
@@ -6954,31 +6977,6 @@ function QuizPage({currentPlayer,onBack}){
     </div>
   );
 
-  if(view==='duel_setup')return(
-    <div style={S.root}>
-      <div style={S.back}><button onClick={()=>setView('mode_pick')} style={S.back_btn}>←</button><span style={{fontWeight:800,fontSize:20}}>⚔️ Mode Duel</span></div>
-      <div style={{...S.body,paddingBottom:80,overflowY:'auto',flex:1}}>
-        <div style={{background:'rgba(255,255,255,.05)',borderRadius:12,padding:'14px 16px'}}>
-          <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>Nombre de questions : <span style={{color:'#e74c3c',fontWeight:900}}>{duelCount}</span></div>
-          <input type='range' min={10} max={100} step={5} value={duelCount} onChange={e=>setDuelCount(Number(e.target.value))} style={{width:'100%',accentColor:'#e74c3c'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#555',marginTop:2}}><span>10</span><span>100</span></div>
-        </div>
-        <ThemeSelector selected={duelThemes} onChange={setDuelThemes}/>
-        {error&&<div style={S.err}>{error}</div>}
-        <button style={S.btn('#e74c3c',loading||duelThemes.length===0)} disabled={loading||duelThemes.length===0} onClick={async()=>{
-          setLoading(true);setError(null);
-          try{
-            const qs=await loadBDDQuestions(duelCount,duelThemes);
-            if(!qs||qs.length<2)throw new Error(`Pas assez de questions (${qs?.length||0})`);
-            const quiz={title:'⚔️ Duel',emoji:'⚔️',questions:qs,_hostPlays:true};
-            const pin=await createGame(quiz);
-            setHostQuiz(quiz);setGamePin(pin);setView('host_game');
-          }catch(e){setError(e.message);}
-          setLoading(false);
-        }}>{loading?'Chargement…':'🚀 Lancer le duel'}</button>
-      </div>
-    </div>
-  );
 
   if(view==='social_setup')return(
     <div style={S.root}>
