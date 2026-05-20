@@ -1217,15 +1217,17 @@ function EventLogo({ev, size=48}){
 // ─── O2026 DETAIL PAGE ───────────────────────────────
 function O2026DetailPage({nav,navBack,o2026Scores,o2026Assignments}){
   const m=useIsMobile();
-  const ac="#E8342A";
+  const ac=getETC("olympiades");
+
+  // Build ranked teams from live scores
   const teams=TEAMS.filter(t=>t.active);
   const totals={};teams.forEach(t=>{totals[t.id]=0;});
   Object.values(o2026Scores||{}).forEach(d=>{if(d?.ranked?.length)d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);});});
   const ranked=teams.slice().sort((a,b)=>(totals[b.id]||0)-(totals[a.id]||0));
 
-  const allIndivPlayers=PLAYERS.filter(p=>p.t26);
+  // Build individual ratings from live scores
   const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
-  const playerIndiv=allIndivPlayers.map(p=>{
+  const playerRatings=PLAYERS.filter(p=>p.t26).map(p=>{
     let totalPts=0,count=0;
     finishedEpIds.forEach(epId=>{
       const assigned=(o2026Assignments||{})[`${p.t26}_${epId}`]||[];
@@ -1234,19 +1236,11 @@ function O2026DetailPage({nav,navBack,o2026Scores,o2026Assignments}){
       const entry=rd.find(r=>r.teamId===p.t26);
       if(entry){totalPts+=(entry.pts||0);count++;}
     });
-    const avg=count>0?totalPts/count:0;
-    const rating=count>0?Math.max(0,1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7))):0;
-    return{player:p,epCount:count,avg:Math.round(avg*10)/10,rating:Math.round(rating*100)/100};
-  }).sort((a,b)=>b.rating-a.rating||b.avg-a.avg||a.player.name.localeCompare(b.player.name));
-
-  const [tab,setTab]=React.useState("equipes");
-
-  const TAB=(id,label,col)=>({
-    cursor:"pointer",padding:"6px 16px",borderRadius:20,fontSize:12,fontWeight:600,
-    background:tab===id?col||ac:"transparent",
-    color:tab===id?"#fff":"#60607a",
-    border:tab===id?"none":"1px solid #1e1e30",
-  });
+    if(!count)return null;
+    const avg=totalPts/count;
+    const rating=Math.max(0,1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7)));
+    return{pid:p.id,r:Math.round(rating*100)/100};
+  }).filter(Boolean).sort((a,b)=>b.r-a.r);
 
   return(
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1100,margin:"0 auto"}} className="fade">
@@ -1256,84 +1250,82 @@ function O2026DetailPage({nav,navBack,o2026Scores,o2026Assignments}){
         <div>
           <Badge color={ac}>Olympiades Physiques</Badge>
           <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?38:54,lineHeight:1,marginTop:8}}>Olympiade été <span style={{color:ac}}>2026</span></h1>
-          <div style={{marginTop:6,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?140:200)+'" height="'+(m?48:68)+'" style="max-height:'+(m?48:68)+'px" ')}}/>
+          <div style={{marginTop:8,marginBottom:4}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?140:200)+'" height="'+(m?48:68)+'" style="max-height:'+(m?48:68)+'px" ')}}/>
           <p style={{color:"#60607a",marginTop:6,fontSize:13}}>Épreuves sportives et ludiques — classement par équipes et individuel.</p>
         </div>
         <div style={{textAlign:"right",color:"#60607a",fontSize:12,lineHeight:2}}>
           <div>Juin 2026</div>
-          <div>{allIndivPlayers.length} participants</div>
-          <div style={{color:finishedEpIds.length>0?"#34d399":"#404058"}}>{finishedEpIds.length}/{O2026_EPREUVES.length} épreuves</div>
+          <div>101 participants</div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <div style={{display:"flex",gap:8,marginBottom:16}}>
-        <div style={TAB("equipes","Équipes","#E8B84B")} onClick={()=>setTab("equipes")}>🏆 Équipes</div>
-        <div style={TAB("individuel","Individuel","#60a5fa")} onClick={()=>setTab("individuel")}>👤 Individuel</div>
-        <div style={TAB("epreuves","Épreuves","#34d399")} onClick={()=>setTab("epreuves")}>📋 Épreuves</div>
-      </div>
-
-      {/* Équipes */}
-      {tab==="equipes"&&(
-        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20}}>
-          {ranked.map((team,i)=>(
-            <div key={team.id} onClick={()=>nav("teamDetail",{teamId:team.id})} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:16,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:30,textAlign:"center",flexShrink:0}}>{i+1}</span>
-              <div style={{width:10,height:10,borderRadius:"50%",background:team.color,flexShrink:0}}/>
-              <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?15:18,color:team.color}}>{team.name}</span>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#E8B84B"}}>{totals[team.id]||0} pts</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Individuel */}
-      {tab==="individuel"&&(
-        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,overflowX:"auto"}}>
-          <div style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,padding:"9px 14px",background:"#13131f",borderBottom:"1px solid #1e1e30",fontSize:10,color:"#60607a",textTransform:"uppercase"}}>
-            <span/><span>Joueur</span><span>Équipe</span><span style={{textAlign:"center"}}>Épr.</span><span style={{textAlign:"center"}}>Moy.</span><span style={{textAlign:"right",color:"#E8B84B"}}>Rating</span>
-          </div>
-          {playerIndiv.map((d,i)=>{
-            const team=getTeam(d.player.t26);
+      <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:m?12:18}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:14}}>CLASSEMENT PROVISOIRE</div>
+          {ranked.map((t,i)=>{
+            const pts=totals[t.id]||0;
             return(
-              <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,alignItems:"center",padding:"8px 14px",borderBottom:i<playerIndiv.length-1?"1px solid #1e1e30":"none"}}>
-                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?18:13,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",textAlign:"center"}}>{i+1}</span>
-                <span onClick={()=>nav("playerDetail",{playerId:d.player.id})} style={{fontSize:m?11:12,color:"#eeeef5",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
-                <span onClick={team?()=>nav("teamDetail",{teamId:team.id}):undefined} style={{fontSize:10,color:team?.color||"#404058",cursor:team?"pointer":"default",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team?.name||"—"}</span>
-                <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.epCount||"—"}</span>
-                <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg||"—"}</span>
-                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:d.rating>0?"#E8B84B":"#404058",textAlign:"right"}}>{d.rating>0?d.rating:"—"}</span>
+              <div key={t.id} onClick={()=>nav("teamDetail",{teamId:t.id})} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,marginBottom:4,cursor:"pointer",background:"#0d0d1c",border:`1px solid ${i===0?"#E8B84B33":"#1e1e30"}`}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="#0d0d1c"}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?20:14,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:28,textAlign:"center",flexShrink:0}}>{i+1}</span>
+                <div style={{width:3,height:20,background:t.color,borderRadius:2}}/>
+                <span style={{flex:1,fontWeight:500,fontSize:13}}>{t.name}</span>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:ac,marginRight:6}}>{pts}</span>
               </div>
             );
           })}
         </div>
-      )}
-
-      {/* Épreuves */}
-      {tab==="epreuves"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {O2026_EPREUVES.map(ep=>{
-            const done=!!(o2026Scores||{})[ep.id]?.ranked?.length;
-            const res=((o2026Scores||{})[ep.id]?.ranked||[]).slice(0,3);
-            return(
-              <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${done?ep.color+"55":"#1e1e30"}`,borderRadius:10,padding:m?12:16,display:"flex",alignItems:"center",gap:12}}>
-                <span style={{fontSize:20}}>{ep.emoji}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?16:20,color:done?ep.color:"#60607a"}}>PHASE {ep.phase} — {ep.nom}</div>
-                  <div style={{fontSize:10,color:"#60607a"}}>{ep.horaire} · {ep.format}</div>
-                </div>
-                {done&&res.map((r,i)=>{const t=getTeam(r.teamId);return t&&(
-                  <div key={r.teamId} style={{display:"flex",alignItems:"center",gap:3}}>
-                    <span style={{fontSize:11}}>{["🥇","🥈","🥉"][i]}</span>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:t.color}}/>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:14}}>ÉPREUVES</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {O2026_EPREUVES.map(ep=>{
+              const done=!!(o2026Scores||{})[ep.id]?.ranked?.length;
+              const res=((o2026Scores||{})[ep.id]?.ranked||[]).slice(0,3);
+              const [open,setOpen]=React.useState(false);
+              return(
+                <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${done?ep.color+"55":"#1e1e30"}`,borderRadius:8,overflow:"hidden"}}>
+                  <div onClick={()=>done&&setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",cursor:done?"pointer":"default"}} onMouseEnter={e=>{if(done)e.currentTarget.style.background="#13131f";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <span style={{fontSize:14}}>{ep.emoji}</span>
+                    <span style={{fontWeight:600,fontSize:12,flex:1,color:done?ep.color:"#60607a"}}>{ep.nom}</span>
+                    {!done&&<span style={{fontSize:10,color:"#404058"}}>À venir</span>}
+                    {done&&!open&&res.map((r,i)=>{const t=getTeam(r.teamId);return t&&(<div key={r.teamId} style={{display:"flex",alignItems:"center",gap:2}}><span style={{fontSize:10}}>{["🥇","🥈","🥉"][i]}</span><div style={{width:5,height:5,borderRadius:"50%",background:t.color}}/></div>);})}
+                    {done&&<span style={{fontSize:9,color:"#404058",transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s"}}>▼</span>}
                   </div>
-                );})}
-                {!done&&<span style={{fontSize:10,color:"#404058"}}>À venir</span>}
-              </div>
-            );
-          })}
+                  {open&&done&&(
+                    <div style={{background:"#13131f",borderTop:`1px solid ${ep.color}33`,padding:"8px 12px"}}>
+                      {res.map((r,i)=>{const t=getTeam(r.teamId);return t&&(
+                        <div key={r.teamId} onClick={()=>nav("teamDetail",{teamId:r.teamId})} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",cursor:"pointer"}}>
+                          <span style={{fontSize:13}}>{["🥇","🥈","🥉"][i]}</span>
+                          <div style={{width:3,height:16,background:t.color,borderRadius:2}}/>
+                          <span style={{fontSize:11,fontWeight:600,color:t.color,flex:1}}>{t.name}</span>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>{r.pts}</span>
+                        </div>
+                      );})}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      )}
+      </div>
+      <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:16,marginTop:m?12:18}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:14}}>RATINGS JOUEURS</div>
+        {playerRatings.length===0&&<div style={{fontSize:12,color:"#404058"}}>Aucune épreuve terminée.</div>}
+        {playerRatings.map((r,i)=>{
+          const p=getPlayer(r.pid);
+          const team=p?getTeam(p.t26):null;
+          return(
+            <div key={r.pid} style={{display:"grid",gridTemplateColumns:"22px 1fr 80px 46px",alignItems:"center",gap:6,padding:"7px 0",borderBottom:i<playerRatings.length-1?"1px solid #1e1e30":"none",cursor:"pointer"}} onClick={()=>nav("playerDetail",{playerId:r.pid})}>
+              <span style={{fontSize:11,color:i<3?"#E8B84B":"#60607a",fontWeight:600}}>{i+1}</span>
+              <div>
+                <div style={{fontSize:12,fontWeight:600}}>{getDisplayName(p,PLAYERS)}</div>
+                {team&&<div style={{display:"flex",alignItems:"center",gap:4,marginTop:1}}><div style={{width:5,height:5,borderRadius:"50%",background:team.color}}/><span style={{fontSize:10,color:team.color}}>{team.name}</span></div>}
+              </div>
+              <div/>
+              <span style={{fontSize:13,fontWeight:700,color:r.r>=1.8?"#E8B84B":r.r>=1.6?"#34d399":"#60a5fa",textAlign:"right"}}>{r.r.toFixed(2)}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2642,6 +2634,9 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     sh.forEach((tid,i)=>g[(i%4)+1].push(tid));
     setGroupes(g);setResultats({});setMiniRes({});setBracketResultats({});
     setPhase("groupes");setFinalizedGroupes({1:false,2:false,3:false,4:false});
+    setEpreuveValidated(false);validatedRankedRef.current=null;
+    setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});
+    SUPABASE.from("o2026_state").delete().eq("epreuve_id",ep.id).then(()=>{}).catch(()=>{});
   }
 
   function tirageMolky(){
