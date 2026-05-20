@@ -4623,6 +4623,8 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                         if(sex(p)==="m"&&assignedMen.length>=sexLim.maxH)return false;
                         if(sex(p)==="f"&&assignedWomen.length>=sexLim.maxF)return false;
                       }
+                      if(ep.id==="tircorde"&&bioIds.includes(p.id)&&roster.filter(r=>sex(r)===sex(p)).length>=4)return false;
+                      if(ep.id==="biathlon"&&tcIds.includes(p.id)&&roster.filter(r=>sex(r)===sex(p)).length>=4)return false;
                       return true;
                     });
 
