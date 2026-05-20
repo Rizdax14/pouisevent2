@@ -2173,6 +2173,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [biathlonPhase,setBiathlonPhase]=useState("courses");
   const [biathlonFinalLocked,setBiathlonFinalLocked]=useState(false);
   const [epreuveValidated,setEpreuveValidated]=useState(false);
+  const validatedRankedRef=React.useRef(null);
   const [biathlonWin,setBiathlonWin]=useState([]);
   const [biathlonLose,setBiathlonLose]=useState([]);
   // Tir à la corde - 16-team bracket
@@ -2194,8 +2195,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
 
   // Serialize all mutable state
   function validateClassement(ranked){
+    validatedRankedRef.current=ranked;
     setO2026Scores(prev=>({...prev,[ep.id]:{...getStateSnapshot(),ranked}}));
     setEpreuveValidated(true);
+    // Save directly to Supabase immediately (don't wait for debounce)
     SUPABASE.from("o2026_state").upsert({epreuve_id:ep.id,data:{...getStateSnapshot(),ranked},updated_by:"louis"}).catch(()=>{});
   }
 
@@ -2206,7 +2209,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       flechetteGroup1,flechetteGroup2,flechettePhase,flechetteWin,flechetteLose,flechetteDone,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,epreuveValidated,ranked:epreuveValidated?o2026Scores?.[ep.id]?.ranked:undefined};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,epreuveValidated,ranked:validatedRankedRef.current||undefined};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2250,7 +2253,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.beretRanked?.length){setBeretRanked(d.beretRanked);setO2026Scores(prev=>({...prev,beret:{ranked:d.beretRanked,beretO2026Results:d.beretO2026Results||{}}}));}
     if(d.tcTeams?.length)setTcTeams(d.tcTeams);
     if(d.tcDone!==undefined)setTcDone(d.tcDone);
-    if(d.ranked?.length)setEpreuveValidated(true);
+    if(d.ranked?.length){setEpreuveValidated(true);validatedRankedRef.current=d.ranked;}
   }
 
   // Load state from Supabase on mount
@@ -2830,7 +2833,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                 <button onClick={simulateDragRank} style={BTN("#404058")}>🎲 Simuler le classement</button>
-                <button onClick={()=>{if(dragRankLocked){setDragRankLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setDragRankLocked(true);if(dragRank.length>0){const ranked=dragRank.map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}}} disabled={dragRank.length===0} style={BTN(dragRankLocked?"#404058":"#34d399")}>
+                <button onClick={()=>{if(dragRankLocked){setDragRankLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});validatedRankedRef.current=null;setEpreuveValidated(false);}else{setDragRankLocked(true);if(dragRank.length>0){const ranked=dragRank.map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}}} disabled={dragRank.length===0} style={BTN(dragRankLocked?"#404058":"#34d399")}>
                   {dragRankLocked?"✅ Classement officiel":"📋 Valider le classement officiel"}
                 </button>
               </div>
@@ -2881,7 +2884,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             <>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                 <button onClick={simulateCercles} style={BTN("#404058")}>🎲 Simuler le classement</button>
-                <button onClick={()=>{if(dragRankCoefLocked){setDragRankCoefLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setDragRankCoefLocked(true);const allT=getO2026ActiveTeams();const teamSc={};dragRankCoef.forEach((s,i)=>{if(!teamSc[s.teamId])teamSc[s.teamId]=[];teamSc[s.teamId].push(i+1);});const ranked=allT.slice().sort((a,b)=>{const pA=teamSc[a.id]||[99,99];const pB=teamSc[b.id]||[99,99];const sA=(Math.min(...pA)*2+Math.max(...pA))/3;const sB=(Math.min(...pB)*2+Math.max(...pB))/3;return sA-sB;}).map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={dragRankCoef.length===0} style={BTN(dragRankCoefLocked?"#404058":"#34d399")}>
+                <button onClick={()=>{if(dragRankCoefLocked){setDragRankCoefLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});validatedRankedRef.current=null;setEpreuveValidated(false);}else{setDragRankCoefLocked(true);const allT=getO2026ActiveTeams();const teamSc={};dragRankCoef.forEach((s,i)=>{if(!teamSc[s.teamId])teamSc[s.teamId]=[];teamSc[s.teamId].push(i+1);});const ranked=allT.slice().sort((a,b)=>{const pA=teamSc[a.id]||[99,99];const pB=teamSc[b.id]||[99,99];const sA=(Math.min(...pA)*2+Math.max(...pA))/3;const sB=(Math.min(...pB)*2+Math.max(...pB))/3;return sA-sB;}).map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={dragRankCoef.length===0} style={BTN(dragRankCoefLocked?"#404058":"#34d399")}>
                   {dragRankCoefLocked?"✅ Validé":"📋 Valider & calculer classement"}
                 </button>
               </div>
@@ -3192,7 +3195,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                       </div>
                     ))}
                   </div>
-                  <button onClick={()=>{if(biathlonFinalLocked){setBiathlonFinalLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}else{setBiathlonFinalLocked(true);const ranked=[...biathlonWin,...biathlonLose].map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={biathlonWin.length===0} style={BTN(biathlonFinalLocked?"#404058":"#34d399")}>
+                  <button onClick={()=>{if(biathlonFinalLocked){setBiathlonFinalLocked(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});validatedRankedRef.current=null;setEpreuveValidated(false);}else{setBiathlonFinalLocked(true);const ranked=[...biathlonWin,...biathlonLose].map((tid,i)=>({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));validateClassement(ranked);}}} disabled={biathlonWin.length===0} style={BTN(biathlonFinalLocked?"#404058":"#34d399")}>
                     {biathlonFinalLocked?"✅ Classement officiel":"📋 Valider le classement final"}
                   </button>
                 </div>
@@ -3224,7 +3227,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 );
               })}
               {isLouis&&(<div style={{display:"flex",gap:8,marginTop:12}}>
-              <button onClick={()=>{setBasketScores({});setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}} style={{flex:1,background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
+              <button onClick={()=>{setBasketScores({});setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});validatedRankedRef.current=null;setEpreuveValidated(false);}} style={{flex:1,background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
               <button onClick={()=>{
                 const ranked=[...getO2026ActiveTeams()]
                   .map(t=>({...t,total:(parseInt(basketScores[t.id]?.e1)||0)+(parseInt(basketScores[t.id]?.e2)||0)}))
