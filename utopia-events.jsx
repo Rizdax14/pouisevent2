@@ -1,5 +1,5 @@
 // VERSION: 2.0
-import { useState, useEffect } from "react";
+const { useState, useEffect } = React;
 // ─── SUPABASE ────────────────────────────────────────
 const SUPABASE_URL = "https://daerxouhvmvqhirgyrjr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZXJ4b3Vodm12cWhpcmd5cmpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NzM1NTMsImV4cCI6MjA5MDA0OTU1M30.CHaqQj8dd-C6NmA6JUkjzL5xtY8drzHqlYZAtJwCzGA";
