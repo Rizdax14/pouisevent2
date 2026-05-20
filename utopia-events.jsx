@@ -909,7 +909,7 @@ function NavBar({page,setPage,currentPlayer,isAdmin,onMenuBL}){
     currentPlayer?{id:"profile",l:"Profil",ic:"👤"}:{id:"profile",l:"Connexion",ic:"🔑"},
     ...(isAdmin?[{id:"admin",l:"Data",ic:"📊"}]:[]),
   ];
-  const map={home:"home",events:"events",eventDetail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026"};
+  const map={home:"home",events:"events",eventDetail:"events",o2026Detail:"events",rankings:"rankings",playerDetail:"rankings",teams:"teams",teamDetail:"teams",admin:"admin",profile:"profile",o2026:"o2026",epreuveO2026:"o2026"};
   if(m){
     return(
       <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"#0d0d1c",borderTop:"1px solid #1e1e30",display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>
@@ -1213,7 +1213,132 @@ function EventLogo({ev, size=48}){
 }
 
 
-function EventsPage({nav,navBack}){
+
+// ─── O2026 DETAIL PAGE ───────────────────────────────
+function O2026DetailPage({nav,navBack,o2026Scores,o2026Assignments}){
+  const m=useIsMobile();
+  const ac="#E8342A";
+  const teams=TEAMS.filter(t=>t.active);
+  const totals={};teams.forEach(t=>{totals[t.id]=0;});
+  Object.values(o2026Scores||{}).forEach(d=>{if(d?.ranked?.length)d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);});});
+  const ranked=teams.slice().sort((a,b)=>(totals[b.id]||0)-(totals[a.id]||0));
+
+  const allIndivPlayers=PLAYERS.filter(p=>p.t26);
+  const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
+  const playerIndiv=allIndivPlayers.map(p=>{
+    let totalPts=0,count=0;
+    finishedEpIds.forEach(epId=>{
+      const assigned=(o2026Assignments||{})[`${p.t26}_${epId}`]||[];
+      if(!assigned.includes(p.id))return;
+      const rd=(o2026Scores[epId]?.ranked)||[];
+      const entry=rd.find(r=>r.teamId===p.t26);
+      if(entry){totalPts+=(entry.pts||0);count++;}
+    });
+    const avg=count>0?totalPts/count:0;
+    const rating=count>0?Math.max(0,1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7))):0;
+    return{player:p,epCount:count,avg:Math.round(avg*10)/10,rating:Math.round(rating*100)/100};
+  }).sort((a,b)=>b.rating-a.rating||b.avg-a.avg||a.player.name.localeCompare(b.player.name));
+
+  const [tab,setTab]=React.useState("equipes");
+
+  const TAB=(id,label,col)=>({
+    cursor:"pointer",padding:"6px 16px",borderRadius:20,fontSize:12,fontWeight:600,
+    background:tab===id?col||ac:"transparent",
+    color:tab===id?"#fff":"#60607a",
+    border:tab===id?"none":"1px solid #1e1e30",
+  });
+
+  return(
+    <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1100,margin:"0 auto"}} className="fade">
+      <BackBtn onClick={navBack} label="Retour"/>
+      <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`,borderRadius:2,marginBottom:18}}/>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:20}}>
+        <div>
+          <Badge color={ac}>Olympiades Physiques</Badge>
+          <h1 style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?38:54,lineHeight:1,marginTop:8}}>Olympiade <span style={{color:ac}}>2026</span></h1>
+          <div style={{marginTop:6,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?140:200)+'" height="'+(m?48:68)+'" style="max-height:'+(m?48:68)+'px" ')}}/>
+          <p style={{color:"#60607a",marginTop:6,fontSize:13}}>Épreuves sportives et ludiques — classement par équipes et individuel.</p>
+        </div>
+        <div style={{textAlign:"right",color:"#60607a",fontSize:12,lineHeight:2}}>
+          <div>Juin 2026</div>
+          <div>{allIndivPlayers.length} participants</div>
+          <div style={{color:finishedEpIds.length>0?"#34d399":"#404058"}}>{finishedEpIds.length}/{O2026_EPREUVES.length} épreuves</div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <div style={TAB("equipes","Équipes","#E8B84B")} onClick={()=>setTab("equipes")}>🏆 Équipes</div>
+        <div style={TAB("individuel","Individuel","#60a5fa")} onClick={()=>setTab("individuel")}>👤 Individuel</div>
+        <div style={TAB("epreuves","Épreuves","#34d399")} onClick={()=>setTab("epreuves")}>📋 Épreuves</div>
+      </div>
+
+      {/* Équipes */}
+      {tab==="equipes"&&(
+        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20}}>
+          {ranked.map((team,i)=>(
+            <div key={team.id} onClick={()=>nav("teamDetail",{teamId:team.id})} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background="#13131f"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:16,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:30,textAlign:"center",flexShrink:0}}>{i+1}</span>
+              <div style={{width:10,height:10,borderRadius:"50%",background:team.color,flexShrink:0}}/>
+              <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:m?15:18,color:team.color}}>{team.name}</span>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#E8B84B"}}>{totals[team.id]||0} pts</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Individuel */}
+      {tab==="individuel"&&(
+        <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,overflowX:"auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,padding:"9px 14px",background:"#13131f",borderBottom:"1px solid #1e1e30",fontSize:10,color:"#60607a",textTransform:"uppercase"}}>
+            <span/><span>Joueur</span><span>Équipe</span><span style={{textAlign:"center"}}>Épr.</span><span style={{textAlign:"center"}}>Moy.</span><span style={{textAlign:"right",color:"#E8B84B"}}>Rating</span>
+          </div>
+          {playerIndiv.map((d,i)=>{
+            const team=getTeam(d.player.t26);
+            return(
+              <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,alignItems:"center",padding:"8px 14px",borderBottom:i<playerIndiv.length-1?"1px solid #1e1e30":"none"}}>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?18:13,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",textAlign:"center"}}>{i+1}</span>
+                <span onClick={()=>nav("playerDetail",{playerId:d.player.id})} style={{fontSize:m?11:12,color:"#eeeef5",cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
+                <span onClick={team?()=>nav("teamDetail",{teamId:team.id}):undefined} style={{fontSize:10,color:team?.color||"#404058",cursor:team?"pointer":"default",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team?.name||"—"}</span>
+                <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.epCount||"—"}</span>
+                <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg||"—"}</span>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:d.rating>0?"#E8B84B":"#404058",textAlign:"right"}}>{d.rating>0?d.rating:"—"}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Épreuves */}
+      {tab==="epreuves"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {O2026_EPREUVES.map(ep=>{
+            const done=!!(o2026Scores||{})[ep.id]?.ranked?.length;
+            const res=((o2026Scores||{})[ep.id]?.ranked||[]).slice(0,3);
+            return(
+              <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${done?ep.color+"55":"#1e1e30"}`,borderRadius:10,padding:m?12:16,display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:20}}>{ep.emoji}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?16:20,color:done?ep.color:"#60607a"}}>PHASE {ep.phase} — {ep.nom}</div>
+                  <div style={{fontSize:10,color:"#60607a"}}>{ep.horaire} · {ep.format}</div>
+                </div>
+                {done&&res.map((r,i)=>{const t=getTeam(r.teamId);return t&&(
+                  <div key={r.teamId} style={{display:"flex",alignItems:"center",gap:3}}>
+                    <span style={{fontSize:11}}>{["🥇","🥈","🥉"][i]}</span>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:t.color}}/>
+                  </div>
+                );})}
+                {!done&&<span style={{fontSize:10,color:"#404058"}}>À venir</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventsPage({nav,navBack,o2026Scores,o2026Assignments}){
   const m=useIsMobile();
   return(
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1100,margin:"0 auto"}} className="fade">
@@ -1259,32 +1384,39 @@ function EventsPage({nav,navBack}){
             </div>
           );
         })}
-        {/* O2026 inline card */}
+        {/* O2026 card → detail page */}
         {(()=>{
           const ac="#E8342A";
-          const o2026Teams=TEAMS.filter(t=>t.active);
+          const teams=TEAMS.filter(t=>t.active);
+          const totals={};teams.forEach(t=>{totals[t.id]=0;});
+          Object.values(o2026Scores||{}).forEach(d=>{if(d?.ranked?.length)d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);});});
+          const ranked=teams.slice().sort((a,b)=>(totals[b.id]||0)-(totals[a.id]||0));
+          const allIndivPlayers=PLAYERS.filter(p=>p.t26);
+          const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
           return(
-            <div key="o2026" style={{background:"#0d0d1c",border:`1px solid ${ac}33`,borderRadius:12,overflow:"hidden",cursor:"default",transition:"transform .2s,border-color .2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=ac+"77";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=ac+"33";}}>
+            <div key="o2026" onClick={()=>nav("o2026Detail")} style={{background:"#0d0d1c",border:`1px solid ${ac}33`,borderRadius:12,overflow:"hidden",cursor:"pointer",transition:"transform .2s,border-color .2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=ac+"77";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=ac+"33";}}>
               <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`}}/>
               <div style={{padding:m?14:22}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                   <div>
-                    <Badge color={ac}>Olympiades</Badge>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:34,marginTop:8,lineHeight:1}}>Olympiade 2026</div>
+                    <Badge color={ac}>Olympiades Physiques</Badge>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:34,marginTop:8,lineHeight:1}}>Olympiade <span style={{color:ac}}>2026</span></div>
                     <div style={{color:ac,fontFamily:"'Bebas Neue',sans-serif",fontSize:18}}>eO2026</div>
+                    <div style={{marginTop:6,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?120:160)+'" height="'+(m?40:55)+'" style="max-height:'+(m?40:55)+'px" ')}}/>
                   </div>
                   <div style={{textAlign:"right",color:"#60607a",fontSize:11,lineHeight:1.8}}>
-                    <div>2026</div>
-                    <div>{o2026Teams.length} équipes</div>
+                    <div>Juin 2026</div>
+                    <div>{allIndivPlayers.length} participants</div>
+                    <div style={{color:finishedEpIds.length>0?"#34d399":"#404058",fontSize:10,marginTop:4}}>{finishedEpIds.length} épr. terminée{finishedEpIds.length!==1?"s":""}</div>
                   </div>
                 </div>
                 <p style={{color:"#60607a",fontSize:12,lineHeight:1.6,marginBottom:14}}>Épreuves sportives et ludiques — classement par équipes et individuel.</p>
                 <div style={{display:"flex",gap:6}}>
-                  {o2026Teams.slice(0,3).map((t,i)=>(
+                  {ranked.slice(0,3).map((t,i)=>(
                     <div key={t.id} style={{flex:1,background:"#13131f",borderRadius:8,padding:"7px 10px",display:"flex",alignItems:"center",gap:5}}>
                       <span style={{fontSize:13}}>{["🥇","🥈","🥉"][i]}</span>
                       <div style={{width:3,height:16,background:t.color,borderRadius:2}}/>
-                      <div style={{fontSize:11,fontWeight:600,color:t.color}}>{t.name}</div>
+                      <div><div style={{fontSize:11,fontWeight:600,color:t.color}}>{t.name}</div><div style={{fontSize:10,color:"#60607a"}}>{totals[t.id]||0} pts</div></div>
                     </div>
                   ))}
                 </div>
@@ -1566,7 +1698,7 @@ function EventDetailPage({eventId,nav,navBack}){
 }
 
 // ─── RANKINGS ────────────────────────────────────────
-function RankingsPage({nav}){
+function RankingsPage({nav,o2026Scores,o2026Assignments}){
   const m=useIsMobile();
   const [mode,setMode]=useState("individual");
   const [filter,setFilter]=useState("all");
@@ -1618,6 +1750,11 @@ function RankingsPage({nav}){
       const rb=RATINGS.find(r=>r.p===b.player.id&&r.e===eid)?.r||0;
       return d*(rb-ra);
     }
+    if(sortCol==="o2026"){
+      const ra=getPlayerO2026Rating(a.player.id)||0;
+      const rb=getPlayerO2026Rating(b.player.id)||0;
+      return d*(rb-ra);
+    }
     if(submode==="medals") return b.medals.gold!==a.medals.gold?b.medals.gold-a.medals.gold:b.medals.silver!==a.medals.silver?b.medals.silver-a.medals.silver:b.medals.bronze-a.medals.bronze;
     if(submode==="podpct") return b.pct!==a.pct?b.pct-a.pct:b.medals.gold+b.medals.silver+b.medals.bronze-(a.medals.gold+a.medals.silver+a.medals.bronze);
     return b.avg-a.avg;
@@ -1645,14 +1782,32 @@ function RankingsPage({nav}){
   const filters=mode==="individual"?indivFilters:teamFilters;
 
   // Column template for individual table
+  // O2026 individual ratings per player from live data
+  const getPlayerO2026Rating=(playerId)=>{
+    const p=PLAYERS.find(pl=>pl.id===playerId);
+    if(!p||!p.t26)return null;
+    const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
+    let totalPts=0,count=0;
+    finishedEpIds.forEach(epId=>{
+      const assigned=(o2026Assignments||{})[`${p.t26}_${epId}`]||[];
+      if(!assigned.includes(p.id))return;
+      const ranked=(o2026Scores[epId]?.ranked)||[];
+      const entry=ranked.find(r=>r.teamId===p.t26);
+      if(entry){totalPts+=(entry.pts||0);count++;}
+    });
+    if(!count)return null;
+    const avg=totalPts/count;
+    return Math.round((1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7)))*100)/100;
+  };
+
   const colDesktop=isSquidFilter
     ?"44px 1fr 120px 70px"
     :submode==="ratings"
-    ?(`44px 1fr 120px `+visibleEvs.map(()=>"60px").join(" ")+" 70px")
+    ?(`44px 1fr 120px `+visibleEvs.map(()=>"60px").join(" ")+" 60px 70px")
     :submode==="medals"
     ?"44px 1fr 120px 55px 55px 55px 55px"
     :"44px 1fr 120px 70px 70px 70px";
-  const colMobile=isSquidFilter?"24px 1fr 55px":submode==="ratings"?(`24px 1fr `+visibleEvs.map(()=>"1fr").join(" ")+" 1fr"):submode==="medals"?"24px 1fr 1fr 1fr 1fr 1fr":"24px 1fr 1fr 1fr 1fr";
+  const colMobile=isSquidFilter?"24px 1fr 55px":submode==="ratings"?(`24px 1fr `+visibleEvs.map(()=>"1fr").join(" ")+" 1fr 1fr"):submode==="medals"?"24px 1fr 1fr 1fr 1fr 1fr":"24px 1fr 1fr 1fr 1fr";
 
   return(
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1200,margin:"0 auto"}} className="fade">
@@ -1754,10 +1909,11 @@ function RankingsPage({nav}){
               <div style={{display:"grid",gridTemplateColumns:m?colMobile:colDesktop,gap:6,padding:"9px 14px",background:"#13131f",borderBottom:"1px solid #1e1e30",fontSize:10,color:"#60607a",textTransform:"uppercase",letterSpacing:"0.07em",minWidth:0}}>
                 <span>#</span><span>Joueur</span>
                 {submode==="ratings"&&!isSquidFilter&&visibleEvs.map(e=>{
-                  const lbl=e.id===1?"O 24'":e.id===2?"O 25'":e.id===3?"SG 25'":"eO 26'";
+                  const lbl=e.id===1?"O2024":e.id===2?"O2025":e.id===3?"SG25":"eO2026";
                   const key="ev"+e.id;
                   return(<span key={e.id} onClick={()=>handleSort(key)} style={{textAlign:"center",cursor:"pointer",color:sortCol===key?"#E8B84B":"#60607a",userSelect:"none"}}>{lbl}{sortCol===key?(sortDir===1?" ▲":" ▼"):""}</span>);
                 })}
+                {submode==="ratings"&&!isSquidFilter&&<span onClick={()=>handleSort("o2026")} style={{textAlign:"center",cursor:"pointer",color:sortCol==="o2026"?"#E8342A":"#60607a",userSelect:"none"}}>O2026{sortCol==="o2026"?(sortDir===1?" ▲":" ▼"):""}</span>}
                 {submode==="medals"&&<>
                   {[["gold","🥇"],["silver","🥈"],["bronze","🥉"],["total","Total"]].map(([k,l])=>(
                     <span key={k} onClick={()=>handleSort(k)} style={{textAlign:"center",cursor:"pointer",color:sortCol===k?"#E8B84B":"#60607a",userSelect:"none"}}>{l}{sortCol===k?(sortDir===1?" ▲":" ▼"):""}</span>
@@ -1779,6 +1935,7 @@ function RankingsPage({nav}){
                     {m&&<span style={{fontSize:10,color:r.team?.color||"#404058"}}>{r.team?.name||"Libre"}</span>}
                   </div>
                   {submode==="ratings"&&!isSquidFilter&&visibleEvs.map(ev=>{const ro=RATINGS.find(rt=>rt.p===r.player.id&&rt.e===ev.id);const v=ro?.r;const c=!v?"#404058":v>=1.8?"#E8B84B":v>=1.6?"#34d399":"#60a5fa";return(<span key={ev.id} style={{textAlign:"center",fontWeight:600,fontSize:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})}
+                  {submode==="ratings"&&!isSquidFilter&&(()=>{const v=getPlayerO2026Rating(r.player.id);const c=!v?"#404058":v>=1.8?"#E8342A":v>=1.6?"#f97316":"#60a5fa";return(<span style={{textAlign:"center",fontWeight:600,fontSize:12,color:c}}>{v?v.toFixed(2):"—"}</span>);})()}
                   {submode==="medals"&&<>
                     <span style={{textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:"#E8B84B"}}>{r.medals.gold}</span>
                     <span style={{textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:"#aaaaaa"}}>{r.medals.silver}</span>
@@ -2130,8 +2287,8 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
                   return(
                     <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,alignItems:"center",padding:"7px 0",borderBottom:i<indivSlice.length-1?"1px solid #0d0d1c":"none"}}>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:rank<3?18:13,color:rank===0?"#E8B84B":rank===1?"#aaaaaa":rank===2?"#c87533":"#404058",textAlign:"center"}}>{rank+1}</span>
-                      <span style={{fontSize:m?11:12,color:"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
-                      <span style={{fontSize:10,color:team?.color||"#404058",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{team?.name||"—"}</span>
+                      <span onClick={()=>nav("playerDetail",{playerId:d.player.id})} style={{fontSize:m?11:12,color:"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",textDecoration:"underline",textDecorationColor:"#404058"}}>{getDisplayName(d.player,PLAYERS)}</span>
+                      <span onClick={team?()=>nav("teamDetail",{teamId:team.id}):undefined} style={{fontSize:10,color:team?.color||"#404058",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:team?"pointer":"default"}}>{team?.name||"—"}</span>
                       <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.epCount}</span>
                       <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg||"—"}</span>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:d.rating>0?"#E8B84B":"#404058",textAlign:"right"}}>{d.rating>0?d.rating:"—"}</span>
@@ -4544,19 +4701,15 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
 
           <button onClick={handleLogout} style={BTN("#1e1e30")}>🔓 Se déconnecter</button>
           {player.uid==="louis-mar"&&(()=>{
-            const [resetStep,setResetStep]=React.useState("idle"); // idle | confirm | pin
-            const [resetPin,setResetPin]=React.useState("");
-            const [resetErr,setResetErr]=React.useState(false);
+            const [resetStep,setResetStep]=React.useState("idle"); // idle | confirm
             const [resetDone,setResetDone]=React.useState(false);
             async function doReset(){
               try{
-                const rows=await sbFetch("players",`?uid=eq.louis-mar&pin=eq.${encodeURIComponent(resetPin)}&select=id`);
-                if(!rows||!rows.length){setResetErr(true);setResetPin("");return;}
-                await sbFetch("o2026_state","",{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+                await sbFetch("o2026_state","",{method:"DELETE"});
                 if(setO2026Scores)setO2026Scores({});
-                setResetStep("idle");setResetPin("");setResetErr(false);setResetDone(true);
+                setResetStep("idle");setResetDone(true);
                 setTimeout(()=>setResetDone(false),3000);
-              }catch(e){console.error("reset error",e);setResetErr(true);setResetPin("");}
+              }catch(e){console.error("reset error",e);}
             }
             return(
               <div style={{marginTop:12,borderTop:"1px solid #1e1e30",paddingTop:12}}>
@@ -4567,23 +4720,10 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                 )}
                 {resetStep==="confirm"&&(
                   <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:12}}>
-                    <div style={{fontSize:12,color:"#fca5a5",marginBottom:10}}>⚠️ Cette action supprime tous les résultats des épreuves O2026. Continue ?</div>
+                    <div style={{fontSize:12,color:"#fca5a5",marginBottom:10}}>⚠️ Supprimer tous les résultats O2026 ? Action irréversible.</div>
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>setResetStep("pin")} style={{flex:1,...BTN("#ef4444")}}>Oui, continuer</button>
+                      <button onClick={doReset} style={{flex:1,...BTN("#ef4444")}}>Oui, confirmer</button>
                       <button onClick={()=>setResetStep("idle")} style={{flex:1,...BTN("#1e1e30")}}>Annuler</button>
-                    </div>
-                  </div>
-                )}
-                {resetStep==="pin"&&(
-                  <div style={{background:"#0a0a18",border:"1px solid #ef444444",borderRadius:10,padding:12}}>
-                    <div style={{fontSize:12,color:"#fca5a5",marginBottom:8}}>Entre ton PIN pour confirmer</div>
-                    <input type="password" value={resetPin} onChange={e=>setResetPin(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doReset()}
-                      placeholder="PIN" autoFocus
-                      style={{width:"100%",background:"#13131f",border:`1px solid ${resetErr?"#ef4444":"#1e1e30"}`,borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
-                    {resetErr&&<div style={{fontSize:11,color:"#ef4444",marginBottom:6}}>PIN incorrect</div>}
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={doReset} style={{flex:1,...BTN("#ef4444")}}>Confirmer le reset</button>
-                      <button onClick={()=>{setResetStep("idle");setResetPin("");setResetErr(false);}} style={{flex:1,...BTN("#1e1e30")}}>Annuler</button>
                     </div>
                   </div>
                 )}
@@ -7383,11 +7523,12 @@ function App(){
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
       <div key={page+JSON.stringify(sub)+dbVersion} className="fade">
-        {page==="events"        &&<EventsPage nav={nav} navBack={navBack}/>}
+        {page==="events"        &&<EventsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
-        {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack}/>}
+        {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
         {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
         {page==="o2026"         &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
+        {page==="o2026Detail"   &&<O2026DetailPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
         {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores} o2026Scores={o2026Scores}/>}
         {page==="teams"         &&<TeamsPage nav={nav} navBack={navBack}/>}
         {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
