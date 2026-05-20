@@ -2017,6 +2017,39 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
 
 
         const ranked=teams.sort((a,b)=>totals[b.id]-totals[a.id]);
+
+        // ── Individual ranking ──
+        const allPlayers=PLAYERS.filter(p=>p.t26);
+        const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
+        const playerIndiv=allPlayers.map(p=>{
+          let totalPts=0,count=0;
+          finishedEpIds.forEach(epId=>{
+            const assigned=(o2026Assignments||{})[`${p.t26}_${epId}`]||[];
+            if(!assigned.includes(p.id))return;
+            const ranked=(o2026Scores[epId]?.ranked)||[];
+            const entry=ranked.find(r=>r.teamId===p.t26);
+            if(entry){totalPts+=(entry.pts||0);count++;}
+          });
+          const avg=count>0?totalPts/count:0;
+          const rating=count>0?Math.max(0,1+((avg-4)/21)*(0.5+0.5*Math.sqrt(count/7))):0;
+          return{player:p,epCount:count,avg:Math.round(avg*10)/10,rating:Math.round(rating*100)/100};
+        }).filter(p=>p.epCount>0||finishedEpIds.length===0).sort((a,b)=>b.rating-a.rating||b.avg-a.avg);
+
+        // Tab state + pagination
+        const [rankTab,setRankTab]=React.useState("equipes");
+        const PER_PAGE=16;
+        const [indivPage,setIndivPage]=React.useState(0);
+        const indivPages=Math.ceil(playerIndiv.length/PER_PAGE);
+        const indivSlice=playerIndiv.slice(indivPage*PER_PAGE,(indivPage+1)*PER_PAGE);
+        const globalOffset=indivPage*PER_PAGE;
+
+        const TAB=(id,label)=>({
+          cursor:"pointer",padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:600,
+          background:rankTab===id?"#E8B84B":"transparent",
+          color:rankTab===id?"#080810":"#60607a",
+          border:rankTab===id?"none":"1px solid #1e1e30",
+        });
+
         return(
           <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:20}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
@@ -2026,7 +2059,15 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
                 <span style={{fontSize:10,color:"#34d399"}}>En direct</span>
               </div>
             </div>
-            {ranked.map((team,i)=>{
+
+            {/* Tabs */}
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              <div style={TAB("equipes","Équipes")} onClick={()=>setRankTab("equipes")}>Équipes</div>
+              <div style={TAB("individuel","Individuel")} onClick={()=>{setRankTab("individuel");setIndivPage(0);}}>Individuel</div>
+            </div>
+
+            {/* Équipes tab */}
+            {rankTab==="equipes"&&ranked.map((team,i)=>{
               const score=totals[team.id]||0;
               return(
                 <div key={team.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
@@ -2037,6 +2078,47 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
                 </div>
               );
             })}
+
+            {/* Individuel tab */}
+            {rankTab==="individuel"&&(
+              <>
+                {/* Header */}
+                <div style={{display:"grid",gridTemplateColumns:"30px 1fr 50px 50px 60px",gap:6,padding:"4px 0 8px",borderBottom:"1px solid #1e1e30",marginBottom:4}}>
+                  <span/>
+                  <span style={{fontSize:9,color:"#404058",fontWeight:600}}>JOUEUR</span>
+                  <span style={{fontSize:9,color:"#404058",textAlign:"center",fontWeight:600}}>ÉPR.</span>
+                  <span style={{fontSize:9,color:"#404058",textAlign:"center",fontWeight:600}}>MOY.</span>
+                  <span style={{fontSize:9,color:"#E8B84B",textAlign:"right",fontWeight:600}}>RATING</span>
+                </div>
+                {indivSlice.length===0&&<div style={{fontSize:12,color:"#404058",padding:"12px 0",textAlign:"center"}}>Aucun résultat encore</div>}
+                {indivSlice.map((d,i)=>{
+                  const rank=globalOffset+i;
+                  const team=getTeam(d.player.t26);
+                  return(
+                    <div key={d.player.id} style={{display:"grid",gridTemplateColumns:"30px 1fr 50px 50px 60px",gap:6,alignItems:"center",padding:"7px 0",borderBottom:i<indivSlice.length-1?"1px solid #0d0d1c":"none"}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:rank<3?18:13,color:rank===0?"#E8B84B":rank===1?"#aaaaaa":rank===2?"#c87533":"#404058",textAlign:"center"}}>{rank+1}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+                        {team&&<div style={{width:6,height:6,borderRadius:"50%",background:team.color,flexShrink:0}}/>}
+                        <span style={{fontSize:m?11:12,color:"#eeeef5",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{getDisplayName(d.player,PLAYERS)}</span>
+                      </div>
+                      <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.epCount}</span>
+                      <span style={{fontSize:12,color:"#60607a",textAlign:"center"}}>{d.avg}</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B",textAlign:"right"}}>{d.rating}</span>
+                    </div>
+                  );
+                })}
+                {/* Pagination */}
+                {indivPages>1&&(
+                  <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,marginTop:14}}>
+                    <button onClick={()=>setIndivPage(p=>Math.max(0,p-1))} disabled={indivPage===0}
+                      style={{background:"#1e1e30",border:"none",borderRadius:8,color:indivPage===0?"#2a2a40":"#eeeef5",padding:"6px 12px",cursor:indivPage===0?"default":"pointer",fontSize:13}}>←</button>
+                    <span style={{fontSize:12,color:"#60607a"}}>{indivPage+1} / {indivPages}</span>
+                    <button onClick={()=>setIndivPage(p=>Math.min(indivPages-1,p+1))} disabled={indivPage===indivPages-1}
+                      style={{background:"#1e1e30",border:"none",borderRadius:8,color:indivPage===indivPages-1?"#2a2a40":"#eeeef5",padding:"6px 12px",cursor:indivPage===indivPages-1?"default":"pointer",fontSize:13}}>→</button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         );
       })()}
@@ -4328,7 +4410,7 @@ function PlayerDetailPage({playerId,nav,navBack}){
 }
 
 // ─── PROFILE PAGE ───────────────────────────────────────
-function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignments,setO2026Assignments}){
+function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignments,setO2026Assignments,setO2026Scores}){
   const m=useIsMobile();
   const [step,setStep]=useState(currentPlayer?"profile":"initial"); // initial | select | pin | profile
   const [initial,setInitial]=useState("");
@@ -4430,6 +4512,56 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
 
 
           <button onClick={handleLogout} style={BTN("#1e1e30")}>🔓 Se déconnecter</button>
+          {player.uid==="louis-mar"&&(()=>{
+            const [resetStep,setResetStep]=React.useState("idle"); // idle | confirm | pin
+            const [resetPin,setResetPin]=React.useState("");
+            const [resetErr,setResetErr]=React.useState(false);
+            const [resetDone,setResetDone]=React.useState(false);
+            async function doReset(){
+              try{
+                const rows=await sbFetch("players",`?id=eq.${player.id}&pin=eq.${encodeURIComponent(resetPin)}&select=id`);
+                if(!rows||!rows.length){setResetErr(true);setResetPin("");return;}
+                // Delete all o2026_state rows
+                await sbFetch("o2026_state","",{method:"DELETE"});
+                // Clear local state
+                if(setO2026Scores)setO2026Scores({});
+                setResetStep("idle");setResetPin("");setResetErr(false);setResetDone(true);
+                setTimeout(()=>setResetDone(false),3000);
+              }catch(e){setResetErr(true);setResetPin("");}
+            }
+            return(
+              <div style={{marginTop:12,borderTop:"1px solid #1e1e30",paddingTop:12}}>
+                {resetStep==="idle"&&(
+                  <button onClick={()=>setResetStep("confirm")} style={{...BTN("#ef444422"),color:"#ef4444",border:"1px solid #ef444444",marginTop:0}}>
+                    🗑 Remettre les résultats à zéro
+                  </button>
+                )}
+                {resetStep==="confirm"&&(
+                  <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:12}}>
+                    <div style={{fontSize:12,color:"#fca5a5",marginBottom:10}}>⚠️ Cette action supprime tous les résultats des épreuves O2026. Continue ?</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setResetStep("pin")} style={{flex:1,...BTN("#ef4444")}}>Oui, continuer</button>
+                      <button onClick={()=>setResetStep("idle")} style={{flex:1,...BTN("#1e1e30")}}>Annuler</button>
+                    </div>
+                  </div>
+                )}
+                {resetStep==="pin"&&(
+                  <div style={{background:"#0a0a18",border:"1px solid #ef444444",borderRadius:10,padding:12}}>
+                    <div style={{fontSize:12,color:"#fca5a5",marginBottom:8}}>Entre ton PIN pour confirmer</div>
+                    <input type="password" value={resetPin} onChange={e=>setResetPin(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doReset()}
+                      placeholder="PIN" autoFocus
+                      style={{width:"100%",background:"#13131f",border:`1px solid ${resetErr?"#ef4444":"#1e1e30"}`,borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+                    {resetErr&&<div style={{fontSize:11,color:"#ef4444",marginBottom:6}}>PIN incorrect</div>}
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={doReset} style={{flex:1,...BTN("#ef4444")}}>Confirmer le reset</button>
+                      <button onClick={()=>{setResetStep("idle");setResetPin("");setResetErr(false);}} style={{flex:1,...BTN("#1e1e30")}}>Annuler</button>
+                    </div>
+                  </div>
+                )}
+                {resetDone&&<div style={{fontSize:12,color:"#34d399",marginTop:8}}>✓ Résultats remis à zéro</div>}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Espace Capitaine */}
@@ -4579,16 +4711,6 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                 })}
               </div>
 
-              {/* Validation errors */}
-              {validErrors.length>0&&(
-                <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#ef4444",marginBottom:8}}>❌ ERREURS À CORRIGER</div>
-                  {validErrors.map((e,i)=>(
-                    <div key={i} style={{fontSize:12,color:"#fca5a5",marginBottom:4}}>• {e}</div>
-                  ))}
-                </div>
-              )}
-
               {/* Validated banner */}
               {isValidated&&(
                 <div style={{background:"#22c55e15",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
@@ -4623,10 +4745,28 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                         if(sex(p)==="m"&&assignedMen.length>=sexLim.maxH)return false;
                         if(sex(p)==="f"&&assignedWomen.length>=sexLim.maxF)return false;
                       }
+                      // >= 4 of that gender: strict exclusion between TC/Bio
                       if(ep.id==="tircorde"&&bioIds.includes(p.id)&&roster.filter(r=>sex(r)===sex(p)).length>=4)return false;
                       if(ep.id==="biathlon"&&tcIds.includes(p.id)&&roster.filter(r=>sex(r)===sex(p)).length>=4)return false;
                       return true;
                     });
+
+                    // For TC/Bio with < 4 of a gender: compute which cross-assigned players are greyed
+                    const forcedGrey=new Set();
+                    if(ep.id==="tircorde"||ep.id==="biathlon"){
+                      const opposite=ep.id==="tircorde"?"biathlon":"tircorde";
+                      const oppAssigned=getAssigned(opposite);
+                      ["m","f"].forEach(g=>{
+                        const gRoster=roster.filter(r=>sex(r)===g);
+                        if(gRoster.length>=4)return; // already fully filtered
+                        const alreadyInCurrent=assigned.filter(id=>{const p=roster.find(r=>r.id===id);return sex(p||{})===g;}).length;
+                        const remaining=2-alreadyInCurrent;
+                        const mandatoryNotYet=gRoster.filter(p=>!oppAssigned.includes(p.id)&&!assigned.includes(p.id)).length;
+                        if(remaining-mandatoryNotYet<=0){
+                          oppAssigned.forEach(id=>{const p=roster.find(r=>r.id===id);if(p&&sex(p)===g)forcedGrey.add(id);});
+                        }
+                      });
+                    }
 
                     return(
                       <div key={ep.id} style={{background:"#13131f",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
@@ -4658,17 +4798,19 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                         {assigned.length<maxPlayers&&(
                           <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                             {available.map(p=>{
-                              const disabled=usedInPhase.has(p.id);
+                              const phaseConflict=usedInPhase.has(p.id);
+                              const grey=forcedGrey.has(p.id);
+                              const disabled=phaseConflict||grey;
                               return(
                                 <div key={p.id}
                                   onClick={()=>!disabled&&saveAssignment(ep.id,[...assigned,p.id])}
                                   style={{background:disabled?"transparent":"#1e1e30",borderRadius:20,padding:"4px 10px",fontSize:11,
                                     color:disabled?"#2a2a40":"#60607a",cursor:disabled?"default":"pointer",
-                                    border:`1px solid ${disabled?"transparent":"#2a2a40"}`,
-                                    opacity:disabled?0.4:1}}>
-                                  {disabled?"":"+  "}{getDisplayName(p,PLAYERS)}
+                                    border:`1px solid ${disabled?"#1e1e2a":"#2a2a40"}`,
+                                    opacity:disabled?0.45:1}}>
+                                  {!disabled&&"+  "}{getDisplayName(p,PLAYERS)}
                                   <span style={{fontSize:9,marginLeft:3,color:sex(p)==="f"?"#f472b6":"#60a5fa"}}>{sex(p)==="f"?"F":"H"}</span>
-                                  {disabled&&<span style={{fontSize:8,marginLeft:2}}>Ph.{ep.phase}</span>}
+                                  {phaseConflict&&<span style={{fontSize:8,marginLeft:2}}>Ph.{ep.phase}</span>}
                                 </div>
                               );
                             })}
@@ -4704,6 +4846,15 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                   color:isValidated?"#60607a":"#fff"}}>
                 {isValidated?"✏️ Modifier l'équipe":"✅ Valider l'inscription"}
               </button>
+              {/* Validation errors */}
+              {validErrors.length>0&&(
+                <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:"12px 14px",marginTop:12}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#ef4444",marginBottom:8}}>❌ ERREURS À CORRIGER</div>
+                  {validErrors.map((e,i)=>(
+                    <div key={i} style={{fontSize:12,color:"#fca5a5",marginBottom:4}}>• {e}</div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}
@@ -7242,7 +7393,7 @@ function App(){
         {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores} o2026Scores={o2026Scores}/>}
         {page==="teams"         &&<TeamsPage nav={nav} navBack={navBack}/>}
         {page==="teamDetail"    &&<TeamDetailPage teamId={sub.teamId} nav={nav} navBack={navBack}/>}
-        {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments}/>}
+        {page==="profile"       &&<ProfilePage nav={nav} navBack={navBack} currentPlayer={currentPlayer} setCurrentPlayer={setCurrentPlayer} o2026Assignments={o2026Assignments} setO2026Assignments={setO2026Assignments} setO2026Scores={setO2026Scores}/>}
         {page==="admin"         &&<DataPage/>}
       </div>
     </div>
