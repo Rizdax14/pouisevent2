@@ -241,7 +241,6 @@ const PLAYERS = [
   {id:79,uid:"melyne",name:"Mélyne",teamId:14,t25:17,teo:17,t26:14,photoUrl:"/photos/melyne.jpg"},
   {id:68,uid:"lea",name:"Léa",teamId:null,t25:15,photoUrl:"/photos/lea.jpg"},
   {id:67,uid:"lou-ann",name:"Lou-Ann",teamId:15,t25:15,teo:15,t26:15,photoUrl:"/photos/lou-ann.jpg"},
-,
   {id:161,uid:"remy",name:"Rémy",photoUrl:null}
 ];
 
