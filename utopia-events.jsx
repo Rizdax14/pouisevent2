@@ -1386,12 +1386,11 @@ function EventsPage({nav,navBack,o2026Scores,o2026Assignments}){
         })}
         {/* O2026 card → detail page */}
         {(()=>{
-          const ac="#E8342A";
+          const ac=getETC("olympiades");
           const teams=TEAMS.filter(t=>t.active);
           const totals={};teams.forEach(t=>{totals[t.id]=0;});
           Object.values(o2026Scores||{}).forEach(d=>{if(d?.ranked?.length)d.ranked.forEach(r=>{if(totals[r.teamId]!==undefined)totals[r.teamId]+=(r.pts||0);});});
           const ranked=teams.slice().sort((a,b)=>(totals[b.id]||0)-(totals[a.id]||0));
-          const allIndivPlayers=PLAYERS.filter(p=>p.t26);
           const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
           const allDone=finishedEpIds.length===O2026_EPREUVES.length&&O2026_EPREUVES.length>0;
           return(
@@ -1401,13 +1400,13 @@ function EventsPage({nav,navBack,o2026Scores,o2026Assignments}){
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                   <div>
                     <Badge color={ac}>Olympiades Physiques</Badge>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:34,marginTop:8,lineHeight:1}}>Olympiade été <span style={{color:ac}}>2026</span></div>
-                    <div style={{color:ac,fontFamily:"'Bebas Neue',sans-serif",fontSize:18}}>eO2026</div>
-                    <div style={{marginTop:6,opacity:0.9}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?120:160)+'" height="'+(m?40:55)+'" style="max-height:'+(m?40:55)+'px" ')}}/>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:m?28:34,marginTop:8,lineHeight:1}}>Olympiade été</div>
+                    <div style={{color:ac,fontFamily:"'Bebas Neue',sans-serif",fontSize:18}}>2026</div>
+                    <div style={{marginTop:6}} dangerouslySetInnerHTML={{__html:O2026_LOGO_SVG.replace('<svg ','<svg fill="white" width="'+(m?120:160)+'" height="'+(m?40:55)+'" style="max-height:'+(m?40:55)+'px" ')}}/>
                   </div>
                   <div style={{textAlign:"right",color:"#60607a",fontSize:11,lineHeight:1.8}}>
                     <div>Juin 2026</div>
-                    <div>{allIndivPlayers.length} participants</div>
+                    <div>101 p.</div>
                   </div>
                 </div>
                 <p style={{color:"#60607a",fontSize:12,lineHeight:1.6,marginBottom:allDone?14:0}}>Épreuves sportives et ludiques — classement par équipes et individuel.</p>
@@ -4030,7 +4029,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       })()}
 
       {phase==="done"&&isLouis&&(<div style={{marginBottom:12,display:"flex",gap:8}}>
-        {epreuveValidated&&<button onClick={()=>{validatedRankedRef.current=null;setEpreuveValidated(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});}} style={{background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px 12px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>}
+        {epreuveValidated&&<button onClick={()=>{validatedRankedRef.current=null;setEpreuveValidated(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});setPhase("groupes");setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});setFinalizedGroupes({1:false,2:false,3:false,4:false});}} style={{background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px 12px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>}
         <button onClick={()=>validateClassement(getFinalRanking())} disabled={epreuveValidated}
           style={{flex:1,background:epreuveValidated?"#1e2e1e":"#34d399",border:"none",color:epreuveValidated?"#555":"#080810",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:epreuveValidated?"default":"pointer",fontFamily:"'Outfit',sans-serif"}}>
           {epreuveValidated?"✅ Classement validé":"✓ Valider le classement officiel"}
