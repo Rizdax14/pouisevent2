@@ -3448,13 +3448,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               const sh=[...allT].sort(()=>Math.random()-0.5);
               const nQF={1:sh.slice(0,4).map(t=>t.id),2:sh.slice(4,8).map(t=>t.id),3:sh.slice(8,12).map(t=>t.id),4:sh.slice(12,16).map(t=>t.id)};
               setBQF(nQF);
-              const sf1=[nQF[1][0],nQF[1][1],nQF[2][0],nQF[2][1]].sort(()=>Math.random()-0.5);
-              const sf2=[nQF[3][0],nQF[3][1],nQF[4][0],nQF[4][1]].sort(()=>Math.random()-0.5);
+              const sf1=[nQF[1][0],nQF[2][1],nQF[3][0],nQF[4][1]].sort(()=>Math.random()-0.5);
+              const sf2=[nQF[1][1],nQF[2][0],nQF[3][1],nQF[4][0]].sort(()=>Math.random()-0.5);
               setBSF({1:sf1,2:sf2});
               const fin=[sf1[0],sf1[1],sf2[0],sf2[1]].sort(()=>Math.random()-0.5);
               setBFin(fin);setBPhase("fin");
             }
-            function launchSF(){setBSF({1:[bQF[1][0],bQF[1][1],bQF[2][0],bQF[2][1]],2:[bQF[3][0],bQF[3][1],bQF[4][0],bQF[4][1]]});setBPhase("sf");}
+            function launchSF(){setBSF({1:[bQF[1][0],bQF[2][1],bQF[3][0],bQF[4][1]],2:[bQF[1][1],bQF[2][0],bQF[3][1],bQF[4][0]]});setBPhase("sf");}
             function launchFin(){setBFin([bSF[1][0],bSF[1][1],bSF[2][0],bSF[2][1]]);setBPhase("fin");}
             function doValidate(){
               if(bLocked){setBLocked(false);setEpreuveValidated(false);validatedRankedRef.current=null;setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});return;}
@@ -3491,6 +3491,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                       ))}
                     </div>
                     {bPhase==="qf"&&isLouis&&<button onClick={launchSF} disabled={!qfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer les demi-finales →</button>}
+                    {bPhase==="sf"&&isLouis&&<button onClick={()=>setBPhase("qf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour QF</button>}
                   </div>
                 )}
                 {(bPhase==="sf"||bPhase==="fin")&&(
@@ -3507,6 +3508,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                       ))}
                     </div>
                     {bPhase==="sf"&&isLouis&&<button onClick={launchFin} disabled={!sfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer la finale →</button>}
+                    {bPhase==="fin"&&isLouis&&<button onClick={()=>setBPhase("sf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour SF</button>}
                   </div>
                 )}
                 {bPhase==="fin"&&(
@@ -3713,7 +3715,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── STARTLIST for "tout le monde" epreuves ─────────────── */}
-      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","beret","molky","puissance4","beerpong"].includes(ep.id)&&(
+      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","beret","molky","puissance4","beerpong","bp","football","tircorde","biathlon"].includes(ep.id)&&(
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
@@ -3928,7 +3930,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
-      {scoreType==="biathlon"&&bLocked&&bFin.length>0&&(()=>{
+      {scoreType==="biathlon"&&(bQF[1].length>0||bFin.length>0)&&(()=>{
         // Build full public ranking from bracket state
         const sharedPts=(p1,p2)=>Math.round(((O2026_POINTS[p1-1]||0)+(O2026_POINTS[p2-1]||0))/2);
         const sharedPts4=(p1,p2,p3,p4)=>Math.round(((O2026_POINTS[p1-1]||0)+(O2026_POINTS[p2-1]||0)+(O2026_POINTS[p3-1]||0)+(O2026_POINTS[p4-1]||0))/4);
@@ -3943,10 +3945,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         return(
           <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>CLASSEMENT OFFICIEL</div>
-              <span style={{fontSize:10,color:"#34d399"}}>✅ Validé</span>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac}}>{bLocked?"CLASSEMENT OFFICIEL":"BRACKET EN DIRECT"}</div>
+              {bLocked?<span style={{fontSize:10,color:"#34d399"}}>✅ Validé</span>:<div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/>}
             </div>
-            {rows.map((entry,i)=>{const t=getO2026Team(entry.teamId);return(
+            {bLocked&&rows.map((entry,i)=>{const t=getO2026Team(entry.teamId);return(
               <div key={entry.teamId+"-"+i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<rows.length-1?"1px solid #1e1e30":"none"}}>
                 <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:entry.rank<=3?22:15,color:entry.rank===1?"#E8B84B":entry.rank===2?"#aaa":entry.rank===3?"#c87533":"#404058",width:30,textAlign:"center"}}>{entry.tied?"=":""}{entry.rank}</span>
                 <div style={{width:8,height:8,borderRadius:"50%",background:t?.color||"#60607a",flexShrink:0}}/>
@@ -4067,13 +4069,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                     <span style={{flex:1,fontSize:11,textAlign:"right",color:w===tB?"#34d399":r?"#404058":"#eeeef5"}}>{getO2026Team(tB)?.name||tB||"?"}</span>
                   </div>
                 );})}
-                {(()=>{const{slot,tA,tB}=tc.fin;const r=res(slot);const w=gW(slot,tA,tB);return(
+                {(()=>{const{slot,tA,tB}=tc.fin;const r=tA&&tB?res(slot):null;const w=tA&&tB?gW(slot,tA,tB):null;const nameA=tA?getO2026Team(tA)?.name||"?":"En attente";const nameB=tB?getO2026Team(tB)?.name||"?":"En attente";return(
                   <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",borderRadius:6,marginBottom:3,background:"#1c1708",border:"1px solid #E8B84B33"}}>
                     <span style={{fontSize:9,color:"#E8B84B",width:30}}>🏆FIN</span>
-                    <span style={{flex:1,fontSize:11,fontWeight:600,color:w===tA?"#E8B84B":r?"#404058":"#eeeef5"}}>{getO2026Team(tA)?.name||tA||"?"}</span>
+                    <span style={{flex:1,fontSize:11,fontWeight:600,color:w===tA?"#E8B84B":r?"#404058":tA?"#eeeef5":"#404058"}}>{nameA}</span>
                     {r&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B"}}>{r[0]}-{r[1]}</span>}
-                    {!r&&<span style={{fontSize:9,color:"#1e1e30"}}>vs</span>}
-                    <span style={{flex:1,fontSize:11,fontWeight:600,textAlign:"right",color:w===tB?"#E8B84B":r?"#404058":"#eeeef5"}}>{getO2026Team(tB)?.name||tB||"?"}</span>
+                    {!r&&<span style={{fontSize:9,color:"#404058"}}>vs</span>}
+                    <span style={{flex:1,fontSize:11,fontWeight:600,textAlign:"right",color:w===tB?"#E8B84B":r?"#404058":tB?"#eeeef5":"#404058"}}>{nameB}</span>
                   </div>
                 );})}
               </div>
