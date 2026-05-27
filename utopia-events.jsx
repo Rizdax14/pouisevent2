@@ -3720,10 +3720,9 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 );
               }
-              numIdx++;
               return(
-                <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                  <div style={{width:20,height:20,borderRadius:"50%",background:ac+"22",border:`1px solid ${ac}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:ac,marginTop:1}}>{numIdx}</div>
+                <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <span style={{color:ac,flexShrink:0,marginTop:2}}>·</span>
                   <div style={{fontSize:13,color:"#cccce0",lineHeight:1.5}}>{parseBold(r)}</div>
                 </div>
               );
