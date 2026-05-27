@@ -2004,7 +2004,7 @@ function RankingsPage({nav,o2026Scores,o2026Assignments}){
 const PHASE_COLOR={1:"#E84D9B",2:"#3b82f6",3:"#f97316",4:"#ef4444",5:"#22c55e",6:"#8b5cf6",7:"#06b6d4"};
 
 const O2026_EPREUVES = [
-  {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",nbJoueurs:6,color:"#3b82f6",lieuImg:"/lieux/bp.png",regles:["🎯 Objectif : avoir le plus de joueurs dans son camp que l'adversaire au terme des 5 minutes. Si une équipe n'a plus aucun joueur avant la fin du temps, elle a perdu immédiatement.","🔄 Format des matchs : au meilleur des 3 manches — il faut gagner 2 manches pour remporter un match.","🏆 Format de la compétition : Phase de poules — 4 groupes de 4 équipes en round robin (chacun affronte les 3 autres). Puis phase finale — 4 nouveaux brackets de 4 constitués par rang : les 4 premiers ensemble, les 4 deuxièmes ensemble, etc. Chaque bracket se joue en demi-finale puis finale, déterminant les places 1-4, 5-8, 9-12 et 13-16.","📏 Pour toucher un adversaire : lui lancer la balle directement. Pour sauver un allié : lui lancer la balle par-dessus la ligne adverse afin qu'il la récupère.","La possession change de camp quand la balle est attrapée, finit sa course dans la moitié adverse, ou touche un joueur. Il est interdit de perdre du temps exprès.","✅ Attraper en plusieurs temps (ex : contrôle avec le torse puis les mains sans que la balle touche le sol) → la réception est validée.","🤯 LOI DEVILLE : si le ballon touche la tête d'un joueur, la touche est annulée et la balle est rendue à la victime."],notesSpeciales:[],groupes:4,scoreType:"victoire"},
+  {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",nbJoueurs:6,color:"#3b82f6",lieuImg:"/lieux/bp.png",regles:["🎯 Objectif","Avoir le **plus de joueurs dans son camp** que l'adversaire au terme des **5 minutes**. Si une équipe n'a **plus aucun joueur** avant la fin du temps, elle a perdu **immédiatement**.","🏆 Format de la compétition","**Phase de poules** — Les 16 équipes sont réparties en 4 groupes de 4. Dans chaque groupe, **tout le monde affronte tout le monde** (3 matchs par équipe).","**Phase finale** — À l'issue des poules, les équipes sont regroupées **par leur classement** : les 4 premiers ensemble, les 4 deuxièmes ensemble, etc. Chaque groupe joue ensuite **2 matchs** (demi-finale puis finale) pour déterminer les places : **1ère→4ème · 5ème→8ème · 9ème→12ème · 13ème→16ème**.","📏 Règles de jeu","- **Toucher** un adversaire : lui lancer la balle directement","- **Sauver** un allié : lui lancer la balle par-dessus la ligne adverse","- La balle **change de camp** quand elle est attrapée, finit sa course dans la moitié adverse, ou touche un joueur","- ⏱️ **Interdit** de perdre du temps exprès","✅ À savoir","- Attraper en **plusieurs temps** (ex : contrôle torse → mains sans toucher le sol) → réception **validée**","- **🤯 LOI DEVILLE** : ballon dans la **tête** = touche **annulée**, balle rendue à la victime"],notesSpeciales:[],groupes:4,scoreType:"victoire"},
   {id:"balle_folle",phase:2,nom:"La Balle Folle",emoji:"🏃",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,color:"#f59e0b",lieuImg:null,regles:["3 rôles par équipe : sprinteur, lanceur et receveur.","Au top : le sprinteur va chercher la balle et la donne au lanceur.","Le lanceur doit l'envoyer avec précision au receveur, qui ne peut pas sortir de son cerceau.","Une fois la balle dans la main du receveur, c'est gagné pour l'équipe la plus rapide.","Si l'équipe rate le lancé, le sprinteur doit aller récupérer la balle."],notesSpeciales:[{titre:"📊 Format",texte:"4 poules de 4 équipes (round-robin), puis brackets."}],groupes:4,scoreType:"victoire"},
   {id:"football",phase:2,nom:"Football",emoji:"⚽",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,color:"#f59e0b",lieuImg:"/lieux/football.png",regles:["Matchs 3v3 sur terrain réduit.","Victoire = 1 point, défaite = 0 point, match nul = 0.5 point."],notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],groupes:4,scoreType:"victoire"},
   {id:"marathonH",phase:3,nom:"Marathon Hommes",emoji:"🏃‍♂️",horaire:"12H30 - 13H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#10b981",lieuImg:"/lieux/marathon.png",regles:["Un tour entier du complexe à faire (environ 1km).","Tous les hommes courent en même temps — classement par ordre d'arrivée."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
@@ -3685,12 +3685,50 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:12}}>RÈGLES</div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {ep.regles.map((r,i)=>(
-            <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-              <div style={{width:20,height:20,borderRadius:"50%",background:ac+"22",border:`1px solid ${ac}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:ac,marginTop:1}}>{i+1}</div>
-              <div style={{fontSize:13,color:"#cccce0",lineHeight:1.5}}>{r}</div>
-            </div>
-          ))}
+          {(()=>{
+            // Parse **bold** markdown in text
+            function parseBold(text){
+              const parts=text.split(/(\*\*[^*]+\*\*)/g);
+              return parts.map((p,i)=>p.startsWith("**")
+                ?<strong key={i} style={{color:"#eeeef5",fontWeight:700}}>{p.slice(2,-2)}</strong>
+                :<span key={i}>{p}</span>);
+            }
+            let numIdx=0;
+            return ep.regles.map((r,i)=>{
+              // Section header: starts with emoji + all caps after
+              if(typeof r==="object"&&r.type==="separator") return(
+                <div key={i} style={{borderTop:"1px solid #1e1e30",margin:"6px 0"}}/>
+              );
+              if(typeof r==="object"&&r.titre) return(
+                <div key={i} style={{background:"#13131f",borderRadius:8,padding:"10px 14px",borderLeft:`3px solid ${ac}`,marginBottom:2}}>
+                  <div style={{fontWeight:700,fontSize:12,color:ac,marginBottom:3}}>{r.titre}</div>
+                  <div style={{fontSize:12,color:"#60607a",lineHeight:1.5}}>{parseBold(r.texte)}</div>
+                </div>
+              );
+              // Detect section heading: line starts with emoji + word in caps pattern
+              const isHeading=/^[🎯🔄🏆📏✅⏱️🤯💡📋🏅📐]+\s/.test(r)&&r.length<80&&!r.includes(":");
+              const isBullet=r.startsWith("-")||r.startsWith("•");
+              if(isHeading) return(
+                <div key={i} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:ac,marginTop:i>0?10:0,marginBottom:2,letterSpacing:"0.05em"}}>{r}</div>
+              );
+              if(isBullet){
+                numIdx=0;
+                return(
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",paddingLeft:8}}>
+                    <span style={{color:ac,flexShrink:0,marginTop:2}}>·</span>
+                    <div style={{fontSize:13,color:"#cccce0",lineHeight:1.5}}>{parseBold(r.slice(1).trim())}</div>
+                  </div>
+                );
+              }
+              numIdx++;
+              return(
+                <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <div style={{width:20,height:20,borderRadius:"50%",background:ac+"22",border:`1px solid ${ac}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:ac,marginTop:1}}>{numIdx}</div>
+                  <div style={{fontSize:13,color:"#cccce0",lineHeight:1.5}}>{parseBold(r)}</div>
+                </div>
+              );
+            });
+          })()}
         </div>
         {ep.notesSpeciales.length>0&&(
           <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:8}}>
