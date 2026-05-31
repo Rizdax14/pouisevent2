@@ -5346,11 +5346,15 @@ function DataPage(){
       const [players,teams,rows]=await Promise.all([
         sbFetch("players","?select=id,name,uid,team_id,t26,last_name,display_name&order=name"),
         sbFetch("teams","?select=id,name,color,color2,active,logo_color2&order=name"),
-        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids")
+        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids").catch(()=>[])
       ]);
       setData({players,teams});
       const amap={};
-      (rows||[]).forEach(r=>{amap[`${r.team_id}_${r.epreuve_id}`]=r.player_ids||[];});
+      (rows||[]).forEach(r=>{
+        const ids=Array.isArray(r.player_ids)?r.player_ids:
+          (typeof r.player_ids==="string"?JSON.parse(r.player_ids||"[]"):[]);
+        amap[`${r.team_id}_${r.epreuve_id}`]=ids;
+      });
       setAssignments(amap);
     }catch(e){setMsg({type:"error",text:e.message});}
     setLoading(false);
