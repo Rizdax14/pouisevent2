@@ -5548,6 +5548,95 @@ function DataPage(){
           ))}
         </div>
       )}
+      {/* Assignments tab */}
+      {tab==="assignments"&&(
+        <div style={G}>
+          {!selTeam?(
+            <>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>SÉLECTIONNE UNE ÉQUIPE</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
+                {TEAMS.filter(t=>t.active).map(t=>(
+                  <div key={t.id} onClick={()=>setSelTeam(t)} style={{background:"#13131f",border:`1px solid ${t.color}44`,borderRadius:10,padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
+                    <span style={{fontSize:12,fontWeight:600,color:t.color}}>{t.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ):(()=>{
+            const t=selTeam;
+            const teamPlayers=PLAYERS.filter(p=>p.t26===t.id);
+            async function saveAssign(epId, playerIds){
+              const key=`${t.id}_${epId}`;
+              setAssignments(a=>({...a,[key]:playerIds}));
+              try{
+                await SUPABASE.from("o2026_assignments").upsert(
+                  {team_id:t.id,epreuve_id:epId,player_ids:playerIds},
+                  {onConflict:"team_id,epreuve_id"}
+                );
+              }catch(e){setMsg({type:"error",text:"Erreur sauvegarde"});}
+            }
+            return(
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                  <button onClick={()=>setSelTeam(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:0}}>←</button>
+                  <div style={{width:10,height:10,borderRadius:"50%",background:t.color}}/>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:t.color}}>{t.name}</div>
+                  <span style={{fontSize:11,color:"#404058",marginLeft:"auto"}}>{teamPlayers.length} joueurs</span>
+                </div>
+                {/* Player tags */}
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+                  {teamPlayers.map(p=>(
+                    <div key={p.id} style={{background:"#13131f",border:`1px solid ${t.color}33`,borderRadius:20,padding:"4px 10px",fontSize:11,color:"#cccce0",display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{color:p.sex==="f"?"#f472b6":"#60a5fa",fontSize:9}}>{p.sex==="f"?"F":"H"}</span>
+                      {getDisplayName(p,PLAYERS)}
+                    </div>
+                  ))}
+                </div>
+                {/* Epreuves */}
+                {O2026_EPREUVES.map(ep=>{
+                  const key=`${t.id}_${ep.id}`;
+                  const assigned=assignments[key]||[];
+                  return(
+                    <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${assigned.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:assigned.length>0?8:0}}>
+                        <span style={{fontSize:14}}>{ep.emoji}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                          <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
+                        </div>
+                        {assigned.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {assigned.length} joueur{assigned.length>1?"s":""}</span>}
+                      </div>
+                      {/* Assigned chips */}
+                      {assigned.length>0&&(
+                        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                          {assigned.map(pid=>{
+                            const p=PLAYERS.find(pl=>pl.id===pid);
+                            return(
+                              <div key={pid} onClick={()=>saveAssign(ep.id,assigned.filter(id=>id!==pid))} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                                {getDisplayName(p,PLAYERS)} <span style={{fontSize:9,opacity:0.6}}>✕</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Available players */}
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                        {teamPlayers.filter(p=>!assigned.includes(p.id)).map(p=>(
+                          <div key={p.id} onClick={()=>saveAssign(ep.id,[...assigned,p.id])} style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#60607a",cursor:"pointer"}}>
+                            + {getDisplayName(p,PLAYERS)}
+                            <span style={{fontSize:9,marginLeft:3,color:p.sex==="f"?"#f472b6":"#60a5fa"}}>{p.sex==="f"?"F":"H"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
@@ -6561,95 +6650,6 @@ function ProfilBL({currentPlayer,setCurrentPlayer,onBack}){
           </div>
         )}
       </div>
-      {/* Assignments tab */}
-      {tab==="assignments"&&(
-        <div style={G}>
-          {!selTeam?(
-            <>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>SÉLECTIONNE UNE ÉQUIPE</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
-                {TEAMS.filter(t=>t.active).map(t=>(
-                  <div key={t.id} onClick={()=>setSelTeam(t)} style={{background:"#13131f",border:`1px solid ${t.color}44`,borderRadius:10,padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
-                    <span style={{fontSize:12,fontWeight:600,color:t.color}}>{t.name}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ):(()=>{
-            const t=selTeam;
-            const teamPlayers=PLAYERS.filter(p=>p.t26===t.id);
-            async function saveAssign(epId, playerIds){
-              const key=`${t.id}_${epId}`;
-              setAssignments(a=>({...a,[key]:playerIds}));
-              try{
-                await SUPABASE.from("o2026_assignments").upsert(
-                  {team_id:t.id,epreuve_id:epId,player_ids:playerIds},
-                  {onConflict:"team_id,epreuve_id"}
-                );
-              }catch(e){setMsg({type:"error",text:"Erreur sauvegarde"});}
-            }
-            return(
-              <>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                  <button onClick={()=>setSelTeam(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:0}}>←</button>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:t.color}}/>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:t.color}}>{t.name}</div>
-                  <span style={{fontSize:11,color:"#404058",marginLeft:"auto"}}>{teamPlayers.length} joueurs</span>
-                </div>
-                {/* Player tags */}
-                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
-                  {teamPlayers.map(p=>(
-                    <div key={p.id} style={{background:"#13131f",border:`1px solid ${t.color}33`,borderRadius:20,padding:"4px 10px",fontSize:11,color:"#cccce0",display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{color:p.sex==="f"?"#f472b6":"#60a5fa",fontSize:9}}>{p.sex==="f"?"F":"H"}</span>
-                      {getDisplayName(p,PLAYERS)}
-                    </div>
-                  ))}
-                </div>
-                {/* Epreuves */}
-                {O2026_EPREUVES.map(ep=>{
-                  const key=`${t.id}_${ep.id}`;
-                  const assigned=assignments[key]||[];
-                  return(
-                    <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${assigned.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:assigned.length>0?8:0}}>
-                        <span style={{fontSize:14}}>{ep.emoji}</span>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
-                          <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
-                        </div>
-                        {assigned.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {assigned.length} joueur{assigned.length>1?"s":""}</span>}
-                      </div>
-                      {/* Assigned chips */}
-                      {assigned.length>0&&(
-                        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
-                          {assigned.map(pid=>{
-                            const p=PLAYERS.find(pl=>pl.id===pid);
-                            return(
-                              <div key={pid} onClick={()=>saveAssign(ep.id,assigned.filter(id=>id!==pid))} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                                {getDisplayName(p,PLAYERS)} <span style={{fontSize:9,opacity:0.6}}>✕</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Available players */}
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                        {teamPlayers.filter(p=>!assigned.includes(p.id)).map(p=>(
-                          <div key={p.id} onClick={()=>saveAssign(ep.id,[...assigned,p.id])} style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#60607a",cursor:"pointer"}}>
-                            + {getDisplayName(p,PLAYERS)}
-                            <span style={{fontSize:9,marginLeft:3,color:p.sex==="f"?"#f472b6":"#60a5fa"}}>{p.sex==="f"?"F":"H"}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            );
-          })()}
-        </div>
-      )}
     </div>
   );
 }
