@@ -1331,7 +1331,7 @@ function O2026DetailPage({nav,navBack,o2026Scores,o2026Assignments}){
   );
 }
 
-function EventsPage({nav,navBack,o2026Scores,o2026Assignments}){
+function EventsPage({nav,navBack,o2026Scores,o2026Assignments,currentPlayer}){
   const m=useIsMobile();
   return(
     <div style={{padding:m?"14px 14px 76px":"40px 32px",maxWidth:1100,margin:"0 auto"}} className="fade">
@@ -1387,7 +1387,7 @@ function EventsPage({nav,navBack,o2026Scores,o2026Assignments}){
           const finishedEpIds=Object.keys(o2026Scores||{}).filter(epId=>(o2026Scores[epId]?.ranked?.length>0));
           const allDone=finishedEpIds.length===O2026_EPREUVES.length&&O2026_EPREUVES.length>0;
           return(
-            <div key="o2026" onClick={()=>nav("o2026Detail")} style={{background:"#0d0d1c",border:`1px solid ${ac}33`,borderRadius:12,overflow:"hidden",cursor:"pointer",transition:"transform .2s,border-color .2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=ac+"77";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=ac+"33";}}>
+            <div key="o2026" onClick={()=>currentPlayer?.uid===ADMIN_UID&&nav("o2026Detail")} style={{background:"#0d0d1c",border:`1px solid ${currentPlayer?.uid===ADMIN_UID?ac+"33":"#1e1e30"}`,borderRadius:12,overflow:"hidden",cursor:currentPlayer?.uid===ADMIN_UID?"pointer":"default",transition:"transform .2s,border-color .2s",opacity:currentPlayer?.uid===ADMIN_UID?1:0.4,filter:currentPlayer?.uid===ADMIN_UID?"none":"grayscale(0.7)"}} onMouseEnter={e=>{if(currentPlayer?.uid===ADMIN_UID){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=ac+"77";}}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.borderColor=currentPlayer?.uid===ADMIN_UID?ac+"33":"#1e1e30";}}>
               <div style={{height:4,background:`linear-gradient(90deg,${ac},${ac}44)`}}/>
               <div style={{padding:m?14:22}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
@@ -2222,6 +2222,9 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
 
         // Tab state + pagination
         const [rankTab,setRankTab]=React.useState("equipes");
+        const RANK_HIDDEN_KEY="o2026_rank_hidden";
+        const [rankHidden,setRankHidden]=React.useState(()=>{try{return localStorage.getItem(RANK_HIDDEN_KEY)==="1";}catch{return false;}});
+        function toggleRankHidden(){const next=!rankHidden;setRankHidden(next);try{localStorage.setItem(RANK_HIDDEN_KEY,next?"1":"");}catch{}}
         const PER_PAGE=16;
         const [indivPage,setIndivPage]=React.useState(0);
         const indivPages=Math.ceil(playerIndiv.length/PER_PAGE);
@@ -2239,20 +2242,28 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
           <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:20}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#E8B84B"}}>🏆 CLASSEMENT PROVISOIRE</div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:6,height:6,borderRadius:"50%",background:"#34d399",boxShadow:"0 0 6px #34d399"}}/>
                 <span style={{fontSize:10,color:"#34d399"}}>En direct</span>
+                {isLouis&&<button onClick={toggleRankHidden} style={{background:"none",border:"1px solid #404058",borderRadius:6,color:"#60607a",fontSize:10,cursor:"pointer",padding:"2px 8px",marginLeft:6}}>{rankHidden?"👁 Afficher":"🙈 Masquer"}</button>}
               </div>
             </div>
 
+            {/* Hidden message for non-louis */}
+            {rankHidden&&!isLouis&&(
+              <div style={{textAlign:"center",padding:"20px 0",color:"#404058",fontSize:13}}>🔒 Classement masqué par l'organisateur</div>
+            )}
+
             {/* Tabs */}
+            {(!rankHidden||isLouis)&&(
             <div style={{display:"flex",gap:8,marginBottom:16}}>
               <div style={TAB("equipes","Équipes")} onClick={()=>setRankTab("equipes")}>Équipes</div>
               <div style={TAB("individuel","Individuel")} onClick={()=>{setRankTab("individuel");setIndivPage(0);}}>Individuel</div>
             </div>
+            )}
 
             {/* Équipes tab */}
-            {rankTab==="equipes"&&ranked.map((team,i)=>{
+            {rankTab==="equipes"&&(!rankHidden||isLouis)&&ranked.map((team,i)=>{
               const score=totals[team.id]||0;
               return(
                 <div key={team.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
@@ -2265,7 +2276,7 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments}){
             })}
 
             {/* Individuel tab */}
-            {rankTab==="individuel"&&(
+            {rankTab==="individuel"&&(!rankHidden||isLouis)&&(
               <>
                 {/* Header */}
                 <div style={{display:"grid",gridTemplateColumns:"30px 1fr 70px 50px 50px 60px",gap:6,padding:"4px 0 8px",borderBottom:"1px solid #1e1e30",marginBottom:4}}>
@@ -5327,6 +5338,7 @@ function DataPage(){
   const [tab,setTab]=useState("players");
   const [assignments,setAssignments]=useState({});
   const [selTeam,setSelTeam]=useState(null);
+  const [arbitres,setArbitres]=useState({}); // epId -> [playerUid, ...]
   const [data,setData]=useState({players:[],teams:[]});
   const [loading,setLoading]=useState(false);
   const [saving,setSaving]=useState(false);
@@ -5436,7 +5448,7 @@ function DataPage(){
 
       {/* Tabs */}
       <div style={{display:"flex",gap:0,marginBottom:20,background:"#13131f",borderRadius:8,padding:4,border:"1px solid #1e1e30",overflowX:"auto",WebkitOverflowScrolling:"touch",flexShrink:0}}>
-        {[{id:"players",l:"👤 Joueurs"},{id:"teams",l:"🏆 Équipes"},{id:"stats",l:"📊 Stats"},{id:"assignments",l:"📋 Assignations"}].map(t=>(
+        {[{id:"players",l:"👤 Joueurs"},{id:"teams",l:"🏆 Équipes"},{id:"stats",l:"📊 Stats"},{id:"assignments",l:"📋 Assignations"},{id:"arbitres",l:"🦺 Arbitres"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 18px",borderRadius:6,cursor:"pointer",background:tab===t.id?"#E8B84B":"transparent",color:tab===t.id?"#080810":"#60607a",border:"none",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600}}>{t.l}</button>
         ))}
       </div>
@@ -5635,6 +5647,59 @@ function DataPage(){
               </>
             );
           })()}
+        </div>
+      )}
+      {/* Arbitres tab */}
+      {tab==="arbitres"&&(
+        <div style={G}>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>ARBITRES PAR ÉPREUVE</div>
+          {O2026_EPREUVES.map(ep=>{
+            const epArbitres=arbitres[ep.id]||[];
+            async function saveArbitre(uid,add){
+              const next=add?[...epArbitres,uid]:epArbitres.filter(u=>u!==uid);
+              setArbitres(a=>({...a,[ep.id]:next}));
+              try{
+                await sbFetch("o2026_arbitres","",{method:"DELETE",params:`?epreuve_id=eq.${ep.id}`});
+                if(next.length>0){
+                  await sbFetch("o2026_arbitres","",{method:"POST",body:JSON.stringify(next.map(u=>({epreuve_id:ep.id,player_uid:u})))});
+                }
+              }catch(e){console.error("save arbitre",e);}
+            }
+            const allUIDs=PLAYERS.filter(p=>p.uid).map(p=>p);
+            return(
+              <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${epArbitres.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:epArbitres.length>0?8:4}}>
+                  <span style={{fontSize:14}}>{ep.emoji}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                    <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
+                  </div>
+                  {epArbitres.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {epArbitres.length} arbitre{epArbitres.length>1?"s":""}</span>}
+                </div>
+                {/* Assigned arbitres */}
+                {epArbitres.length>0&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                    {epArbitres.map(uid=>{
+                      const p=PLAYERS.find(pl=>pl.uid===uid);
+                      return(
+                        <div key={uid} onClick={()=>saveArbitre(uid,false)} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                          {p?getDisplayName(p,PLAYERS):uid} <span style={{fontSize:9,opacity:0.6}}>✕</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Add arbitre dropdown */}
+                <select onChange={e=>{if(e.target.value&&!epArbitres.includes(e.target.value)){saveArbitre(e.target.value,true);e.target.value="";}}}
+                  style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:8,color:"#60607a",fontSize:11,padding:"4px 8px",cursor:"pointer",outline:"none"}}>
+                  <option value="">+ Ajouter un arbitre...</option>
+                  {PLAYERS.filter(p=>p.uid&&!epArbitres.includes(p.uid)).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>(
+                    <option key={p.uid} value={p.uid}>{getDisplayName(p,PLAYERS)}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -7854,7 +7919,7 @@ function App(){
       <NavBar page={page} setPage={p=>nav(p)} currentPlayer={currentPlayer} isAdmin={isAdmin} onMenuBL={()=>{setSection("menu");}}/>
       {dbError&&<div style={{background:"#1a0a0a",color:"#fb923c",fontSize:11,textAlign:"center",padding:"4px 8px"}}>⚠ Mode hors-ligne</div>}
       <div key={page+JSON.stringify(sub)+dbVersion} className="fade">
-        {page==="events"        &&<EventsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
+        {page==="events"        &&<EventsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments} currentPlayer={currentPlayer}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
         {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
