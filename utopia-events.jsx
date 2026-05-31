@@ -5431,7 +5431,7 @@ function DataPage(){
       </div>}
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:0,marginBottom:20,background:"#13131f",borderRadius:8,padding:4,width:"fit-content",border:"1px solid #1e1e30"}}>
+      <div style={{display:"flex",gap:0,marginBottom:20,background:"#13131f",borderRadius:8,padding:4,border:"1px solid #1e1e30",overflowX:"auto",WebkitOverflowScrolling:"touch",flexShrink:0}}>
         {[{id:"players",l:"👤 Joueurs"},{id:"teams",l:"🏆 Équipes"},{id:"stats",l:"📊 Stats"},{id:"assignments",l:"📋 Assignations"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 18px",borderRadius:6,cursor:"pointer",background:tab===t.id?"#E8B84B":"transparent",color:tab===t.id?"#080810":"#60607a",border:"none",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600}}>{t.l}</button>
         ))}
