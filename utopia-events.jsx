@@ -4926,11 +4926,32 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
         {/* Espace joueur */}
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:20,marginBottom:16}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#60607a",marginBottom:16}}>ESPACE JOUEUR</div>
-          
-
-
+          {player.t26&&(()=>{
+            const myEpreuves=O2026_EPREUVES.filter(ep=>{
+              const assigned=(o2026Assignments||{})[`${player.t26}_${ep.id}`]||[];
+              return assigned.includes(player.id);
+            });
+            return(
+              <div style={{marginBottom:16}}>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:"#60607a",marginBottom:8,letterSpacing:"0.05em"}}>MES ÉPREUVES O2026</div>
+                {myEpreuves.length===0
+                  ?<div style={{fontSize:12,color:"#404058",fontStyle:"italic"}}>Aucune épreuve assignée pour l'instant.</div>
+                  :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {myEpreuves.map(ep=>(
+                      <div key={ep.id} style={{display:"flex",alignItems:"center",gap:10,background:"#13131f",borderRadius:8,padding:"9px 12px",border:`1px solid ${ep.color}33`}}>
+                        <span style={{fontSize:16,flexShrink:0}}>{ep.emoji}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                          <div style={{fontSize:11,color:"#60607a",marginTop:1}}>Phase {ep.phase} · {ep.horaire}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              </div>
+            );
+          })()}
           <button onClick={handleLogout} style={BTN("#1e1e30")}>🔓 Se déconnecter</button>
-
         </div>
 
         {/* Espace Capitaine */}
@@ -5014,8 +5035,19 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
               if(rule.onlyH&&ps.some(p=>sex(p)==="f"))errs.push(`${name} : réservé aux garçons`);
               if(rule.onlyF&&ps.some(p=>sex(p)==="m"))errs.push(`${name} : réservé aux filles`);
             }
-            // TC/Biathlon : everyone in at least one
-            const missing=roster.filter(p=>!inTcOrBio.has(p.id));
+            // TC/Biathlon : only flag players who COULD be assigned (gender had room)
+            const tcH=tcIds.filter(id=>{const p=roster.find(r=>r.id===id);return sex(p)==="m";}).length;
+            const tcF=tcIds.filter(id=>{const p=roster.find(r=>r.id===id);return sex(p)==="f";}).length;
+            const bioH=bioIds.filter(id=>{const p=roster.find(r=>r.id===id);return sex(p)==="m";}).length;
+            const bioF=bioIds.filter(id=>{const p=roster.find(r=>r.id===id);return sex(p)==="f";}).length;
+            const missing=roster.filter(p=>{
+              if(inTcOrBio.has(p.id))return false;
+              const isH=sex(p)==="m";
+              // Could they fit in TC or Bio?
+              const couldTC=isH?(tcH<2):(tcF<2);
+              const couldBio=isH?(bioH<2):(bioF<2);
+              return couldTC||couldBio;
+            });
             if(missing.length>0)errs.push(`TC/Biathlon : ${missing.map(p=>getDisplayName(p,PLAYERS)).join(", ")} non assigné(s)`);
             return errs;
           }
