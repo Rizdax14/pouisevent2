@@ -3001,7 +3001,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         </div>
       </div>
 
-      {isLouis&&(
+      {isArbitre&&(
         <div style={{display:"flex",gap:8,marginBottom:16}}>
           {[{id:"view",l:"👁 Public"},{id:"admin",l:"🦺 Arbitre"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"6px 16px",borderRadius:8,cursor:"pointer",border:tab===t.id?"none":"1px solid #1e1e30",background:tab===t.id?ac:"#13131f",color:tab===t.id?"#080810":"#60607a",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600}}>{t.l}</button>
@@ -3010,7 +3010,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── ADMIN ─────────────────────────────────────────────── */}
-      {tab==="admin"&&isLouis&&(
+      {tab==="admin"&&isArbitre&&(
         <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:16,marginBottom:16}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12}}>PANEL ARBITRE</div>
 
@@ -3499,8 +3499,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                         </div>
                       ))}
                     </div>
-                    {bPhase==="qf"&&isLouis&&<button onClick={launchSF} disabled={!qfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer les demi-finales →</button>}
-                    {bPhase==="sf"&&isLouis&&<button onClick={()=>setBPhase("qf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour QF</button>}
+                    {bPhase==="qf"&&isArbitre&&<button onClick={launchSF} disabled={!qfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer les demi-finales →</button>}
+                    {bPhase==="sf"&&isArbitre&&<button onClick={()=>setBPhase("qf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour QF</button>}
                   </div>
                 )}
                 {(bPhase==="sf"||bPhase==="fin")&&(
@@ -3516,8 +3516,8 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                         </div>
                       ))}
                     </div>
-                    {bPhase==="sf"&&isLouis&&<button onClick={launchFin} disabled={!sfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer la finale →</button>}
-                    {bPhase==="fin"&&isLouis&&<button onClick={()=>setBPhase("sf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour SF</button>}
+                    {bPhase==="sf"&&isArbitre&&<button onClick={launchFin} disabled={!sfComplete} style={{...BTN("#34d399"),marginTop:10}}>🏆 Lancer la finale →</button>}
+                    {bPhase==="fin"&&isArbitre&&<button onClick={()=>setBPhase("sf")} style={{...BTN("#1e1e30"),marginTop:10}}>← Retour SF</button>}
                   </div>
                 )}
                 {bPhase==="fin"&&(
@@ -3526,7 +3526,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                     <DragRankList compact items={bFin} onReorder={setBFin} locked={bLocked} getKey={id=>id}
                       getLabel={id=>{const t=getO2026Team(id);return t?.name||"?";}}
                       getColor={id=>getO2026Team(id)?.color||"#60607a"}/>
-                    {isLouis&&<button onClick={doValidate} disabled={!finComplete} style={{...BTN(bLocked?"#404058":"#34d399"),marginTop:10}}>
+                    {isArbitre&&<button onClick={doValidate} disabled={!finComplete} style={{...BTN(bLocked?"#404058":"#34d399"),marginTop:10}}>
                       {bLocked?"✅ Validé — Modifier":"📋 Valider le classement final"}
                     </button>}
                   </div>
@@ -3558,7 +3558,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 );
               })}
-              {isLouis&&(<div style={{display:"flex",gap:8,marginTop:12}}>
+              {isArbitre&&(<div style={{display:"flex",gap:8,marginTop:12}}>
               <button onClick={()=>{setBasketScores({});setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});validatedRankedRef.current=null;setEpreuveValidated(false);}} style={{flex:1,background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>
               <button onClick={()=>{const sim={};getO2026ActiveTeams().forEach(t=>{sim[t.id]={e1:Math.floor(Math.random()*30)+1,e2:Math.floor(Math.random()*30)+1};});setBasketScores(sim);}} style={{flex:1,background:"#1e1e30",border:"1px solid #2a2a40",color:"#aaa",borderRadius:8,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🎲 Simuler</button>
               <button onClick={()=>{
@@ -3642,7 +3642,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   </div>
                 </div>
               ))}
-              {isLouis&&<button onClick={()=>{
+              {isArbitre&&<button onClick={()=>{
                 const allT=getO2026ActiveTeams();
                 const teams=beretPositions.map(idx=>allT[idx]||allT[0]);
                 const wins={};
@@ -4229,7 +4229,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
 
       {/* BRACKET */}
       {(hasBracketPhase)&&(()=>{
-        const isAdmin=tab==="admin"&&isLouis;
+        const isAdmin=tab==="admin"&&isArbitre;
         return(
           <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
@@ -4263,7 +4263,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         );
       })()}
 
-      {phase==="done"&&isLouis&&(<div style={{marginBottom:12,display:"flex",gap:8}}>
+      {phase==="done"&&isArbitre&&(<div style={{marginBottom:12,display:"flex",gap:8}}>
         {epreuveValidated&&<button onClick={()=>{validatedRankedRef.current=null;setEpreuveValidated(false);setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});setPhase("groupes");setGroupes({1:[],2:[],3:[],4:[]});setResultats({});setMiniRes({});setBracketResultats({});setFinalizedGroupes({1:false,2:false,3:false,4:false});}} style={{background:"#1e1e30",border:"1px solid #444",color:"#aaa",borderRadius:8,padding:"8px 12px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Reset</button>}
         <button onClick={()=>validateClassement(getFinalRanking())} disabled={epreuveValidated}
           style={{flex:1,background:epreuveValidated?"#1e2e1e":"#34d399",border:"none",color:epreuveValidated?"#555":"#080810",borderRadius:8,padding:"10px",fontSize:13,fontWeight:700,cursor:epreuveValidated?"default":"pointer",fontFamily:"'Outfit',sans-serif"}}>
