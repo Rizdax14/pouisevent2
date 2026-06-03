@@ -2388,6 +2388,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   if(!ep)return null;
   const ac=ep.color;
   const isLouis=currentPlayer?.uid===ADMIN_UID;
+  const [epArbitreUids,setEpArbitreUids]=React.useState(null);
+  React.useEffect(()=>{
+    sbFetch("o2026_arbitres",`?select=player_uid&epreuve_id=eq.${epreuveId}`)
+      .then(rows=>{setEpArbitreUids((rows||[]).map(r=>r.player_uid));})
+      .catch(()=>setEpArbitreUids([]));
+  },[epreuveId]);
+  const isArbitre=isLouis||(epArbitreUids!==null&&!!currentPlayer?.uid&&epArbitreUids.includes(currentPlayer.uid));
   const scoreType=ep.scoreType||"manche";
   const isDragRank=["drag_rank","drag_rank_2","drag_rank_coef","drag_rank_group"].includes(scoreType);
   const hasGroupFormat=ep.groupes>0; // round-robin groups (beerpong, football, puissance4, overcooked)
@@ -2549,13 +2556,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   },[ep.id]);
 
   // Debounced save on state change (arbitre only)
-  const [epArbitreUids,setEpArbitreUids]=React.useState(null);
-  React.useEffect(()=>{
-    sbFetch("o2026_arbitres",`?select=player_uid&epreuve_id=eq.${ep.id}`)
-      .then(rows=>{setEpArbitreUids((rows||[]).map(r=>r.player_uid));})
-      .catch(()=>setEpArbitreUids([]));
-  },[ep.id]);
-  const isArbitre=isLouis||(epArbitreUids!==null&&currentPlayer?.uid&&epArbitreUids.includes(currentPlayer.uid));
   React.useEffect(()=>{
     if(!isArbitre||supaLoading)return;
     if(saveTimeoutRef.current)clearTimeout(saveTimeoutRef.current);
