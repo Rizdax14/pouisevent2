@@ -1216,6 +1216,22 @@ function EventLogo({ev, size=48}){
 
 
 // ─── O2026 DETAIL PAGE ───────────────────────────────
+const LOGIK_ENIGMAS=[
+  {id:1,titre:"Recherche Littéraire",text:"Ouvrez Google. Cherchez l'œuvre majeure de Marcel Proust, publiée entre 1913 et 1927. Le titre de cette série est \"À la recherche du [Mot-code]...\" Quel est le tout dernier mot du titre ?",answer:"perdu",pts:1},
+  {id:2,titre:"Recherche Visuelle",text:"Tapez sur internet : \"La Persistance de la mémoire\" de Salvador Dalí (1931). Regardez l'image. Quels objets du quotidien, utilisés pour mesurer le mot-code, sont littéralement en train de fondre ?",answer:"montres",pts:1},
+  {id:3,titre:"L'Homonyme culinaire",text:"Lâchez les téléphones. Je suis une petite herbe aromatique qui se marie avec le romarin et les grillades. À l'oral, je me prononce EXACTEMENT comme le mot-code, mais je m'écris avec un H. Quel est mon nom ?",answer:"thym",pts:1},
+  {id:4,titre:"Mythologie",text:"Dans la mythologie grecque, quel est le nom du Titan — père de Zeus — tristement célèbre pour dévorer ses propres enfants ? Il est la personnification du mot-code.",answer:"cronos",pts:2},
+  {id:5,titre:"La Citation",text:"Benjamin Franklin a écrit en 1748 : \"Souviens-toi que le [mot-code], c'est de l'...\" Complétez. Que dit la citation ?",answer:"argent",pts:2},
+  {id:6,titre:"Observation géométrique",text:"Couché sur le flanc, mon contour dessine le symbole de l'infini (∞). Debout, j'utilise la gravité et du sable pour mesurer le mot-code. Quel suis-je ?",answer:"sablier",pts:2},
+  {id:7,titre:"Le Compagnon scientifique",text:"En physique (surtout depuis Einstein), on associe le mot-code à une autre dimension pour former un continuum à 4 dimensions. Quelle est cette autre notion ? (L'___ - [mot-code])",answer:"espace",pts:2},
+  {id:8,titre:"L'Outil de la couturière",text:"Je suis la tige sur laquelle la Belle au Bois Dormant s'est piquée. Mais associé au mot-code, je sers à découper la Terre en 24 tranches imaginaires pour gérer le décalage... [mot-code]. Qui suis-je ?",answer:"fuseau",pts:3},
+  {id:9,titre:"Logique implacable",text:"Plus le mot-code avance, plus j'augmente. Je suis invisible, je ne pèse rien, mais au moment de votre dernier souffle j'atteindrai mon nombre le plus élevé. Chez l'humain, on me compte souvent en années.",answer:"age",pts:3},
+  {id:10,titre:"Le Quotidien",text:"C'est la science qui étudie les nuages, la pluie et le soleil. Mais en France on demande directement : \"Quel [mot-code] fait-il aujourd'hui ?\" Quel est ce domaine ?",answer:"meteo",pts:3},
+];
+const LOGIK_FINAL_WORD="temps";
+const LOGIK_MAX_ATTEMPTS=3;
+
+
 const O2026_EPREUVES = [
   {id:"bp",phase:1,nom:"Ballon-Prisonnier",emoji:"🏐",horaire:"10H - 11H30",format:"6V6 — Groupe + Arbre",nbJoueurs:6,color:"#3b82f6",lieuImg:"/lieux/bp.png",regles:["🎯 Objectif","Avoir le **plus de joueurs dans son camp** que l'adversaire au terme des **5 minutes**. Si une équipe n'a **plus aucun joueur** avant la fin du temps, elle a perdu **immédiatement**.","📏 Règles de jeu","- **Toucher** un adversaire : lui lancer la balle directement","- **Sauver** un allié : lui lancer la balle par-dessus la ligne adverse","- La balle **change de camp** quand elle est attrapée, finit sa course dans la moitié adverse, ou touche un joueur","- ⏱️ **Interdit** de perdre du temps exprès","✅ À savoir","- Attraper en **plusieurs temps** (ex : contrôle torse → mains sans toucher le sol) → réception **validée**","- **🤯 LOI DEVILLE** : ballon dans la **tête** = touche **annulée**, balle rendue à la victime","🏆 Format de la compétition","**Phase de poules** — Les 16 équipes sont réparties en 4 groupes de 4. Dans chaque groupe, **tout le monde affronte tout le monde** (3 matchs par équipe).","**Phase finale** — À l'issue des poules, les équipes sont regroupées **par leur classement** : les 4 premiers ensemble, les 4 deuxièmes ensemble, etc. Chaque groupe joue ensuite **2 matchs** (demi-finale puis finale) pour déterminer les places : **1ère→4ème · 5ème→8ème · 9ème→12ème · 13ème→16ème**."],notesSpeciales:[],groupes:4,scoreType:"victoire"},
   {id:"balle_folle",phase:2,nom:"La Balle Folle",emoji:"🏃",horaire:"11H30 - 12H30",format:"3V3 — Groupe + Arbre",nbJoueurs:3,color:"#f59e0b",lieuImg:"/lieux/balle_folle.png",regles:["🎯 Objectif","Être la première équipe à avoir la balle **dans la main du receveur** après le top départ.","👥 Les 3 rôles","- **Sprinteur** : au top, il fonce chercher la balle au centre et la ramène au lanceur","- **Lanceur** : réceptionne la balle et doit l'envoyer avec **précision** au receveur","- **Receveur** : attend dans son cerceau — il doit **toujours garder au moins un pied dedans**","📏 Règles","- Si le lanceur **rate son lancer**, le sprinteur doit aller récupérer la balle et recommencer","- La balle doit être **dans la main** du receveur pour valider","🏆 Format de la compétition","**Phase de poules** — Les 16 équipes sont réparties en 4 groupes de 4. Dans chaque groupe, **tout le monde affronte tout le monde** (3 matchs par équipe).","**Phase finale** — À l'issue des poules, les équipes sont regroupées **par leur classement** : les 4 premiers ensemble, les 4 deuxièmes ensemble, etc. Chaque groupe joue ensuite **2 matchs** (demi-finale puis finale) pour déterminer les places : **1ère→4ème · 5ème→8ème · 9ème→12ème · 13ème→16ème**."],notesSpeciales:[],groupes:4,scoreType:"victoire"},
@@ -1225,7 +1241,7 @@ const O2026_EPREUVES = [
   {id:"cultureg",phase:4,nom:"Culture G",emoji:"🧠",horaire:"14H - 15H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#8b5cf6",lieuImg:"/lieux/cultureg.png",regles:["Quiz de culture générale — chaque joueur répond individuellement.","Classement par score décroissant."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
   {id:"molky",phase:4,nom:"Mölky",emoji:"🪵",horaire:"14H - 15H",format:"1V1 — Groupe (drag & drop par groupe)",nbJoueurs:1,color:"#8b5cf6",lieuImg:"/lieux/molky.png",regles:["🎯 Objectif","Atteindre **exactement 50 points** avant les autres. Le premier à le faire est classé **1er** de son groupe, le deuxième **2ème**, etc. Limite de temps : **20 minutes**.","📏 Règles de base","- Tu fais tomber **un seul cône** → tu marques le **chiffre inscrit** dessus","- Tu fais tomber **plusieurs cônes** → tu marques le **nombre de cônes** tombés","- Ordre de passage : du **plus jeune au plus âgé**","📐 Règles additionnelles","- **Checkpoint à 25 points** — mémorisez-le, il peut vous sauver !","- Dépasser 50 points → **retour à 25**","- **3 erreurs d'affilée** (aucune touche) → retour au checkpoint si score > 25, sinon **retour à 0**","- Limite de 20 min atteinte → classement au **nombre de points** à la fin du dernier tour","🏆 Format de la compétition","**Phase de poules** — Les 16 équipes sont réparties en 4 groupes de 4. Dans chaque groupe, **tout le monde affronte tout le monde** (3 matchs par équipe).","**Phase finale** — À l'issue des poules, les équipes sont regroupées **par leur classement** : les 4 premiers ensemble, les 4 deuxièmes ensemble, etc. Chaque groupe joue ensuite **2 matchs** (demi-finale puis finale) pour déterminer les places : **1ère→4ème · 5ème→8ème · 9ème→12ème · 13ème→16ème**."],notesSpeciales:[],groupes:0,scoreType:"drag_rank_group"},
   {id:"beret",phase:4,nom:"Béret",emoji:"🎓",horaire:"14H - 15H",format:"2V2 — 5 tours × 16 matchs",nbJoueurs:2,color:"#8b5cf6",lieuImg:"/lieux/beret.png",regles:["🎯 Objectif","Accumuler le **maximum de victoires** sur les 5 tours de matchs.","📏 Format","- **16 équipes mixtes** : 1 garçon + 1 fille par équipe","- **5 tours** de 16 matchs chacun (8 matchs H + 8 matchs F par tour)","- Sur chaque tour, le garçon et la fille d'une même équipe **n'affrontent jamais la même équipe adverse**","- **Score final** = total de victoires sur les 5 tours (max **10 victoires**)","📋 Déroulement","- Chaque joueur reçoit un **papier avec ses numéros** pour chaque tour de match","- On commence par les **16 matchs du Tour 1** — un joueur peut par exemple être appelé en **numéro 6**","- **Écoutez bien l'arbitre** qui annonce les numéros — c'est lui qui gère le rythme des matchs"],notesSpeciales:[],groupes:0,scoreType:"beret_o2026"},
-  {id:"puzzlerun",phase:4,nom:"Puzzle & Run",emoji:"🧩",horaire:"14H - 15H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,color:"#8b5cf6",lieuImg:"/lieux/puzzlerun.png",regles:["🎯 Objectif","Être la première équipe à **compléter le puzzle** de 100 pièces — le même pour tout le monde.","📏 Règles","- Les 2 joueurs reçoivent une **carte** indiquant **10 spots** répartis sur le site","- À chaque spot se trouve un **jeton** aux couleurs de l'équipe","- Le joueur ramène le jeton à la **table de marque** où un arbitre lui remet **10 pièces** du puzzle","- Les joueurs se relaient : **un joueur sur deux** fait chaque déplacement","- Les jetons se récupèrent **un par un** — impossible d'en ramener plusieurs à la fois","- La **première équipe** à assembler son puzzle entier gagne","🏆 Format","Toutes les équipes s'élancent **en même temps** — classement par ordre d'arrivée."],notesSpeciales:[],groupes:0,scoreType:"drag_rank"},
+  {id:"logikrun",phase:3,nom:"Logik & Run",emoji:"🧠",horaire:"12H30 - 14H",format:"2V2 — 45 min",nbJoueurs:2,color:"#10b981",lieuImg:"/lieux/puzzlerun.png",regles:["🎯 Objectif","Trouver le **mot-code final** en résolvant un maximum d'énigmes en **45 minutes**.","📏 Règles","- Les 2 joueurs reçoivent une **carte** indiquant **10 spots** sur le site","- À chaque spot : un **jeton** à ramener à la **table de marque**","- Les joueurs se relaient : **un joueur sur deux** fait chaque déplacement","- Chaque jeton débloque une **nouvelle énigme** — récupérés **un par un**","- **3 essais** max par énigme pour trouver le mot-indice","- Une fois les **10 jetons** récupérés, le mot-code final se déverrouille","🏆 Classement","1. Équipes ayant trouvé le mot-code → triées par **temps**","2. Les autres → triées par **nombre d'indices trouvés**"],notesSpeciales:[],groupes:0,scoreType:"logik_run"},
   {id:"puissance4",phase:5,nom:"Puissance 4",emoji:"🔴",horaire:"15H - 16H",format:"1V1 — Poule + Arbre",nbJoueurs:1,color:"#ef4444",lieuImg:"/lieux/puissance4.png",regles:["Match en 1 manche."],notesSpeciales:[{titre:"🏅 Départage",texte:"En cas d'égalité de points : résultat du match direct."}],groupes:4,scoreType:"victoire"},
   {id:"basket",phase:5,nom:"Basket",emoji:"🏀",horaire:"15H - 16H",format:"1V1 — Tout le monde en même temps",nbJoueurs:1,color:"#ef4444",lieuImg:"/lieux/basket.png",regles:["Chaque joueur tire 2 fois 1m30.","Score = somme des paniers réussis sur les 2 essais.","Classement par score décroissant."],notesSpeciales:[],groupes:0,scoreType:"basket"},
   {id:"cercles",phase:5,nom:"Cercles Musical",emoji:"⭕",horaire:"15H - 16H",format:"2V2 — Tout le monde en même temps",nbJoueurs:2,color:"#ef4444",lieuImg:"/lieux/cercles.png",regles:["🎯 Objectif","Être l'un des derniers à avoir une balle quand la musique s'arrête — jusqu'au **duel final**.","📏 Principe","- **32 joueurs** tournent en continu dans le **cercle central** — il est **interdit de doubler**, de rentrer ou de sortir sous peine d'**élimination immédiate**","- Autour du cercle : **2 zones de balles** — un cercle **extérieur** (16 balles) et un cercle **intérieur** (15 balles)","- Quand la musique s'arrête, chaque joueur doit **attraper une balle**","- Celui qui n'en a pas est **éliminé**","🔢 Les balles","- Les balles sont **numérotées de 1 à 31**","- À chaque tour, on retire **1 balle** en alternant intérieur/extérieur pour garder l'équilibre","- Tour 1 → on retire 1 balle **intérieure** (rééquilibre à 15/15)","- Tour 2 → on retire 1 balle **extérieure**, Tour 3 → **intérieure**, etc.","- Le **duel final** oppose les 2 derniers joueurs sur **1 seule balle**","🏆 Classement","Classement par ordre d'élimination — le dernier éliminé avant le duel est **3ème**, le perdant du duel est **2ème**, le gagnant est **1er**."],notesSpeciales:[{titre:"📊 Score d'équipe",texte:"Coef 2 pour le meilleur joueur, coef 1 pour l'autre."}],groupes:0,scoreType:"drag_rank_coef"},
@@ -2459,6 +2475,12 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   // Tir à la corde - 16-team bracket
   const [tcResultats,setTcResultats]=useState({});
   const [basketScores,setBasketScores]=useState({});
+  // Logik & Run state
+  const [lrTokens,setLrTokens]=useState({}); // teamId -> count
+  const [lrEnigmas,setLrEnigmas]=useState({}); // teamId -> [{attempts:[], solved:bool}]
+  const [lrFinal,setLrFinal]=useState({}); // teamId -> {attempts:[], solved:bool, solvedAt:null}
+  const [lrTimer,setLrTimer]=useState({started:false,startTime:null});
+  const [lrTimerDisplay,setLrTimerDisplay]=useState("45:00");
   const [beretO2026Results,setBeretO2026Results]=useState({});
   const [beretPositions,setBeretPositions]=useState([...Array(16).keys()]);
   const [beretRanked,setBeretRanked]=useState([]); // pos→teamIdx
@@ -2490,7 +2512,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
       bQF,bSF,bFin,bPhase,bLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,epreuveValidated,ranked:validatedRankedRef.current||undefined};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,lrTokens,lrEnigmas,lrFinal,lrTimer,epreuveValidated,ranked:validatedRankedRef.current||undefined,lrTokens,lrEnigmas,lrFinal,lrTimer};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2534,6 +2556,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.bLocked!==undefined)setBLocked(d.bLocked);
     if(d.tcResultats)setTcResultats(d.tcResultats);
     if(d.basketScores)setBasketScores(d.basketScores);
+    if(d.lrTokens)setLrTokens(d.lrTokens);
+    if(d.lrEnigmas)setLrEnigmas(d.lrEnigmas);
+    if(d.lrFinal)setLrFinal(d.lrFinal);
+    if(d.lrTimer)setLrTimer(d.lrTimer);
     if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.beretPositions)setBeretPositions(d.beretPositions);
     if(d.beretRanked?.length){setBeretRanked(d.beretRanked);setO2026Scores(prev=>({...prev,beret:{ranked:d.beretRanked,beretO2026Results:d.beretO2026Results||{}}}));}
@@ -3003,7 +3029,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
 
       {isArbitre&&(
         <div style={{display:"flex",gap:8,marginBottom:16}}>
-          {[{id:"view",l:"👁 Public"},{id:"admin",l:"🦺 Arbitre"}].map(t=>(
+          {[{id:"view",l:"👁 Public"},...(scoreType==="logik_run"?[{id:"joueur",l:"🎮 Joueur"}]:[]),...(isArbitre?[{id:"admin",l:"🦺 Arbitre"}]:[])].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"6px 16px",borderRadius:8,cursor:"pointer",border:tab===t.id?"none":"1px solid #1e1e30",background:tab===t.id?ac:"#13131f",color:tab===t.id?"#080810":"#60607a",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600}}>{t.l}</button>
           ))}
         </div>
@@ -3535,6 +3561,210 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             );
           })()}
 
+
+          {/* ── Logik & Run */}
+          {scoreType==="logik_run"&&(()=>{
+            const allTeams=getO2026ActiveTeams();
+            function normalize(s){return(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();}
+            function matchAnswer(input,answer){return normalize(input).includes(normalize(answer));}
+
+            // Timer
+            React.useEffect(()=>{
+              if(!lrTimer.started)return;
+              const interval=setInterval(()=>{
+                const elapsed=Math.floor((Date.now()-lrTimer.startTime)/1000);
+                const remaining=Math.max(0,45*60-elapsed);
+                const m=Math.floor(remaining/60),s=remaining%60;
+                setLrTimerDisplay(`${m}:${s.toString().padStart(2,"0")}`);
+                if(remaining===0)clearInterval(interval);
+              },1000);
+              return()=>clearInterval(interval);
+            },[lrTimer]);
+
+            function getTeamEnigmas(teamId){return lrEnigmas[teamId]||LOGIK_ENIGMAS.map(()=>({attempts:[],solved:false}));}
+            function getTeamFinal(teamId){return lrFinal[teamId]||{attempts:[],solved:false,solvedAt:null};}
+            function getTeamTokens(teamId){return lrTokens[teamId]||0;}
+            function getScore(teamId){
+              const enigs=getTeamEnigmas(teamId);
+              return enigs.reduce((s,e,i)=>s+(e.solved?LOGIK_ENIGMAS[i].pts:0),0);
+            }
+
+            function setToken(teamId,delta){
+              const cur=getTeamTokens(teamId);
+              const next=Math.max(0,Math.min(10,cur+delta));
+              setLrTokens(t=>({...t,[teamId]:next}));
+            }
+
+            function tryEnigma(teamId,enigmaIdx,input){
+              const enigs=getTeamEnigmas(teamId);
+              const enig=enigs[enigmaIdx];
+              if(enig.solved||enig.attempts.length>=LOGIK_FINAL_WORD.length)return;// reuse constant for maxAttempts
+              const newEnig={...enig,attempts:[...enig.attempts,input]};
+              if(matchAnswer(input,LOGIK_ENIGMAS[enigmaIdx].answer)){newEnig.solved=true;}
+              const newEnigs=[...enigs];newEnigs[enigmaIdx]=newEnig;
+              setLrEnigmas(e=>({...e,[teamId]:newEnigs}));
+            }
+
+            function tryFinal(teamId,input){
+              const cur=getTeamFinal(teamId);
+              if(cur.solved||cur.attempts.length>=LOGIK_MAX_ATTEMPTS)return;
+              const newFinal={...cur,attempts:[...cur.attempts,input]};
+              if(matchAnswer(input,LOGIK_FINAL_WORD)){
+                newFinal.solved=true;
+                newFinal.solvedAt=Date.now();
+              }
+              setLrFinal(f=>({...f,[teamId]:newFinal}));
+            }
+
+            // Classement
+            const ranked=[...allTeams].sort((a,b)=>{
+              const fa=getTeamFinal(a.id),fb=getTeamFinal(b.id);
+              if(fa.solved&&fb.solved)return fa.solvedAt-fb.solvedAt;
+              if(fa.solved)return -1;
+              if(fb.solved)return 1;
+              return getScore(b.id)-getScore(a.id);
+            });
+
+            const myTeamId=currentPlayer?.t26;
+            const myTokens=getTeamTokens(myTeamId);
+            const myEnigmas=getTeamEnigmas(myTeamId);
+            const myFinal=getTeamFinal(myTeamId);
+
+            return(
+              <>
+                {/* ── Chrono & tabs header */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:lrTimer.started?(parseInt(lrTimerDisplay)<"10:00"?"#ef4444":ac):ac}}>
+                    ⏱ {lrTimerDisplay}
+                  </div>
+                  {isArbitre&&!lrTimer.started&&<button onClick={()=>setLrTimer({started:true,startTime:Date.now()})} style={BTN(ac)}>▶ Lancer le chrono</button>}
+                  {isArbitre&&lrTimer.started&&<button onClick={()=>{setLrTimer({started:false,startTime:null});setLrTimerDisplay("45:00");}} style={BTN("#1e1e30")}>⏹ Reset chrono</button>}
+                </div>
+
+                {/* ── Vue Publique */}
+                {tab==="view"&&(
+                  <div>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#60607a",marginBottom:10}}>CLASSEMENT EN DIRECT</div>
+                    {ranked.map((t,i)=>{
+                      const f=getTeamFinal(t.id);
+                      const score=getScore(t.id);
+                      const tokens=getTeamTokens(t.id);
+                      const solvedCount=getTeamEnigmas(t.id).filter(e=>e.solved).length;
+                      return(
+                        <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:15,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:28,textAlign:"center"}}>{i+1}</span>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
+                          <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:t.color}}>{t.name}</span>
+                          {f.solved&&<span style={{fontSize:11,color:"#34d399",fontWeight:700}}>✅ MOT-CODE !</span>}
+                          <span style={{fontSize:11,color:"#60607a"}}>{solvedCount}/10 indices · {score}pts</span>
+                          <span style={{fontSize:10,color:"#404058"}}>🪙{tokens}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── Vue Joueur */}
+                {tab==="joueur"&&myTeamId&&(
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:ac}}>JETONS RÉCUPÉRÉS</span>
+                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:ac}}>{myTokens}/10</span>
+                      <div style={{flex:1,height:6,background:"#1e1e30",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${myTokens*10}%`,background:ac,borderRadius:3,transition:"width .3s"}}/>
+                      </div>
+                    </div>
+                    {LOGIK_ENIGMAS.map((enig,idx)=>{
+                      const e=myEnigmas[idx];
+                      const unlocked=myTokens>idx;
+                      const attLeft=LOGIK_MAX_ATTEMPTS-e.attempts.length;
+                      const [input,setInput]=React.useState("");
+                      const diffColor=enig.pts===1?"#34d399":enig.pts===2?"#E8B84B":"#ef4444";
+                      const diffLabel=enig.pts===1?"Facile":enig.pts===2?"Moyen":"Difficile";
+                      return(
+                        <div key={enig.id} style={{background:"#0d0d1c",border:`1px solid ${unlocked?(e.solved?"#34d39944":ac+"33"):"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,opacity:unlocked?1:0.4}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:unlocked?8:0}}>
+                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:diffColor,background:diffColor+"22",padding:"2px 8px",borderRadius:10}}>{diffLabel} · {enig.pts}pt{enig.pts>1?"s":""}</span>
+                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:unlocked?ac:"#404058"}}>Énigme {enig.id} — {enig.titre}</span>
+                            {e.solved&&<span style={{marginLeft:"auto",fontSize:11,color:"#34d399"}}>✅ +{enig.pts}pts</span>}
+                            {!unlocked&&<span style={{marginLeft:"auto",fontSize:10,color:"#404058"}}>🔒 Jeton {enig.id} requis</span>}
+                          </div>
+                          {unlocked&&!e.solved&&<p style={{fontSize:12,color:"#cccce0",lineHeight:1.6,marginBottom:10}}>{enig.text}</p>}
+                          {unlocked&&e.solved&&<p style={{fontSize:12,color:"#34d399",marginBottom:6}}>✅ Mot-indice trouvé !</p>}
+                          {unlocked&&!e.solved&&attLeft>0&&(
+                            <div style={{display:"flex",gap:8}}>
+                              <input value={input} onChange={ev=>setInput(ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter"&&input.trim()){tryEnigma(myTeamId,idx,input.trim());setInput("");}}}
+                                placeholder={`Votre réponse... (${attLeft} essai${attLeft>1?"s":""} restant${attLeft>1?"s":""})`}
+                                style={{flex:1,background:"#13131f",border:"1px solid #2a2a40",borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:13,outline:"none"}}/>
+                              <button onClick={()=>{if(input.trim()){tryEnigma(myTeamId,idx,input.trim());setInput("");}}} style={BTN(ac)}>Valider</button>
+                            </div>
+                          )}
+                          {unlocked&&!e.solved&&attLeft===0&&<div style={{fontSize:12,color:"#ef4444"}}>❌ Plus d'essais pour cette énigme</div>}
+                          {unlocked&&e.attempts.length>0&&!e.solved&&(
+                            <div style={{marginTop:6}}>
+                              {e.attempts.map((a,ai)=><span key={ai} style={{fontSize:11,color:"#404058",marginRight:8}}>✗ {a}</span>)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {/* Mot-code final */}
+                    <div style={{background:"#0d0d1c",border:`1px solid ${myTokens===10?"#E8B84B44":"#1e1e30"}`,borderRadius:10,padding:"14px",marginTop:8,opacity:myTokens===10?1:0.4}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B",marginBottom:8}}>🔓 MOT-CODE FINAL {myTokens<10&&"— Récupère tous les jetons d'abord"}</div>
+                      {myFinal.solved
+                        ?<div style={{fontSize:14,color:"#34d399",fontWeight:700}}>🎉 MOT-CODE TROUVÉ ! Félicitations !</div>
+                        :myTokens===10?(()=>{
+                          const [finInput,setFinInput]=React.useState("");
+                          const attLeft=LOGIK_MAX_ATTEMPTS-myFinal.attempts.length;
+                          return attLeft>0?(
+                            <>
+                              <p style={{fontSize:12,color:"#cccce0",marginBottom:10}}>Tu as tous les indices. Quel est le mot qui relie toutes ces réponses ?</p>
+                              <div style={{display:"flex",gap:8}}>
+                                <input value={finInput} onChange={ev=>setFinInput(ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter"&&finInput.trim()){tryFinal(myTeamId,finInput.trim());setFinInput("");}}}
+                                  placeholder={`Mot-code final... (${attLeft} essai${attLeft>1?"s":""} restant${attLeft>1?"s":""})`}
+                                  style={{flex:1,background:"#13131f",border:"1px solid #E8B84B44",borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:13,outline:"none"}}/>
+                                <button onClick={()=>{if(finInput.trim()){tryFinal(myTeamId,finInput.trim());setFinInput("");}}} style={BTN("#E8B84B")}>Valider</button>
+                              </div>
+                              {myFinal.attempts.length>0&&<div style={{marginTop:6}}>{myFinal.attempts.map((a,ai)=><span key={ai} style={{fontSize:11,color:"#404058",marginRight:8}}>✗ {a}</span>)}</div>}
+                            </>
+                          ):<div style={{fontSize:12,color:"#ef4444"}}>❌ Plus d'essais pour le mot-code final</div>;
+                        })()
+                        :<p style={{fontSize:12,color:"#404058"}}>🔒 Récupère les 10 jetons pour débloquer</p>
+                      }
+                    </div>
+                  </div>
+                )}
+                {tab==="joueur"&&!myTeamId&&<div style={{fontSize:12,color:"#404058",padding:20,textAlign:"center"}}>Tu n'es pas assigné à une équipe O2026.</div>}
+
+                {/* ── Vue Arbitre */}
+                {tab==="admin"&&isArbitre&&(
+                  <div>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#60607a",marginBottom:12}}>GESTION DES JETONS PAR ÉQUIPE</div>
+                    {allTeams.map(t=>{
+                      const tokens=getTeamTokens(t.id);
+                      const score=getScore(t.id);
+                      const solved=getTeamFinal(t.id).solved;
+                      const enigsSolved=getTeamEnigmas(t.id).filter(e=>e.solved).length;
+                      return(
+                        <div key={t.id} style={{background:"#0d0d1c",border:`1px solid ${t.color}33`,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:t.color,flex:1}}>{t.name}</span>
+                          {solved&&<span style={{fontSize:11,color:"#34d399",fontWeight:700}}>✅ MOT-CODE</span>}
+                          <span style={{fontSize:11,color:"#60607a"}}>{enigsSolved}/10 · {score}pts</span>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <button onClick={()=>setToken(t.id,-1)} disabled={tokens===0} style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:6,color:tokens===0?"#404058":"#eeeef5",width:28,height:28,cursor:tokens===0?"default":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:ac,minWidth:28,textAlign:"center"}}>🪙{tokens}</span>
+                            <button onClick={()=>setToken(t.id,1)} disabled={tokens===10} style={{background:ac+"22",border:`1px solid ${ac}55`,borderRadius:6,color:tokens===10?"#404058":ac,width:28,height:28,cursor:tokens===10?"default":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
           {/* ── Basket */}
           {scoreType==="basket"&&(
             <div>
@@ -3761,7 +3991,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       )}
 
       {/* ── STARTLIST for "tout le monde" epreuves ─────────────── */}
-      {["cultureg","marathonH","marathonF","cercles","puzzlerun","balle_folle","basket","beret","molky","puissance4","beerpong","bp","football","tircorde","biathlon"].includes(ep.id)&&(
+      {["cultureg","marathonH","marathonF","cercles","logikrun","balle_folle","basket","beret","molky","puissance4","beerpong","bp","football","tircorde","biathlon"].includes(ep.id)&&(
         <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginBottom:14}}>
           <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>📋 STARTLIST</div>
           <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr":"repeat(4,1fr)",gap:10}}>
@@ -5004,7 +5234,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
             cultureg:"1 joueur",
             molky:"1 joueur",
             beret:"1 garçon + 1 fille",
-            puzzlerun:"2 joueurs",
+            logikrun:"2 joueurs",
             puissance4:"1 joueur",
             basket:"1 joueur",
             cercles:"1 garçon + 1 fille",
@@ -5026,7 +5256,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
               bp:{count:6,minH:1,minF:1},balle_folle:{count:3},football:{count:3},
               marathonH:{count:1,onlyH:true},marathonF:{count:1,onlyF:true},
               cultureg:{count:1},molky:{count:1},beret:{count:2,minH:1,minF:1},
-              puzzlerun:{count:2},puissance4:{count:1},basket:{count:1},
+              logikrun:{count:2},puissance4:{count:1},basket:{count:1},
               cercles:{count:2,minH:1,minF:1},beerpong:{count:2},
               tircorde:{count:4,minH:2,minF:2},biathlon:{count:4,minH:2,minF:2},
             };
