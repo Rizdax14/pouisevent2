@@ -2549,7 +2549,13 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   },[ep.id]);
 
   // Debounced save on state change (arbitre only)
-  const isArbitre=isLouis;
+  const [epArbitreUids,setEpArbitreUids]=React.useState(null);
+  React.useEffect(()=>{
+    sbFetch("o2026_arbitres",`?select=player_uid&epreuve_id=eq.${ep.id}`)
+      .then(rows=>{setEpArbitreUids((rows||[]).map(r=>r.player_uid));})
+      .catch(()=>setEpArbitreUids([]));
+  },[ep.id]);
+  const isArbitre=isLouis||(epArbitreUids!==null&&currentPlayer?.uid&&epArbitreUids.includes(currentPlayer.uid));
   React.useEffect(()=>{
     if(!isArbitre||supaLoading)return;
     if(saveTimeoutRef.current)clearTimeout(saveTimeoutRef.current);
@@ -5346,10 +5352,11 @@ function DataPage(){
   async function loadData(){
     setLoading(true);
     try{
-      const [players,teams,rows]=await Promise.all([
+      const [players,teams,rows,arbRows]=await Promise.all([
         sbFetch("players","?select=id,name,uid,team_id,t26,last_name,display_name&order=name"),
         sbFetch("teams","?select=id,name,color,color2,active,logo_color2&order=name"),
-        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids").catch(()=>[])
+        sbFetch("o2026_assignments","?select=team_id,epreuve_id,player_ids").catch(()=>[]),
+        sbFetch("o2026_arbitres","?select=epreuve_id,player_uid").catch(()=>[])
       ]);
       setData({players,teams});
       const amap={};
@@ -5359,6 +5366,12 @@ function DataPage(){
         amap[`${r.team_id}_${r.epreuve_id}`]=ids;
       });
       setAssignments(amap);
+      const armap={};
+      (arbRows||[]).forEach(r=>{
+        if(!armap[r.epreuve_id])armap[r.epreuve_id]=[];
+        armap[r.epreuve_id].push(r.player_uid);
+      });
+      setArbitres(armap);
     }catch(e){setMsg({type:"error",text:e.message});}
     setLoading(false);
   }
@@ -5650,7 +5663,7 @@ function DataPage(){
               const next=add?[...epArbitres,uid]:epArbitres.filter(u=>u!==uid);
               setArbitres(a=>({...a,[ep.id]:next}));
               try{
-                await sbFetch("o2026_arbitres","",{method:"DELETE",params:`?epreuve_id=eq.${ep.id}`});
+                await sbFetch("o2026_arbitres",`?epreuve_id=eq.${ep.id}`,{method:"DELETE"});
                 if(next.length>0){
                   await sbFetch("o2026_arbitres","",{method:"POST",body:JSON.stringify(next.map(u=>({epreuve_id:ep.id,player_uid:u})))});
                 }
