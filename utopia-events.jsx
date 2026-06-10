@@ -4806,7 +4806,7 @@ function PodiumDetail({podiums,nav}){
 }
 
 // ─── PLAYER DETAIL ────────────────────────────────────
-function PlayerDetailPage({playerId,nav,navBack}){
+function PlayerDetailPage({playerId,nav,navBack,o2026Assignments}){
   const m=useIsMobile();
   const player=getPlayer(playerId);
   if(!player) return null;
@@ -5023,6 +5023,31 @@ function PlayerDetailPage({playerId,nav,navBack}){
           </div>
         </div>
       </div>
+        {/* Épreuves O2026 */}
+        {player.t26&&(()=>{
+          const myEpreuves=O2026_EPREUVES.filter(ep=>{
+            const assigned=(o2026Assignments||{})[`${player.t26}_${ep.id}`]||[];
+            return assigned.includes(player.id);
+          });
+          if(!myEpreuves.length)return null;
+          const tc=getTeam(player.t26)?.color||"#E8B84B";
+          return(
+            <div style={{background:"#0d0d1c",border:"1px solid #1e1e30",borderRadius:12,padding:m?14:20,marginTop:m?12:20}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:12}}>ÉPREUVES O2026</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {myEpreuves.map(ep=>(
+                  <div key={ep.id} style={{display:"flex",alignItems:"center",gap:10,background:"#13131f",borderRadius:8,padding:"9px 12px",border:`1px solid ${ep.color}33`}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{ep.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                      <div style={{fontSize:11,color:"#60607a",marginTop:1}}>Phase {ep.phase} · {ep.horaire}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -5846,58 +5871,113 @@ function DataPage(){
         </div>
       )}
       {/* Arbitres tab */}
-      {tab==="arbitres"&&(
-        <div style={G}>
-          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>ARBITRES PAR ÉPREUVE</div>
-          {O2026_EPREUVES.map(ep=>{
-            const epArbitres=arbitres[ep.id]||[];
-            async function saveArbitre(uid,add){
-              const next=add?[...epArbitres,uid]:epArbitres.filter(u=>u!==uid);
-              setArbitres(a=>({...a,[ep.id]:next}));
-              try{
-                await sbFetch("o2026_arbitres",`?epreuve_id=eq.${ep.id}`,{method:"DELETE"});
-                if(next.length>0){
-                  await sbFetch("o2026_arbitres","",{method:"POST",body:JSON.stringify(next.map(u=>({epreuve_id:ep.id,player_uid:u})))});
-                }
-              }catch(e){console.error("save arbitre",e);}
-            }
-            const allUIDs=PLAYERS.filter(p=>p.uid).map(p=>p);
-            return(
-              <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${epArbitres.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:epArbitres.length>0?8:4}}>
-                  <span style={{fontSize:14}}>{ep.emoji}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
-                    <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
+      {tab==="arbitres"&&(()=>{
+        const sex=p=>(p?.sex||"m");
+        const SEX_MAX={bp:{maxH:5,maxF:5},beret:{maxH:1,maxF:1},cercles:{maxH:1,maxF:1},tircorde:{maxH:2,maxF:2},biathlon:{maxH:2,maxF:2}};
+        const phases=[...new Set(O2026_EPREUVES.map(e=>e.phase))].sort();
+
+        async function saveArbitre(epId,uid,add){
+          const cur=arbitres[epId]||[];
+          const next=add?[...cur,uid]:cur.filter(u=>u!==uid);
+          setArbitres(a=>({...a,[epId]:next}));
+          try{
+            await sbFetch("o2026_arbitres",`?epreuve_id=eq.${epId}`,{method:"DELETE"});
+            if(next.length>0) await sbFetch("o2026_arbitres","",{method:"POST",body:JSON.stringify(next.map(u=>({epreuve_id:epId,player_uid:u})))});
+          }catch(e){console.error("save arbitre",e);}
+        }
+
+        return(
+          <div style={G}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>ARBITRES PAR ÉPREUVE</div>
+            {phases.map(phase=>{
+              const phaseEps=O2026_EPREUVES.filter(e=>e.phase===phase);
+              // Players not assigned in this phase (across all teams with t26)
+              const allT26Players=PLAYERS.filter(p=>p.t26);
+              const assignedInPhase=new Set(phaseEps.flatMap(ep=>
+                TEAMS.filter(t=>t.active).flatMap(t=>(assignments[`${t.id}_${ep.id}`]||[]))
+              ));
+              const idleInPhase=allT26Players.filter(p=>!assignedInPhase.has(p.id));
+
+              return(
+                <div key={phase} style={{marginBottom:24}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#E8B84B",borderBottom:"1px solid #1e1e30",paddingBottom:6,marginBottom:12}}>
+                    PHASE {phase}
                   </div>
-                  {epArbitres.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {epArbitres.length} arbitre{epArbitres.length>1?"s":""}</span>}
-                </div>
-                {/* Assigned arbitres */}
-                {epArbitres.length>0&&(
-                  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
-                    {epArbitres.map(uid=>{
-                      const p=PLAYERS.find(pl=>pl.uid===uid);
-                      return(
-                        <div key={uid} onClick={()=>saveArbitre(uid,false)} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                          {p?getDisplayName(p,PLAYERS):uid} <span style={{fontSize:9,opacity:0.6}}>✕</span>
+                  {phaseEps.map(ep=>{
+                    const epArbitres=arbitres[ep.id]||[];
+                    const sexLim=SEX_MAX[ep.id]||null;
+                    const assignedH=epArbitres.filter(uid=>{const p=PLAYERS.find(pl=>pl.uid===uid);return sex(p)==="m";}).length;
+                    const assignedF=epArbitres.filter(uid=>{const p=PLAYERS.find(pl=>pl.uid===uid);return sex(p)==="f";}).length;
+                    const needsSex=ep.id==="marathonH"?"m":ep.id==="marathonF"?"f":null;
+                    const tcIds=arbitres["tircorde"]||[];
+                    const bioIds=arbitres["biathlon"]||[];
+
+                    const available=PLAYERS.filter(p=>{
+                      if(!p.uid||epArbitres.includes(p.uid))return false;
+                      if(needsSex&&sex(p)!==needsSex)return false;
+                      if(sexLim){
+                        if(sex(p)==="m"&&assignedH>=sexLim.maxH)return false;
+                        if(sex(p)==="f"&&assignedF>=sexLim.maxF)return false;
+                      }
+                      if(ep.id==="tircorde"&&bioIds.includes(p.uid)&&PLAYERS.filter(r=>r.t26&&sex(r)===sex(p)).length>=4)return false;
+                      if(ep.id==="biathlon"&&tcIds.includes(p.uid)&&PLAYERS.filter(r=>r.t26&&sex(r)===sex(p)).length>=4)return false;
+                      return true;
+                    }).sort((a,b)=>a.name.localeCompare(b.name));
+
+                    return(
+                      <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${epArbitres.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:epArbitres.length>0?8:4}}>
+                          <span style={{fontSize:14}}>{ep.emoji}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                            <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
+                          </div>
+                          {epArbitres.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {epArbitres.length}</span>}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {/* Add arbitre dropdown */}
-                <select onChange={e=>{if(e.target.value&&!epArbitres.includes(e.target.value)){saveArbitre(e.target.value,true);e.target.value="";}}}
-                  style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:8,color:"#60607a",fontSize:11,padding:"4px 8px",cursor:"pointer",outline:"none"}}>
-                  <option value="">+ Ajouter un arbitre...</option>
-                  {PLAYERS.filter(p=>p.uid&&!epArbitres.includes(p.uid)).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>(
-                    <option key={p.uid} value={p.uid}>{getDisplayName(p,PLAYERS)}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                        {epArbitres.length>0&&(
+                          <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                            {epArbitres.map(uid=>{
+                              const p=PLAYERS.find(pl=>pl.uid===uid);
+                              return(
+                                <div key={uid} onClick={()=>saveArbitre(ep.id,uid,false)} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                                  {p?getDisplayName(p,PLAYERS):uid} <span style={{fontSize:9,opacity:0.6}}>✕</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <select onChange={e=>{if(e.target.value){saveArbitre(ep.id,e.target.value,true);e.target.value="";}}}
+                          style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:8,color:"#60607a",fontSize:11,padding:"4px 8px",cursor:"pointer",outline:"none"}}>
+                          <option value="">+ Ajouter un arbitre...</option>
+                          {available.map(p=>(
+                            <option key={p.uid} value={p.uid}>{getDisplayName(p,PLAYERS)} ({sex(p)==="f"?"F":"H"})</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                  {/* Idle players this phase */}
+                  {idleInPhase.length>0&&(
+                    <div style={{background:"#13131f",borderRadius:8,padding:"10px 14px",marginTop:8,border:"1px solid #1e1e30"}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>JOUEURS SANS ÉPREUVE CETTE PHASE</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                        {idleInPhase.map(p=>{
+                          const t=getTeam(p.t26);
+                          return(
+                            <span key={p.id} style={{fontSize:11,color:t?.color||"#60607a",background:"#0d0d1c",borderRadius:20,padding:"3px 10px",border:`1px solid ${t?.color||"#1e1e30"}33`}}>
+                              {getDisplayName(p,PLAYERS)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -8118,7 +8198,7 @@ function App(){
         {page==="events"        &&<EventsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments} currentPlayer={currentPlayer}/>}
         {page==="eventDetail"   &&<EventDetailPage eventId={sub.eventId} nav={nav} navBack={navBack}/>}
         {page==="rankings"      &&<RankingsPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
-        {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack}/>}
+        {page==="playerDetail"  &&<PlayerDetailPage playerId={sub.playerId} nav={nav} navBack={navBack} o2026Assignments={o2026Assignments}/>}
         {page==="o2026"         &&<O2026Page nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments} currentPlayer={currentPlayer}/>}
         {page==="o2026Detail"   &&<O2026DetailPage nav={nav} navBack={navBack} o2026Scores={o2026Scores} o2026Assignments={o2026Assignments}/>}
         {page==="epreuveO2026"  &&<EpreuveO2026Page epreuveId={sub.epreuveId} nav={nav} navBack={navBack} currentPlayer={currentPlayer} o2026Assignments={o2026Assignments} setO2026Scores={setO2026Scores} o2026Scores={o2026Scores}/>}
