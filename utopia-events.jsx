@@ -2476,9 +2476,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [tcResultats,setTcResultats]=useState({});
   const [basketScores,setBasketScores]=useState({});
   // Logik & Run state
-  const [lrTokens,setLrTokens]=useState({}); // teamId -> count
-  const [lrEnigmas,setLrEnigmas]=useState({}); // teamId -> [{attempts:[], solved:bool}]
-  const [lrFinal,setLrFinal]=useState({}); // teamId -> {attempts:[], solved:bool, solvedAt:null}
   const [lrTimer,setLrTimer]=useState({started:false,startTime:null});
   const [lrTimerDisplay,setLrTimerDisplay]=useState("45:00");
   const [beretO2026Results,setBeretO2026Results]=useState({});
@@ -2512,7 +2509,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       biathlonRace1,biathlonRace2,biathlonRace1Locked,biathlonRace2Locked,
       biathlonPhase,biathlonWin,biathlonLose,biathlonFinalLocked,
       bQF,bSF,bFin,bPhase,bLocked,
-      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,lrTokens,lrEnigmas,lrFinal,lrTimer,epreuveValidated,ranked:validatedRankedRef.current||undefined,lrTokens,lrEnigmas,lrFinal,lrTimer};
+      tcResultats,tcTeams,tcDone,basketScores,beretO2026Results,beretPositions,beretRanked,lrTimer,epreuveValidated,ranked:validatedRankedRef.current||undefined,lrTimer};
   }
 
   // Apply a snapshot from Supabase (remote state)
@@ -2556,9 +2553,6 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.bLocked!==undefined)setBLocked(d.bLocked);
     if(d.tcResultats)setTcResultats(d.tcResultats);
     if(d.basketScores)setBasketScores(d.basketScores);
-    if(d.lrTokens)setLrTokens(d.lrTokens);
-    if(d.lrEnigmas)setLrEnigmas(d.lrEnigmas);
-    if(d.lrFinal)setLrFinal(d.lrFinal);
     if(d.lrTimer)setLrTimer(d.lrTimer);
     if(d.beretO2026Results)setBeretO2026Results(d.beretO2026Results);
     if(d.beretPositions)setBeretPositions(d.beretPositions);
@@ -3566,199 +3560,137 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
           {scoreType==="logik_run"&&(()=>{
             const allTeams=getO2026ActiveTeams();
             function normalize(s){return(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();}
-            function matchAnswer(input,answer){return normalize(input).includes(normalize(answer));}
+
+            // Load target word + submissions from Supabase
+            const [targetWord,setTargetWord]=React.useState("");
+            const [submissions,setSubmissions]=React.useState({}); // teamId -> {foundAt, attempts}
+            const [myInput,setMyInput]=React.useState("");
+            const [myMsg,setMyMsg]=React.useState("");
+            const myTeamId=currentPlayer?.t26;
+            const myFound=!!(submissions[myTeamId]?.foundAt);
+
+            // Poll Supabase every 5s
+            React.useEffect(()=>{
+              async function poll(){
+                try{
+                  const [cfg,subs]=await Promise.all([
+                    sbFetch("logik_config","?select=target_word&id=eq.1").catch(()=>[]),
+                    sbFetch("logik_submissions","?select=team_id,found_at,attempts").catch(()=>[])
+                  ]);
+                  if(cfg?.[0]?.target_word)setTargetWord(cfg[0].target_word);
+                  const map={};
+                  (subs||[]).forEach(r=>{map[r.team_id]={foundAt:r.found_at,attempts:r.attempts||0};});
+                  setSubmissions(map);
+                }catch(e){}
+              }
+              poll();
+              const iv=setInterval(poll,5000);
+              return()=>clearInterval(iv);
+            },[]);
 
             // Timer
             React.useEffect(()=>{
               if(!lrTimer.started)return;
-              const interval=setInterval(()=>{
+              const iv=setInterval(()=>{
                 const elapsed=Math.floor((Date.now()-lrTimer.startTime)/1000);
-                const remaining=Math.max(0,45*60-elapsed);
-                const m=Math.floor(remaining/60),s=remaining%60;
+                const rem=Math.max(0,45*60-elapsed);
+                const m=Math.floor(rem/60),s=rem%60;
                 setLrTimerDisplay(`${m}:${s.toString().padStart(2,"0")}`);
-                if(remaining===0)clearInterval(interval);
+                if(rem===0)clearInterval(iv);
               },1000);
-              return()=>clearInterval(interval);
+              return()=>clearInterval(iv);
             },[lrTimer]);
 
-            function getTeamEnigmas(teamId){return lrEnigmas[teamId]||LOGIK_ENIGMAS.map(()=>({attempts:[],solved:false}));}
-            function getTeamFinal(teamId){return lrFinal[teamId]||{attempts:[],solved:false,solvedAt:null};}
-            function getTeamTokens(teamId){return lrTokens[teamId]||0;}
-            function getScore(teamId){
-              const enigs=getTeamEnigmas(teamId);
-              return enigs.reduce((s,e,i)=>s+(e.solved?LOGIK_ENIGMAS[i].pts:0),0);
-            }
-
-            function setToken(teamId,delta){
-              const cur=getTeamTokens(teamId);
-              const next=Math.max(0,Math.min(10,cur+delta));
-              setLrTokens(t=>({...t,[teamId]:next}));
-            }
-
-            function tryEnigma(teamId,enigmaIdx,input){
-              const enigs=getTeamEnigmas(teamId);
-              const enig=enigs[enigmaIdx];
-              if(enig.solved||enig.attempts.length>=LOGIK_FINAL_WORD.length)return;// reuse constant for maxAttempts
-              const newEnig={...enig,attempts:[...enig.attempts,input]};
-              if(matchAnswer(input,LOGIK_ENIGMAS[enigmaIdx].answer)){newEnig.solved=true;}
-              const newEnigs=[...enigs];newEnigs[enigmaIdx]=newEnig;
-              setLrEnigmas(e=>({...e,[teamId]:newEnigs}));
-            }
-
-            function tryFinal(teamId,input){
-              const cur=getTeamFinal(teamId);
-              if(cur.solved||cur.attempts.length>=LOGIK_MAX_ATTEMPTS)return;
-              const newFinal={...cur,attempts:[...cur.attempts,input]};
-              if(matchAnswer(input,LOGIK_FINAL_WORD)){
-                newFinal.solved=true;
-                newFinal.solvedAt=Date.now();
+            async function submitWord(){
+              if(!myInput.trim()||!myTeamId)return;
+              const prev=submissions[myTeamId]||{attempts:0};
+              const attempts=(prev.attempts||0)+1;
+              const correct=targetWord&&normalize(myInput).includes(normalize(targetWord));
+              if(correct){
+                const now=new Date().toISOString();
+                await sbFetch("logik_submissions","",{method:"POST",body:JSON.stringify({team_id:myTeamId,found_at:now,attempts})});
+                setSubmissions(s=>({...s,[myTeamId]:{foundAt:now,attempts}}));
+                setMyMsg("🎉 Bonne réponse !");
+              }else{
+                await sbFetch("logik_submissions","",{method:"POST",body:JSON.stringify({team_id:myTeamId,found_at:null,attempts})}).catch(()=>{});
+                setMyMsg("❌ Mauvaise réponse, réessaie !");
               }
-              setLrFinal(f=>({...f,[teamId]:newFinal}));
+              setMyInput("");
             }
 
             // Classement
             const ranked=[...allTeams].sort((a,b)=>{
-              const fa=getTeamFinal(a.id),fb=getTeamFinal(b.id);
-              if(fa.solved&&fb.solved)return fa.solvedAt-fb.solvedAt;
-              if(fa.solved)return -1;
-              if(fb.solved)return 1;
-              return getScore(b.id)-getScore(a.id);
+              const fa=submissions[a.id],fb=submissions[b.id];
+              if(fa?.foundAt&&fb?.foundAt)return new Date(fa.foundAt)-new Date(fb.foundAt);
+              if(fa?.foundAt)return -1;
+              if(fb?.foundAt)return 1;
+              return 0;
             });
-
-            const myTeamId=currentPlayer?.t26;
-            const myTokens=getTeamTokens(myTeamId);
-            const myEnigmas=getTeamEnigmas(myTeamId);
-            const myFinal=getTeamFinal(myTeamId);
 
             return(
               <>
-                {/* ── Chrono & tabs header */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:lrTimer.started?(parseInt(lrTimerDisplay)<"10:00"?"#ef4444":ac):ac}}>
-                    ⏱ {lrTimerDisplay}
-                  </div>
-                  {isArbitre&&!lrTimer.started&&<button onClick={()=>setLrTimer({started:true,startTime:Date.now()})} style={BTN(ac)}>▶ Lancer le chrono</button>}
-                  {isArbitre&&lrTimer.started&&<button onClick={()=>{setLrTimer({started:false,startTime:null});setLrTimerDisplay("45:00");}} style={BTN("#1e1e30")}>⏹ Reset chrono</button>}
+                {/* Chrono */}
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:ac}}>⏱ {lrTimerDisplay}</div>
+                  {isArbitre&&!lrTimer.started&&<button onClick={()=>setLrTimer({started:true,startTime:Date.now()})} style={BTN(ac)}>▶ Lancer</button>}
+                  {isArbitre&&lrTimer.started&&<button onClick={()=>{setLrTimer({started:false,startTime:null});setLrTimerDisplay("45:00");}} style={BTN("#1e1e30")}>⏹ Reset</button>}
                 </div>
 
-                {/* ── Vue Publique */}
+                {/* Vue publique */}
                 {tab==="view"&&(
                   <div>
                     <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#60607a",marginBottom:10}}>CLASSEMENT EN DIRECT</div>
                     {ranked.map((t,i)=>{
-                      const f=getTeamFinal(t.id);
-                      const score=getScore(t.id);
-                      const tokens=getTeamTokens(t.id);
-                      const solvedCount=getTeamEnigmas(t.id).filter(e=>e.solved).length;
+                      const f=submissions[t.id];
                       return(
                         <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<ranked.length-1?"1px solid #1e1e30":"none"}}>
-                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:15,color:i===0?"#E8B84B":i===1?"#aaaaaa":i===2?"#c87533":"#404058",width:28,textAlign:"center"}}>{i+1}</span>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:i<3?22:15,color:i===0?"#E8B84B":i===1?"#aaa":i===2?"#c87533":"#404058",width:28,textAlign:"center"}}>{i+1}</span>
                           <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
                           <span style={{flex:1,fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:t.color}}>{t.name}</span>
-                          {f.solved&&<span style={{fontSize:11,color:"#34d399",fontWeight:700}}>✅ MOT-CODE !</span>}
-                          <span style={{fontSize:11,color:"#60607a"}}>{solvedCount}/10 indices · {score}pts</span>
-                          <span style={{fontSize:10,color:"#404058"}}>🪙{tokens}</span>
+                          {f?.foundAt
+                            ?<span style={{fontSize:11,color:"#34d399",fontWeight:700}}>✅ Trouvé !</span>
+                            :<span style={{fontSize:11,color:"#404058"}}>En cours...</span>
+                          }
                         </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* ── Vue Joueur */}
-                {tab==="joueur"&&myTeamId&&(
+                {/* Vue joueur */}
+                {tab==="joueur"&&(
                   <div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:ac}}>JETONS RÉCUPÉRÉS</span>
-                      <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:ac}}>{myTokens}/10</span>
-                      <div style={{flex:1,height:6,background:"#1e1e30",borderRadius:3,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${myTokens*10}%`,background:ac,borderRadius:3,transition:"width .3s"}}/>
+                    {myFound
+                      ?<div style={{textAlign:"center",padding:"24px 0"}}>
+                        <div style={{fontSize:40,marginBottom:8}}>🎉</div>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#34d399"}}>Bonne réponse !</div>
+                        <div style={{fontSize:12,color:"#60607a",marginTop:6}}>Votre équipe a trouvé le mot.</div>
                       </div>
-                    </div>
-                    {LOGIK_ENIGMAS.map((enig,idx)=>{
-                      const e=myEnigmas[idx];
-                      const unlocked=myTokens>idx;
-                      const attLeft=LOGIK_MAX_ATTEMPTS-e.attempts.length;
-                      const [input,setInput]=React.useState("");
-                      const diffColor=enig.pts===1?"#34d399":enig.pts===2?"#E8B84B":"#ef4444";
-                      const diffLabel=enig.pts===1?"Facile":enig.pts===2?"Moyen":"Difficile";
-                      return(
-                        <div key={enig.id} style={{background:"#0d0d1c",border:`1px solid ${unlocked?(e.solved?"#34d39944":ac+"33"):"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,opacity:unlocked?1:0.4}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:unlocked?8:0}}>
-                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:diffColor,background:diffColor+"22",padding:"2px 8px",borderRadius:10}}>{diffLabel} · {enig.pts}pt{enig.pts>1?"s":""}</span>
-                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:unlocked?ac:"#404058"}}>Énigme {enig.id} — {enig.titre}</span>
-                            {e.solved&&<span style={{marginLeft:"auto",fontSize:11,color:"#34d399"}}>✅ +{enig.pts}pts</span>}
-                            {!unlocked&&<span style={{marginLeft:"auto",fontSize:10,color:"#404058"}}>🔒 Jeton {enig.id} requis</span>}
-                          </div>
-                          {unlocked&&!e.solved&&<p style={{fontSize:12,color:"#cccce0",lineHeight:1.6,marginBottom:10}}>{enig.text}</p>}
-                          {unlocked&&e.solved&&<p style={{fontSize:12,color:"#34d399",marginBottom:6}}>✅ Mot-indice trouvé !</p>}
-                          {unlocked&&!e.solved&&attLeft>0&&(
-                            <div style={{display:"flex",gap:8}}>
-                              <input value={input} onChange={ev=>setInput(ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter"&&input.trim()){tryEnigma(myTeamId,idx,input.trim());setInput("");}}}
-                                placeholder={`Votre réponse... (${attLeft} essai${attLeft>1?"s":""} restant${attLeft>1?"s":""})`}
-                                style={{flex:1,background:"#13131f",border:"1px solid #2a2a40",borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:13,outline:"none"}}/>
-                              <button onClick={()=>{if(input.trim()){tryEnigma(myTeamId,idx,input.trim());setInput("");}}} style={BTN(ac)}>Valider</button>
-                            </div>
-                          )}
-                          {unlocked&&!e.solved&&attLeft===0&&<div style={{fontSize:12,color:"#ef4444"}}>❌ Plus d'essais pour cette énigme</div>}
-                          {unlocked&&e.attempts.length>0&&!e.solved&&(
-                            <div style={{marginTop:6}}>
-                              {e.attempts.map((a,ai)=><span key={ai} style={{fontSize:11,color:"#404058",marginRight:8}}>✗ {a}</span>)}
-                            </div>
-                          )}
+                      :<div style={{padding:"8px 0"}}>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:ac,marginBottom:12}}>ENTREZ VOTRE MOT</div>
+                        <div style={{display:"flex",gap:8}}>
+                          <input value={myInput} onChange={e=>setMyInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitWord()}
+                            placeholder="Votre mot..."
+                            style={{flex:1,background:"#13131f",border:`1px solid ${ac}44`,borderRadius:8,padding:"12px 14px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:15,outline:"none"}}/>
+                          <button onClick={submitWord} style={BTN(ac)}>Valider</button>
                         </div>
-                      );
-                    })}
-                    {/* Mot-code final */}
-                    <div style={{background:"#0d0d1c",border:`1px solid ${myTokens===10?"#E8B84B44":"#1e1e30"}`,borderRadius:10,padding:"14px",marginTop:8,opacity:myTokens===10?1:0.4}}>
-                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#E8B84B",marginBottom:8}}>🔓 MOT-CODE FINAL {myTokens<10&&"— Récupère tous les jetons d'abord"}</div>
-                      {myFinal.solved
-                        ?<div style={{fontSize:14,color:"#34d399",fontWeight:700}}>🎉 MOT-CODE TROUVÉ ! Félicitations !</div>
-                        :myTokens===10?(()=>{
-                          const [finInput,setFinInput]=React.useState("");
-                          const attLeft=LOGIK_MAX_ATTEMPTS-myFinal.attempts.length;
-                          return attLeft>0?(
-                            <>
-                              <p style={{fontSize:12,color:"#cccce0",marginBottom:10}}>Tu as tous les indices. Quel est le mot qui relie toutes ces réponses ?</p>
-                              <div style={{display:"flex",gap:8}}>
-                                <input value={finInput} onChange={ev=>setFinInput(ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter"&&finInput.trim()){tryFinal(myTeamId,finInput.trim());setFinInput("");}}}
-                                  placeholder={`Mot-code final... (${attLeft} essai${attLeft>1?"s":""} restant${attLeft>1?"s":""})`}
-                                  style={{flex:1,background:"#13131f",border:"1px solid #E8B84B44",borderRadius:8,padding:"8px 12px",color:"#eeeef5",fontFamily:"'Outfit',sans-serif",fontSize:13,outline:"none"}}/>
-                                <button onClick={()=>{if(finInput.trim()){tryFinal(myTeamId,finInput.trim());setFinInput("");}}} style={BTN("#E8B84B")}>Valider</button>
-                              </div>
-                              {myFinal.attempts.length>0&&<div style={{marginTop:6}}>{myFinal.attempts.map((a,ai)=><span key={ai} style={{fontSize:11,color:"#404058",marginRight:8}}>✗ {a}</span>)}</div>}
-                            </>
-                          ):<div style={{fontSize:12,color:"#ef4444"}}>❌ Plus d'essais pour le mot-code final</div>;
-                        })()
-                        :<p style={{fontSize:12,color:"#404058"}}>🔒 Récupère les 10 jetons pour débloquer</p>
-                      }
-                    </div>
+                        {myMsg&&<div style={{marginTop:10,fontSize:13,color:myMsg.startsWith("🎉")?"#34d399":"#ef4444"}}>{myMsg}</div>}
+                      </div>
+                    }
                   </div>
                 )}
-                {tab==="joueur"&&!myTeamId&&<div style={{fontSize:12,color:"#404058",padding:20,textAlign:"center"}}>Tu n'es pas assigné à une équipe O2026.</div>}
 
-                {/* ── Vue Arbitre */}
+                {/* Vue arbitre */}
                 {tab==="admin"&&isArbitre&&(
                   <div>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#60607a",marginBottom:12}}>GESTION DES JETONS PAR ÉQUIPE</div>
-                    {allTeams.map(t=>{
-                      const tokens=getTeamTokens(t.id);
-                      const score=getScore(t.id);
-                      const solved=getTeamFinal(t.id).solved;
-                      const enigsSolved=getTeamEnigmas(t.id).filter(e=>e.solved).length;
-                      return(
-                        <div key={t.id} style={{background:"#0d0d1c",border:`1px solid ${t.color}33`,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                          <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
-                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:t.color,flex:1}}>{t.name}</span>
-                          {solved&&<span style={{fontSize:11,color:"#34d399",fontWeight:700}}>✅ MOT-CODE</span>}
-                          <span style={{fontSize:11,color:"#60607a"}}>{enigsSolved}/10 · {score}pts</span>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <button onClick={()=>setToken(t.id,-1)} disabled={tokens===0} style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:6,color:tokens===0?"#404058":"#eeeef5",width:28,height:28,cursor:tokens===0?"default":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:ac,minWidth:28,textAlign:"center"}}>🪙{tokens}</span>
-                            <button onClick={()=>setToken(t.id,1)} disabled={tokens===10} style={{background:ac+"22",border:`1px solid ${ac}55`,borderRadius:6,color:tokens===10?"#404058":ac,width:28,height:28,cursor:tokens===10?"default":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <div style={{background:"#13131f",border:"1px solid #1e1e30",borderRadius:10,padding:"14px",marginBottom:16}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:"#60607a",marginBottom:8}}>MOT À MATCHER (Supabase → table logik_config)</div>
+                      <div style={{fontSize:12,color:"#404058"}}>Modifie directement la valeur dans Supabase.<br/>Mot actuel chargé : <strong style={{color:ac}}>{targetWord||"(non défini)"}</strong></div>
+                    </div>
+                    <button onClick={async()=>{
+                      await sbFetch("logik_submissions","",{method:"DELETE"}).catch(()=>{});
+                      setSubmissions({});
+                    }} style={{...BTN("#ef444422"),color:"#ef4444",border:"1px solid #ef444444"}}>🗑 Effacer toutes les soumissions</button>
                   </div>
                 )}
               </>
