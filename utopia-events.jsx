@@ -2074,7 +2074,9 @@ const O2026_FAKE_TEAMS=[
   {id:902,name:"Équipe 15",color:"#0ea5e9",color2:null,active:true,logoUrl:null},
   {id:903,name:"Équipe 16",color:"#f97316",color2:null,active:true,logoUrl:null},
 ];
+const BERET_PHANTOM_TEAM={id:0,name:"FANTÔME",color:"#2a2a40",color2:null,active:false,logoUrl:null};
 function getO2026Team(id){ return getTeam(id)||O2026_FAKE_TEAMS.find(t=>t.id===id)||null; }
+function getBeretTeams(){ return [...getO2026ActiveTeams(), BERET_PHANTOM_TEAM]; } // 15 real + FANTÔME
 function getO2026ActiveTeams(){
   return TEAMS.filter(t=>t.active);
 }
@@ -2506,7 +2508,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   const [lrTimer,setLrTimer]=useState({started:false,startTime:null});
   const [lrTimerDisplay,setLrTimerDisplay]=useState("45:00");
   const [beretO2026Results,setBeretO2026Results]=useState({});
-  const [beretPositions,setBeretPositions]=useState([...Array(15).keys()]);
+  const [beretPositions,setBeretPositions]=useState([...Array(16).keys()]);
   const [beretRanked,setBeretRanked]=useState([]); // pos→teamIdx
   const [tcTeams,setTcTeams]=useState([]); // shuffled team order for bracket
   const [editTC,setEditTC]=useState(null);
@@ -3769,7 +3771,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
                 <button onClick={()=>{
                   const r={};
-                  BERET_O2026_MATCHES.forEach(mx=>{if(mx.d1===15||mx.d2===15){r[`m${mx.num}`]=mx.d2===15?"d1":"d2";}else{r[`m${mx.num}`]=Math.random()<0.5?"d1":"d2";}});
+                  BERET_O2026_MATCHES.forEach(mx=>{const bt=getBeretTeams();const t1=bt[mx.d1],t2=bt[mx.d2];if(t1?.id===0)r[`m${mx.num}`]="d2";else if(t2?.id===0)r[`m${mx.num}`]="d1";else r[`m${mx.num}`]=Math.random()<0.5?"d1":"d2";});
                   setBeretO2026Results(r);
                 }} style={{flex:1,background:"#1e1e30",border:"1px solid #2a2a40",color:"#aaa",borderRadius:8,padding:"7px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
                   🎲 Simuler
@@ -3790,7 +3792,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               <div style={{background:"#0d0d1c",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
                 <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:"#60607a",marginBottom:10}}>POSITIONS SUR LE CERCLE (1→16 dans le sens horaire)</div>
                 <div style={{display:"grid",gridTemplateColumns:m?"1fr 1fr 1fr 1fr":"repeat(8,1fr)",gap:6}}>
-                  {beretPositions.map((teamIdx,posIdx)=>{const allT=getO2026ActiveTeams();const t=allT[teamIdx]||allT[0];const idx=posIdx;return(
+                  {beretPositions.map((teamIdx,posIdx)=>{const allT=getBeretTeams();const t=allT[teamIdx]||allT[0];const idx=posIdx;return(
                     <div key={t.id} style={{textAlign:"center",background:`${t.color}22`,borderRadius:6,padding:"6px 4px",border:`1px solid ${t.color}44`}}>
                       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:t.color}}>{idx+1}</div>
                       <div style={{fontSize:8,color:"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</div>
@@ -3807,7 +3809,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:5}}>
                     {BERET_O2026_MATCHES.filter(mx=>mx.tour===tour).map(mx=>{
                       const allT=getO2026ActiveTeams();
-                      const teams=beretPositions.map(idx=>allT[idx]||allT[0]);
+                      const teams=beretPositions.map(idx=>getBeretTeams()[idx]||getBeretTeams()[0]);
                       const t1=teams[mx.d1]||{name:`Pos.${mx.d1+1}`,color:"#666"};
                       const t2=teams[mx.d2]||{name:`Pos.${mx.d2+1}`,color:"#666"};
                       const key=`m${mx.num}`;
@@ -3833,16 +3835,16 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               ))}
               {isArbitre&&<button onClick={()=>{
                 const allT=getO2026ActiveTeams();
-                const teams=beretPositions.map(idx=>allT[idx]||allT[0]);
+                const teams=beretPositions.map(idx=>getBeretTeams()[idx]||getBeretTeams()[0]);
                 const wins={};
                 teams.forEach(t=>wins[t.id]=0);
                 BERET_O2026_MATCHES.forEach(mx=>{
                   const w=beretO2026Results[`m${mx.num}`];
-                  const t1=mx.d1!==15?teams[mx.d1]:null,t2=mx.d2!==15?teams[mx.d2]:null;
-                  if(w==="d1"&&t1)wins[t1.id]++;
+                  const t1=teams[mx.d1],t2=teams[mx.d2];const skip1=!t1||t1.id===0,skip2=!t2||t2.id===0;
+                  if(w==="d1"&&t1&&!skip1)wins[t1.id]++;
                   if(w==="d2"&&t2)wins[t2.id]++;
                 });
-                const ranked=[...teams].map(t=>({...t,wins:wins[t.id]||0}))
+                const ranked=[...teams].filter(t=>t.id!==0).map(t=>({...t,wins:wins[t.id]||0}))
                   .sort((a,b)=>b.wins-a.wins)
                   .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
                 setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
@@ -5804,104 +5806,15 @@ function DataPage(){
         </div>
       )}
       {/* Assignments tab */}
-      {tab==="assignments"&&(
-        <div style={G}>
-          {!selTeam?(
-            <>
-              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>SÉLECTIONNE UNE ÉQUIPE</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
-                {TEAMS.filter(t=>t.active).map(t=>(
-                  <div key={t.id} onClick={()=>setSelTeam(t)} style={{background:"#13131f",border:`1px solid ${t.color}44`,borderRadius:10,padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
-                    <span style={{fontSize:12,fontWeight:600,color:t.color}}>{t.name}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ):(()=>{
-            const t=selTeam;
-            const teamPlayers=PLAYERS.filter(p=>p.t26===t.id);
-            async function saveAssign(epId, playerIds){
-              const key=`${t.id}_${epId}`;
-              setAssignments(a=>({...a,[key]:playerIds}));
-              try{
-                await SUPABASE.from("o2026_assignments").upsert(
-                  {team_id:t.id,epreuve_id:epId,player_ids:playerIds},
-                  {onConflict:"team_id,epreuve_id"}
-                );
-              }catch(e){setMsg({type:"error",text:"Erreur sauvegarde"});}
-            }
-            return(
-              <>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                  <button onClick={()=>setSelTeam(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:0}}>←</button>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:t.color}}/>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:t.color}}>{t.name}</div>
-                  <span style={{fontSize:11,color:"#404058",marginLeft:"auto"}}>{teamPlayers.length} joueurs</span>
-                </div>
-                {/* Player tags */}
-                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
-                  {teamPlayers.map(p=>(
-                    <div key={p.id} style={{background:"#13131f",border:`1px solid ${t.color}33`,borderRadius:20,padding:"4px 10px",fontSize:11,color:"#cccce0",display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{color:p.sex==="f"?"#f472b6":"#60a5fa",fontSize:9}}>{p.sex==="f"?"F":"H"}</span>
-                      {getDisplayName(p,PLAYERS)}
-                    </div>
-                  ))}
-                </div>
-                {/* Epreuves */}
-                {O2026_EPREUVES.map(ep=>{
-                  const key=`${t.id}_${ep.id}`;
-                  const assigned=assignments[key]||[];
-                  return(
-                    <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${assigned.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:assigned.length>0?8:0}}>
-                        <span style={{fontSize:14}}>{ep.emoji}</span>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
-                          <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
-                        </div>
-                        {assigned.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {assigned.length} joueur{assigned.length>1?"s":""}</span>}
-                      </div>
-                      {/* Assigned chips */}
-                      {assigned.length>0&&(
-                        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
-                          {assigned.map(pid=>{
-                            const p=PLAYERS.find(pl=>pl.id===pid);
-                            return(
-                              <div key={pid} onClick={()=>saveAssign(ep.id,assigned.filter(id=>id!==pid))} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                                {getDisplayName(p,PLAYERS)} <span style={{fontSize:9,opacity:0.6}}>✕</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Available players */}
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                        {teamPlayers.filter(p=>!assigned.includes(p.id)).map(p=>(
-                          <div key={p.id} onClick={()=>saveAssign(ep.id,[...assigned,p.id])} style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#60607a",cursor:"pointer"}}>
-                            + {getDisplayName(p,PLAYERS)}
-                            <span style={{fontSize:9,marginLeft:3,color:p.sex==="f"?"#f472b6":"#60a5fa"}}>{p.sex==="f"?"F":"H"}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            );
-          })()}
-        </div>
-      )}
-      {/* Arbitres tab */}
-      {tab==="arbitres"&&(()=>{
-        const [selTeamArb,setSelTeamArb]=React.useState(null);
+      {tab==="assignments"&&(()=>{
+        const [selTeamA,setSelTeamA]=React.useState(null);
 
-        if(!selTeamArb) return(
+        if(!selTeamA) return(
           <div style={G}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>SÉLECTIONNE UNE ÉQUIPE</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
               {TEAMS.filter(t=>t.active).map(t=>(
-                <div key={t.id} onClick={()=>setSelTeamArb(t)} style={{background:"#13131f",border:`1px solid ${t.color}44`,borderRadius:10,padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}>
+                <div key={t.id} onClick={()=>setSelTeamA(t)} style={{background:"#13131f",border:`1px solid ${t.color}44`,borderRadius:10,padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.borderColor=t.color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.color+"44"}>
                   <div style={{width:8,height:8,borderRadius:"50%",background:t.color,flexShrink:0}}/>
                   <span style={{fontSize:12,fontWeight:600,color:t.color}}>{t.name}</span>
                 </div>
@@ -5910,7 +5823,7 @@ function DataPage(){
           </div>
         );
 
-        const team=selTeamArb;
+        const team=selTeamA;
         const roster=PLAYERS.filter(p=>p.t26===team.id);
         const tc=team.color||"#E8B84B";
         const sex=p=>(p.sex||"m");
@@ -5969,7 +5882,7 @@ function DataPage(){
         return(
           <div style={G}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-              <button onClick={()=>setSelTeamArb(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:0}}>←</button>
+              <button onClick={()=>setSelTeamA(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:0}}>←</button>
               <div style={{width:10,height:10,borderRadius:"50%",background:tc}}/>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:tc}}>{team.name}</div>
             </div>
@@ -6046,10 +5959,59 @@ function DataPage(){
           </div>
         );
       })()}
+      {tab==="arbitres"&&(()=>{
+        async function saveArbitre(epId,uid,add){
+          const cur=arbitres[epId]||[];
+          const next=add?[...cur,uid]:cur.filter(u=>u!==uid);
+          setArbitres(a=>({...a,[epId]:next}));
+          try{
+            await sbFetch("o2026_arbitres",`?epreuve_id=eq.${epId}`,{method:"DELETE"});
+            if(next.length>0) await sbFetch("o2026_arbitres","",{method:"POST",body:JSON.stringify(next.map(u=>({epreuve_id:epId,player_uid:u})))});
+          }catch(e){console.error("save arbitre",e);}
+        }
+        return(
+          <div style={G}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#60607a",marginBottom:14}}>ARBITRES PAR ÉPREUVE</div>
+            {O2026_EPREUVES.map(ep=>{
+              const epArbitres=arbitres[ep.id]||[];
+              return(
+                <div key={ep.id} style={{background:"#0d0d1c",border:`1px solid ${epArbitres.length>0?ep.color+"44":"#1e1e30"}`,borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:epArbitres.length>0?8:4}}>
+                    <span style={{fontSize:14}}>{ep.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:ep.color}}>{ep.nom}</div>
+                      <div style={{fontSize:10,color:"#404058"}}>{ep.horaire}</div>
+                    </div>
+                    {epArbitres.length>0&&<span style={{fontSize:10,color:"#34d399"}}>✓ {epArbitres.length} arbitre{epArbitres.length>1?"s":""}</span>}
+                  </div>
+                  {epArbitres.length>0&&(
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                      {epArbitres.map(uid=>{
+                        const p=PLAYERS.find(pl=>pl.uid===uid);
+                        return(
+                          <div key={uid} onClick={()=>saveArbitre(ep.id,uid,false)} style={{background:ep.color+"22",border:`1px solid ${ep.color}55`,borderRadius:20,padding:"3px 10px",fontSize:11,color:ep.color,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                            {p?getDisplayName(p,PLAYERS):uid} <span style={{fontSize:9,opacity:0.6}}>✕</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <select onChange={e=>{if(e.target.value){saveArbitre(ep.id,e.target.value,true);e.target.value="";}}}
+                    style={{background:"#1e1e30",border:"1px solid #2a2a40",borderRadius:8,color:"#60607a",fontSize:11,padding:"4px 8px",cursor:"pointer",outline:"none"}}>
+                    <option value="">+ Ajouter un arbitre...</option>
+                    {PLAYERS.filter(p=>p.uid&&!(arbitres[ep.id]||[]).includes(p.uid)).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>(
+                      <option key={p.uid} value={p.uid}>{getDisplayName(p,PLAYERS)}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
-
 
 // ─── APP ─────────────────────────────────────────────
 const ADMIN_UID = "louis-mar";
