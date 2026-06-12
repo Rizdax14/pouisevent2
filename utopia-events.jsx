@@ -2084,10 +2084,20 @@ function getO2026ActiveTeams(){
 // Build round-robin schedule for a group, putting JPEGCORP_ID last to delay their matches
 const JPEGCORP_ID=11;
 function buildGroupSchedule(teams, terrains){
-  // Sort: put JPEGCORP last
   const sorted=[...teams.filter(t=>t!==JPEGCORP_ID),...teams.filter(t=>t===JPEGCORP_ID)];
+  if(sorted.length===3){
+    const [A,B,C]=sorted;
+    // Aller-retour: 6 matchs en 6 rounds de 1 match
+    return[
+      [{tA:A,tB:B,terrain:terrains[0]}],
+      [{tA:A,tB:C,terrain:terrains[0]}],
+      [{tA:B,tB:C,terrain:terrains[0]}],
+      [{tA:B,tB:A,terrain:terrains[0]}],
+      [{tA:C,tB:A,terrain:terrains[0]}],
+      [{tA:C,tB:B,terrain:terrains[0]}],
+    ];
+  }
   const [A,B,C,D]=sorted;
-  // Fixed rounds: each round 2 matches on 2 terrains simultaneously
   const rounds=[
     [{tA:A,tB:B,terrain:terrains[0]},{tA:C,tB:D,terrain:terrains[1]}],
     [{tA:A,tB:C,terrain:terrains[0]},{tA:B,tB:D,terrain:terrains[1]}],
@@ -3020,14 +3030,26 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
       {prefix:"t4",sf1:"t4sf1",sf2:"t4sf2",fin:"t4f",offset:12},
     ];
     const result=[];
-    groups.forEach(({sf1,sf2,fin,offset})=>{
+    groups.forEach(({sf1,sf2,fin,offset,prefix})=>{
+      if(prefix==="t4"){
+        // t4 = 3-team round robin
+        const t4=getRankGroup(4).slice(0,3);
+        const wins={}; t4.forEach(t=>wins[t]=0);
+        [["t4_m1",0,1],["t4_m2",0,2],["t4_m3",1,2]].forEach(([slot,ai,bi])=>{
+          const r=br[`b_${slot}`]||br[slot];if(!r)return;
+          if(r[0]>r[1])wins[t4[ai]]=(wins[t4[ai]]||0)+1;
+          else if(r[1]>r[0])wins[t4[bi]]=(wins[t4[bi]]||0)+1;
+        });
+        const sorted=[...t4].sort((a,b)=>(wins[b]||0)-(wins[a]||0));
+        sorted.forEach((tid,i)=>{if(tid)result.push({teamId:tid,rank:offset+i+1,pts:O2026_POINTS[offset+i]||0});});
+        return;
+      }
       const finW=w(fin,br[fin]?.tA,br[fin]?.tB);
       const finL=lo(fin,br[fin]?.tA,br[fin]?.tB);
       const sf1L=lo(sf1,br[sf1]?.tA,br[sf1]?.tB);
       const sf2L=lo(sf2,br[sf2]?.tA,br[sf2]?.tB);
       if(finW)result.push({teamId:finW,rank:offset+1,pts:O2026_POINTS[offset]||0});
       if(finL)result.push({teamId:finL,rank:offset+2,pts:O2026_POINTS[offset+1]||0});
-      // Bracket never has petite finale → SF losers always tied at 3rd of their group
       const sharedPts=Math.round(((O2026_POINTS[offset+2]||0)+(O2026_POINTS[offset+3]||0))/2);
       if(sf1L)result.push({teamId:sf1L,rank:offset+3,pts:sharedPts,tied:true});
       if(sf2L)result.push({teamId:sf2L,rank:offset+3,pts:sharedPts,tied:true});
@@ -4444,10 +4466,25 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 <BM slot="t3sf2" tA={gT("t3sf2","A")} tB={gT("t3sf2","B")} phA={gP("t3sf2","A")} phB={gP("t3sf2","B")} label="1/2 Finale" isAdmin={isAdmin&&phase!=="groupes"}/>
                 <BM slot="t3f" tA={gT("t3f","A")} tB={gT("t3f","B")} phA={gP("t3f","A")} phB={gP("t3f","B")} label="Finale" isAdmin={isAdmin&&!!(bracketResultats["b_t3sf1"]&&bracketResultats["b_t3sf2"])}/>
               </div>
-              <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>💪 GROUPE DES 4ÈMES</div>
-                <BM slot="t4sf1" tA={gT("t4sf1","A")} tB={gT("t4sf1","B")} phA={gP("t4sf1","A")} phB={gP("t4sf1","B")} label="1/2 Finale" isAdmin={isAdmin&&phase!=="groupes"}/>
-                <BM slot="t4sf2" tA={gT("t4sf2","A")} tB={gT("t4sf2","B")} phA={gP("t4sf2","A")} phB={gP("t4sf2","B")} label="1/2 Finale" isAdmin={isAdmin&&phase!=="groupes"}/>
-                <BM slot="t4f" tA={gT("t4f","A")} tB={gT("t4f","B")} phA={gP("t4f","A")} phB={gP("t4f","B")} label="Finale" isAdmin={isAdmin&&!!(bracketResultats["b_t4sf1"]&&bracketResultats["b_t4sf2"])}/>
+              <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>💪 GROUPE DES 4ÈMES <span style={{fontSize:9,color:"#404058"}}>(round robin)</span></div>
+                {(()=>{
+                  const t4=[...getRankGroup(4)].slice(0,3);
+                  if(!t4[0])return <div style={{fontSize:10,color:"#404058"}}>En attente des poules...</div>;
+                  const res=(slot)=>bracketResultats[`b_t4_${slot}`];
+                  const win=(slot,a,b)=>{const r=res(slot);return r?(r[0]>r[1]?a:r[1]>r[0]?b:null):null;};
+                  const wins={};t4.forEach(t=>wins[t]=0);
+                  [["m1",0,1],["m2",0,2],["m3",1,2]].forEach(([slot,ai,bi])=>{
+                    const r=res(slot);if(!r)return;
+                    if(r[0]>r[1])wins[t4[ai]]=(wins[t4[ai]]||0)+1;
+                    else if(r[1]>r[0])wins[t4[bi]]=(wins[t4[bi]]||0)+1;
+                  });
+                  return(<>
+                    <BM slot="t4_m1" tA={t4[0]} tB={t4[1]} phA={gP("t4sf1","A")} phB={gP("t4sf1","B")} label="Match 1" isAdmin={isAdmin&&phase!=="groupes"}/>
+                    <BM slot="t4_m2" tA={t4[0]} tB={t4[2]} phA={gP("t4sf1","A")} phB={gP("t4sf2","B")} label="Match 2" isAdmin={isAdmin&&phase!=="groupes"}/>
+                    <BM slot="t4_m3" tA={t4[1]} tB={t4[2]} phA={gP("t4sf2","A")} phB={gP("t4sf2","B")} label="Match 3" isAdmin={isAdmin&&phase!=="groupes"}/>
+                    <div style={{marginTop:6,fontSize:10,color:"#60607a"}}>Victoires : {t4.map(t=>`${getO2026Team(t)?.name||t} ${wins[t]||0}v`).join(" · ")}</div>
+                  </>);
+                })()}
               </div>
             </div>
           </div>
