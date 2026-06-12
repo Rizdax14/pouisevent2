@@ -3033,15 +3033,16 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     groups.forEach(({sf1,sf2,fin,offset,prefix})=>{
       if(prefix==="t4"){
         // t4 = 3-team round robin
-        const t4=getRankGroup(4).slice(0,3);
+        const t4rr=([1,2,3,4].map(g=>getTop(g,4))).filter(Boolean).slice(0,3);
         const wins={}; t4.forEach(t=>wins[t]=0);
         [["t4_m1",0,1],["t4_m2",0,2],["t4_m3",1,2]].forEach(([slot,ai,bi])=>{
           const r=br[`b_${slot}`]||br[slot];if(!r)return;
-          if(r[0]>r[1])wins[t4[ai]]=(wins[t4[ai]]||0)+1;
-          else if(r[1]>r[0])wins[t4[bi]]=(wins[t4[bi]]||0)+1;
+          if(r[0]>r[1])wins[t4rr[ai]]=(wins[t4rr[ai]]||0)+1;
+          else if(r[1]>r[0])wins[t4rr[bi]]=(wins[t4rr[bi]]||0)+1;
         });
-        const sorted=[...t4].sort((a,b)=>(wins[b]||0)-(wins[a]||0));
+        const sorted=[...t4rr].sort((a,b)=>(wins[b]||0)-(wins[a]||0));
         sorted.forEach((tid,i)=>{if(tid)result.push({teamId:tid,rank:offset+i+1,pts:O2026_POINTS[offset+i]||0});});
+        return;
         return;
       }
       const finW=w(fin,br[fin]?.tA,br[fin]?.tB);
@@ -4468,7 +4469,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               </div>
               <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>💪 GROUPE DES 4ÈMES <span style={{fontSize:9,color:"#404058"}}>(round robin)</span></div>
                 {(()=>{
-                  const t4=[...getRankGroup(4)].slice(0,3);
+                  const t4=([1,2,3,4].map(g=>{const st=getStandings(g);return st[3]?.teamId;}).filter(Boolean)).slice(0,3);
                   if(!t4[0])return <div style={{fontSize:10,color:"#404058"}}>En attente des poules...</div>;
                   const res=(slot)=>bracketResultats[`b_t4_${slot}`];
                   const win=(slot,a,b)=>{const r=res(slot);return r?(r[0]>r[1]?a:r[1]>r[0]?b:null):null;};
