@@ -2795,7 +2795,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     ];
     const sf=[
       {slot:"sf_0",tA:getW("r2_0",r2[0].tA,r2[0].tB),tB:getW("r2_1",r2[1].tA,r2[1].tB)},
-      {slot:"sf_1",tA:getW("r2_2",r2[2].tA,r2[2].tB),tB:r2[3].tA||byeTeam},
+      {slot:"sf_1",tA:getW("r2_2",r2[2].tA,r2[2].tB),tB:getW("r2_3",r2[3].tA,r2[3].tB)},
     ];
     const fin={slot:"fin",tA:getW("sf_0",sf[0].tA,sf[0].tB),tB:getW("sf_1",sf[1].tA,sf[1].tB)};
     return{r1,r2,sf,fin,teams,byeTeam};
@@ -3548,14 +3548,15 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
               if(bLocked){setBLocked(false);setEpreuveValidated(false);validatedRankedRef.current=null;setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});return;}
               const ranked=[];
               bFin.forEach((tid,i)=>ranked.push({teamId:tid,pos:i+1,pts:O2026_POINTS[i]||0}));
-              const sf3pts=sharedPts(5,6),sf4pts=sharedPts(7,8),qf3pts=sharedPts4(9,10,11,12),qf4pts=sharedPts4(13,14,15,16);
+              const sf3pts=sharedPts(5,6),sf4pts=sharedPts(7,8),qf3pts=sharedPts4(9,10,11,12),qf4pts=Math.round((O2026_POINTS[12]+O2026_POINTS[13]+O2026_POINTS[14])/3);
               [bSF[1][2],bSF[2][2]].filter(Boolean).forEach(tid=>ranked.push({teamId:tid,pos:5,pts:sf3pts}));
               [bSF[1][3],bSF[2][3]].filter(Boolean).forEach(tid=>ranked.push({teamId:tid,pos:7,pts:sf4pts}));
               [bQF[1][2],bQF[2][2],bQF[3][2],bQF[4][2]].filter(Boolean).forEach(tid=>ranked.push({teamId:tid,pos:9,pts:qf3pts}));
-              [bQF[1][3],bQF[2][3],bQF[3][3],bQF[4][3]].filter(Boolean).forEach(tid=>ranked.push({teamId:tid,pos:13,pts:qf4pts}));
+              const qf4teams=[bQF[1][3],bQF[2][3],bQF[3][3]].filter(Boolean);
+              qf4teams.forEach(tid=>ranked.push({teamId:tid,pos:13,pts:qf4pts}));
               setBLocked(true);validateClassement(ranked);
             }
-            const qfComplete=Object.values(bQF).every(q=>q.length===4);
+            const qfComplete=bQF[1].length===4&&bQF[2].length===4&&bQF[3].length===4&&bQF[4].length>=3;
             const sfComplete=bSF[1].length===4&&bSF[2].length===4;
             const finComplete=bFin.length===4;
             return(
@@ -4203,11 +4204,11 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
         const sharedPts4=(p1,p2,p3,p4)=>Math.round(((O2026_POINTS[p1-1]||0)+(O2026_POINTS[p2-1]||0)+(O2026_POINTS[p3-1]||0)+(O2026_POINTS[p4-1]||0))/4);
         const rows=[];
         bFin.forEach((tid,i)=>rows.push({teamId:tid,rank:i+1,pts:O2026_POINTS[i]||0}));
-        const sf3pts=sharedPts(5,6),sf4pts=sharedPts(7,8),qf3pts=sharedPts4(9,10,11,12),qf4pts=sharedPts4(13,14,15,16);
+        const sf3pts=sharedPts(5,6),sf4pts=sharedPts(7,8),qf3pts=sharedPts4(9,10,11,12),qf4pts=Math.round((O2026_POINTS[12]+O2026_POINTS[13]+O2026_POINTS[14])/3);
         [bSF[1][2],bSF[2][2]].filter(Boolean).forEach(tid=>rows.push({teamId:tid,rank:5,pts:sf3pts,tied:true}));
         [bSF[1][3],bSF[2][3]].filter(Boolean).forEach(tid=>rows.push({teamId:tid,rank:7,pts:sf4pts,tied:true}));
         [bQF[1][2],bQF[2][2],bQF[3][2],bQF[4][2]].filter(Boolean).forEach(tid=>rows.push({teamId:tid,rank:9,pts:qf3pts,tied:true}));
-        [bQF[1][3],bQF[2][3],bQF[3][3],bQF[4][3]].filter(Boolean).forEach(tid=>rows.push({teamId:tid,rank:13,pts:qf4pts,tied:true}));
+        [bQF[1][3],bQF[2][3],bQF[3][3]].filter(Boolean).forEach(tid=>rows.push({teamId:tid,rank:13,pts:qf4pts,tied:true}));
         rows.sort((a,b)=>a.rank-b.rank);
         return(
           <div style={{background:"#0d0d1c",border:`1px solid ${ac}44`,borderRadius:12,padding:m?14:20,marginBottom:14}}>
