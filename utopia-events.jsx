@@ -2569,7 +2569,10 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     if(d.dragRankFinal)setDragRankFinal(d.dragRankFinal);
     if(d.dragRankFinalLocked)setDragRankFinalLocked(d.dragRankFinalLocked);
     if(d.dragRankFinalDone!==undefined)setDragRankFinalDone(d.dragRankFinalDone);
-    if(d.dragRankCoef?.length)setDragRankCoef(d.dragRankCoef);
+    if(d.dragRankCoef?.length){
+      const activeIds=new Set(getO2026ActiveTeams().map(t=>t.id));
+      setDragRankCoef(d.dragRankCoef.filter(s=>activeIds.has(s.teamId)));
+    }
     if(d.dragRankCoefLocked!==undefined)setDragRankCoefLocked(d.dragRankCoefLocked);
     if(d.flechetteGroup1?.length)setFlechetteGroup1(d.flechetteGroup1);
     if(d.flechetteGroup2?.length)setFlechetteGroup2(d.flechetteGroup2);
