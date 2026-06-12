@@ -3032,17 +3032,17 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     const result=[];
     groups.forEach(({sf1,sf2,fin,offset,prefix})=>{
       if(prefix==="t4"){
-        // t4 = 3-team round robin
-        const t4rr=([1,2,3,4].map(g=>getTop(g,4))).filter(Boolean).slice(0,3);
-        const wins={}; t4.forEach(t=>wins[t]=0);
+        // t4 = 3-team round robin (group 4 has only 3 teams with 15 teams total)
+        const t4rr=[1,2,3,4].map(g=>{const st=getStandings(g);return st[3]?.teamId;}).filter(Boolean).slice(0,3);
+        const wins={};t4rr.forEach(t=>{wins[t]=0;});
         [["t4_m1",0,1],["t4_m2",0,2],["t4_m3",1,2]].forEach(([slot,ai,bi])=>{
-          const r=br[`b_${slot}`]||br[slot];if(!r)return;
-          if(r[0]>r[1])wins[t4rr[ai]]=(wins[t4rr[ai]]||0)+1;
-          else if(r[1]>r[0])wins[t4rr[bi]]=(wins[t4rr[bi]]||0)+1;
+          if(!t4rr[ai]||!t4rr[bi])return;
+          const r=br[`b_${slot}`];if(!r)return;
+          if(r[0]>r[1])wins[t4rr[ai]]++;
+          else if(r[1]>r[0])wins[t4rr[bi]]++;
         });
         const sorted=[...t4rr].sort((a,b)=>(wins[b]||0)-(wins[a]||0));
         sorted.forEach((tid,i)=>{if(tid)result.push({teamId:tid,rank:offset+i+1,pts:O2026_POINTS[offset+i]||0});});
-        return;
         return;
       }
       const finW=w(fin,br[fin]?.tA,br[fin]?.tB);
