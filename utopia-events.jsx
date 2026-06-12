@@ -2645,17 +2645,14 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
     }
     if(scoreType==="drag_rank_coef"&&dragRankCoef.length===0){
       const slots=[];
-      teams.slice(0,16).forEach(t=>{slots.push({teamId:t.id,slot:0});slots.push({teamId:t.id,slot:1});});
+      teams.slice(0,15).forEach(t=>{slots.push({teamId:t.id,slot:0});slots.push({teamId:t.id,slot:1});});
       setDragRankCoef(slots);
     }
     if(scoreType==="flechette"&&flechetteGroup1.length===0){
       setFlechetteGroup1(tIds.slice(0,8).map(id=>({id,score:""})));
       setFlechetteGroup2(tIds.slice(8,16).map(id=>({id,score:""})));
     }
-    if(scoreType==="biathlon"&&biathlonRace1.length===0){
-      setBiathlonRace1([...tIds].slice(0,8));
-      setBiathlonRace2([...tIds].slice(8,16));
-    }
+    // biathlon QF init handled by bQF state
     // basketScores and beretO2026Results are restored via applySnapshot
     if(scoreType==="bracket_direct"&&Object.keys(tcResultats).length===0){
       // 16 teams, 8 R1 matches
@@ -2780,18 +2777,28 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
   function getTCBracket(){
     const allTeams=getO2026ActiveTeams().map(t=>t.id);
     const teams=tcTeams.length===allTeams.length?tcTeams:allTeams;
-    // R1: 8 matches, R2: 4, SF: 2, F: 1
+    // 15 teams: 7 R1 matches + 1 bye (teams[14])
+    const byeTeam=teams[14];
     const getW=(slot,a,b)=>{const r=tcResultats[slot];return r?(r[0]>r[1]?a:b):null;};
-    const r1=[0,1,2,3,4,5,6,7].map(i=>({slot:`r1_${i}`,tA:teams[i*2],tB:teams[i*2+1]}));
-    const r2=[0,1,2,3].map(i=>({slot:`r2_${i}`,
-      tA:getW(`r1_${i*2}`,teams[i*4],teams[i*4+1]),
-      tB:getW(`r1_${i*2+1}`,teams[i*4+2],teams[i*4+3])}));
+    // R1: 7 matches (teams 0-13), teams[14] = bye → goes directly to R2
+    const r1=[0,1,2,3,4,5,6].map(i=>({slot:`r1_${i}`,tA:teams[i*2],tB:teams[i*2+1]}));
+    // R2: 4 matches
+    // r2_0: winner r1_0 vs winner r1_1
+    // r2_1: winner r1_2 vs winner r1_3
+    // r2_2: winner r1_4 vs winner r1_5
+    // r2_3: winner r1_6 vs byeTeam (bye → auto-advance)
+    const r2=[
+      {slot:"r2_0",tA:getW("r1_0",teams[0],teams[1]),tB:getW("r1_1",teams[2],teams[3])},
+      {slot:"r2_1",tA:getW("r1_2",teams[4],teams[5]),tB:getW("r1_3",teams[6],teams[7])},
+      {slot:"r2_2",tA:getW("r1_4",teams[8],teams[9]),tB:getW("r1_5",teams[10],teams[11])},
+      {slot:"r2_3",tA:getW("r1_6",teams[12],teams[13]),tB:byeTeam,isBye:true},
+    ];
     const sf=[
       {slot:"sf_0",tA:getW("r2_0",r2[0].tA,r2[0].tB),tB:getW("r2_1",r2[1].tA,r2[1].tB)},
-      {slot:"sf_1",tA:getW("r2_2",r2[2].tA,r2[2].tB),tB:getW("r2_3",r2[3].tA,r2[3].tB)},
+      {slot:"sf_1",tA:getW("r2_2",r2[2].tA,r2[2].tB),tB:r2[3].tA||byeTeam},
     ];
     const fin={slot:"fin",tA:getW("sf_0",sf[0].tA,sf[0].tB),tB:getW("sf_1",sf[1].tA,sf[1].tB)};
-    return{r1,r2,sf,fin,teams};
+    return{r1,r2,sf,fin,teams,byeTeam};
   }
 
   // Random score helpers
@@ -3520,14 +3527,14 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             }
             function doTirage(){
               const sh=[...allT].sort(()=>Math.random()-0.5);
-              setBQF({1:sh.slice(0,4).map(t=>t.id),2:sh.slice(4,8).map(t=>t.id),3:sh.slice(8,12).map(t=>t.id),4:sh.slice(12,16).map(t=>t.id)});
+              setBQF({1:sh.slice(0,4).map(t=>t.id),2:sh.slice(4,8).map(t=>t.id),3:sh.slice(8,12).map(t=>t.id),4:sh.slice(12).map(t=>t.id)}); // QF4 has 3 teams with 15 teams
               setBSF({1:[],2:[]});setBFin([]);setBPhase("qf");setBLocked(false);
               setEpreuveValidated(false);validatedRankedRef.current=null;
               setO2026Scores(prev=>{const n={...prev};delete n[ep.id];return n;});
             }
             function doSimulate(){
               const sh=[...allT].sort(()=>Math.random()-0.5);
-              const nQF={1:sh.slice(0,4).map(t=>t.id),2:sh.slice(4,8).map(t=>t.id),3:sh.slice(8,12).map(t=>t.id),4:sh.slice(12,16).map(t=>t.id)};
+              const nQF={1:sh.slice(0,4).map(t=>t.id),2:sh.slice(4,8).map(t=>t.id),3:sh.slice(8,12).map(t=>t.id),4:sh.slice(12).map(t=>t.id)};
               setBQF(nQF);
               const sf1=[nQF[1][0],nQF[2][1],nQF[3][0],nQF[4][1]].sort(()=>Math.random()-0.5);
               const sf2=[nQF[1][1],nQF[2][0],nQF[3][1],nQF[4][0]].sort(()=>Math.random()-0.5);
