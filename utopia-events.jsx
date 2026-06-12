@@ -2832,7 +2832,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
 
   function simulateBracket(){
     const nb={};
-    ["wsf1","wsf2","lsf1","lsf2","t3sf1","t3sf2","t4sf1","t4sf2","wf","lf","t3f","t4f"].forEach(s=>{nb[`b_${s}`]=randomScore();});
+    ["wsf1","wsf2","lsf1","lsf2","t3sf1","t3sf2","wf","lf","t3f","t4_m1","t4_m2","t4_m3"].forEach(s=>{nb[`b_${s}`]=randomScore();});
     setBracketResultats(nb);setPhase("done");
   }
 
@@ -4254,7 +4254,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                     </div>
                   );})}
                 </div>
-              </div>
+              </div>)}
             </div>
           </div>
         );
@@ -4467,24 +4467,20 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                 <BM slot="t3sf2" tA={gT("t3sf2","A")} tB={gT("t3sf2","B")} phA={gP("t3sf2","A")} phB={gP("t3sf2","B")} label="1/2 Finale" isAdmin={isAdmin&&phase!=="groupes"}/>
                 <BM slot="t3f" tA={gT("t3f","A")} tB={gT("t3f","B")} phA={gP("t3f","A")} phB={gP("t3f","B")} label="Finale" isAdmin={isAdmin&&!!(bracketResultats["b_t3sf1"]&&bracketResultats["b_t3sf2"])}/>
               </div>
-              <div><div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>💪 GROUPE DES 4ÈMES <span style={{fontSize:9,color:"#404058"}}>(round robin)</span></div>
-                {(()=>{
+              <div>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:11,color:"#404058",marginBottom:6}}>💪 GROUPE DES 4ÈMES <span style={{fontSize:9,color:"#404058"}}>(round robin)</span></div>
+                {phase==="groupes"&&<div style={{fontSize:10,color:"#2a2a40",fontStyle:"italic",padding:"4px 0"}}>Disponible après le lancement du bracket</div>}
+                {phase!=="groupes"&&(()=>{
                   const t4=([1,2,3,4].map(g=>{const st=getStandings(g);return st[3]?.teamId;}).filter(Boolean)).slice(0,3);
-                  if(!t4[0])return <div style={{fontSize:10,color:"#404058"}}>En attente des poules...</div>;
                   const res=(slot)=>bracketResultats[`b_t4_${slot}`];
-                  const win=(slot,a,b)=>{const r=res(slot);return r?(r[0]>r[1]?a:r[1]>r[0]?b:null):null;};
-                  const wins={};t4.forEach(t=>wins[t]=0);
-                  [["m1",0,1],["m2",0,2],["m3",1,2]].forEach(([slot,ai,bi])=>{
-                    const r=res(slot);if(!r)return;
-                    if(r[0]>r[1])wins[t4[ai]]=(wins[t4[ai]]||0)+1;
-                    else if(r[1]>r[0])wins[t4[bi]]=(wins[t4[bi]]||0)+1;
-                  });
-                  return(<>
-                    <BM slot="t4_m1" tA={t4[0]} tB={t4[1]} phA={gP("t4sf1","A")} phB={gP("t4sf1","B")} label="Match 1" isAdmin={isAdmin&&phase!=="groupes"}/>
-                    <BM slot="t4_m2" tA={t4[0]} tB={t4[2]} phA={gP("t4sf1","A")} phB={gP("t4sf2","B")} label="Match 2" isAdmin={isAdmin&&phase!=="groupes"}/>
-                    <BM slot="t4_m3" tA={t4[1]} tB={t4[2]} phA={gP("t4sf2","A")} phB={gP("t4sf2","B")} label="Match 3" isAdmin={isAdmin&&phase!=="groupes"}/>
-                    <div style={{marginTop:6,fontSize:10,color:"#60607a"}}>Victoires : {t4.map(t=>`${getO2026Team(t)?.name||t} ${wins[t]||0}v`).join(" · ")}</div>
-                  </>);
+                  const wins={};t4.forEach(t=>{wins[t]=0;});
+                  [["m1",0,1],["m2",0,2],["m3",1,2]].forEach(([slot,ai,bi])=>{const r=res(slot);if(!r)return;if(r[0]>r[1])wins[t4[ai]]++;else if(r[1]>r[0])wins[t4[bi]]++;});
+                  return(<div>
+                    <BM slot="t4_m1" tA={t4[0]} tB={t4[1]} phA={gP("t4sf1","A")} phB={gP("t4sf1","B")} label="Match 1" isAdmin={isAdmin}/>
+                    <BM slot="t4_m2" tA={t4[0]} tB={t4[2]} phA={gP("t4sf1","A")} phB={gP("t4sf2","B")} label="Match 2" isAdmin={isAdmin}/>
+                    <BM slot="t4_m3" tA={t4[1]} tB={t4[2]} phA={gP("t4sf2","A")} phB={gP("t4sf2","B")} label="Match 3" isAdmin={isAdmin}/>
+                    <div style={{marginTop:6,fontSize:10,color:"#60607a"}}>{t4.map(t=>`${getO2026Team(t)?.name||t}: ${wins[t]||0}v`).join(" · ")}</div>
+                  </div>);
                 })()}
               </div>
             </div>
