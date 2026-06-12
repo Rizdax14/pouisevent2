@@ -5185,7 +5185,7 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
           const team=getTeam(player.t26);
           const roster=PLAYERS.filter(p=>p.t26===player.t26);
           const tc=team?.color||"#E8B84B";
-          const sex=p=>(p.sex||"m");
+          const sex=p=>((p&&p.sex)||"m");
           const boys=roster.filter(p=>sex(p)==="m");
           const girls=roster.filter(p=>sex(p)==="f");
 
@@ -5476,18 +5476,6 @@ function ProfilePage({nav,navBack,currentPlayer,setCurrentPlayer,o2026Assignment
                   <span>✅</span><span style={{fontSize:13,color:"#22c55e"}}>Tout est correct — prêt à valider !</span>
                 </div>
               );})()}
-
-              {/* Live errors - always shown */}
-              {(()=>{const errs=validateTeam();return errs.length>0?(
-                <div style={{background:"#ef444415",border:"1px solid #ef444444",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
-                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"#ef4444",marginBottom:8}}>❌ ERREURS À CORRIGER</div>
-                  {errs.map((e,i)=><div key={i} style={{fontSize:12,color:"#fca5a5",marginBottom:4}}>· {e}</div>)}
-                </div>
-              ):(
-                <div style={{background:"#22c55e15",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                  <span>✅</span><span style={{fontSize:13,color:"#22c55e"}}>Tout est correct — prêt à valider !</span>
-                </div>
-              );})()}
               {/* Validate / Unvalidate button */}
               <button
                 onClick={isValidated?handleUnvalidate:handleValidate}
@@ -5583,10 +5571,16 @@ function AssignmentPanel({assignments,setAssignments}){
   );
   const team=selTeam;
   const roster=PLAYERS.filter(p=>p.t26===team.id);
-  const tc=team.color||"#E8B84B";
-  const sex=p=>(p.sex||"m");
+  const tc=team.color==="000000"||team.color==="#1d1d1b"||team.color==="#000000"?"#888":team.color||"#E8B84B";
+  const sex=p=>((p&&p.sex)||"m");
   const boys=roster.filter(p=>sex(p)==="m");
   const girls=roster.filter(p=>sex(p)==="f");
+  if(roster.length===0)return(
+    <div>
+      <button onClick={()=>setSelTeam(null)} style={{background:"none",border:"none",color:"#60607a",cursor:"pointer",fontSize:18,padding:"0 0 12px 0"}}>←</button>
+      <div style={{fontSize:13,color:"#404058",padding:"20px 0",textAlign:"center"}}>Aucun joueur assigné à cette équipe (t26={team.id}).<br/>Vérifie que les joueurs ont bien t26={team.id} dans Supabase.</div>
+    </div>
+  );
   const phases=[...new Set(O2026_EPREUVES.map(e=>e.phase))].sort();
   const getAssigned=(epId)=>(assignments||{})[`${team.id}_${epId}`]||[];
   const tcIds=getAssigned("tircorde"),bioIds=getAssigned("biathlon");
