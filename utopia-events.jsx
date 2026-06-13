@@ -3879,9 +3879,17 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
                   if(w==="d1"&&t1&&!skip1)wins[t1.id]++;
                   if(w==="d2"&&t2)wins[t2.id]++;
                 });
-                const ranked=[...teams].filter(t=>t.id!==0).map(t=>({...t,wins:wins[t.id]||0}))
-                  .sort((a,b)=>b.wins-a.wins)
-                  .map((t,i)=>({teamId:t.id,pos:i+1,pts:O2026_POINTS[i]||0,wins:t.wins}));
+                // Sort by wins, tied teams all get the BEST pts of their group
+                const sorted=[...teams].filter(t=>t.id!==0).map(t=>({...t,wins:wins[t.id]||0})).sort((a,b)=>b.wins-a.wins);
+                const ranked=[];
+                let i=0;
+                while(i<sorted.length){
+                  let j=i;
+                  while(j<sorted.length&&sorted[j].wins===sorted[i].wins)j++;
+                  const bestPts=O2026_POINTS[i]||0; // best position in tie group
+                  sorted.slice(i,j).forEach(t=>ranked.push({teamId:t.id,pos:i+1,pts:bestPts,wins:t.wins,tied:j-i>1}));
+                  i=j;
+                }
                 setO2026Scores(prev=>({...prev,beret:{ranked,beretO2026Results}}));
                 setBeretRanked(ranked);
                 setEpreuveValidated(true);
