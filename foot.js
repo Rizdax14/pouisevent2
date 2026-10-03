@@ -2072,14 +2072,19 @@ function FootballApp({
   const [attendance, setAttendance] = React.useState([]);
   const [events, setEvents] = React.useState([]);
   const [lineups, setLineups] = React.useState([]);
+  const [ratings, setRatings] = React.useState([]);
   const isAdmin = currentPlayer?.uid === ADMIN_UID;
   async function reloadFoot() {
-    const [r, m, a, e, l] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id")]);
+    const [r, m, a, e, l, rt] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score")]);
     setRoster(r || []);
     setMatches(m || []);
     setAttendance(a || []);
     setEvents(e || []);
     setLineups(l || []);
+    setRatings((rt || []).map(x => ({
+      ...x,
+      score: Number(x.score)
+    })));
   }
   React.useEffect(() => {
     reloadFoot().then(() => setLoaded(true)).catch(err => {
