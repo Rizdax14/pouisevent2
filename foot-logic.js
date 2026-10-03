@@ -54,6 +54,36 @@ function assertUpsertOk(result) {
   }
 }
 
+function normalizeForSearch(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function filterPlayersByName(players, query, getName) {
+  const q = normalizeForSearch(query).trim();
+  if (!q) return players;
+  return players.filter((p) => normalizeForSearch(getName(p)).includes(q));
+}
+
+function toDatetimeLocalValue(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function buildEventPayload({ type, half, minute, playerId, assistId }) {
+  const h = Number(half);
+  const m = Number(minute);
+  if (!Number.isInteger(h) || h < 1) throw new Error("Mi-temps invalide");
+  if (!Number.isInteger(m) || m < 0) throw new Error("Minute invalide");
+  if (type === "goal_opponent") {
+    return { type, half: h, minute: m, player_id: null, assist_player_id: null };
+  }
+  if (!playerId) throw new Error("Choisis un buteur");
+  if (assistId && String(assistId) === String(playerId)) throw new Error("Le buteur ne peut pas faire la passe décisive");
+  return { type: "goal_bl", half: h, minute: m, player_id: Number(playerId), assist_player_id: assistId ? Number(assistId) : null };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -64,5 +94,8 @@ if (typeof module !== "undefined" && module.exports) {
     canConfirmGoal,
     nextLiveAction,
     assertUpsertOk,
+    filterPlayersByName,
+    toDatetimeLocalValue,
+    buildEventPayload,
   };
 }

@@ -106,18 +106,60 @@ function FootPlaceholderPage({
     }
   }, "\uD83D\uDD12 Bient\xF4t disponible"));
 }
-function FootCreateMatchForm({
-  reload
+const FOOT_INPUT_STYLE = {
+  width: "100%",
+  background: "#13131f",
+  border: "1px solid #1e1e30",
+  borderRadius: 8,
+  padding: "9px 12px",
+  color: "#eeeef5",
+  fontSize: 13,
+  marginBottom: 10
+};
+async function setMatchAttendance(matchId, playerId, status) {
+  assertUpsertOk(await SUPABASE.from("foot_attendance").upsert({
+    match_id: matchId,
+    player_id: playerId,
+    status,
+    responded_at: new Date().toISOString()
+  }, {
+    onConflict: "match_id,player_id"
+  }));
+}
+function formatMatchPlace(match) {
+  const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
+  return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
+}
+function FootMatchForm({
+  title,
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  resetOnSuccess
 }) {
-  const [opponentName, setOpponentName] = React.useState("");
-  const [matchDatetime, setMatchDatetime] = React.useState("");
-  const [address, setAddress] = React.useState("");
-  const [postalCode, setPostalCode] = React.useState("");
-  const [city, setCity] = React.useState("");
+  const empty = {
+    opponent_name: "",
+    match_datetime: "",
+    stadium_name: "",
+    address: "",
+    postal_code: "",
+    city: ""
+  };
+  const start = initial ? {
+    ...empty,
+    ...initial,
+    match_datetime: toDatetimeLocalValue(initial.match_datetime)
+  } : empty;
+  const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
+  const set = k => e => setF({
+    ...f,
+    [k]: e.target.value
+  });
   async function submit() {
-    if (!opponentName.trim() || !matchDatetime) {
+    if (!f.opponent_name.trim() || !f.match_datetime) {
       setMsg({
         t: "error",
         m: "Adversaire et date/heure sont obligatoires."
@@ -126,23 +168,19 @@ function FootCreateMatchForm({
     }
     setSaving(true);
     try {
-      await sbInsert("foot_matches", {
-        opponent_name: opponentName.trim(),
-        match_datetime: new Date(matchDatetime).toISOString(),
-        address: address.trim() || null,
-        postal_code: postalCode.trim() || null,
-        city: city.trim() || null
+      await onSubmit({
+        opponent_name: f.opponent_name.trim(),
+        match_datetime: new Date(f.match_datetime).toISOString(),
+        stadium_name: (f.stadium_name || "").trim() || null,
+        address: (f.address || "").trim() || null,
+        postal_code: (f.postal_code || "").trim() || null,
+        city: (f.city || "").trim() || null
       });
-      setOpponentName("");
-      setMatchDatetime("");
-      setAddress("");
-      setPostalCode("");
-      setCity("");
+      if (resetOnSuccess) setF(empty);
       setMsg({
         t: "success",
-        m: "Match créé ✓"
+        m: "Enregistré ✓"
       });
-      await reload();
     } catch (e) {
       setMsg({
         t: "error",
@@ -151,16 +189,6 @@ function FootCreateMatchForm({
     }
     setSaving(false);
   }
-  const inputStyle = {
-    width: "100%",
-    background: "#13131f",
-    border: "1px solid #1e1e30",
-    borderRadius: 8,
-    padding: "9px 12px",
-    color: "#eeeef5",
-    fontSize: 13,
-    marginBottom: 10
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
@@ -175,41 +203,64 @@ function FootCreateMatchForm({
       fontSize: 16,
       marginBottom: 12
     }
-  }, "Cr\xE9er un match"), /*#__PURE__*/React.createElement("input", {
-    style: inputStyle,
+  }, title), /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
     placeholder: "Nom de l'\xE9quipe adverse",
-    value: opponentName,
-    onChange: e => setOpponentName(e.target.value)
+    value: f.opponent_name,
+    onChange: set("opponent_name")
   }), /*#__PURE__*/React.createElement("input", {
-    style: inputStyle,
+    style: FOOT_INPUT_STYLE,
     type: "datetime-local",
-    value: matchDatetime,
-    onChange: e => setMatchDatetime(e.target.value)
+    value: f.match_datetime,
+    onChange: set("match_datetime")
   }), /*#__PURE__*/React.createElement("input", {
-    style: inputStyle,
+    style: FOOT_INPUT_STYLE,
+    placeholder: "Nom du stade",
+    value: f.stadium_name || "",
+    onChange: set("stadium_name")
+  }), /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
     placeholder: "Adresse",
-    value: address,
-    onChange: e => setAddress(e.target.value)
+    value: f.address || "",
+    onChange: set("address")
   }), /*#__PURE__*/React.createElement("input", {
-    style: inputStyle,
+    style: FOOT_INPUT_STYLE,
     placeholder: "Code postal",
-    value: postalCode,
-    onChange: e => setPostalCode(e.target.value)
+    value: f.postal_code || "",
+    onChange: set("postal_code")
   }), /*#__PURE__*/React.createElement("input", {
-    style: inputStyle,
+    style: FOOT_INPUT_STYLE,
     placeholder: "Ville",
-    value: city,
-    onChange: e => setCity(e.target.value)
+    value: f.city || "",
+    onChange: set("city")
   }), msg && /*#__PURE__*/React.createElement("div", {
     style: {
       color: msg.t === "error" ? "#ef4444" : "#34d399",
       fontSize: 12,
       marginBottom: 10
     }
-  }, msg.m), /*#__PURE__*/React.createElement("button", {
+  }, msg.m), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, onCancel && /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "9px 16px",
+      cursor: "pointer"
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
     disabled: saving,
     style: {
+      flex: 1,
       background: "#3b82f6",
       color: "#fff",
       border: "none",
@@ -219,14 +270,75 @@ function FootCreateMatchForm({
       cursor: saving ? "default" : "pointer",
       opacity: saving ? 0.6 : 1
     }
-  }, saving ? "Création…" : "Créer le match"));
+  }, saving ? "Enregistrement…" : submitLabel)));
+}
+function FootCreateMatchForm({
+  reload
+}) {
+  return /*#__PURE__*/React.createElement(FootMatchForm, {
+    title: "Cr\xE9er un match",
+    submitLabel: "Cr\xE9er le match",
+    resetOnSuccess: true,
+    onSubmit: async data => {
+      await sbInsert("foot_matches", data);
+      await reload();
+    }
+  });
+}
+function FootAttendanceButtons({
+  myStatus,
+  saving,
+  onSet,
+  compact
+}) {
+  const base = {
+    flex: 1,
+    border: "1px solid #1e1e30",
+    borderRadius: 8,
+    padding: compact ? "7px" : "10px",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: compact ? 12 : 13
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: compact ? 8 : 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onSet("present");
+    },
+    disabled: saving,
+    style: {
+      ...base,
+      background: myStatus === "present" ? "#34d399" : "#13131f",
+      color: myStatus === "present" ? "#080810" : "#eeeef5"
+    }
+  }, "Pr\xE9sent"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onSet("absent");
+    },
+    disabled: saving,
+    style: {
+      ...base,
+      background: myStatus === "absent" ? "#ef4444" : "#13131f",
+      color: myStatus === "absent" ? "#080810" : "#eeeef5"
+    }
+  }, "Absent"));
 }
 function FootMatchCard({
   match,
   score,
   presentCount,
   rosterSize,
-  onClick
+  onClick,
+  isOnRoster,
+  myStatus,
+  onSetStatus,
+  saving
 }) {
   const dt = new Date(match.match_datetime);
   const dateLabel = dt.toLocaleDateString("fr-FR", {
@@ -239,6 +351,7 @@ function FootMatchCard({
   });
   const statusLabel = match.status === "scheduled" ? "À venir" : match.status === "live" ? "En cours" : "Terminé";
   const statusColor = match.status === "scheduled" ? "#60607a" : match.status === "live" ? "#ef4444" : "#34d399";
+  const place = formatMatchPlace(match);
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClick,
     style: {
@@ -274,12 +387,12 @@ function FootMatchCard({
       color: "#60607a",
       marginBottom: 4
     }
-  }, dateLabel), match.city && /*#__PURE__*/React.createElement("div", {
+  }, dateLabel), place && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#60607a"
     }
-  }, match.city), match.status !== "scheduled" && /*#__PURE__*/React.createElement("div", {
+  }, place), match.status !== "scheduled" && /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Bebas Neue',sans-serif",
       fontSize: 22,
@@ -289,17 +402,37 @@ function FootMatchCard({
     style: {
       fontSize: 12,
       color: "#60607a",
-      marginTop: 6
+      marginTop: 6,
+      marginBottom: isOnRoster ? 10 : 0
     }
-  }, presentCount, "/", rosterSize, " pr\xE9sents"));
+  }, presentCount, "/", rosterSize, " pr\xE9sents"), match.status === "scheduled" && isOnRoster && /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    compact: true,
+    myStatus: myStatus,
+    saving: saving,
+    onSet: onSetStatus
+  }));
 }
 function FootCalendarPage({
   matches,
   events,
   roster,
   attendance,
-  nav
+  nav,
+  currentPlayer,
+  reload
 }) {
+  const [savingMatchId, setSavingMatchId] = React.useState(null);
+  const isOnRoster = roster.some(r => r.player_id === currentPlayer?.id);
+  async function setStatus(matchId, status) {
+    setSavingMatchId(matchId);
+    try {
+      await setMatchAttendance(matchId, currentPlayer.id, status);
+      await reload();
+    } catch (e) {
+      console.warn("attendance update failed", e);
+    }
+    setSavingMatchId(null);
+  }
   if (matches.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -316,7 +449,9 @@ function FootCalendarPage({
   }, matches.map(match => {
     const matchEvents = events.filter(e => e.match_id === match.id);
     const score = computeFootScore(matchEvents);
-    const presentCount = attendance.filter(a => a.match_id === match.id && a.status === "present").length;
+    const matchAttendance = attendance.filter(a => a.match_id === match.id);
+    const presentCount = computeAttendanceBuckets(roster, matchAttendance).present.length;
+    const myStatus = matchAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null;
     return /*#__PURE__*/React.createElement(FootMatchCard, {
       key: match.id,
       match: match,
@@ -325,7 +460,11 @@ function FootCalendarPage({
       rosterSize: roster.length,
       onClick: () => nav("matchDetail", {
         matchId: match.id
-      })
+      }),
+      isOnRoster: isOnRoster,
+      myStatus: myStatus,
+      saving: savingMatchId === match.id,
+      onSetStatus: status => setStatus(match.id, status)
     });
   }));
 }
@@ -334,7 +473,7 @@ function FootRosterManager({
   reload
 }) {
   const [saving, setSaving] = React.useState(null); // player id currently being saved
-
+  const [search, setSearch] = React.useState("");
   const roleByPlayer = {};
   roster.forEach(r => {
     roleByPlayer[r.player_id] = r.role;
@@ -360,15 +499,9 @@ function FootRosterManager({
     }
     setSaving(null);
   }
-  const sortedPlayers = [...PLAYERS].sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
-  if (sortedPlayers.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        color: "#60607a",
-        fontSize: 13
-      }
-    }, "Aucun joueur dans l'effectif.");
-  }
+  const nameOf = p => getDisplayName(p, PLAYERS) || "";
+  const sortedPlayers = [...PLAYERS].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const visiblePlayers = filterPlayersByName(sortedPlayers, search, nameOf);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
@@ -382,7 +515,18 @@ function FootRosterManager({
       fontSize: 16,
       marginBottom: 12
     }
-  }, "Effectif"), sortedPlayers.map(p => /*#__PURE__*/React.createElement("div", {
+  }, "Effectif (", roster.length, ")"), /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    placeholder: "\uD83D\uDD0D Rechercher un joueur\u2026",
+    value: search,
+    onChange: e => setSearch(e.target.value)
+  }), visiblePlayers.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13,
+      padding: "8px 0"
+    }
+  }, "Aucun joueur ne correspond \xE0 \xAB ", search, " \xBB."), visiblePlayers.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     style: {
       display: "flex",
@@ -552,17 +696,244 @@ function FootStartMatchConfig({
     }
   }, saving ? "Démarrage…" : "Démarrer le match"))));
 }
-function FootEventTimeline({
-  events
+function FootEventEditor({
+  event,
+  defaultHalf,
+  roster,
+  onSave,
+  onCancel
 }) {
+  const [type, setType] = React.useState(event?.type || "goal_bl");
+  const [half, setHalf] = React.useState(String(event?.half ?? defaultHalf ?? 1));
+  const [minute, setMinute] = React.useState(String(event?.minute ?? 0));
+  const [playerId, setPlayerId] = React.useState(event?.player_id ? String(event.player_id) : "");
+  const [assistId, setAssistId] = React.useState(event?.assist_player_id ? String(event.assist_player_id) : "");
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  // Keep a player who has since left the roster selectable when editing their old goal.
+  const rosterIds = new Set(roster.map(r => r.player_id));
+  [event?.player_id, event?.assist_player_id].forEach(id => {
+    if (id) rosterIds.add(id);
+  });
+  const options = PLAYERS.filter(p => rosterIds.has(p.id));
+  const selectStyle = {
+    display: "block",
+    width: "100%",
+    background: "#0d0d1c",
+    border: "1px solid #1e1e30",
+    borderRadius: 6,
+    color: "#eeeef5",
+    padding: "7px 10px",
+    marginTop: 4,
+    marginBottom: 10
+  };
+  async function save() {
+    let payload;
+    try {
+      payload = buildEventPayload({
+        type,
+        half,
+        minute,
+        playerId,
+        assistId
+      });
+    } catch (e) {
+      setErr(e.message);
+      return;
+    }
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave(payload);
+    } catch (e) {
+      setErr("Erreur: " + e.message);
+      setSaving(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      padding: 14,
+      margin: "6px 0"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Type"), /*#__PURE__*/React.createElement("select", {
+    value: type,
+    onChange: e => setType(e.target.value),
+    style: selectStyle
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "goal_bl"
+  }, "But Bi\xE8re Leverculsec"), /*#__PURE__*/React.createElement("option", {
+    value: "goal_opponent"
+  }, "But adverse")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Mi-temps"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: 1,
+    value: half,
+    onChange: e => setHalf(e.target.value),
+    style: selectStyle
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Minute"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: 0,
+    value: minute,
+    onChange: e => setMinute(e.target.value),
+    style: selectStyle
+  }))), type === "goal_bl" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Buteur"), /*#__PURE__*/React.createElement("select", {
+    value: playerId,
+    onChange: e => setPlayerId(e.target.value),
+    style: selectStyle
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, getDisplayName(p, PLAYERS)))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Passe d\xE9cisive (optionnel)"), /*#__PURE__*/React.createElement("select", {
+    value: assistId,
+    onChange: e => setAssistId(e.target.value),
+    style: selectStyle
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, getDisplayName(p, PLAYERS))))), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ef4444",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "8px",
+      cursor: "pointer"
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+    onClick: save,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      fontWeight: 700,
+      cursor: saving ? "default" : "pointer",
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "…" : "Enregistrer")));
+}
+function FootEventTimeline({
+  events,
+  editable,
+  match,
+  roster,
+  reload
+}) {
+  const [editingId, setEditingId] = React.useState(null); // event id, "new", or null
+  const [busyId, setBusyId] = React.useState(null);
   const sorted = buildEventTimeline(events);
-  if (sorted.length === 0) return /*#__PURE__*/React.createElement("div", {
+  async function saveEvent(eventId, payload) {
+    if (eventId === "new") {
+      await sbInsert("foot_match_events", {
+        match_id: match.id,
+        ...payload
+      });
+    } else {
+      await sbUpdate("foot_match_events", {
+        id: eventId
+      }, payload);
+    }
+    setEditingId(null);
+    await reload();
+  }
+  async function deleteEvent(e) {
+    if (!window.confirm("Supprimer ce but ?")) return;
+    setBusyId(e.id);
+    try {
+      await sbFetch("foot_match_events", `?id=eq.${e.id}`, {
+        method: "DELETE"
+      });
+      await reload();
+    } catch (err) {
+      console.warn("delete event failed", err);
+    }
+    setBusyId(null);
+  }
+  const iconBtn = {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: 13,
+    padding: "0 4px"
+  };
+  return /*#__PURE__*/React.createElement("div", null, sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13
     }
-  }, "Aucun but pour l'instant.");
-  return /*#__PURE__*/React.createElement("div", null, sorted.map(e => {
+  }, "Aucun but pour l'instant."), sorted.map(e => {
+    if (editingId === e.id) {
+      return /*#__PURE__*/React.createElement(FootEventEditor, {
+        key: e.id,
+        event: e,
+        roster: roster,
+        onSave: p => saveEvent(e.id, p),
+        onCancel: () => setEditingId(null)
+      });
+    }
     const scorer = e.player_id ? PLAYERS.find(p => p.id === e.player_id) : null;
     const assist = e.assist_player_id ? PLAYERS.find(p => p.id === e.assist_player_id) : null;
     const label = e.type === "goal_bl" ? `⚽ ${scorer ? getDisplayName(scorer, PLAYERS) : "?"}${assist ? " (passe D: " + getDisplayName(assist, PLAYERS) + ")" : ""}` : `⚽ But adverse`;
@@ -572,15 +943,52 @@ function FootEventTimeline({
         display: "flex",
         gap: 10,
         padding: "5px 0",
-        fontSize: 13
+        fontSize: 13,
+        alignItems: "center"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         color: "#60607a",
         width: 50
       }
-    }, e.half, "e \xB7 ", e.minute, "'"), /*#__PURE__*/React.createElement("span", null, label));
-  }));
+    }, e.half, "e \xB7 ", e.minute, "'"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }, label), editable && /*#__PURE__*/React.createElement("span", {
+      style: {
+        whiteSpace: "nowrap"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      title: "Modifier",
+      onClick: () => setEditingId(e.id),
+      disabled: busyId === e.id,
+      style: iconBtn
+    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
+      title: "Supprimer",
+      onClick: () => deleteEvent(e),
+      disabled: busyId === e.id,
+      style: iconBtn
+    }, "\uD83D\uDDD1\uFE0F")));
+  }), editable && editingId === "new" && /*#__PURE__*/React.createElement(FootEventEditor, {
+    defaultHalf: match.current_half || 1,
+    roster: roster,
+    onSave: p => saveEvent("new", p),
+    onCancel: () => setEditingId(null)
+  }), editable && editingId !== "new" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditingId("new"),
+    style: {
+      marginTop: 8,
+      background: "none",
+      border: "1px dashed #1e1e30",
+      borderRadius: 8,
+      color: "#60607a",
+      padding: "7px 12px",
+      cursor: "pointer",
+      fontSize: 12,
+      width: "100%"
+    }
+  }, "\u2795 Ajouter un but"));
 }
 function FootGoalPicker({
   roster,
@@ -872,6 +1280,28 @@ function FootLiveAdminConsole({
     }
   }, "\uD83C\uDFC1 Cl\xF4turer le match"));
 }
+function FootMatchHeader({
+  match
+}) {
+  const place = formatMatchPlace(match);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 18
+    }
+  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginTop: 4
+    }
+  }, new Date(match.match_datetime).toLocaleString("fr-FR")), place && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, place));
+}
 function FootLiveView({
   match,
   roster,
@@ -893,19 +1323,20 @@ function FootLiveView({
       borderRadius: 12,
       padding: 16
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
-    }
-  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
+    match: match
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Bebas Neue',sans-serif",
       fontSize: 32,
       margin: "10px 0"
     }
   }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
-    events: matchEvents
+    events: matchEvents,
+    editable: isAdmin,
+    match: match,
+    roster: roster,
+    reload: reload
   })), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
     match: match,
     roster: roster,
@@ -915,7 +1346,10 @@ function FootLiveView({
 }
 function FootFinishedView({
   match,
-  events
+  roster,
+  events,
+  isAdmin,
+  reload
 }) {
   const matchEvents = events.filter(e => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
@@ -930,12 +1364,9 @@ function FootFinishedView({
       borderRadius: 12,
       padding: 16
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
-    }
-  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
+    match: match
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "#34d399",
@@ -950,7 +1381,11 @@ function FootFinishedView({
       margin: "10px 0"
     }
   }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
-    events: matchEvents
+    events: matchEvents,
+    editable: isAdmin,
+    match: match,
+    roster: roster,
+    reload: reload
   })));
 }
 function FootScheduledView({
@@ -970,13 +1405,7 @@ function FootScheduledView({
   async function setMyStatus(status) {
     setSaving(true);
     try {
-      assertUpsertOk(await SUPABASE.from("foot_attendance").upsert({
-        match_id: match.id,
-        player_id: currentPlayer.id,
-        status
-      }, {
-        onConflict: "match_id,player_id"
-      }));
+      await setMatchAttendance(match.id, currentPlayer.id, status);
       await reload();
     } catch (e) {
       console.warn("attendance update failed", e);
@@ -987,7 +1416,6 @@ function FootScheduledView({
     const p = PLAYERS.find(pl => pl.id === playerId);
     return p ? getDisplayName(p, PLAYERS) : "?";
   }
-  const dt = new Date(match.match_datetime);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 20
@@ -1000,55 +1428,17 @@ function FootScheduledView({
       padding: 16,
       marginBottom: 16
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
+    match: match
+  })), isOnRoster && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
+      marginBottom: 16
     }
-  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a",
-      marginTop: 4
-    }
-  }, dt.toLocaleString("fr-FR")), match.address && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a"
-    }
-  }, match.address, ", ", match.postal_code, " ", match.city)), isOnRoster && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 16,
-      display: "flex",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setMyStatus("present"),
-    disabled: saving,
-    style: {
-      flex: 1,
-      background: myStatus === "present" ? "#34d399" : "#13131f",
-      color: myStatus === "present" ? "#080810" : "#eeeef5",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      padding: "10px",
-      cursor: "pointer",
-      fontWeight: 700
-    }
-  }, "Pr\xE9sent"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setMyStatus("absent"),
-    disabled: saving,
-    style: {
-      flex: 1,
-      background: myStatus === "absent" ? "#ef4444" : "#13131f",
-      color: myStatus === "absent" ? "#080810" : "#eeeef5",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      padding: "10px",
-      cursor: "pointer",
-      fontWeight: 700
-    }
-  }, "Absent")), roster.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    myStatus: myStatus,
+    saving: saving,
+    onSet: setMyStatus
+  })), roster.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13,
@@ -1104,28 +1494,79 @@ function FootMatchDetailPage({
 }) {
   const match = matches.find(m => m.id === matchId);
   const [startingConfig, setStartingConfig] = React.useState(false);
+  const [editingInfo, setEditingInfo] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   if (!match) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 20,
       color: "#60607a"
     }
   }, "Match introuvable.");
+  async function deleteMatch() {
+    if (!window.confirm(`Supprimer définitivement le match contre ${match.opponent_name} ? Les buts et présences associés seront aussi supprimés.`)) return;
+    setDeleting(true);
+    try {
+      await sbFetch("foot_matches", `?id=eq.${match.id}`, {
+        method: "DELETE"
+      });
+      await reload();
+      navBack();
+    } catch (e) {
+      console.warn("delete match failed", e);
+      setDeleting(false);
+    }
+  }
+  const topBtn = {
+    background: "none",
+    border: "1px solid #1e1e30",
+    borderRadius: 8,
+    color: "#eeeef5",
+    padding: "6px 12px",
+    cursor: "pointer",
+    fontSize: 12
+  };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "12px 20px 0"
+      padding: "12px 20px 0",
+      display: "flex",
+      gap: 8
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: navBack,
+    style: topBtn
+  }, "\u2190 Retour"), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
-      background: "none",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "6px 12px",
-      cursor: "pointer",
-      fontSize: 12
+      flex: 1
     }
-  }, "\u2190 Retour")), match.status === "scheduled" && !startingConfig && /*#__PURE__*/React.createElement(FootScheduledView, {
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditingInfo(!editingInfo),
+    disabled: deleting,
+    style: topBtn
+  }, "\u270F\uFE0F Modifier"), /*#__PURE__*/React.createElement("button", {
+    onClick: deleteMatch,
+    disabled: deleting,
+    style: {
+      ...topBtn,
+      color: "#ef4444",
+      borderColor: "#ef444455"
+    }
+  }, deleting ? "…" : "🗑️ Supprimer"))), isAdmin && editingInfo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 20px 0"
+    }
+  }, /*#__PURE__*/React.createElement(FootMatchForm, {
+    title: "Modifier le match",
+    submitLabel: "Enregistrer",
+    initial: match,
+    onCancel: () => setEditingInfo(false),
+    onSubmit: async data => {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, data);
+      await reload();
+      setEditingInfo(false);
+    }
+  })), match.status === "scheduled" && !startingConfig && /*#__PURE__*/React.createElement(FootScheduledView, {
     match: match,
     roster: roster,
     attendance: attendance,
@@ -1146,7 +1587,10 @@ function FootMatchDetailPage({
     reload: reload
   }), match.status === "finished" && /*#__PURE__*/React.createElement(FootFinishedView, {
     match: match,
-    events: events
+    roster: roster,
+    events: events,
+    isAdmin: isAdmin,
+    reload: reload
   }));
 }
 function FootballApp({
@@ -1208,7 +1652,9 @@ function FootballApp({
     events: events,
     roster: roster,
     attendance: attendance,
-    nav: nav
+    nav: nav,
+    currentPlayer: currentPlayer,
+    reload: reloadFoot
   }), page === "matchDetail" && /*#__PURE__*/React.createElement(FootMatchDetailPage, {
     matchId: sub.matchId,
     matches: matches,

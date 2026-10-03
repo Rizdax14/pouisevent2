@@ -10,6 +10,9 @@ const {
   canConfirmGoal,
   nextLiveAction,
   assertUpsertOk,
+  filterPlayersByName,
+  toDatetimeLocalValue,
+  buildEventPayload,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -105,4 +108,60 @@ test("assertUpsertOk does nothing when there is no error", () => {
 
 test("assertUpsertOk throws when supabase-js returns an error object (it never rejects the promise)", () => {
   assert.throws(() => assertUpsertOk({ data: null, error: { message: "permission denied" } }), /permission denied/);
+});
+
+const SAMPLE_PLAYERS = [
+  { id: 1, name: "Quentin" },
+  { id: 2, name: "Ferdi" },
+  { id: 3, name: "Élodie" },
+];
+const nameOf = (p) => p.name;
+
+test("filterPlayersByName returns everyone for an empty or blank query", () => {
+  assert.deepEqual(filterPlayersByName(SAMPLE_PLAYERS, "", nameOf).map((p) => p.id), [1, 2, 3]);
+  assert.deepEqual(filterPlayersByName(SAMPLE_PLAYERS, "   ", nameOf).map((p) => p.id), [1, 2, 3]);
+});
+
+test("filterPlayersByName matches a case-insensitive substring", () => {
+  assert.deepEqual(filterPlayersByName(SAMPLE_PLAYERS, "fER", nameOf).map((p) => p.id), [2]);
+});
+
+test("filterPlayersByName ignores accents so 'elo' finds 'Élodie'", () => {
+  assert.deepEqual(filterPlayersByName(SAMPLE_PLAYERS, "elo", nameOf).map((p) => p.id), [3]);
+});
+
+test("toDatetimeLocalValue renders an ISO timestamp as a local datetime-local input value", () => {
+  const d = new Date(2026, 10, 15, 19, 5); // 15 Nov 2026, 19:05 local time
+  assert.equal(toDatetimeLocalValue(d.toISOString()), "2026-11-15T19:05");
+});
+
+test("toDatetimeLocalValue returns an empty string for a missing value", () => {
+  assert.equal(toDatetimeLocalValue(null), "");
+});
+
+test("buildEventPayload keeps scorer and assist for a BL goal", () => {
+  assert.deepEqual(
+    buildEventPayload({ type: "goal_bl", half: "2", minute: "17", playerId: "4", assistId: "9" }),
+    { type: "goal_bl", half: 2, minute: 17, player_id: 4, assist_player_id: 9 }
+  );
+});
+
+test("buildEventPayload clears scorer and assist for an opponent goal", () => {
+  assert.deepEqual(
+    buildEventPayload({ type: "goal_opponent", half: "1", minute: "3", playerId: "4", assistId: "9" }),
+    { type: "goal_opponent", half: 1, minute: 3, player_id: null, assist_player_id: null }
+  );
+});
+
+test("buildEventPayload rejects a BL goal without a scorer", () => {
+  assert.throws(() => buildEventPayload({ type: "goal_bl", half: "1", minute: "3", playerId: "", assistId: "" }), /buteur/i);
+});
+
+test("buildEventPayload rejects an assist by the scorer themself", () => {
+  assert.throws(() => buildEventPayload({ type: "goal_bl", half: "1", minute: "3", playerId: "4", assistId: "4" }), /passe/i);
+});
+
+test("buildEventPayload rejects a half below 1 or a negative minute", () => {
+  assert.throws(() => buildEventPayload({ type: "goal_opponent", half: "0", minute: "3" }), /mi-temps/i);
+  assert.throws(() => buildEventPayload({ type: "goal_opponent", half: "1", minute: "-1" }), /minute/i);
 });
