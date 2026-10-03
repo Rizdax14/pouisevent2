@@ -74,6 +74,10 @@ async function applyLineupChange(matchId, { add, remove }) {
   }
 }
 
+function attendanceRoster(roster) {
+  return roster.filter((r) => r.role !== "invite");
+}
+
 function lineupIdsFor(lineups, matchId) {
   return lineups.filter((l) => l.match_id === matchId).map((l) => l.player_id);
 }
@@ -137,7 +141,7 @@ function formatMatchPlace(match) {
 }
 
 function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
-  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "" };
+  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat" };
   const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime) } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
@@ -154,6 +158,7 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
     try {
       await onSubmit({
         opponent_name: f.opponent_name.trim(),
+        match_type: f.match_type || "championnat",
         match_datetime: new Date(f.match_datetime).toISOString(),
         stadium_name: (f.stadium_name || "").trim() || null,
         address: (f.address || "").trim() || null,
@@ -173,6 +178,10 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 12 }}>{title}</div>
       <input style={FOOT_INPUT_STYLE} placeholder="Nom de l'équipe adverse" value={f.opponent_name} onChange={set("opponent_name")} />
       <input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.match_datetime} onChange={set("match_datetime")} />
+      <select style={FOOT_INPUT_STYLE} value={f.match_type || "championnat"} onChange={set("match_type")}>
+        <option value="championnat">Championnat</option>
+        <option value="amical">Match amical</option>
+      </select>
       <input style={FOOT_INPUT_STYLE} placeholder="Nom du stade" value={f.stadium_name || ""} onChange={set("stadium_name")} />
       <input style={FOOT_INPUT_STYLE} placeholder="Adresse" value={f.address || ""} onChange={set("address")} />
       <input style={FOOT_INPUT_STYLE} placeholder="Code postal" value={f.postal_code || ""} onChange={set("postal_code")} />
@@ -223,7 +232,10 @@ function FootMatchCard({ match, score, presentCount, rosterSize, onClick, isOnRo
     <div onClick={onClick} style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16 }}>Bière Leverculsec vs {match.opponent_name}</div>
-        <div style={{ fontSize: 10, color: statusColor, textTransform: "uppercase", fontWeight: 700 }}>{statusLabel}</div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{ fontSize: 9, color: "#60607a", border: "1px solid #1e1e30", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{match.match_type === "amical" ? "Amical" : "Championnat"}</span>
+          <div style={{ fontSize: 10, color: statusColor, textTransform: "uppercase", fontWeight: 700 }}>{statusLabel}</div>
+        </div>
       </div>
       <div style={{ fontSize: 12, color: "#60607a", marginBottom: 4 }}>{dateLabel}</div>
       {place && <div style={{ fontSize: 12, color: "#60607a" }}>{place}</div>}
@@ -238,7 +250,8 @@ function FootMatchCard({ match, score, presentCount, rosterSize, onClick, isOnRo
 
 function FootCalendarPage({ matches, events, roster, attendance, nav, currentPlayer, reload }) {
   const [savingMatchId, setSavingMatchId] = React.useState(null);
-  const isOnRoster = roster.some((r) => r.player_id === currentPlayer?.id);
+  const presenceRoster = attendanceRoster(roster);
+  const isOnRoster = presenceRoster.some((r) => r.player_id === currentPlayer?.id);
 
   async function setStatus(matchId, status) {
     setSavingMatchId(matchId);
@@ -260,7 +273,7 @@ function FootCalendarPage({ matches, events, roster, attendance, nav, currentPla
         const matchEvents = events.filter((e) => e.match_id === match.id);
         const score = computeFootScore(matchEvents);
         const matchAttendance = attendance.filter((a) => a.match_id === match.id);
-        const presentCount = computeAttendanceBuckets(roster, matchAttendance).present.length;
+        const presentCount = computeAttendanceBuckets(presenceRoster, matchAttendance).present.length;
         const myStatus = matchAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null;
         return (
           <FootMatchCard
@@ -268,7 +281,7 @@ function FootCalendarPage({ matches, events, roster, attendance, nav, currentPla
             match={match}
             score={score}
             presentCount={presentCount}
-            rosterSize={roster.length}
+            rosterSize={presenceRoster.length}
             onClick={() => nav("matchDetail", { matchId: match.id })}
             isOnRoster={isOnRoster}
             myStatus={myStatus}
@@ -682,7 +695,7 @@ function FootMatchHeader({ match }) {
   return (
     <>
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
-      <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{new Date(match.match_datetime).toLocaleString("fr-FR")}</div>
+      <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{new Date(match.match_datetime).toLocaleString("fr-FR")} · {match.match_type === "amical" ? "Amical" : "Championnat"}</div>
       {place && <div style={{ fontSize: 12, color: "#60607a" }}>{place}</div>}
     </>
   );
@@ -722,8 +735,9 @@ function FootFinishedView({ match, roster, events, lineups, isAdmin, reload }) {
 
 function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, reload, onStartMatch }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);
-  const buckets = computeAttendanceBuckets(roster, matchAttendance);
-  const isOnRoster = roster.some((r) => r.player_id === currentPlayer?.id);
+  const presenceRoster = attendanceRoster(roster);
+  const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
+  const isOnRoster = presenceRoster.some((r) => r.player_id === currentPlayer?.id);
   const myStatus = matchAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null;
   const [saving, setSaving] = React.useState(false);
 
@@ -755,7 +769,7 @@ function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, 
         </div>
       )}
 
-      {roster.length === 0 ? (
+      {presenceRoster.length === 0 ? (
         <div style={{ color: "#60607a", fontSize: 13, marginBottom: 16 }}>Aucun joueur dans l'effectif.</div>
       ) : (
         <div style={{ marginBottom: 16 }}>

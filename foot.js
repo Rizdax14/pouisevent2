@@ -150,6 +150,9 @@ async function applyLineupChange(matchId, {
     });
   }
 }
+function attendanceRoster(roster) {
+  return roster.filter(r => r.role !== "invite");
+}
 function lineupIdsFor(lineups, matchId) {
   return lineups.filter(l => l.match_id === matchId).map(l => l.player_id);
 }
@@ -313,7 +316,8 @@ function FootMatchForm({
     stadium_name: "",
     address: "",
     postal_code: "",
-    city: ""
+    city: "",
+    match_type: "championnat"
   };
   const start = initial ? {
     ...empty,
@@ -339,6 +343,7 @@ function FootMatchForm({
     try {
       await onSubmit({
         opponent_name: f.opponent_name.trim(),
+        match_type: f.match_type || "championnat",
         match_datetime: new Date(f.match_datetime).toISOString(),
         stadium_name: (f.stadium_name || "").trim() || null,
         address: (f.address || "").trim() || null,
@@ -382,7 +387,15 @@ function FootMatchForm({
     type: "datetime-local",
     value: f.match_datetime,
     onChange: set("match_datetime")
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("select", {
+    style: FOOT_INPUT_STYLE,
+    value: f.match_type || "championnat",
+    onChange: set("match_type")
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "championnat"
+  }, "Championnat"), /*#__PURE__*/React.createElement("option", {
+    value: "amical"
+  }, "Match amical")), /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Nom du stade",
     value: f.stadium_name || "",
@@ -545,12 +558,27 @@ function FootMatchCard({
     }
   }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      color: "#60607a",
+      border: "1px solid #1e1e30",
+      borderRadius: 4,
+      padding: "1px 5px",
+      textTransform: "uppercase"
+    }
+  }, match.match_type === "amical" ? "Amical" : "Championnat"), /*#__PURE__*/React.createElement("div", {
+    style: {
       fontSize: 10,
       color: statusColor,
       textTransform: "uppercase",
       fontWeight: 700
     }
-  }, statusLabel)), /*#__PURE__*/React.createElement("div", {
+  }, statusLabel))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#60607a",
@@ -591,7 +619,8 @@ function FootCalendarPage({
   reload
 }) {
   const [savingMatchId, setSavingMatchId] = React.useState(null);
-  const isOnRoster = roster.some(r => r.player_id === currentPlayer?.id);
+  const presenceRoster = attendanceRoster(roster);
+  const isOnRoster = presenceRoster.some(r => r.player_id === currentPlayer?.id);
   async function setStatus(matchId, status) {
     setSavingMatchId(matchId);
     try {
@@ -619,14 +648,14 @@ function FootCalendarPage({
     const matchEvents = events.filter(e => e.match_id === match.id);
     const score = computeFootScore(matchEvents);
     const matchAttendance = attendance.filter(a => a.match_id === match.id);
-    const presentCount = computeAttendanceBuckets(roster, matchAttendance).present.length;
+    const presentCount = computeAttendanceBuckets(presenceRoster, matchAttendance).present.length;
     const myStatus = matchAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null;
     return /*#__PURE__*/React.createElement(FootMatchCard, {
       key: match.id,
       match: match,
       score: score,
       presentCount: presentCount,
-      rosterSize: roster.length,
+      rosterSize: presenceRoster.length,
       onClick: () => nav("matchDetail", {
         matchId: match.id
       }),
@@ -1493,7 +1522,7 @@ function FootMatchHeader({
       color: "#60607a",
       marginTop: 4
     }
-  }, new Date(match.match_datetime).toLocaleString("fr-FR")), place && /*#__PURE__*/React.createElement("div", {
+  }, new Date(match.match_datetime).toLocaleString("fr-FR"), " \xB7 ", match.match_type === "amical" ? "Amical" : "Championnat"), place && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#60607a"
@@ -1613,8 +1642,9 @@ function FootScheduledView({
   onStartMatch
 }) {
   const matchAttendance = attendance.filter(a => a.match_id === match.id);
-  const buckets = computeAttendanceBuckets(roster, matchAttendance);
-  const isOnRoster = roster.some(r => r.player_id === currentPlayer?.id);
+  const presenceRoster = attendanceRoster(roster);
+  const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
+  const isOnRoster = presenceRoster.some(r => r.player_id === currentPlayer?.id);
   const myStatus = matchAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null;
   const [saving, setSaving] = React.useState(false);
   async function setMyStatus(status) {
@@ -1653,7 +1683,7 @@ function FootScheduledView({
     myStatus: myStatus,
     saving: saving,
     onSet: setMyStatus
-  })), roster.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })), presenceRoster.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13,
