@@ -126,6 +126,171 @@ async function setMatchAttendance(matchId, playerId, status) {
     onConflict: "match_id,player_id"
   }));
 }
+async function addToLineup(matchId, playerIds) {
+  if (!playerIds.length) return;
+  assertUpsertOk(await SUPABASE.from("foot_lineups").upsert(playerIds.map(player_id => ({
+    match_id: matchId,
+    player_id
+  })), {
+    onConflict: "match_id,player_id",
+    ignoreDuplicates: true
+  }));
+}
+async function saveLineup(matchId, currentIds, wantedIds) {
+  const {
+    add,
+    remove
+  } = diffLineup(currentIds, wantedIds);
+  await addToLineup(matchId, add);
+  if (remove.length) {
+    await sbFetch("foot_lineups", `?match_id=eq.${matchId}&player_id=in.(${remove.join(",")})`, {
+      method: "DELETE"
+    });
+  }
+}
+function lineupIdsFor(lineups, matchId) {
+  return lineups.filter(l => l.match_id === matchId).map(l => l.player_id);
+}
+function FootLineupChecklist({
+  roster,
+  extraIds,
+  checked,
+  onToggle,
+  disabled
+}) {
+  const ids = [...new Set([...roster.map(r => r.player_id), ...(extraIds || [])])];
+  const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
+  if (players.length === 0) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13
+    }
+  }, "Aucun joueur dans l'effectif.");
+  return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement("label", {
+    key: p.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "6px 0",
+      fontSize: 13,
+      cursor: disabled ? "default" : "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: checked.includes(p.id),
+    disabled: disabled,
+    onChange: () => onToggle(p.id)
+  }), getDisplayName(p, PLAYERS))));
+}
+function FootLineupSection({
+  match,
+  roster,
+  lineups,
+  isAdmin,
+  reload
+}) {
+  const current = lineupIdsFor(lineups, match.id);
+  const [editing, setEditing] = React.useState(false);
+  const [wanted, setWanted] = React.useState(current);
+  const [saving, setSaving] = React.useState(false);
+  const toggle = id => setWanted(wanted.includes(id) ? wanted.filter(x => x !== id) : [...wanted, id]);
+  async function save() {
+    setSaving(true);
+    try {
+      await saveLineup(match.id, current, wanted);
+      await reload();
+      setEditing(false);
+    } catch (e) {
+      console.warn("lineup save failed", e);
+    }
+    setSaving(false);
+  }
+  const names = current.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).map(p => getDisplayName(p, PLAYERS));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 16,
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14
+    }
+  }, "Feuille de match (", current.length, ")"), isAdmin && !editing && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setWanted(current);
+      setEditing(true);
+    },
+    style: {
+      background: "none",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "4px 10px",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "\u270F\uFE0F Modifier")), !editing && (names.length ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#cccce0"
+    }
+  }, names.join(" · ")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#60607a"
+    }
+  }, "Personne sur la feuille.")), editing && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootLineupChecklist, {
+    roster: roster,
+    extraIds: current,
+    checked: wanted,
+    onToggle: toggle,
+    disabled: saving
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditing(false),
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "8px",
+      cursor: "pointer"
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+    onClick: save,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      fontWeight: 700,
+      cursor: "pointer",
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "…" : "Enregistrer"))));
+}
 function formatMatchPlace(match) {
   const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
   return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
@@ -578,15 +743,21 @@ function FootAdminPage({
 }
 function FootStartMatchConfig({
   match,
+  roster,
+  attendance,
   reload,
   onCancel
 }) {
   const [nbHalves, setNbHalves] = React.useState(2);
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
+  const presentIds = attendance.filter(a => a.match_id === match.id && a.status === "present").map(a => a.player_id);
+  const [sheet, setSheet] = React.useState(presentIds.filter(id => roster.some(r => r.player_id === id)));
+  const toggle = id => setSheet(sheet.includes(id) ? sheet.filter(x => x !== id) : [...sheet, id]);
   async function start() {
     setSaving(true);
     try {
+      await addToLineup(match.id, sheet);
       await sbUpdate("foot_matches", {
         id: match.id
       }, {
@@ -663,7 +834,21 @@ function FootStartMatchConfig({
       marginTop: 4,
       marginBottom: 18
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, "Feuille de match (", sheet.length, ")"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "6px 0 18px"
+    }
+  }, /*#__PURE__*/React.createElement(FootLineupChecklist, {
+    roster: roster,
+    checked: sheet,
+    onToggle: toggle,
+    disabled: saving
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -880,6 +1065,7 @@ function FootEventTimeline({
   editable,
   match,
   roster,
+  lineups,
   reload
 }) {
   const [editingId, setEditingId] = React.useState(null); // event id, "new", or null
@@ -896,6 +1082,7 @@ function FootEventTimeline({
         id: eventId
       }, payload);
     }
+    await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), payload));
     setEditingId(null);
     await reload();
   }
@@ -1093,6 +1280,7 @@ function FootLiveAdminConsole({
   match,
   roster,
   events,
+  lineups,
   reload
 }) {
   const [now, setNow] = React.useState(Date.now());
@@ -1116,6 +1304,11 @@ function FootLiveAdminConsole({
         player_id: playerId,
         assist_player_id: assistId
       });
+      await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), {
+        type,
+        player_id: playerId,
+        assist_player_id: assistId
+      }));
       setPicking(null);
       await reload();
     } catch (e) {
@@ -1306,6 +1499,7 @@ function FootLiveView({
   match,
   roster,
   events,
+  lineups,
   currentPlayer,
   isAdmin,
   reload
@@ -1336,11 +1530,19 @@ function FootLiveView({
     editable: isAdmin,
     match: match,
     roster: roster,
+    lineups: lineups,
     reload: reload
   })), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
     match: match,
     roster: roster,
     events: matchEvents,
+    lineups: lineups,
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups,
+    isAdmin: isAdmin,
     reload: reload
   }));
 }
@@ -1348,6 +1550,7 @@ function FootFinishedView({
   match,
   roster,
   events,
+  lineups,
   isAdmin,
   reload
 }) {
@@ -1385,8 +1588,15 @@ function FootFinishedView({
     editable: isAdmin,
     match: match,
     roster: roster,
+    lineups: lineups,
     reload: reload
-  })));
+  })), /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups,
+    isAdmin: isAdmin,
+    reload: reload
+  }));
 }
 function FootScheduledView({
   match,
@@ -1487,6 +1697,7 @@ function FootMatchDetailPage({
   roster,
   attendance,
   events,
+  lineups,
   currentPlayer,
   isAdmin,
   navBack,
@@ -1576,12 +1787,15 @@ function FootMatchDetailPage({
     onStartMatch: () => setStartingConfig(true)
   }), match.status === "scheduled" && startingConfig && /*#__PURE__*/React.createElement(FootStartMatchConfig, {
     match: match,
+    roster: roster,
+    attendance: attendance,
     reload: reload,
     onCancel: () => setStartingConfig(false)
   }), match.status === "live" && /*#__PURE__*/React.createElement(FootLiveView, {
     match: match,
     roster: roster,
     events: events,
+    lineups: lineups,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload
@@ -1589,6 +1803,7 @@ function FootMatchDetailPage({
     match: match,
     roster: roster,
     events: events,
+    lineups: lineups,
     isAdmin: isAdmin,
     reload: reload
   }));
@@ -1663,6 +1878,7 @@ function FootballApp({
     roster: roster,
     attendance: attendance,
     events: events,
+    lineups: lineups,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     navBack: () => nav("calendar"),
