@@ -1604,13 +1604,15 @@ function FootballApp({
   const [matches, setMatches] = React.useState([]);
   const [attendance, setAttendance] = React.useState([]);
   const [events, setEvents] = React.useState([]);
+  const [lineups, setLineups] = React.useState([]);
   const isAdmin = currentPlayer?.uid === ADMIN_UID;
   async function reloadFoot() {
-    const [r, m, a, e] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*")]);
+    const [r, m, a, e, l] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id")]);
     setRoster(r || []);
     setMatches(m || []);
     setAttendance(a || []);
     setEvents(e || []);
+    setLineups(l || []);
   }
   React.useEffect(() => {
     reloadFoot().then(() => setLoaded(true)).catch(err => {
