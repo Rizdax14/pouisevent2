@@ -59,7 +59,9 @@ pour chaque joueur ayant `played ≥ 1`.
   sur la feuille ; résultat via `computeFootScore` des événements du match
   (`bl > opponent` victoire, égalité nul, sinon défaite).
 - `goals` / `assists` : événements `goal_bl` des matchs terminés où il est
-  buteur / passeur. `decisive = goals + assists`.
+  buteur / passeur **et sur la feuille de ce match** (garde les stats
+  cohérentes si l'admin décoche volontairement un buteur).
+  `decisive = goals + assists`.
 
 ### `statValue(stat, key, mode)`
 - `mode === "abs"` : valeur brute.
