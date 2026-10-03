@@ -248,6 +248,28 @@ function sortStatsRows(rows, key, dir, mode, nameOf) {
   });
 }
 
+async function submitRatings({ sheetIds, isValidated, writeRatings, readRatings, markValidated }) {
+  if (await isValidated()) return "closed";
+  await writeRatings();
+  if (ratingProgress(sheetIds, (await readRatings()) || []).complete) {
+    await markValidated();
+    return "validated";
+  }
+  return "saved";
+}
+
+function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
+  const showForm = editing && isVoter && !validated;
+  const showAverages = !showForm && (validated || isAdmin || (isVoter && hasVoted));
+  return {
+    showForm,
+    showAverages,
+    showEditButton: !editing && isVoter && !validated,
+    editLabel: hasVoted ? "Modifier mes notes" : "Noter",
+    showHiddenMessage: !showForm && !showAverages,
+  };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -281,5 +303,7 @@ if (typeof module !== "undefined" && module.exports) {
     statsRoster,
     buildStatsRows,
     sortStatsRows,
+    submitRatings,
+    ratingsTabView,
   };
 }

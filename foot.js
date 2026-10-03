@@ -1599,7 +1599,6 @@ function FootRatingsTab({
   const me = currentPlayer?.id;
   const isVoter = sheetIds.includes(me);
   const hasVoted = progress.doneIds.includes(me);
-  const canSeeAverages = validated || isAdmin || isVoter && hasVoted;
   const mine = Object.fromEntries(mr.filter(r => r.rater_id === me).map(r => [r.ratee_id, String(r.score)]));
   const [editing, setEditing] = React.useState(isVoter && !hasVoted && !validated);
   const [scores, setScores] = React.useState(mine);
@@ -1620,20 +1619,23 @@ function FootRatingsTab({
     setBusy(true);
     setErr(null);
     try {
-      assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map(r => ({
-        ...r,
-        updated_at: new Date().toISOString()
-      })), {
-        onConflict: "match_id,rater_id,ratee_id"
-      }));
-      const fresh = await sbFetch("foot_ratings", `?match_id=eq.${match.id}&select=rater_id,ratee_id,score`);
-      if (ratingProgress(sheetIds, fresh || []).complete) {
-        await sbUpdate("foot_matches", {
+      const result = await submitRatings({
+        sheetIds,
+        isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
+        writeRatings: async () => assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map(r => ({
+          ...r,
+          updated_at: new Date().toISOString()
+        })), {
+          onConflict: "match_id,rater_id,ratee_id"
+        })),
+        readRatings: () => sbFetch("foot_ratings", `?match_id=eq.${match.id}&select=rater_id,ratee_id,score`),
+        markValidated: () => sbUpdate("foot_matches", {
           id: match.id
         }, {
           ratings_validated_at: new Date().toISOString()
-        });
-      }
+        })
+      });
+      if (result === "closed") setErr("Les notes de ce match ont déjà été validées, tes notes n'ont pas été enregistrées.");
       setEditing(false);
       await reload();
     } catch (e) {
@@ -1670,6 +1672,13 @@ function FootRatingsTab({
       fontSize: 13
     }
   }, "Pas assez de joueurs sur la feuille de match pour noter."));
+  const view = ratingsTabView({
+    validated,
+    isVoter,
+    hasVoted,
+    editing,
+    isAdmin
+  });
   const ranked = sheetIds.map(id => ({
     id,
     avg: averages[id]
@@ -1694,7 +1703,7 @@ function FootRatingsTab({
       color: validated ? "#34d399" : "#60607a",
       fontWeight: 700
     }
-  }, validated ? "✓ Notes validées" : `${progress.doneIds.length} / ${sheetIds.length} ont voté`)), editing && /*#__PURE__*/React.createElement("div", {
+  }, validated ? "✓ Notes validées" : `${progress.doneIds.length} / ${sheetIds.length} ont voté`)), view.showForm && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -1730,13 +1739,7 @@ function FootRatingsTab({
   }, "\u2014"), FOOT_SCORE_OPTIONS.map(s => /*#__PURE__*/React.createElement("option", {
     key: s,
     value: String(s)
-  }, s.toFixed(1)))))), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginTop: 8
-    }
-  }, err), /*#__PURE__*/React.createElement("button", {
+  }, s.toFixed(1)))))), /*#__PURE__*/React.createElement("button", {
     onClick: save,
     disabled: busy,
     style: {
@@ -1751,9 +1754,16 @@ function FootRatingsTab({
       cursor: "pointer",
       opacity: busy ? 0.6 : 1
     }
-  }, busy ? "…" : "Enregistrer mes notes")), !editing && isVoter && !validated && hasVoted && /*#__PURE__*/React.createElement("button", {
+  }, busy ? "…" : "Enregistrer mes notes")), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ef4444",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, err), view.showEditButton && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setScores(mine);
+      setErr(null);
       setEditing(true);
     },
     style: {
@@ -1766,7 +1776,7 @@ function FootRatingsTab({
       fontSize: 12,
       marginBottom: 10
     }
-  }, "\u270F\uFE0F Modifier mes notes"), canSeeAverages && !editing && ranked.map(({
+  }, "\u270F\uFE0F ", view.editLabel), view.showAverages && ranked.map(({
     id,
     avg
   }) => /*#__PURE__*/React.createElement("div", {
@@ -1782,7 +1792,7 @@ function FootRatingsTab({
       fontFamily: "'Bebas Neue',sans-serif",
       fontSize: 18
     }
-  }, avg == null ? "—" : avg.toFixed(1)))), !canSeeAverages && !editing && /*#__PURE__*/React.createElement("div", {
+  }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#60607a"

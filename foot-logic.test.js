@@ -33,6 +33,8 @@ const {
   statsRoster,
   buildStatsRows,
   sortStatsRows,
+  submitRatings,
+  ratingsTabView,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -394,4 +396,42 @@ test("sortStatsRows breaks ties by name", () => {
   const rows = [{ playerId: 1, played: 2 }, { playerId: 2, played: 2 }];
   const name = (id) => ({ 1: "Zoé", 2: "Alex" })[id];
   assert.deepEqual(sortStatsRows(rows, "played", -1, "abs", name).map((r) => r.playerId), [2, 1]);
+});
+
+test("submitRatings refuses to write once the match is already validated", async () => {
+  let wrote = false;
+  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => true, writeRatings: async () => { wrote = true; }, readRatings: async () => [], markValidated: async () => {} });
+  assert.equal(r, "closed");
+  assert.equal(wrote, false);
+});
+
+test("submitRatings validates when the fresh ratings are complete", async () => {
+  let validated = false;
+  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => false, writeRatings: async () => {}, readRatings: async () => [{ rater_id: 1, ratee_id: 2 }, { rater_id: 2, ratee_id: 1 }], markValidated: async () => { validated = true; } });
+  assert.equal(r, "validated");
+  assert.equal(validated, true);
+});
+
+test("submitRatings only saves when others still have to vote", async () => {
+  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => false, writeRatings: async () => {}, readRatings: async () => [{ rater_id: 1, ratee_id: 2 }], markValidated: async () => { throw new Error("should not validate"); } });
+  assert.equal(r, "saved");
+});
+
+test("ratingsTabView hides the form once validated, even if it was open", () => {
+  const v = ratingsTabView({ validated: true, isVoter: true, hasVoted: false, editing: true, isAdmin: true });
+  assert.equal(v.showForm, false);
+  assert.equal(v.showAverages, true);
+});
+
+test("ratingsTabView gives a pending voter a way back to the form", () => {
+  const v = ratingsTabView({ validated: false, isVoter: true, hasVoted: false, editing: false, isAdmin: false });
+  assert.equal(v.showEditButton, true);
+  assert.equal(v.editLabel, "Noter");
+  assert.equal(v.showAverages, false);
+});
+
+test("ratingsTabView keeps averages hidden from a sheet player before voting", () => {
+  const v = ratingsTabView({ validated: false, isVoter: true, hasVoted: false, editing: true, isAdmin: false });
+  assert.equal(v.showForm, true);
+  assert.equal(v.showAverages, false);
 });

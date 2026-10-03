@@ -728,7 +728,6 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
   const me = currentPlayer?.id;
   const isVoter = sheetIds.includes(me);
   const hasVoted = progress.doneIds.includes(me);
-  const canSeeAverages = validated || isAdmin || (isVoter && hasVoted);
   const mine = Object.fromEntries(mr.filter((r) => r.rater_id === me).map((r) => [r.ratee_id, String(r.score)]));
   const [editing, setEditing] = React.useState(isVoter && !hasVoted && !validated);
   const [scores, setScores] = React.useState(mine);
@@ -741,11 +740,14 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
     try { rows = buildRatingPayload(match.id, me, sheetIds, scores); } catch (e) { setErr(e.message); return; }
     setBusy(true); setErr(null);
     try {
-      assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "match_id,rater_id,ratee_id" }));
-      const fresh = await sbFetch("foot_ratings", `?match_id=eq.${match.id}&select=rater_id,ratee_id,score`);
-      if (ratingProgress(sheetIds, fresh || []).complete) {
-        await sbUpdate("foot_matches", { id: match.id }, { ratings_validated_at: new Date().toISOString() });
-      }
+      const result = await submitRatings({
+        sheetIds,
+        isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
+        writeRatings: async () => assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: "match_id,rater_id,ratee_id" })),
+        readRatings: () => sbFetch("foot_ratings", `?match_id=eq.${match.id}&select=rater_id,ratee_id,score`),
+        markValidated: () => sbUpdate("foot_matches", { id: match.id }, { ratings_validated_at: new Date().toISOString() }),
+      });
+      if (result === "closed") setErr("Les notes de ce match ont déjà été validées, tes notes n'ont pas été enregistrées.");
       setEditing(false);
       await reload();
     } catch (e) { setErr("Erreur: " + e.message); }
@@ -763,6 +765,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
   const card = { background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 };
   if (sheetIds.length < 2) return <div style={card}><div style={{ color: "#60607a", fontSize: 13 }}>Pas assez de joueurs sur la feuille de match pour noter.</div></div>;
 
+  const view = ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin });
   const ranked = sheetIds.map((id) => ({ id, avg: averages[id] })).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
 
   return (
@@ -772,7 +775,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
         <div style={{ fontSize: 11, color: validated ? "#34d399" : "#60607a", fontWeight: 700 }}>{validated ? "✓ Notes validées" : `${progress.doneIds.length} / ${sheetIds.length} ont voté`}</div>
       </div>
 
-      {editing && (
+      {view.showForm && (
         <div style={{ marginBottom: 14 }}>
           {sheetIds.filter((id) => id !== me).map((id) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #1e1e30" }}>
@@ -783,22 +786,23 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
               </select>
             </div>
           ))}
-          {err && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{err}</div>}
           <button onClick={save} disabled={busy} style={{ width: "100%", marginTop: 10, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "Enregistrer mes notes"}</button>
         </div>
       )}
 
-      {!editing && isVoter && !validated && hasVoted && (
-        <button onClick={() => { setScores(mine); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12, marginBottom: 10 }}>✏️ Modifier mes notes</button>
+      {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 8 }}>{err}</div>}
+
+      {view.showEditButton && (
+        <button onClick={() => { setScores(mine); setErr(null); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12, marginBottom: 10 }}>✏️ {view.editLabel}</button>
       )}
 
-      {canSeeAverages && !editing && ranked.map(({ id, avg }) => (
+      {view.showAverages && ranked.map(({ id, avg }) => (
         <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13 }}>
           <span>{nameOf(id)}</span>
           <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>{avg == null ? "—" : avg.toFixed(1)}</span>
         </div>
       ))}
-      {!canSeeAverages && !editing && <div style={{ fontSize: 12, color: "#60607a" }}>Les moyennes seront visibles après validation.</div>}
+      {view.showHiddenMessage && <div style={{ fontSize: 12, color: "#60607a" }}>Les moyennes seront visibles après validation.</div>}
 
       {!validated && progress.pendingIds.length > 0 && (
         <div style={{ marginTop: 12, fontSize: 12, color: "#60607a" }}>Pas encore voté : {progress.pendingIds.map(nameOf).join(" · ")}</div>
