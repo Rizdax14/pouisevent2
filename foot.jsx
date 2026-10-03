@@ -199,6 +199,106 @@ function FootAdminPage({ roster, reload }) {
   );
 }
 
+function FootStartMatchConfig() { return <div style={{ padding: 20, color: "#60607a" }}>Task 10</div>; }
+function FootLiveView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 11</div>; }
+function FootFinishedView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 12</div>; }
+
+function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, reload, onStartMatch }) {
+  const matchAttendance = attendance.filter((a) => a.match_id === match.id);
+  const buckets = computeAttendanceBuckets(roster, matchAttendance);
+  const isOnRoster = roster.some((r) => r.player_id === currentPlayer?.id);
+  const myStatus = matchAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null;
+  const [saving, setSaving] = React.useState(false);
+
+  async function setMyStatus(status) {
+    setSaving(true);
+    try {
+      await SUPABASE.from("foot_attendance").upsert(
+        { match_id: match.id, player_id: currentPlayer.id, status },
+        { onConflict: "match_id,player_id" }
+      );
+      await reload();
+    } catch (e) {
+      console.warn("attendance update failed", e);
+    }
+    setSaving(false);
+  }
+
+  function nameOf(playerId) {
+    const p = PLAYERS.find((pl) => pl.id === playerId);
+    return p ? getDisplayName(p, PLAYERS) : "?";
+  }
+
+  const dt = new Date(match.match_datetime);
+
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
+        <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{dt.toLocaleString("fr-FR")}</div>
+        {match.address && <div style={{ fontSize: 12, color: "#60607a" }}>{match.address}, {match.postal_code} {match.city}</div>}
+      </div>
+
+      {isOnRoster && (
+        <div style={{ marginBottom: 16, display: "flex", gap: 10 }}>
+          <button onClick={() => setMyStatus("present")} disabled={saving} style={{ flex: 1, background: myStatus === "present" ? "#34d399" : "#13131f", color: myStatus === "present" ? "#080810" : "#eeeef5", border: "1px solid #1e1e30", borderRadius: 8, padding: "10px", cursor: "pointer", fontWeight: 700 }}>
+            Présent
+          </button>
+          <button onClick={() => setMyStatus("absent")} disabled={saving} style={{ flex: 1, background: myStatus === "absent" ? "#ef4444" : "#13131f", color: myStatus === "absent" ? "#080810" : "#eeeef5", border: "1px solid #1e1e30", borderRadius: 8, padding: "10px", cursor: "pointer", fontWeight: 700 }}>
+            Absent
+          </button>
+        </div>
+      )}
+
+      {roster.length === 0 ? (
+        <div style={{ color: "#60607a", fontSize: 13, marginBottom: 16 }}>Aucun joueur dans l'effectif.</div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          {[["Présents", buckets.present, "#34d399"], ["N'a pas répondu", buckets.noResponse, "#60607a"], ["Absents", buckets.absent, "#ef4444"]].map(([label, ids, color]) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>{label} ({ids.length})</div>
+              {ids.map((id) => <div key={id} style={{ fontSize: 13, padding: "3px 0" }}>{nameOf(id)}</div>)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isAdmin && (
+        <button onClick={onStartMatch} style={{ width: "100%", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer" }}>
+          COMMENCER LE MATCH
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FootMatchDetailPage({ matchId, matches, roster, attendance, events, currentPlayer, isAdmin, navBack, reload }) {
+  const match = matches.find((m) => m.id === matchId);
+  const [startingConfig, setStartingConfig] = React.useState(false);
+
+  if (!match) return <div style={{ padding: 20, color: "#60607a" }}>Match introuvable.</div>;
+
+  return (
+    <div>
+      <div style={{ padding: "12px 20px 0" }}>
+        <button onClick={navBack} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>← Retour</button>
+      </div>
+      {match.status === "scheduled" && !startingConfig && (
+        <FootScheduledView match={match} roster={roster} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
+      )}
+      {match.status === "scheduled" && startingConfig && (
+        <FootStartMatchConfig match={match} reload={reload} onCancel={() => setStartingConfig(false)} />
+      )}
+      {match.status === "live" && (
+        <FootLiveView match={match} roster={roster} events={events} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />
+      )}
+      {match.status === "finished" && (
+        <FootFinishedView match={match} events={events} />
+      )}
+    </div>
+  );
+}
+
 function FootballApp({ currentPlayer, onBack }) {
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
@@ -237,7 +337,19 @@ function FootballApp({ currentPlayer, onBack }) {
     <div style={{ minHeight: "100vh", background: "#080810", color: "#eeeef5", fontFamily: "'Outfit',sans-serif", paddingBottom: 70 }}>
       <FootballNavBar page={page} setPage={nav} onBack={onBack} isAdmin={isAdmin} />
       {page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} />}
-      {page === "matchDetail" && <FootPlaceholderPage label="Détail du match — Tasks 9-12" />}
+      {page === "matchDetail" && (
+        <FootMatchDetailPage
+          matchId={sub.matchId}
+          matches={matches}
+          roster={roster}
+          attendance={attendance}
+          events={events}
+          currentPlayer={currentPlayer}
+          isAdmin={isAdmin}
+          navBack={() => nav("calendar")}
+          reload={reloadFoot}
+        />
+      )}
       {page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
       {page === "rankings" && <FootPlaceholderPage label="Classement" />}
       {page === "stats" && <FootPlaceholderPage label="Statistiques" />}
