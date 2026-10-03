@@ -30,7 +30,7 @@ sans ce clic.
 | Samedi | **Notes** | 1 image | notes du match validées |
 | Mardi | **Classements** : Buts, Passes D, Buts+Passes D | carrousel 3 images | à tout moment (saison en cours, au moins 1 match terminé) |
 
-Les jours sont des repères éditoriaux affichés dans l'écran Insta, pas des
+Les jours sont des repères éditoriaux affichés dans l'espace Réseaux, pas des
 déclenchements automatiques.
 
 ## Thème
@@ -47,18 +47,18 @@ déclenchements automatiques.
 - Trois types par joueur : **render** (portraits ronds des classements),
   **celebration** (Match Day, Résultat), **dos** (Groupe) ; chacun en deux
   maillots : **domicile** et **exterieur**.
-- Deux variantes par photo : **retouchée** (1080×1350, déjà cadrée et
-  teintée, superposée telle quelle) et **brute** (détourée, recadrée
-  automatiquement : ajustée en hauteur, centrée en bas). La retouchée est
-  prioritaire.
+- Deux variantes par photo : **retouchée** (1080×1350, teintée) et
+  **brute** (détourée). La retouchée est prioritaire quand les deux existent.
+- Le placement d'une photo dans un visuel vient de son **cadrage**
+  (voir « Cadrage »), jamais d'un recadrage automatique figé.
 - Stockage : bucket Supabase Storage public `player-photos`, chemin
   `{player_id}/{kit}/{type}{-retouche}.png` ; table `foot_player_photos`
   (player_id, kit, type, retouched, path, updated_at).
 - Repli si une photo manque : même type dans l'autre maillot, puis aucune
   photo (le visuel reste lisible sans joueur) ; render manquant → initiales
   dans le rond.
-- Écran admin **Photos** : par joueur de l'effectif, 3 types × 2 maillots,
-  upload / remplacement / suppression.
+- Onglet **Photos** de l'espace Réseaux : par joueur de l'effectif,
+  3 types × 2 maillots, upload / remplacement / suppression.
 - Import initial (script ponctuel) depuis
   `G:\My Drive\leverculsec\25 26\PHOTOS Bière Leverculsec\Canva\26 27`
   (`celebration/{domicile|extérieur}/[retouché/]Prénom.png`), avec une table
@@ -71,8 +71,11 @@ déclenchements automatiques.
   création** du match (statut `scheduled` compris).
 - Au coup d'envoi, la checklist est pré-cochée avec la feuille existante si
   elle n'est pas vide, sinon avec les présents (comportement actuel).
-- `foot_roster.jersey_number int` (1–99, optionnel), éditable dans la gestion
-  d'effectif. Groupe affiche « 25. Thomas » (sans numéro : « Thomas »), triés
+- `foot_roster.jersey_number text` (1 à 3 chiffres, zéros conservés :
+  « 02 », « 100 » ; optionnel), éditable dans la gestion d'effectif.
+  Valeurs initiales : Louis 14, Nolan 02, Solal 6, Timothée 100, Nathan 11,
+  Samuel 10, Nils 23, Etienne 28, Léandre 67, Thisma 8, Maxime 27, Juju 4,
+  Thomas 25 (correspondance prénom → joueur validée à l'import). Groupe affiche « 25. Thomas » (sans numéro : « Thomas »), triés
   par numéro puis prénom.
 
 ## Joueur mis en avant (rotation)
@@ -104,9 +107,32 @@ déclenchements automatiques.
   cours parmi réguliers/occasionnels, joueurs à 0 exclus ; égalités →
   ordre alphabétique.
 
-## Écran admin « Insta »
+## Cadrage des photos
 
-- Nouvel onglet de la navbar foot (admin uniquement).
+- Emplacements (layouts) : `matchday` (célébration, centrée), `result`
+  (célébration, à gauche), `groupe` (dos, à gauche), `render` (portrait
+  rond des classements).
+- Table `foot_photo_framings` (photo_id → `foot_player_photos.id` on delete
+  cascade, layout, x, y, width, updated_at ; unique (photo_id, layout)).
+  Coordonnées en pixels du visuel 1080×1350 (pour `render` : dans le carré
+  du rond, base 300×300) ; la hauteur découle du ratio de l'image.
+- Cadrage par défaut si aucun n'est enregistré : retouchée → plein cadre
+  (0, 0, 1080) ; brute → ajustée à la boîte de l'emplacement, collée en bas,
+  centrée ; render → couvre le rond, centré en haut.
+- Outil de cadrage (onglet **Cadrage** de l'espace Réseaux) : choix du
+  joueur, du maillot et de l'emplacement ; aperçu à l'échelle avec le vrai
+  fond, le titre et un texte factice de l'emplacement ; la photo se
+  **déplace (glisser) et se zoome (molette, pincement, curseur)** ;
+  « Enregistrer » et « Réinitialiser » ; bouton « Aperçu serveur » qui rend
+  le vrai JPEG pour vérifier. Le serveur applique exactement les mêmes
+  coordonnées (positionnement absolu).
+
+## Espace Réseaux (admin)
+
+- Nouvel onglet **Réseaux** de la navbar foot, visible uniquement pour
+  l'admin (`uid === ADMIN_UID`), avec trois sous-onglets : **Posts**,
+  **Photos**, **Cadrage**.
+- Sous-onglet Posts :
 - Liste des posts disponibles (calendrier ci-dessus) avec statut « À
   publier » / « Publié le … » (lien vers le post Instagram).
 - Ouvrir un post : aperçu des images (rendues par le serveur), légende
@@ -156,7 +182,7 @@ déclenchements automatiques.
 
 - Les endpoints `prepare` et `publish` exigent l'en-tête
   `X-Insta-Admin-Key` égal à la variable Vercel `INSTA_ADMIN_KEY`.
-  L'admin saisit cette clé une fois dans l'écran Insta (stockée en
+  L'admin saisit cette clé une fois dans l'espace Réseaux (stockée en
   `localStorage` de son appareil).
 - `render` est public (même contenu que les posts) mais ne rend que des
   données déjà visibles dans l'app.
@@ -170,7 +196,7 @@ déclenchements automatiques.
 - Erreur Instagram → statut `failed` + message affiché, bouton « Réessayer ».
 - Photo manquante → repli (voir Photos), jamais d'échec de rendu.
 - Jeton expiré / invalide → message clair « Reconnecte le compte Instagram »
-  dans l'écran Insta.
+  dans l'espace Réseaux.
 
 ## Tests
 
@@ -182,7 +208,7 @@ déclenchements automatiques.
   inspection visuelle côte à côte avec les miniatures Canva.
 - Intégration Instagram : création de conteneurs sans `media_publish` en
   test ; la première vraie publication est faite par l'utilisateur depuis
-  l'écran Insta.
+  l'espace Réseaux.
 
 ## Hors scope
 
