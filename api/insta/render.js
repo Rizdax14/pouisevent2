@@ -36,7 +36,7 @@ async function build(kind, q) {
     // Own rotation slot so Match Day and Résultat don't always feature the same player.
     const f = await featuredPhoto(ctx, "result", "celebration_result", sheetIds);
     const s = F.computeFootScore(ctx.events);
-    return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalLines(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
+    return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalRows(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
   }
   if (kind === "ratings") return buildRatings(q);
   if (kind === "rankings") return buildRankings(q);
@@ -60,28 +60,33 @@ async function buildRatings(q) {
   const nameOf = (id) => L.postName(ctx.players.find((p) => p.id === id), sheetPlayers);
   const rows = L.ratingRows(sheetIds, F.matchAverages(sheetIds, ctx.ratings), seasonAvg, nameOf);
   // Top 3 get their "dos" photo on the podium; missing photos fall back to initials in the template.
-  await Promise.all(rows.slice(0, 3).map(async (r) => {
-    const ph = L.choosePhoto(ctx.photos, r.playerId, "dos", ctx.theme);
-    if (!ph) return;
-    const fr = ctx.framings.find((f) => f.photo_id === ph.id && f.layout === "podium") || null;
-    r.rect = L.framedRect("podium", ph, fr);
-    r.uri = await imageDataUri(publicUrl("player-photos", ph.path));
-  }));
+  await withPodiumPhotos(rows, ctx, "podium_dos", ctx.theme);
   const s = F.computeFootScore(ctx.events);
   return T.ratingsEl({ bg: await imageDataUri(theme.bg), theme, opponent: L.opponentLabel(ctx.match.opponent_name), bl: s.bl, opp: s.opponent, rows });
 }
 
-const RANKING_PAGES = { 1: ["goals", "BUTS"], 2: ["assists", "PASSE D"], 3: ["decisive", "BUTS + PASSE D"] };
+// Adds { uri, rect } to the first 3 rows from each player's photo of the layout's kind.
+async function withPodiumPhotos(rows, data, layout, kit) {
+  const kind = L.PHOTO_KIND_FOR_LAYOUT[layout];
+  await Promise.all(rows.slice(0, 3).map(async (r) => {
+    const ph = L.choosePhoto(data.photos, r.playerId, kind, kit);
+    if (!ph) return;
+    const fr = data.framings.find((f) => f.photo_id === ph.id && f.layout === layout) || null;
+    r.rect = L.framedRect(layout, ph, fr);
+    r.uri = await imageDataUri(publicUrl("player-photos", ph.path));
+  }));
+  return rows;
+}
 
 async function buildRankings(q) {
-  const page = RANKING_PAGES[String(q.page || "1")];
+  const page = L.RANKING_PAGES[Number(q.page || 1) - 1];
   if (!page) throw new Error("Page de classement inconnue");
-  const [key, heading] = page;
-  const [common, matches, lineups, events] = await Promise.all([
+  const [common, matches, lineups, events, ratings] = await Promise.all([
     loadCommon(),
     sbGet("foot_matches", "?select=*"),
     sbGet("foot_lineups", "?select=match_id,player_id"),
     sbGet("foot_match_events", "?select=*"),
+    sbGet("foot_ratings", "?select=*"),
   ]);
   const season = q.season || F.seasonOf(new Date().toISOString());
   const seasonMatches = F.filterMatchesForStats(matches, { season, type: "all" });
@@ -90,17 +95,22 @@ async function buildRankings(q) {
   const themeName = last && last.venue === "exterieur" ? "exterieur" : "domicile";
   const theme = THEMES[themeName];
   const ids = new Set(seasonMatches.map((m) => m.id));
-  const stats = F.computePlayerStats(seasonMatches, lineups.filter((l) => ids.has(l.match_id)), events.filter((e) => ids.has(e.match_id)));
+  const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
+  const stats = F.computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)));
   const rows = F.buildStatsRows(F.statsRoster(common.roster), stats, {});
+  // Season average rating + number of rated matches, for the "MOYENNES" page.
+  for (const r of rows) {
+    const series = F.playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
+    r.rating = F.averageRating(series);
+    r.rated = series.length;
+  }
   const nameOf = (id) => L.postName(common.players.find((p) => p.id === id), common.players);
-  const entries = await Promise.all(L.rankingEntries(rows, key, nameOf).map(async (e) => {
-    const name = nameOf(e.playerId);
-    const ph = L.choosePhoto(common.photos, e.playerId, "render", themeName);
-    if (!ph) return { ...e, name };
-    const fr = common.framings.find((f) => f.photo_id === ph.id && f.layout === "render") || null;
-    return { ...e, rect: L.framedRect("render", ph, fr), uri: await imageDataUri(publicUrl("player-photos", ph.path)) };
+  const byId = Object.fromEntries(rows.map((r) => [r.playerId, r]));
+  const entries = L.rankingEntries(rows, page.key, nameOf).map((e) => ({
+    ...e, name: nameOf(e.playerId), matches: page.key === "rating" ? byId[e.playerId].rated : byId[e.playerId].played,
   }));
-  return T.rankingEl({ bg: await imageDataUri(theme.bg), theme, heading, entries, rows: L.rankingRows(entries.length) });
+  await withPodiumPhotos(entries, common, page.layout, themeName);
+  return T.rankingEl({ bg: await imageDataUri(theme.bg), theme, heading: page.heading, season, entries, decimals: page.key === "rating" });
 }
 
 module.exports = async (req, res) => {
@@ -117,3 +127,4 @@ module.exports = async (req, res) => {
 module.exports.build = build;
 module.exports.featuredPhoto = featuredPhoto;
 module.exports.buildRankings = buildRankings;
+module.exports.buildRatings = buildRatings;

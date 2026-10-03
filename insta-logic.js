@@ -7,14 +7,23 @@ const LAYOUTS = {
   result: { canvas: [1080, 1350], box: { x: -40, y: 260, w: 620, h: 1090 } },
   groupe: { canvas: [1080, 1350], box: { x: -40, y: 180, w: 700, h: 1170 } },
   render: { canvas: [300, 300], box: { x: 0, y: 0, w: 300, h: 300 } },
-  // Notes podium card (1st place size; 2nd/3rd cards reuse it scaled down).
-  podium: { canvas: [330, 430], box: { x: 0, y: 0, w: 330, h: 430 } },
+  // Podium cards (1st place size; 2nd/3rd cards reuse it scaled down), one layout per photo kind.
+  podium_dos: { canvas: [330, 430], box: { x: 0, y: 0, w: 330, h: 430 } },
+  podium_celebration: { canvas: [330, 430], box: { x: 0, y: 0, w: 330, h: 430 } },
+  podium_render: { canvas: [330, 430], box: { x: 0, y: 0, w: 330, h: 430 } },
 };
-const PHOTO_KIND_FOR_LAYOUT = { matchday: "celebration", result: "celebration", groupe: "dos", render: "render", podium: "dos" };
+const PHOTO_KIND_FOR_LAYOUT = { matchday: "celebration", result: "celebration", groupe: "dos", render: "render", podium_dos: "dos", podium_celebration: "celebration", podium_render: "render" };
+
+// Tuesday carousel pages: stat key, title, podium photo layout.
+const RANKING_PAGES = [
+  { key: "goals", heading: "BUTS", layout: "podium_celebration" },
+  { key: "assists", heading: "PASSE D", layout: "podium_dos" },
+  { key: "rating", heading: "MOYENNES", layout: "podium_render" },
+];
 
 function defaultFraming(layout, photo) {
   const L = LAYOUTS[layout];
-  if (layout === "render" || layout === "podium") {
+  if (layout === "render" || layout.startsWith("podium_")) {
     const width = Math.max(L.box.w, (L.box.h * photo.width) / photo.height);
     return { x: (L.box.w - width) / 2, y: 0, width };
   }
@@ -85,11 +94,15 @@ function groupeLines(sheetIds, roster, players) {
   });
 }
 
-function goalLines(events, players) {
+function goalRows(events, players) {
   const nameOf = (id) => postName(players.find((p) => p.id === id), players);
   return events.filter((e) => e.type === "goal_bl")
     .sort((a, b) => a.half - b.half || a.minute - b.minute)
-    .map((e) => `${e.minute}' ${nameOf(e.player_id)}${e.assist_player_id ? ` (${nameOf(e.assist_player_id)})` : ""}`);
+    .map((e) => ({ minute: e.minute, scorer: nameOf(e.player_id), assist: e.assist_player_id ? nameOf(e.assist_player_id) : null }));
+}
+
+function goalLines(events, players) {
+  return goalRows(events, players).map((g) => `${g.minute}' ${g.scorer}${g.assist ? ` (${g.assist})` : ""}`);
 }
 
 function rankingEntries(rows, key, nameOf, limit = 15) {
@@ -143,5 +156,5 @@ function availablePosts({ matches, lineups, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, defaultFraming, framedRect, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, defaultFraming, framedRect, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
 }

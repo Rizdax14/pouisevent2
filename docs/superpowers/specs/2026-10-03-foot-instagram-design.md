@@ -28,7 +28,7 @@ sans ce clic.
 | Jeudi (jour de match) | **Match Day + Groupe** | carrousel 2 images | match `scheduled` avec une feuille de match ≥ 1 joueur |
 | Après le match | **Résultat** | 1 image | match `finished` |
 | Samedi | **Notes** | 1 image | notes du match validées |
-| Mardi | **Classements** : Buts, Passes D, Buts+Passes D | carrousel 3 images | à tout moment (saison en cours, au moins 1 match terminé) |
+| Mardi | **Classements** : Buts, Passes D, Notes moyennes | carrousel 3 images | à tout moment (saison en cours, au moins 1 match terminé) |
 
 Les jours sont des repères éditoriaux affichés dans l'espace Réseaux, pas des
 déclenchements automatiques.
@@ -99,13 +99,18 @@ déclenchements automatiques.
 - **Résultat** : titre RESULTAT, « LEVERCULSEC / X - Y / ADVERSAIRE »,
   joueur célébration à gauche, panneau « buts : » listant `minute' Buteur
   (Passeur)` (« CSC/adverse » non listés ; « Aucun but » si 0).
-- **Notes** (nouveau, même charte) : titre NOTES, adversaire + score, liste
-  des joueurs de la feuille triée par note du match : prénom, note du match,
-  moyenne saison. Maquette soumise à l'utilisateur avant intégration.
-- **Classements** (×3) : titre BUTS / PASSES D / BUTS + PASSES D, grille
-  de portraits ronds (render) avec la valeur dessous, top 14 de la saison en
-  cours parmi réguliers/occasionnels, joueurs à 0 exclus ; égalités →
-  ordre alphabétique.
+- **Notes** (validé le 2026-10-03) : titre NOTES, « LEVERCULSEC X - Y ADVERSAIRE »,
+  podium du top 3 (photo **dos**, carte blanche, badge de rang, pastille
+  prénom + note, « moy. saison » dessous), puis tableau des suivants (note
+  du match + moyenne saison ; 2 colonnes au-delà de 8 lignes).
+- **Classements** (×3, même charte que Notes) : BUTS (photo **célébration**),
+  PASSE D (photo **dos**), MOYENNES = note moyenne de la saison (photo
+  **render**). Sous-titre « SAISON AAAA-AAAA », podium top 3 + tableau, nombre
+  de matchs à droite ; réguliers/occasionnels, joueurs à 0 (ou sans note)
+  exclus, top 15 ; égalités → ordre alphabétique.
+- **Charte commune** : cartes blanches arrondies à ombre franche, pastilles
+  couleur du thème (numéros du Groupe, minutes du Résultat, valeurs) ; les
+  cartes Groupe et Résultat s'ajustent au nombre de lignes.
 
 ## Cadrage des photos
 

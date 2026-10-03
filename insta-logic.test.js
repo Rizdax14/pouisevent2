@@ -110,12 +110,28 @@ test("availablePosts lists matchday, result, ratings and rankings when eligible"
   assert.deepEqual(kinds, ["matchday:1", "result:2", "ratings:2", "rankings:2026-2027"]);
 });
 
-test("defaultFraming: podium covers the card from the top, using the dos photo", () => {
-  assert.equal(L.PHOTO_KIND_FOR_LAYOUT.podium, "dos");
-  const f = L.defaultFraming("podium", { kind: "dos", width: 1000, height: 1000 });
-  assert.equal(f.width, 430);
-  assert.equal(f.y, 0);
-  assert.equal(f.x, (330 - 430) / 2);
+test("defaultFraming: podium layouts cover the card from the top, one per photo kind", () => {
+  assert.equal(L.PHOTO_KIND_FOR_LAYOUT.podium_dos, "dos");
+  assert.equal(L.PHOTO_KIND_FOR_LAYOUT.podium_celebration, "celebration");
+  assert.equal(L.PHOTO_KIND_FOR_LAYOUT.podium_render, "render");
+  for (const layout of ["podium_dos", "podium_celebration", "podium_render"]) {
+    const f = L.defaultFraming(layout, { kind: "dos", width: 1000, height: 1000 });
+    assert.deepEqual(f, { x: (330 - 430) / 2, y: 0, width: 430 });
+  }
+});
+
+test("goalRows gives minute, scorer and assist in match order", () => {
+  const players = [{ id: 1, name: "Louis" }, { id: 2, name: "Thisma" }];
+  const ev = [
+    { half: 2, minute: 5, type: "goal_bl", player_id: 2, assist_player_id: null },
+    { half: 1, minute: 32, type: "goal_bl", player_id: 1, assist_player_id: 2 },
+    { half: 1, minute: 40, type: "goal_opponent", player_id: null, assist_player_id: null },
+  ];
+  assert.deepEqual(L.goalRows(ev, players), [{ minute: 32, scorer: "Louis", assist: "Thisma" }, { minute: 5, scorer: "Thisma", assist: null }]);
+});
+
+test("RANKING_PAGES: Buts (célébration), Passes D (dos), Notes moyennes (render)", () => {
+  assert.deepEqual(L.RANKING_PAGES.map((p) => [p.key, p.layout]), [["goals", "podium_celebration"], ["assists", "podium_dos"], ["rating", "podium_render"]]);
 });
 
 test("ratingRows: sorted by match rating desc, unrated last, with season averages", () => {
