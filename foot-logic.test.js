@@ -13,6 +13,13 @@ const {
   filterPlayersByName,
   toDatetimeLocalValue,
   buildEventPayload,
+  computePlayerStats,
+  statValue,
+  rankPlayers,
+  formatRank,
+  formatStatValue,
+  missingLineupPlayers,
+  diffLineup,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -164,4 +171,83 @@ test("buildEventPayload rejects an assist by the scorer themself", () => {
 test("buildEventPayload rejects a half below 1 or a negative minute", () => {
   assert.throws(() => buildEventPayload({ type: "goal_opponent", half: "0", minute: "3" }), /mi-temps/i);
   assert.throws(() => buildEventPayload({ type: "goal_opponent", half: "1", minute: "-1" }), /minute/i);
+});
+
+const M = (id, status) => ({ id, status });
+let evSeq = 1000;
+const G = (match_id, player_id, assist_player_id = null) => ({ id: evSeq++, match_id, type: "goal_bl", player_id, assist_player_id, half: 1, minute: 0 });
+const O = (match_id) => ({ id: evSeq++, match_id, type: "goal_opponent", player_id: null, assist_player_id: null, half: 1, minute: 0 });
+const L = (match_id, player_id) => ({ match_id, player_id });
+const byId = (list) => Object.fromEntries(list.map((s) => [s.playerId, s]));
+
+test("computePlayerStats counts W/D/L from finished matches on the sheet only", () => {
+  const matches = [M(1, "finished"), M(2, "finished"), M(3, "finished"), M(4, "live")];
+  const lineups = [L(1, 10), L(2, 10), L(3, 10), L(4, 10), L(1, 20)];
+  const events = [G(1, 10), O(2), O(4)]; // m1 win 1-0, m2 loss 0-1, m3 draw 0-0, m4 ignored (live)
+  const s = byId(computePlayerStats(matches, lineups, events));
+  assert.deepEqual(s[10], { playerId: 10, played: 3, wins: 1, draws: 1, losses: 1, goals: 1, assists: 0, decisive: 1 });
+  assert.deepEqual(s[20], { playerId: 20, played: 1, wins: 1, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 });
+});
+
+test("computePlayerStats only counts goals/assists for matches where the player is on the sheet", () => {
+  const s = byId(computePlayerStats([M(1, "finished")], [L(1, 10)], [G(1, 10, 30), G(1, 30)]));
+  assert.equal(s[10].goals, 1);
+  assert.equal(s[30], undefined);
+});
+
+test("computePlayerStats omits players with no finished match", () => {
+  assert.deepEqual(computePlayerStats([M(1, "scheduled")], [L(1, 10)], []), []);
+});
+
+test("statValue converts W/D/L to percentages and goals to per-match averages in pct mode", () => {
+  const st = { playerId: 1, played: 4, wins: 3, draws: 0, losses: 1, goals: 3, assists: 1, decisive: 4 };
+  assert.equal(statValue(st, "wins", "pct"), 75);
+  assert.equal(statValue(st, "goals", "pct"), 0.75);
+  assert.equal(statValue(st, "played", "pct"), 4);
+  assert.equal(statValue(st, "wins", "abs"), 3);
+});
+
+test("statValue never returns NaN for a player with 0 played", () => {
+  const st = { playerId: 1, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 };
+  assert.equal(statValue(st, "wins", "pct"), 0);
+  assert.equal(statValue(st, "goals", "pct"), 0);
+});
+
+test("rankPlayers uses competition ranking with shared ties", () => {
+  const list = [
+    { playerId: 1, goals: 5 }, { playerId: 2, goals: 3 }, { playerId: 3, goals: 3 }, { playerId: 4, goals: 1 },
+  ];
+  const r = rankPlayers(list, "goals", "abs");
+  assert.deepEqual([r[1].rank, r[2].rank, r[3].rank, r[4].rank], [1, 2, 2, 4]);
+  assert.equal(r[2].tied, true);
+  assert.equal(r[1].tied, false);
+  assert.equal(r[1].total, 4);
+});
+
+test("rankPlayers ranks losses ascending (fewest losses is 1st)", () => {
+  const r = rankPlayers([{ playerId: 1, losses: 4 }, { playerId: 2, losses: 0 }], "losses", "abs");
+  assert.equal(r[2].rank, 1);
+  assert.equal(r[1].rank, 2);
+});
+
+test("formatRank renders 1er, Nème and ex æquo", () => {
+  assert.equal(formatRank({ rank: 1, total: 13, tied: false }), "1er / 13");
+  assert.equal(formatRank({ rank: 2, total: 13, tied: true }), "2ème ex æquo / 13");
+  assert.equal(formatRank(undefined), "—");
+});
+
+test("formatStatValue formats by key and mode", () => {
+  assert.equal(formatStatValue(66.6666, "wins", "pct"), "66.7%");
+  assert.equal(formatStatValue(0.75, "goals", "pct"), "0.75");
+  assert.equal(formatStatValue(3, "wins", "abs"), "3");
+  assert.equal(formatStatValue(4, "played", "pct"), "4");
+});
+
+test("missingLineupPlayers returns scorer/assister not yet on the sheet", () => {
+  assert.deepEqual(missingLineupPlayers([1], { type: "goal_bl", player_id: 1, assist_player_id: 2 }), [2]);
+  assert.deepEqual(missingLineupPlayers([], { type: "goal_opponent", player_id: null, assist_player_id: null }), []);
+});
+
+test("diffLineup computes additions and removals", () => {
+  assert.deepEqual(diffLineup([1, 2, 3], [2, 3, 4]), { add: [4], remove: [1] });
 });

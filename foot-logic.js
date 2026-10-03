@@ -84,6 +84,75 @@ function buildEventPayload({ type, half, minute, playerId, assistId }) {
   return { type: "goal_bl", half: h, minute: m, player_id: Number(playerId), assist_player_id: assistId ? Number(assistId) : null };
 }
 
+const STAT_KEYS_PCT_OF_PLAYED = ["wins", "draws", "losses"];
+
+function computePlayerStats(matches, lineups, events) {
+  const finished = new Set(matches.filter((m) => m.status === "finished").map((m) => m.id));
+  const resultByMatch = {};
+  for (const id of finished) {
+    const s = computeFootScore(events.filter((e) => e.match_id === id));
+    resultByMatch[id] = s.bl > s.opponent ? "wins" : s.bl === s.opponent ? "draws" : "losses";
+  }
+  const onSheet = new Set();
+  const stats = {};
+  for (const l of lineups) {
+    if (!finished.has(l.match_id)) continue;
+    onSheet.add(`${l.match_id}:${l.player_id}`);
+    const st = stats[l.player_id] || (stats[l.player_id] = { playerId: l.player_id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 });
+    st.played++;
+    st[resultByMatch[l.match_id]]++;
+  }
+  for (const e of events) {
+    if (e.type !== "goal_bl" || !finished.has(e.match_id)) continue;
+    if (e.player_id && onSheet.has(`${e.match_id}:${e.player_id}`)) stats[e.player_id].goals++;
+    if (e.assist_player_id && onSheet.has(`${e.match_id}:${e.assist_player_id}`)) stats[e.assist_player_id].assists++;
+  }
+  return Object.values(stats).map((s) => ({ ...s, decisive: s.goals + s.assists }));
+}
+
+function statValue(stat, key, mode) {
+  const raw = stat[key] || 0;
+  if (mode !== "pct" || key === "played") return raw;
+  if (!stat.played) return 0;
+  if (STAT_KEYS_PCT_OF_PLAYED.includes(key)) return (raw / stat.played) * 100;
+  return raw / stat.played;
+}
+
+function rankPlayers(statsList, key, mode) {
+  const asc = key === "losses";
+  const vals = statsList.map((s) => ({ id: s.playerId, v: statValue(s, key, mode) }));
+  const out = {};
+  for (const a of vals) {
+    const better = vals.filter((b) => (asc ? b.v < a.v : b.v > a.v)).length;
+    const same = vals.filter((b) => b.v === a.v).length;
+    out[a.id] = { rank: better + 1, total: vals.length, tied: same > 1 };
+  }
+  return out;
+}
+
+function formatRank(r) {
+  if (!r) return "—";
+  return `${r.rank === 1 ? "1er" : r.rank + "ème"}${r.tied ? " ex æquo" : ""} / ${r.total}`;
+}
+
+function formatStatValue(value, key, mode) {
+  if (mode !== "pct" || key === "played") return String(Math.round(value));
+  if (STAT_KEYS_PCT_OF_PLAYED.includes(key)) return `${(Math.round(value * 10) / 10).toFixed(1)}%`;
+  return (Math.round(value * 100) / 100).toFixed(2);
+}
+
+function missingLineupPlayers(lineupPlayerIds, payload) {
+  if (payload.type !== "goal_bl") return [];
+  const have = new Set(lineupPlayerIds);
+  return [payload.player_id, payload.assist_player_id].filter((id) => id && !have.has(id));
+}
+
+function diffLineup(currentIds, wantedIds) {
+  const cur = new Set(currentIds);
+  const want = new Set(wantedIds);
+  return { add: wantedIds.filter((id) => !cur.has(id)), remove: currentIds.filter((id) => !want.has(id)) };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -97,5 +166,12 @@ if (typeof module !== "undefined" && module.exports) {
     filterPlayersByName,
     toDatetimeLocalValue,
     buildEventPayload,
+    computePlayerStats,
+    statValue,
+    rankPlayers,
+    formatRank,
+    formatStatValue,
+    missingLineupPlayers,
+    diffLineup,
   };
 }
