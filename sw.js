@@ -1,10 +1,11 @@
 // VERSION: bump this string to force cache clear on all clients
-const CACHE_VERSION = 'pouis-v2-' + '20261003240600';
+const CACHE_VERSION = 'pouis-v2-' + '20261003250100';
 const ASSETS = [
   '/',
   '/index.html',
   '/utopia-events.js',
   '/foot-logic.js',
+  '/insta-logic.js',
   '/foot.js',
   '/manifest.json',
 ];
@@ -46,7 +47,7 @@ self.addEventListener('fetch', e => {
   }
 
   // Network first for main app files — always get latest
-  if (url.includes('utopia-events.js') || url.includes('foot-logic.js') || url.includes('foot.js') || url.includes('index.html') || url.endsWith('/')) {
+  if (url.includes('utopia-events.js') || url.includes('foot-logic.js') || url.includes('insta-logic.js') || url.includes('foot.js') || url.includes('index.html') || url.endsWith('/')) {
     e.respondWith(
       fetch(e.request)
         .then(res => {
