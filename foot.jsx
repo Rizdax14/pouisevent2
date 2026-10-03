@@ -416,7 +416,20 @@ function FootLiveView({ match, roster, events, currentPlayer, isAdmin, reload })
     </div>
   );
 }
-function FootFinishedView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 12</div>; }
+function FootFinishedView({ match, events }) {
+  const matchEvents = events.filter((e) => e.match_id === match.id);
+  const score = computeFootScore(matchEvents);
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
+        <div style={{ fontSize: 10, color: "#34d399", textTransform: "uppercase", fontWeight: 700, marginTop: 4 }}>Terminé</div>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, margin: "10px 0" }}>{score.bl} — {score.opponent}</div>
+        <FootEventTimeline events={matchEvents} />
+      </div>
+    </div>
+  );
+}
 
 function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, reload, onStartMatch }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);

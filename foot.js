@@ -910,13 +910,45 @@ function FootLiveView({
     reload: reload
   }));
 }
-function FootFinishedView() {
+function FootFinishedView({
+  match,
+  events
+}) {
+  const matchEvents = events.filter(e => e.match_id === match.id);
+  const score = computeFootScore(matchEvents);
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 20,
-      color: "#60607a"
+      padding: 20
     }
-  }, "Task 12");
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 18
+    }
+  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#34d399",
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginTop: 4
+    }
+  }, "Termin\xE9"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 32,
+      margin: "10px 0"
+    }
+  }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
+    events: matchEvents
+  })));
 }
 function FootScheduledView({
   match,
