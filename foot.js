@@ -432,13 +432,125 @@ function FootAdminPage({
     reload: reload
   }));
 }
-function FootStartMatchConfig() {
+function FootStartMatchConfig({
+  match,
+  reload,
+  onCancel
+}) {
+  const [nbHalves, setNbHalves] = React.useState(2);
+  const [halfDuration, setHalfDuration] = React.useState(45);
+  const [saving, setSaving] = React.useState(false);
+  async function start() {
+    setSaving(true);
+    try {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        status: "live",
+        nb_halves: nbHalves,
+        half_duration_min: halfDuration,
+        current_half: 1,
+        half_started_at: null,
+        half_elapsed_seconds: 0
+      });
+      await reload();
+    } catch (e) {
+      console.warn("start match failed", e);
+      setSaving(false);
+    }
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 20,
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 16,
+      marginBottom: 14
+    }
+  }, "Configuration du match"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
       color: "#60607a"
     }
-  }, "Task 10");
+  }, "Nombre de mi-temps"), /*#__PURE__*/React.createElement("select", {
+    value: nbHalves,
+    onChange: e => setNbHalves(Number(e.target.value)),
+    style: {
+      display: "block",
+      width: "100%",
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "9px 12px",
+      marginTop: 4,
+      marginBottom: 14
+    }
+  }, [1, 2, 3, 4].map(n => /*#__PURE__*/React.createElement("option", {
+    key: n,
+    value: n
+  }, n))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, "Dur\xE9e par mi-temps (minutes)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: 1,
+    value: halfDuration,
+    onChange: e => setHalfDuration(Number(e.target.value)),
+    style: {
+      display: "block",
+      width: "100%",
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "9px 12px",
+      marginTop: 4,
+      marginBottom: 18
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "10px",
+      cursor: "pointer"
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+    onClick: start,
+    disabled: saving,
+    style: {
+      flex: 1,
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontWeight: 700,
+      cursor: saving ? "default" : "pointer",
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "Démarrage…" : "Démarrer le match"))));
 }
 function FootLiveView() {
   return /*#__PURE__*/React.createElement("div", {

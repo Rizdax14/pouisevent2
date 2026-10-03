@@ -199,7 +199,50 @@ function FootAdminPage({ roster, reload }) {
   );
 }
 
-function FootStartMatchConfig() { return <div style={{ padding: 20, color: "#60607a" }}>Task 10</div>; }
+function FootStartMatchConfig({ match, reload, onCancel }) {
+  const [nbHalves, setNbHalves] = React.useState(2);
+  const [halfDuration, setHalfDuration] = React.useState(45);
+  const [saving, setSaving] = React.useState(false);
+
+  async function start() {
+    setSaving(true);
+    try {
+      await sbUpdate("foot_matches", { id: match.id }, {
+        status: "live",
+        nb_halves: nbHalves,
+        half_duration_min: halfDuration,
+        current_half: 1,
+        half_started_at: null,
+        half_elapsed_seconds: 0,
+      });
+      await reload();
+    } catch (e) {
+      console.warn("start match failed", e);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 14 }}>Configuration du match</div>
+        <label style={{ fontSize: 12, color: "#60607a" }}>Nombre de mi-temps</label>
+        <select value={nbHalves} onChange={(e) => setNbHalves(Number(e.target.value))} style={{ display: "block", width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 12px", marginTop: 4, marginBottom: 14 }}>
+          {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <label style={{ fontSize: 12, color: "#60607a" }}>Durée par mi-temps (minutes)</label>
+        <input type="number" min={1} value={halfDuration} onChange={(e) => setHalfDuration(Number(e.target.value))} style={{ display: "block", width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 12px", marginTop: 4, marginBottom: 18 }} />
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>Annuler</button>
+          <button onClick={start} disabled={saving} style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Démarrage…" : "Démarrer le match"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FootLiveView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 11</div>; }
 function FootFinishedView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 12</div>; }
 
