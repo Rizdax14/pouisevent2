@@ -38,8 +38,37 @@ async function build(kind, q) {
     const s = F.computeFootScore(ctx.events);
     return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalLines(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
   }
+  if (kind === "ratings") return buildRatings(q);
   if (kind === "rankings") return buildRankings(q);
   throw new Error(`Type inconnu : ${kind}`);
+}
+
+async function buildRatings(q) {
+  const ctx = await loadMatchContext(q.match);
+  const theme = THEMES[ctx.theme];
+  const sheetIds = ctx.lineups.map((l) => l.player_id);
+  const season = F.seasonOf(ctx.match.match_datetime);
+  const [matches, lineups, ratings] = await Promise.all([
+    sbGet("foot_matches", "?select=*"),
+    sbGet("foot_lineups", "?select=match_id,player_id"),
+    sbGet("foot_ratings", "?select=*"),
+  ]);
+  const seasonMatches = F.filterMatchesForStats(matches, { season, type: "all" });
+  const seasonAvg = {};
+  for (const id of sheetIds) seasonAvg[id] = F.averageRating(F.playerRatingSeries(seasonMatches, ratings, lineups, id));
+  const sheetPlayers = ctx.players.filter((p) => sheetIds.includes(p.id));
+  const nameOf = (id) => L.postName(ctx.players.find((p) => p.id === id), sheetPlayers);
+  const rows = L.ratingRows(sheetIds, F.matchAverages(sheetIds, ctx.ratings), seasonAvg, nameOf);
+  // Top 3 get their "dos" photo on the podium; missing photos fall back to initials in the template.
+  await Promise.all(rows.slice(0, 3).map(async (r) => {
+    const ph = L.choosePhoto(ctx.photos, r.playerId, "dos", ctx.theme);
+    if (!ph) return;
+    const fr = ctx.framings.find((f) => f.photo_id === ph.id && f.layout === "podium") || null;
+    r.rect = L.framedRect("podium", ph, fr);
+    r.uri = await imageDataUri(publicUrl("player-photos", ph.path));
+  }));
+  const s = F.computeFootScore(ctx.events);
+  return T.ratingsEl({ bg: await imageDataUri(theme.bg), theme, opponent: L.opponentLabel(ctx.match.opponent_name), bl: s.bl, opp: s.opponent, rows });
 }
 
 const RANKING_PAGES = { 1: ["goals", "BUTS"], 2: ["assists", "PASSE D"], 3: ["decisive", "BUTS + PASSE D"] };

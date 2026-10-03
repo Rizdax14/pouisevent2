@@ -7,12 +7,14 @@ const LAYOUTS = {
   result: { canvas: [1080, 1350], box: { x: -40, y: 260, w: 620, h: 1090 } },
   groupe: { canvas: [1080, 1350], box: { x: -40, y: 180, w: 700, h: 1170 } },
   render: { canvas: [300, 300], box: { x: 0, y: 0, w: 300, h: 300 } },
+  // Notes podium card (1st place size; 2nd/3rd cards reuse it scaled down).
+  podium: { canvas: [330, 430], box: { x: 0, y: 0, w: 330, h: 430 } },
 };
-const PHOTO_KIND_FOR_LAYOUT = { matchday: "celebration", result: "celebration", groupe: "dos", render: "render" };
+const PHOTO_KIND_FOR_LAYOUT = { matchday: "celebration", result: "celebration", groupe: "dos", render: "render", podium: "dos" };
 
 function defaultFraming(layout, photo) {
   const L = LAYOUTS[layout];
-  if (layout === "render") {
+  if (layout === "render" || layout === "podium") {
     const width = Math.max(L.box.w, (L.box.h * photo.width) / photo.height);
     return { x: (L.box.w - width) / 2, y: 0, width };
   }
@@ -96,6 +98,14 @@ function rankingEntries(rows, key, nameOf, limit = 15) {
     .slice(0, limit).map((r) => ({ playerId: r.playerId, value: r[key] }));
 }
 
+function ratingRows(sheetIds, matchAvg, seasonAvg, nameOf) {
+  return sheetIds.map((id) => ({ playerId: id, name: nameOf(id), match: matchAvg[id] ?? null, season: seasonAvg[id] ?? null }))
+    .sort((a, b) => {
+      if (a.match == null || b.match == null) return a.match == null && b.match == null ? a.name.localeCompare(b.name) : a.match == null ? 1 : -1;
+      return b.match - a.match || a.name.localeCompare(b.name);
+    });
+}
+
 function rankingRows(n) {
   if (n <= 0) return [];
   if (n <= 3) return [n];
@@ -133,5 +143,5 @@ function availablePosts({ matches, lineups, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, defaultFraming, framedRect, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, rankingRows, captionFor, availablePosts };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, defaultFraming, framedRect, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
 }

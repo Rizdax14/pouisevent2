@@ -109,3 +109,25 @@ test("availablePosts lists matchday, result, ratings and rankings when eligible"
   const kinds = L.availablePosts({ matches, lineups, now: new Date("2026-10-15T10:00:00Z") }).map((p) => `${p.kind}:${p.matchId ?? p.season}`);
   assert.deepEqual(kinds, ["matchday:1", "result:2", "ratings:2", "rankings:2026-2027"]);
 });
+
+test("defaultFraming: podium covers the card from the top, using the dos photo", () => {
+  assert.equal(L.PHOTO_KIND_FOR_LAYOUT.podium, "dos");
+  const f = L.defaultFraming("podium", { kind: "dos", width: 1000, height: 1000 });
+  assert.equal(f.width, 430);
+  assert.equal(f.y, 0);
+  assert.equal(f.x, (330 - 430) / 2);
+});
+
+test("ratingRows: sorted by match rating desc, unrated last, with season averages", () => {
+  const rows = L.ratingRows([1, 2, 3], { 1: 6, 2: 8.25, 3: null }, { 1: 7, 2: null, 3: 5 }, (id) => ({ 1: "Louis", 2: "Nolan", 3: "Solal" })[id]);
+  assert.deepEqual(rows, [
+    { playerId: 2, name: "Nolan", match: 8.25, season: null },
+    { playerId: 1, name: "Louis", match: 6, season: 7 },
+    { playerId: 3, name: "Solal", match: null, season: 5 },
+  ]);
+});
+
+test("ratingRows: ties broken by name", () => {
+  const rows = L.ratingRows([1, 2], { 1: 7, 2: 7 }, {}, (id) => (id === 1 ? "Zoé" : "Adam"));
+  assert.deepEqual(rows.map((r) => r.name), ["Adam", "Zoé"]);
+});
