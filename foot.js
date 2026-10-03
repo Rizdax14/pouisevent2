@@ -2134,13 +2134,31 @@ const FOOT_STAT_COLUMNS = [{
   key: "decisive",
   label: "Déc.",
   title: "Décisifs"
+}, {
+  key: "rating",
+  label: "Note",
+  title: "Note"
 }];
-function readStatsMode() {
+const FOOT_SELECT_STYLE = {
+  background: "#13131f",
+  border: "1px solid #1e1e30",
+  borderRadius: 8,
+  color: "#eeeef5",
+  padding: "6px 10px",
+  fontSize: 12
+};
+function readPref(key, fallback, allowed) {
   try {
-    return localStorage.getItem("foot_stats_mode") === "pct" ? "pct" : "abs";
+    const v = localStorage.getItem(key);
+    return v && (!allowed || allowed.includes(v)) ? v : fallback;
   } catch (e) {
-    return "abs";
+    return fallback;
   }
+}
+function writePref(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {}
 }
 function FootStatTile({
   title,
@@ -2175,24 +2193,138 @@ function FootStatTile({
     }
   }, rank));
 }
+function FootRatingChart({
+  series
+}) {
+  const [hover, setHover] = React.useState(null);
+  if (series.length < 2) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13
+    }
+  }, "Il faut au moins 2 matchs not\xE9s pour afficher l'\xE9volution.");
+  const W = 320,
+    H = 150,
+    L = 32,
+    R = 12,
+    T = 12,
+    B = 12;
+  const x = i => L + i * (W - L - R) / (series.length - 1);
+  const y = v => T + (10 - v) * (H - T - B) / 9;
+  const pts = series.map((s, i) => `${x(i)},${y(s.rating)}`).join(" ");
+  const label = series.map(s => `${s.opponent} ${s.rating.toFixed(1)}`).join(", ");
+  const h = hover != null ? series[hover] : null;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: 18,
+      textAlign: "center",
+      fontSize: 12,
+      color: "#eeeef5"
+    }
+  }, h ? /*#__PURE__*/React.createElement(React.Fragment, null, "vs ", h.opponent, " \xB7 ", /*#__PURE__*/React.createElement("b", null, h.rating.toFixed(1)), " \xB7 ", new Date(h.date).toLocaleDateString("fr-FR")) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#60607a"
+    }
+  }, "Touche un point pour le d\xE9tail")), /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    style: {
+      width: "100%",
+      height: "auto",
+      display: "block"
+    },
+    role: "img",
+    "aria-label": `Notes des derniers matchs : ${label}`
+  }, [2, 4, 6, 8, 10].map(v => /*#__PURE__*/React.createElement("g", {
+    key: v
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: L,
+    x2: W - R,
+    y1: y(v),
+    y2: y(v),
+    stroke: "#1e1e30",
+    strokeWidth: "1"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: L - 10,
+    y: y(v) + 3.5,
+    fontSize: "10",
+    fill: "#60607a",
+    textAnchor: "end"
+  }, v))), h && /*#__PURE__*/React.createElement("line", {
+    x1: x(hover),
+    x2: x(hover),
+    y1: T,
+    y2: H - B,
+    stroke: "#60607a",
+    strokeWidth: "1",
+    strokeDasharray: "2 2"
+  }), /*#__PURE__*/React.createElement("polyline", {
+    points: pts,
+    fill: "none",
+    stroke: "#3b82f6",
+    strokeWidth: "2",
+    strokeLinejoin: "round",
+    strokeLinecap: "round"
+  }), series.map((s, i) => /*#__PURE__*/React.createElement("g", {
+    key: s.matchId,
+    onMouseEnter: () => setHover(i),
+    onMouseLeave: () => setHover(null),
+    onClick: () => setHover(hover === i ? null : i),
+    style: {
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: x(i),
+    cy: y(s.rating),
+    r: "12",
+    fill: "transparent"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: x(i),
+    cy: y(s.rating),
+    r: hover === i ? 5 : 4,
+    fill: "#3b82f6",
+    stroke: "#0d0d1c",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("title", null, `${s.opponent} : ${s.rating.toFixed(1)}`)))));
+}
 function FootStatsPage({
   matches,
   lineups,
   events,
+  ratings,
+  roster,
   currentPlayer
 }) {
-  const [mode, setModeState] = React.useState(readStatsMode);
+  const currentSeason = seasonOf(new Date().toISOString());
+  const [mode, setModeState] = React.useState(() => readPref("foot_stats_mode", "abs", ["abs", "pct"]));
+  const [season, setSeasonState] = React.useState(() => readPref("foot_stats_season", currentSeason));
+  const [type, setTypeState] = React.useState(() => readPref("foot_stats_type", "all", ["all", "amical", "championnat"]));
   const [sortKey, setSortKey] = React.useState("played");
   const [sortDir, setSortDir] = React.useState(-1);
-  const setMode = m => {
-    setModeState(m);
-    try {
-      localStorage.setItem("foot_stats_mode", m);
-    } catch (e) {}
+  const setMode = v => {
+    setModeState(v);
+    writePref("foot_stats_mode", v);
   };
-  const stats = computePlayerStats(matches, lineups, events);
-  const me = stats.find(s => s.playerId === currentPlayer?.id);
-  const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(stats, c.key, mode)]));
+  const setSeason = v => {
+    setSeasonState(v);
+    writePref("foot_stats_season", v);
+  };
+  const setType = v => {
+    setTypeState(v);
+    writePref("foot_stats_type", v);
+  };
+  const seasonOptions = [...new Set([currentSeason, ...seasonsFromMatches(matches), ...(season !== "all" ? [season] : [])])].sort().reverse();
+  const filtered = filterMatchesForStats(matches, {
+    season,
+    type
+  });
+  const population = statsRoster(roster);
+  const ratingBy = Object.fromEntries(population.map(id => [id, averageRating(playerRatingSeries(filtered, ratings, lineups, id))]));
+  const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events), ratingBy);
+  const pool = rows.filter(r => r.played > 0);
+  const ratingPool = rows.filter(r => r.rating != null);
+  const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
+  const me = rows.find(r => r.playerId === currentPlayer?.id);
+  const series = currentPlayer ? playerRatingSeries(filtered, ratings, lineups, currentPlayer.id).slice(-10) : [];
   const nameOf = id => {
     const p = PLAYERS.find(x => x.id === id);
     return p ? getDisplayName(p, PLAYERS) : "?";
@@ -2200,11 +2332,13 @@ function FootStatsPage({
   function tilesFor(keys) {
     return keys.map(k => {
       const col = FOOT_STAT_COLUMNS.find(c => c.key === k);
+      const value = me ? formatStatValue(statValue(me, k, mode), k, mode) : "—";
+      const rank = me && ranks[k][me.playerId] ? formatRank(ranks[k][me.playerId]) : "—";
       return /*#__PURE__*/React.createElement(FootStatTile, {
         key: k,
         title: col.title,
-        value: me ? formatStatValue(statValue(me, k, mode), k, mode) : "—",
-        rank: me ? formatRank(ranks[k][me.playerId]) : "—"
+        value: value,
+        rank: rank
       });
     });
   }
@@ -2214,10 +2348,7 @@ function FootStatsPage({
       setSortDir(-1);
     }
   }
-  const rows = [...stats].sort((a, b) => {
-    const d = (statValue(a, sortKey, mode) - statValue(b, sortKey, mode)) * sortDir;
-    return d !== 0 ? d : nameOf(a.playerId).localeCompare(nameOf(b.playerId));
-  });
+  const sorted = sortStatsRows(rows, sortKey, sortDir, mode, nameOf);
   const card = {
     background: "#0d0d1c",
     border: "1px solid #1e1e30",
@@ -2237,7 +2368,7 @@ function FootStatsPage({
       fontSize: 12
     }
   }, label);
-  const grid = "minmax(110px,1fr) repeat(7, 52px)";
+  const grid = "minmax(110px,1fr) repeat(8, 52px)";
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16,
@@ -2247,16 +2378,48 @@ function FootStatsPage({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "flex-end",
+      gap: 8,
+      flexWrap: "wrap",
+      justifyContent: "space-between",
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: season,
+    onChange: e => setSeason(e.target.value),
+    style: FOOT_SELECT_STYLE
+  }, seasonOptions.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s,
+    value: s
+  }, "Saison ", s)), /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Toutes les saisons")), /*#__PURE__*/React.createElement("select", {
+    value: type,
+    onChange: e => setType(e.target.value),
+    style: FOOT_SELECT_STYLE
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les matchs"), /*#__PURE__*/React.createElement("option", {
+    value: "championnat"
+  }, "Championnat"), /*#__PURE__*/React.createElement("option", {
+    value: "amical"
+  }, "Amical"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       borderRadius: 8,
       overflow: "hidden"
     }
   }, toggleBtn("abs", "Valeurs"), toggleBtn("pct", "%"))), !me && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13,
+      marginBottom: 10
+    }
+  }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && me.played === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13,
@@ -2276,7 +2439,7 @@ function FootStatsPage({
       gap: 8,
       flexWrap: "wrap"
     }
-  }, tilesFor(["played", "wins", "draws", "losses"]))), /*#__PURE__*/React.createElement("div", {
+  }, tilesFor(["played", "wins", "draws", "losses", "rating"]))), /*#__PURE__*/React.createElement("div", {
     style: card
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2291,6 +2454,16 @@ function FootStatsPage({
       flexWrap: "wrap"
     }
   }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement("div", {
+    style: card
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 15,
+      marginBottom: 6
+    }
+  }, "Mon \xE9volution"), /*#__PURE__*/React.createElement(FootRatingChart, {
+    series: series
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       ...card,
       padding: 0,
@@ -2298,7 +2471,7 @@ function FootStatsPage({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      minWidth: 520
+      minWidth: 600
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2321,13 +2494,13 @@ function FootStatsPage({
       userSelect: "none",
       color: sortKey === c.key ? "#3b82f6" : "#60607a"
     }
-  }, c.label, sortKey === c.key ? sortDir === -1 ? " ▼" : " ▲" : ""))), rows.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, c.label, sortKey === c.key ? sortDir === -1 ? " ▼" : " ▲" : ""))), sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16,
       color: "#60607a",
       fontSize: 13
     }
-  }, "Aucune statistique pour l'instant."), rows.map(s => /*#__PURE__*/React.createElement("div", {
+  }, "Aucun joueur r\xE9gulier ou occasionnel dans l'effectif."), sorted.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.playerId,
     style: {
       display: "grid",
@@ -2442,6 +2615,8 @@ function FootballApp({
     matches: matches,
     lineups: lineups,
     events: events,
+    ratings: ratings,
+    roster: roster,
     currentPlayer: currentPlayer
   }));
 }

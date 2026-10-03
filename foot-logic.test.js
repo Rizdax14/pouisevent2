@@ -32,6 +32,7 @@ const {
   buildRatingPayload,
   statsRoster,
   buildStatsRows,
+  sortStatsRows,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -380,4 +381,17 @@ test("statValue and formatStatValue handle the rating key", () => {
   assert.equal(statValue({ rating: 7.25, played: 2 }, "rating", "pct"), 7.25);
   assert.equal(formatStatValue(7.25, "rating", "abs"), "7.3");
   assert.equal(formatStatValue(null, "rating", "pct"), "—");
+});
+
+test("sortStatsRows keeps rows without a rating last in both directions", () => {
+  const rows = [{ playerId: 1, rating: null }, { playerId: 2, rating: 6 }, { playerId: 3, rating: 8 }];
+  const name = (id) => ({ 1: "A", 2: "B", 3: "C" })[id];
+  assert.deepEqual(sortStatsRows(rows, "rating", -1, "abs", name).map((r) => r.playerId), [3, 2, 1]);
+  assert.deepEqual(sortStatsRows(rows, "rating", 1, "abs", name).map((r) => r.playerId), [2, 3, 1]);
+});
+
+test("sortStatsRows breaks ties by name", () => {
+  const rows = [{ playerId: 1, played: 2 }, { playerId: 2, played: 2 }];
+  const name = (id) => ({ 1: "Zoé", 2: "Alex" })[id];
+  assert.deepEqual(sortStatsRows(rows, "played", -1, "abs", name).map((r) => r.playerId), [2, 1]);
 });

@@ -238,6 +238,16 @@ function buildStatsRows(rosterIds, stats, ratingByPlayer) {
   });
 }
 
+function sortStatsRows(rows, key, dir, mode, nameOf) {
+  return [...rows].sort((a, b) => {
+    const va = statValue(a, key, mode);
+    const vb = statValue(b, key, mode);
+    const byName = nameOf(a.playerId).localeCompare(nameOf(b.playerId));
+    if (va == null || vb == null) return va == null && vb == null ? byName : va == null ? 1 : -1;
+    return (va - vb) * dir || byName;
+  });
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -270,5 +280,6 @@ if (typeof module !== "undefined" && module.exports) {
     buildRatingPayload,
     statsRoster,
     buildStatsRows,
+    sortStatsRows,
   };
 }
