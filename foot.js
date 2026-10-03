@@ -137,10 +137,12 @@ async function addToLineup(matchId, playerIds) {
   }));
 }
 async function saveLineup(matchId, currentIds, wantedIds) {
-  const {
-    add,
-    remove
-  } = diffLineup(currentIds, wantedIds);
+  await applyLineupChange(matchId, diffLineup(currentIds, wantedIds));
+}
+async function applyLineupChange(matchId, {
+  add,
+  remove
+}) {
   await addToLineup(matchId, add);
   if (remove.length) {
     await sbFetch("foot_lineups", `?match_id=eq.${matchId}&player_id=in.(${remove.join(",")})`, {
@@ -192,13 +194,14 @@ function FootLineupSection({
 }) {
   const current = lineupIdsFor(lineups, match.id);
   const [editing, setEditing] = React.useState(false);
+  const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
   const toggle = id => setWanted(wanted.includes(id) ? wanted.filter(x => x !== id) : [...wanted, id]);
   async function save() {
     setSaving(true);
     try {
-      await saveLineup(match.id, current, wanted);
+      await applyLineupChange(match.id, diffLineupEdit(snapshot, current, wanted));
       await reload();
       setEditing(false);
     } catch (e) {
@@ -229,6 +232,7 @@ function FootLineupSection({
     }
   }, "Feuille de match (", current.length, ")"), isAdmin && !editing && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
+      setSnapshot(current);
       setWanted(current);
       setEditing(true);
     },
@@ -745,6 +749,7 @@ function FootStartMatchConfig({
   match,
   roster,
   attendance,
+  lineups,
   reload,
   onCancel
 }) {
@@ -757,7 +762,7 @@ function FootStartMatchConfig({
   async function start() {
     setSaving(true);
     try {
-      await addToLineup(match.id, sheet);
+      await saveLineup(match.id, lineupIdsFor(lineups || [], match.id), sheet);
       await sbUpdate("foot_matches", {
         id: match.id
       }, {
@@ -1072,17 +1077,15 @@ function FootEventTimeline({
   const [busyId, setBusyId] = React.useState(null);
   const sorted = buildEventTimeline(events);
   async function saveEvent(eventId, payload) {
-    if (eventId === "new") {
-      await sbInsert("foot_match_events", {
+    await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
+      addToSheet: ids => addToLineup(match.id, ids),
+      writeGoal: () => eventId === "new" ? sbInsert("foot_match_events", {
         match_id: match.id,
         ...payload
-      });
-    } else {
-      await sbUpdate("foot_match_events", {
+      }) : sbUpdate("foot_match_events", {
         id: eventId
-      }, payload);
-    }
-    await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), payload));
+      }, payload)
+    });
     setEditingId(null);
     await reload();
   }
@@ -1296,19 +1299,21 @@ function FootLiveAdminConsole({
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
     try {
-      await sbInsert("foot_match_events", {
-        match_id: match.id,
-        half: match.current_half,
-        minute: minutesElapsed,
+      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), {
         type,
         player_id: playerId,
         assist_player_id: assistId
+      }, {
+        addToSheet: ids => addToLineup(match.id, ids),
+        writeGoal: () => sbInsert("foot_match_events", {
+          match_id: match.id,
+          half: match.current_half,
+          minute: minutesElapsed,
+          type,
+          player_id: playerId,
+          assist_player_id: assistId
+        })
       });
-      await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), {
-        type,
-        player_id: playerId,
-        assist_player_id: assistId
-      }));
       setPicking(null);
       await reload();
     } catch (e) {
@@ -1789,6 +1794,7 @@ function FootMatchDetailPage({
     match: match,
     roster: roster,
     attendance: attendance,
+    lineups: lineups,
     reload: reload,
     onCancel: () => setStartingConfig(false)
   }), match.status === "live" && /*#__PURE__*/React.createElement(FootLiveView, {

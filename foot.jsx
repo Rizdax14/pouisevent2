@@ -64,7 +64,10 @@ async function addToLineup(matchId, playerIds) {
 }
 
 async function saveLineup(matchId, currentIds, wantedIds) {
-  const { add, remove } = diffLineup(currentIds, wantedIds);
+  await applyLineupChange(matchId, diffLineup(currentIds, wantedIds));
+}
+
+async function applyLineupChange(matchId, { add, remove }) {
   await addToLineup(matchId, add);
   if (remove.length) {
     await sbFetch("foot_lineups", `?match_id=eq.${matchId}&player_id=in.(${remove.join(",")})`, { method: "DELETE" });
@@ -95,13 +98,14 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled }) 
 function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
   const current = lineupIdsFor(lineups, match.id);
   const [editing, setEditing] = React.useState(false);
+  const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
   const toggle = (id) => setWanted(wanted.includes(id) ? wanted.filter((x) => x !== id) : [...wanted, id]);
 
   async function save() {
     setSaving(true);
-    try { await saveLineup(match.id, current, wanted); await reload(); setEditing(false); }
+    try { await applyLineupChange(match.id, diffLineupEdit(snapshot, current, wanted)); await reload(); setEditing(false); }
     catch (e) { console.warn("lineup save failed", e); }
     setSaving(false);
   }
@@ -111,7 +115,7 @@ function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
     <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 14 }}>Feuille de match ({current.length})</div>
-        {isAdmin && !editing && <button onClick={() => { setWanted(current); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>✏️ Modifier</button>}
+        {isAdmin && !editing && <button onClick={() => { setSnapshot(current); setWanted(current); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>✏️ Modifier</button>}
       </div>
       {!editing && (names.length ? <div style={{ fontSize: 13, color: "#cccce0" }}>{names.join(" · ")}</div> : <div style={{ fontSize: 13, color: "#60607a" }}>Personne sur la feuille.</div>)}
       {editing && (
@@ -337,7 +341,7 @@ function FootAdminPage({ roster, reload }) {
   );
 }
 
-function FootStartMatchConfig({ match, roster, attendance, reload, onCancel }) {
+function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCancel }) {
   const [nbHalves, setNbHalves] = React.useState(2);
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
@@ -348,7 +352,7 @@ function FootStartMatchConfig({ match, roster, attendance, reload, onCancel }) {
   async function start() {
     setSaving(true);
     try {
-      await addToLineup(match.id, sheet);
+      await saveLineup(match.id, lineupIdsFor(lineups || [], match.id), sheet);
       await sbUpdate("foot_matches", { id: match.id }, {
         status: "live",
         nb_halves: nbHalves,
@@ -471,12 +475,12 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
   const sorted = buildEventTimeline(events);
 
   async function saveEvent(eventId, payload) {
-    if (eventId === "new") {
-      await sbInsert("foot_match_events", { match_id: match.id, ...payload });
-    } else {
-      await sbUpdate("foot_match_events", { id: eventId }, payload);
-    }
-    await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), payload));
+    await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
+      addToSheet: (ids) => addToLineup(match.id, ids),
+      writeGoal: () => (eventId === "new"
+        ? sbInsert("foot_match_events", { match_id: match.id, ...payload })
+        : sbUpdate("foot_match_events", { id: eventId }, payload)),
+    });
     setEditingId(null);
     await reload();
   }
@@ -583,15 +587,17 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
     try {
-      await sbInsert("foot_match_events", {
-        match_id: match.id,
-        half: match.current_half,
-        minute: minutesElapsed,
-        type,
-        player_id: playerId,
-        assist_player_id: assistId,
+      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), { type, player_id: playerId, assist_player_id: assistId }, {
+        addToSheet: (ids) => addToLineup(match.id, ids),
+        writeGoal: () => sbInsert("foot_match_events", {
+          match_id: match.id,
+          half: match.current_half,
+          minute: minutesElapsed,
+          type,
+          player_id: playerId,
+          assist_player_id: assistId,
+        }),
       });
-      await addToLineup(match.id, missingLineupPlayers(lineupIdsFor(lineups || [], match.id), { type, player_id: playerId, assist_player_id: assistId }));
       setPicking(null);
       await reload();
     } catch (e) {
@@ -821,7 +827,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
         <FootScheduledView match={match} roster={roster} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
       )}
       {match.status === "scheduled" && startingConfig && (
-        <FootStartMatchConfig match={match} roster={roster} attendance={attendance} reload={reload} onCancel={() => setStartingConfig(false)} />
+        <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} reload={reload} onCancel={() => setStartingConfig(false)} />
       )}
       {match.status === "live" && (
         <FootLiveView match={match} roster={roster} events={events} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />

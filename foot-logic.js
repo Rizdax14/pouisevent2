@@ -153,6 +153,19 @@ function diffLineup(currentIds, wantedIds) {
   return { add: wantedIds.filter((id) => !cur.has(id)), remove: currentIds.filter((id) => !want.has(id)) };
 }
 
+function diffLineupEdit(snapshotIds, currentIds, wantedIds) {
+  const cur = new Set(currentIds);
+  const want = new Set(wantedIds);
+  return { add: wantedIds.filter((id) => !cur.has(id)), remove: snapshotIds.filter((id) => !want.has(id) && cur.has(id)) };
+}
+
+// Sheet first: the upsert is idempotent, so a failure here leaves nothing to duplicate on retry.
+async function saveGoalWithSheet(lineupIds, payload, { addToSheet, writeGoal }) {
+  const missing = missingLineupPlayers(lineupIds, payload);
+  if (missing.length) await addToSheet(missing);
+  await writeGoal();
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -173,5 +186,7 @@ if (typeof module !== "undefined" && module.exports) {
     formatStatValue,
     missingLineupPlayers,
     diffLineup,
+    diffLineupEdit,
+    saveGoalWithSheet,
   };
 }

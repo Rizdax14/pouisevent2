@@ -20,6 +20,8 @@ const {
   formatStatValue,
   missingLineupPlayers,
   diffLineup,
+  diffLineupEdit,
+  saveGoalWithSheet,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -250,4 +252,31 @@ test("missingLineupPlayers returns scorer/assister not yet on the sheet", () => 
 
 test("diffLineup computes additions and removals", () => {
   assert.deepEqual(diffLineup([1, 2, 3], [2, 3, 4]), { add: [4], remove: [1] });
+});
+
+test("diffLineupEdit keeps a player auto-added while the editor was open", () => {
+  // Editor opened on [1,2]; meanwhile a goal auto-added 9; admin unchecks 2 and adds 3.
+  assert.deepEqual(diffLineupEdit([1, 2], [1, 2, 9], [1, 3]), { add: [3], remove: [2] });
+});
+
+test("diffLineupEdit removes only players that were on the sheet when editing started", () => {
+  assert.deepEqual(diffLineupEdit([1, 2], [1, 2], []), { add: [], remove: [1, 2] });
+});
+
+test("saveGoalWithSheet writes the sheet before the goal", async () => {
+  const calls = [];
+  await saveGoalWithSheet([1], { type: "goal_bl", player_id: 1, assist_player_id: 2 }, {
+    addToSheet: async (ids) => calls.push(["sheet", ids]),
+    writeGoal: async () => calls.push(["goal"]),
+  });
+  assert.deepEqual(calls, [["sheet", [2]], ["goal"]]);
+});
+
+test("saveGoalWithSheet does not write the goal when the sheet write fails (no duplicate on retry)", async () => {
+  let goalWritten = false;
+  await assert.rejects(saveGoalWithSheet([], { type: "goal_bl", player_id: 1, assist_player_id: null }, {
+    addToSheet: async () => { throw new Error("network"); },
+    writeGoal: async () => { goalWritten = true; },
+  }), /network/);
+  assert.equal(goalWritten, false);
 });
