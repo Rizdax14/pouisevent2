@@ -6925,7 +6925,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
   const TEST_MENU_UIDS=['etienne-oll','jeanne-roc','ilian-tif','louis-mar','thomas-pey','samuel-oll','maxime-mar','solal-bru','nils-bra','nolan-mar','loan-bar','lou-ann-del','emma-gar','lise-roc','pauline-fic','romane-mic','melyne-dar','marie-ger','emma-sao'];
   const cards=[
     {id:"events",label:"Events",icon:"🎉",desc:"Olympiades & événements",color:"#E8B84B",active:true},
-    {id:"football",label:"Football",icon:"⚽",desc:"Bientôt disponible",color:"#60607a",active:false},
+    {id:"football",label:"Football",icon:"⚽",desc:"Matchs & effectif",color:"#3b82f6",active:true},
     {id:"games",label:"Games",icon:"🎮",desc:"Tournoi · Plappy · Crackito",color:"#a855f7",active:true},
     {id:"profil",label:"Mon Profil",icon:"👤",desc:"Carte membre & paramètres",color:BL_GREEN_LIGHT,active:true},
   ];
@@ -8212,6 +8212,7 @@ function App(){
       else if(s==="dataBL") setSection("dataBL");
       else if(s==="events"){setSection("events");}
       else if(s==="games"){setSection("games");}
+      else if(s==="football"){setSection("football");}
     }} onLogout={()=>{setCurrentPlayer(null);setSection("login");localStorage.removeItem("bl_player_id");localStorage.removeItem("bl_section");localStorage.clear();}}/>
   );
 
@@ -8230,6 +8231,10 @@ function App(){
     <GamesHomePage currentPlayer={currentPlayer} onBack={()=>setSection("menu")} nav={(g)=>setSection(g)}/>
   );
 
+  // Football section
+  if(section==="football") return(
+    <FootballApp currentPlayer={currentPlayer} onBack={()=>setSection("menu")}/>
+  );
 
   if(section==="crackito") return(
     <CrackitoColorsPage currentPlayer={currentPlayer} onBack={()=>setSection("games")}/>
