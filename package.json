@@ -4,12 +4,17 @@
   "scripts": {
     "build": "babel utopia-events.jsx --presets @babel/preset-react -o utopia-events.js && babel foot.jsx --presets @babel/preset-react -o foot.js",
     "dev": "serve -l 3000",
-    "test": "node --test"
+    "test": "node --test *.test.js"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.0",
     "@babel/core": "^7.25.0",
     "@babel/preset-react": "^7.24.0",
     "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "satori": "^0.35.0",
+    "sharp": "^0.35.5"
   }
 }
