@@ -833,6 +833,103 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   );
 }
 
+const FOOT_STAT_COLUMNS = [
+  { key: "played", label: "MJ", title: "Joués" },
+  { key: "wins", label: "V", title: "Victoires" },
+  { key: "draws", label: "N", title: "Nuls" },
+  { key: "losses", label: "D", title: "Défaites" },
+  { key: "goals", label: "Buts", title: "Buts" },
+  { key: "assists", label: "PD", title: "Passes D" },
+  { key: "decisive", label: "Déc.", title: "Décisifs" },
+];
+
+function readStatsMode() {
+  try { return localStorage.getItem("foot_stats_mode") === "pct" ? "pct" : "abs"; } catch (e) { return "abs"; }
+}
+
+function FootStatTile({ title, value, rank }) {
+  return (
+    <div style={{ flex: "1 1 70px", background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+      <div style={{ fontSize: 10, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
+      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 10, color: "#3b82f6" }}>{rank}</div>
+    </div>
+  );
+}
+
+function FootStatsPage({ matches, lineups, events, currentPlayer }) {
+  const [mode, setModeState] = React.useState(readStatsMode);
+  const [sortKey, setSortKey] = React.useState("played");
+  const [sortDir, setSortDir] = React.useState(-1);
+  const setMode = (m) => { setModeState(m); try { localStorage.setItem("foot_stats_mode", m); } catch (e) {} };
+
+  const stats = computePlayerStats(matches, lineups, events);
+  const me = stats.find((s) => s.playerId === currentPlayer?.id);
+  const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map((c) => [c.key, rankPlayers(stats, c.key, mode)]));
+  const nameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
+
+  function tilesFor(keys) {
+    return keys.map((k) => {
+      const col = FOOT_STAT_COLUMNS.find((c) => c.key === k);
+      return <FootStatTile key={k} title={col.title} value={me ? formatStatValue(statValue(me, k, mode), k, mode) : "—"} rank={me ? formatRank(ranks[k][me.playerId]) : "—"} />;
+    });
+  }
+
+  function clickHeader(key) {
+    if (key === sortKey) setSortDir(-sortDir); else { setSortKey(key); setSortDir(-1); }
+  }
+
+  const rows = [...stats].sort((a, b) => {
+    const d = (statValue(a, sortKey, mode) - statValue(b, sortKey, mode)) * sortDir;
+    return d !== 0 ? d : nameOf(a.playerId).localeCompare(nameOf(b.playerId));
+  });
+
+  const card = { background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 14 };
+  const toggleBtn = (m, label) => (
+    <button onClick={() => setMode(m)} style={{ background: mode === m ? "#3b82f6" : "#13131f", color: mode === m ? "#fff" : "#60607a", border: "1px solid #1e1e30", padding: "6px 14px", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>{label}</button>
+  );
+  const grid = "minmax(110px,1fr) repeat(7, 52px)";
+
+  return (
+    <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden" }}>{toggleBtn("abs", "Valeurs")}{toggleBtn("pct", "%")}</div>
+      </div>
+
+      {!me && <div style={{ color: "#60607a", fontSize: 13, marginBottom: 10 }}>Pas encore de match terminé sur une feuille de match.</div>}
+
+      <div style={card}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 10 }}>Mes matchs</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{tilesFor(["played", "wins", "draws", "losses"])}</div>
+      </div>
+      <div style={card}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 10 }}>Mes stats offensives</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{tilesFor(["goals", "assists", "decisive"])}</div>
+      </div>
+
+      <div style={{ ...card, padding: 0, overflowX: "auto" }}>
+        <div style={{ minWidth: 520 }}>
+          <div style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", background: "#13131f", borderBottom: "1px solid #1e1e30", fontSize: 10, color: "#60607a", textTransform: "uppercase" }}>
+            <span>Joueur</span>
+            {FOOT_STAT_COLUMNS.map((c) => (
+              <span key={c.key} onClick={() => clickHeader(c.key)} style={{ textAlign: "center", cursor: "pointer", userSelect: "none", color: sortKey === c.key ? "#3b82f6" : "#60607a" }}>
+                {c.label}{sortKey === c.key ? (sortDir === -1 ? " ▼" : " ▲") : ""}
+              </span>
+            ))}
+          </div>
+          {rows.length === 0 && <div style={{ padding: 16, color: "#60607a", fontSize: 13 }}>Aucune statistique pour l'instant.</div>}
+          {rows.map((s) => (
+            <div key={s.playerId} style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", borderBottom: "1px solid #1e1e30", fontSize: 13, alignItems: "center", background: s.playerId === currentPlayer?.id ? "#3b82f61a" : "transparent" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(s.playerId)}</span>
+              {FOOT_STAT_COLUMNS.map((c) => <span key={c.key} style={{ textAlign: "center" }}>{formatStatValue(statValue(s, c.key, mode), c.key, mode)}</span>)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FootballApp({ currentPlayer, onBack }) {
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
@@ -890,7 +987,7 @@ function FootballApp({ currentPlayer, onBack }) {
       )}
       {page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
       {page === "rankings" && <FootPlaceholderPage label="Classement" />}
-      {page === "stats" && <FootPlaceholderPage label="Statistiques" />}
+      {page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} currentPlayer={currentPlayer} />}
     </div>
   );
 }
