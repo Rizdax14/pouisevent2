@@ -329,6 +329,94 @@ function FootCalendarPage({
     });
   }));
 }
+function FootRosterManager({
+  roster,
+  reload
+}) {
+  const [saving, setSaving] = React.useState(null); // player id currently being saved
+
+  const roleByPlayer = {};
+  roster.forEach(r => {
+    roleByPlayer[r.player_id] = r.role;
+  });
+  async function setRole(playerId, role) {
+    setSaving(playerId);
+    try {
+      if (role === "") {
+        await sbFetch("foot_roster", `?player_id=eq.${playerId}`, {
+          method: "DELETE"
+        });
+      } else {
+        await SUPABASE.from("foot_roster").upsert({
+          player_id: playerId,
+          role
+        }, {
+          onConflict: "player_id"
+        });
+      }
+      await reload();
+    } catch (e) {
+      console.warn("roster update failed", e);
+    }
+    setSaving(null);
+  }
+  const sortedPlayers = [...PLAYERS].sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
+  if (sortedPlayers.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "#60607a",
+        fontSize: 13
+      }
+    }, "Aucun joueur dans l'effectif.");
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 16,
+      marginBottom: 12
+    }
+  }, "Effectif"), sortedPlayers.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "8px 0",
+      borderBottom: "1px solid #1e1e30"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13
+    }
+  }, getDisplayName(p, PLAYERS)), /*#__PURE__*/React.createElement("select", {
+    value: roleByPlayer[p.id] || "",
+    disabled: saving === p.id,
+    onChange: e => setRole(p.id, e.target.value),
+    style: {
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "5px 8px",
+      fontSize: 12
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Pas dans l'\xE9quipe"), /*#__PURE__*/React.createElement("option", {
+    value: "regulier"
+  }, "R\xE9gulier"), /*#__PURE__*/React.createElement("option", {
+    value: "occasionnel"
+  }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
+    value: "invite"
+  }, "Invit\xE9")))));
+}
 function FootAdminPage({
   roster,
   reload
@@ -338,6 +426,9 @@ function FootAdminPage({
       padding: 20
     }
   }, /*#__PURE__*/React.createElement(FootCreateMatchForm, {
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FootRosterManager, {
+    roster: roster,
     reload: reload
   }));
 }

@@ -140,10 +140,61 @@ function FootCalendarPage({ matches, events, roster, attendance, nav }) {
   );
 }
 
+function FootRosterManager({ roster, reload }) {
+  const [saving, setSaving] = React.useState(null); // player id currently being saved
+
+  const roleByPlayer = {};
+  roster.forEach((r) => { roleByPlayer[r.player_id] = r.role; });
+
+  async function setRole(playerId, role) {
+    setSaving(playerId);
+    try {
+      if (role === "") {
+        await sbFetch("foot_roster", `?player_id=eq.${playerId}`, { method: "DELETE" });
+      } else {
+        await SUPABASE.from("foot_roster").upsert({ player_id: playerId, role }, { onConflict: "player_id" });
+      }
+      await reload();
+    } catch (e) {
+      console.warn("roster update failed", e);
+    }
+    setSaving(null);
+  }
+
+  const sortedPlayers = [...PLAYERS].sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
+
+  if (sortedPlayers.length === 0) {
+    return <div style={{ color: "#60607a", fontSize: 13 }}>Aucun joueur dans l'effectif.</div>;
+  }
+
+  return (
+    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18 }}>
+      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 12 }}>Effectif</div>
+      {sortedPlayers.map((p) => (
+        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1e1e30" }}>
+          <div style={{ fontSize: 13 }}>{getDisplayName(p, PLAYERS)}</div>
+          <select
+            value={roleByPlayer[p.id] || ""}
+            disabled={saving === p.id}
+            onChange={(e) => setRole(p.id, e.target.value)}
+            style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 8px", fontSize: 12 }}
+          >
+            <option value="">Pas dans l'équipe</option>
+            <option value="regulier">Régulier</option>
+            <option value="occasionnel">Occasionnel</option>
+            <option value="invite">Invité</option>
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FootAdminPage({ roster, reload }) {
   return (
     <div style={{ padding: 20 }}>
       <FootCreateMatchForm reload={reload} />
+      <FootRosterManager roster={roster} reload={reload} />
     </div>
   );
 }
