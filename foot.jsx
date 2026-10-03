@@ -46,6 +46,64 @@ function FootPlaceholderPage({ label }) {
   );
 }
 
+function FootCreateMatchForm({ reload }) {
+  const [opponentName, setOpponentName] = React.useState("");
+  const [matchDatetime, setMatchDatetime] = React.useState("");
+  const [address, setAddress] = React.useState("");
+  const [postalCode, setPostalCode] = React.useState("");
+  const [city, setCity] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  async function submit() {
+    if (!opponentName.trim() || !matchDatetime) {
+      setMsg({ t: "error", m: "Adversaire et date/heure sont obligatoires." });
+      return;
+    }
+    setSaving(true);
+    try {
+      await sbInsert("foot_matches", {
+        opponent_name: opponentName.trim(),
+        match_datetime: new Date(matchDatetime).toISOString(),
+        address: address.trim() || null,
+        postal_code: postalCode.trim() || null,
+        city: city.trim() || null,
+      });
+      setOpponentName(""); setMatchDatetime(""); setAddress(""); setPostalCode(""); setCity("");
+      setMsg({ t: "success", m: "Match créé ✓" });
+      await reload();
+    } catch (e) {
+      setMsg({ t: "error", m: "Erreur: " + e.message });
+    }
+    setSaving(false);
+  }
+
+  const inputStyle = { width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, padding: "9px 12px", color: "#eeeef5", fontSize: 13, marginBottom: 10 };
+
+  return (
+    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18, marginBottom: 20 }}>
+      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 12 }}>Créer un match</div>
+      <input style={inputStyle} placeholder="Nom de l'équipe adverse" value={opponentName} onChange={(e) => setOpponentName(e.target.value)} />
+      <input style={inputStyle} type="datetime-local" value={matchDatetime} onChange={(e) => setMatchDatetime(e.target.value)} />
+      <input style={inputStyle} placeholder="Adresse" value={address} onChange={(e) => setAddress(e.target.value)} />
+      <input style={inputStyle} placeholder="Code postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+      <input style={inputStyle} placeholder="Ville" value={city} onChange={(e) => setCity(e.target.value)} />
+      {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 10 }}>{msg.m}</div>}
+      <button onClick={submit} disabled={saving} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "Création…" : "Créer le match"}
+      </button>
+    </div>
+  );
+}
+
+function FootAdminPage({ roster, reload }) {
+  return (
+    <div style={{ padding: 20 }}>
+      <FootCreateMatchForm reload={reload} />
+    </div>
+  );
+}
+
 function FootballApp({ currentPlayer, onBack }) {
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
@@ -85,7 +143,7 @@ function FootballApp({ currentPlayer, onBack }) {
       <FootballNavBar page={page} setPage={nav} onBack={onBack} isAdmin={isAdmin} />
       {page === "calendar" && <FootPlaceholderPage label="Calendrier — Task 7" />}
       {page === "matchDetail" && <FootPlaceholderPage label="Détail du match — Tasks 9-12" />}
-      {page === "admin" && isAdmin && <FootPlaceholderPage label="Admin — Tasks 6, 8" />}
+      {page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
       {page === "rankings" && <FootPlaceholderPage label="Classement" />}
       {page === "stats" && <FootPlaceholderPage label="Statistiques" />}
     </div>

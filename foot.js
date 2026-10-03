@@ -106,6 +106,133 @@ function FootPlaceholderPage({
     }
   }, "\uD83D\uDD12 Bient\xF4t disponible"));
 }
+function FootCreateMatchForm({
+  reload
+}) {
+  const [opponentName, setOpponentName] = React.useState("");
+  const [matchDatetime, setMatchDatetime] = React.useState("");
+  const [address, setAddress] = React.useState("");
+  const [postalCode, setPostalCode] = React.useState("");
+  const [city, setCity] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  async function submit() {
+    if (!opponentName.trim() || !matchDatetime) {
+      setMsg({
+        t: "error",
+        m: "Adversaire et date/heure sont obligatoires."
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      await sbInsert("foot_matches", {
+        opponent_name: opponentName.trim(),
+        match_datetime: new Date(matchDatetime).toISOString(),
+        address: address.trim() || null,
+        postal_code: postalCode.trim() || null,
+        city: city.trim() || null
+      });
+      setOpponentName("");
+      setMatchDatetime("");
+      setAddress("");
+      setPostalCode("");
+      setCity("");
+      setMsg({
+        t: "success",
+        m: "Match créé ✓"
+      });
+      await reload();
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Erreur: " + e.message
+      });
+    }
+    setSaving(false);
+  }
+  const inputStyle = {
+    width: "100%",
+    background: "#13131f",
+    border: "1px solid #1e1e30",
+    borderRadius: 8,
+    padding: "9px 12px",
+    color: "#eeeef5",
+    fontSize: 13,
+    marginBottom: 10
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 18,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 16,
+      marginBottom: 12
+    }
+  }, "Cr\xE9er un match"), /*#__PURE__*/React.createElement("input", {
+    style: inputStyle,
+    placeholder: "Nom de l'\xE9quipe adverse",
+    value: opponentName,
+    onChange: e => setOpponentName(e.target.value)
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inputStyle,
+    type: "datetime-local",
+    value: matchDatetime,
+    onChange: e => setMatchDatetime(e.target.value)
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inputStyle,
+    placeholder: "Adresse",
+    value: address,
+    onChange: e => setAddress(e.target.value)
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inputStyle,
+    placeholder: "Code postal",
+    value: postalCode,
+    onChange: e => setPostalCode(e.target.value)
+  }), /*#__PURE__*/React.createElement("input", {
+    style: inputStyle,
+    placeholder: "Ville",
+    value: city,
+    onChange: e => setCity(e.target.value)
+  }), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: msg.t === "error" ? "#ef4444" : "#34d399",
+      fontSize: 12,
+      marginBottom: 10
+    }
+  }, msg.m), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: saving,
+    style: {
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "9px 16px",
+      fontWeight: 700,
+      cursor: saving ? "default" : "pointer",
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "Création…" : "Créer le match"));
+}
+function FootAdminPage({
+  roster,
+  reload
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement(FootCreateMatchForm, {
+    reload: reload
+  }));
+}
 function FootballApp({
   currentPlayer,
   onBack
@@ -164,8 +291,9 @@ function FootballApp({
     label: "Calendrier \u2014 Task 7"
   }), page === "matchDetail" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
     label: "D\xE9tail du match \u2014 Tasks 9-12"
-  }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
-    label: "Admin \u2014 Tasks 6, 8"
+  }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
+    roster: roster,
+    reload: reloadFoot
   }), page === "rankings" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
     label: "Classement"
   }), page === "stats" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
