@@ -221,6 +221,114 @@ function FootCreateMatchForm({
     }
   }, saving ? "Création…" : "Créer le match"));
 }
+function FootMatchCard({
+  match,
+  score,
+  presentCount,
+  rosterSize,
+  onClick
+}) {
+  const dt = new Date(match.match_datetime);
+  const dateLabel = dt.toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short"
+  }) + " · " + dt.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const statusLabel = match.status === "scheduled" ? "À venir" : match.status === "live" ? "En cours" : "Terminé";
+  const statusColor = match.status === "scheduled" ? "#60607a" : match.status === "live" ? "#ef4444" : "#34d399";
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClick,
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 10,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 16
+    }
+  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: statusColor,
+      textTransform: "uppercase",
+      fontWeight: 700
+    }
+  }, statusLabel)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginBottom: 4
+    }
+  }, dateLabel), match.city && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, match.city), match.status !== "scheduled" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 22,
+      marginTop: 6
+    }
+  }, score.bl, " \u2014 ", score.opponent), match.status === "scheduled" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginTop: 6
+    }
+  }, presentCount, "/", rosterSize, " pr\xE9sents"));
+}
+function FootCalendarPage({
+  matches,
+  events,
+  roster,
+  attendance,
+  nav
+}) {
+  if (matches.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 40,
+        textAlign: "center",
+        color: "#60607a"
+      }
+    }, "Aucun match pour l'instant.");
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 16
+    }
+  }, matches.map(match => {
+    const matchEvents = events.filter(e => e.match_id === match.id);
+    const score = computeFootScore(matchEvents);
+    const presentCount = attendance.filter(a => a.match_id === match.id && a.status === "present").length;
+    return /*#__PURE__*/React.createElement(FootMatchCard, {
+      key: match.id,
+      match: match,
+      score: score,
+      presentCount: presentCount,
+      rosterSize: roster.length,
+      onClick: () => nav("matchDetail", {
+        matchId: match.id
+      })
+    });
+  }));
+}
 function FootAdminPage({
   roster,
   reload
@@ -287,8 +395,12 @@ function FootballApp({
     setPage: nav,
     onBack: onBack,
     isAdmin: isAdmin
-  }), page === "calendar" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
-    label: "Calendrier \u2014 Task 7"
+  }), page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
+    matches: matches,
+    events: events,
+    roster: roster,
+    attendance: attendance,
+    nav: nav
   }), page === "matchDetail" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
     label: "D\xE9tail du match \u2014 Tasks 9-12"
   }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {

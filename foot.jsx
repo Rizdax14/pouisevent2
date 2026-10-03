@@ -96,6 +96,50 @@ function FootCreateMatchForm({ reload }) {
   );
 }
 
+function FootMatchCard({ match, score, presentCount, rosterSize, onClick }) {
+  const dt = new Date(match.match_datetime);
+  const dateLabel = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) + " · " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const statusLabel = match.status === "scheduled" ? "À venir" : match.status === "live" ? "En cours" : "Terminé";
+  const statusColor = match.status === "scheduled" ? "#60607a" : match.status === "live" ? "#ef4444" : "#34d399";
+  return (
+    <div onClick={onClick} style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 10, cursor: "pointer" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16 }}>Bière Leverculsec vs {match.opponent_name}</div>
+        <div style={{ fontSize: 10, color: statusColor, textTransform: "uppercase", fontWeight: 700 }}>{statusLabel}</div>
+      </div>
+      <div style={{ fontSize: 12, color: "#60607a", marginBottom: 4 }}>{dateLabel}</div>
+      {match.city && <div style={{ fontSize: 12, color: "#60607a" }}>{match.city}</div>}
+      {match.status !== "scheduled" && <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 22, marginTop: 6 }}>{score.bl} — {score.opponent}</div>}
+      {match.status === "scheduled" && <div style={{ fontSize: 12, color: "#60607a", marginTop: 6 }}>{presentCount}/{rosterSize} présents</div>}
+    </div>
+  );
+}
+
+function FootCalendarPage({ matches, events, roster, attendance, nav }) {
+  if (matches.length === 0) {
+    return <div style={{ padding: 40, textAlign: "center", color: "#60607a" }}>Aucun match pour l'instant.</div>;
+  }
+  return (
+    <div style={{ padding: 16 }}>
+      {matches.map((match) => {
+        const matchEvents = events.filter((e) => e.match_id === match.id);
+        const score = computeFootScore(matchEvents);
+        const presentCount = attendance.filter((a) => a.match_id === match.id && a.status === "present").length;
+        return (
+          <FootMatchCard
+            key={match.id}
+            match={match}
+            score={score}
+            presentCount={presentCount}
+            rosterSize={roster.length}
+            onClick={() => nav("matchDetail", { matchId: match.id })}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function FootAdminPage({ roster, reload }) {
   return (
     <div style={{ padding: 20 }}>
@@ -141,7 +185,7 @@ function FootballApp({ currentPlayer, onBack }) {
   return (
     <div style={{ minHeight: "100vh", background: "#080810", color: "#eeeef5", fontFamily: "'Outfit',sans-serif", paddingBottom: 70 }}>
       <FootballNavBar page={page} setPage={nav} onBack={onBack} isAdmin={isAdmin} />
-      {page === "calendar" && <FootPlaceholderPage label="Calendrier — Task 7" />}
+      {page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} />}
       {page === "matchDetail" && <FootPlaceholderPage label="Détail du match — Tasks 9-12" />}
       {page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
       {page === "rankings" && <FootPlaceholderPage label="Classement" />}
