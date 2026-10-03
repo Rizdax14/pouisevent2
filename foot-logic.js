@@ -111,6 +111,7 @@ function computePlayerStats(matches, lineups, events) {
 }
 
 function statValue(stat, key, mode) {
+  if (key === "rating") return stat.rating ?? null;
   const raw = stat[key] || 0;
   if (mode !== "pct" || key === "played") return raw;
   if (!stat.played) return 0;
@@ -136,6 +137,7 @@ function formatRank(r) {
 }
 
 function formatStatValue(value, key, mode) {
+  if (key === "rating") return value == null ? "—" : (Math.round(value * 10) / 10).toFixed(1);
   if (mode !== "pct" || key === "played") return String(Math.round(value));
   if (STAT_KEYS_PCT_OF_PLAYED.includes(key)) return `${(Math.round(value * 10) / 10).toFixed(1)}%`;
   return (Math.round(value * 100) / 100).toFixed(2);
@@ -166,6 +168,76 @@ async function saveGoalWithSheet(lineupIds, payload, { addToSheet, writeGoal }) 
   await writeGoal();
 }
 
+function seasonOf(dateIso) {
+  const d = new Date(dateIso);
+  const start = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+  return `${start}-${start + 1}`;
+}
+
+function seasonsFromMatches(matches) {
+  return [...new Set(matches.map((m) => seasonOf(m.match_datetime)))].sort().reverse();
+}
+
+function filterMatchesForStats(matches, { season, type }) {
+  return matches.filter((m) => (season === "all" || seasonOf(m.match_datetime) === season) && (type === "all" || m.match_type === type));
+}
+
+function ratingProgress(sheetIds, matchRatings) {
+  if (sheetIds.length < 2) return { doneIds: [], pendingIds: [...sheetIds], complete: false };
+  const rated = new Set(matchRatings.map((r) => `${r.rater_id}:${r.ratee_id}`));
+  const doneIds = sheetIds.filter((rater) => sheetIds.every((ratee) => ratee === rater || rated.has(`${rater}:${ratee}`)));
+  const pendingIds = sheetIds.filter((id) => !doneIds.includes(id));
+  return { doneIds, pendingIds, complete: pendingIds.length === 0 };
+}
+
+function matchAverages(sheetIds, matchRatings) {
+  const out = {};
+  for (const id of sheetIds) {
+    const got = matchRatings.filter((r) => r.ratee_id === id && r.rater_id !== id && sheetIds.includes(r.rater_id)).map((r) => Number(r.score));
+    out[id] = got.length ? got.reduce((a, b) => a + b, 0) / got.length : null;
+  }
+  return out;
+}
+
+function playerRatingSeries(matches, ratings, lineups, playerId) {
+  const series = [];
+  for (const m of matches) {
+    if (!m.ratings_validated_at) continue;
+    const sheet = lineups.filter((l) => l.match_id === m.id).map((l) => l.player_id);
+    if (!sheet.includes(playerId)) continue;
+    const rating = matchAverages(sheet, ratings.filter((r) => r.match_id === m.id))[playerId];
+    if (rating == null) continue;
+    series.push({ matchId: m.id, date: m.match_datetime, opponent: m.opponent_name, rating });
+  }
+  return series.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+function averageRating(series) {
+  return series.length ? series.reduce((a, s) => a + s.rating, 0) / series.length : null;
+}
+
+function buildRatingPayload(matchId, raterId, sheetIds, scoresByRatee) {
+  return sheetIds.filter((id) => id !== raterId).map((id) => {
+    const raw = scoresByRatee[id];
+    const s = Number(raw);
+    if (raw == null || raw === "" || !(s >= 1 && s <= 10) || s * 2 !== Math.floor(s * 2)) {
+      throw new Error("Donne une note entre 1 et 10 (par demi-points) à chaque joueur");
+    }
+    return { match_id: matchId, rater_id: raterId, ratee_id: id, score: s };
+  });
+}
+
+function statsRoster(roster) {
+  return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel").map((r) => r.player_id);
+}
+
+function buildStatsRows(rosterIds, stats, ratingByPlayer) {
+  return rosterIds.map((id) => {
+    const s = stats.find((x) => x.playerId === id) || { playerId: id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 };
+    return { ...s, rating: ratingByPlayer[id] ?? null };
+  });
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -188,5 +260,15 @@ if (typeof module !== "undefined" && module.exports) {
     diffLineup,
     diffLineupEdit,
     saveGoalWithSheet,
+    seasonOf,
+    seasonsFromMatches,
+    filterMatchesForStats,
+    ratingProgress,
+    matchAverages,
+    playerRatingSeries,
+    averageRating,
+    buildRatingPayload,
+    statsRoster,
+    buildStatsRows,
   };
 }

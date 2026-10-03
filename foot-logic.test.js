@@ -22,6 +22,16 @@ const {
   diffLineup,
   diffLineupEdit,
   saveGoalWithSheet,
+  seasonOf,
+  seasonsFromMatches,
+  filterMatchesForStats,
+  ratingProgress,
+  matchAverages,
+  playerRatingSeries,
+  averageRating,
+  buildRatingPayload,
+  statsRoster,
+  buildStatsRows,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -279,4 +289,95 @@ test("saveGoalWithSheet does not write the goal when the sheet write fails (no d
     writeGoal: async () => { goalWritten = true; },
   }), /network/);
   assert.equal(goalWritten, false);
+});
+
+test("seasonOf maps September–August to one season label", () => {
+  assert.equal(seasonOf(new Date(2026, 8, 1).toISOString()), "2026-2027");
+  assert.equal(seasonOf(new Date(2027, 7, 31, 12).toISOString()), "2026-2027");
+  assert.equal(seasonOf(new Date(2026, 7, 31, 12).toISOString()), "2025-2026");
+});
+
+test("seasonsFromMatches lists distinct seasons newest first", () => {
+  const ms = [{ match_datetime: new Date(2025, 9, 1).toISOString() }, { match_datetime: new Date(2026, 9, 1).toISOString() }, { match_datetime: new Date(2026, 10, 1).toISOString() }];
+  assert.deepEqual(seasonsFromMatches(ms), ["2026-2027", "2025-2026"]);
+});
+
+test("filterMatchesForStats filters by season and type", () => {
+  const ms = [
+    { id: 1, match_type: "amical", match_datetime: new Date(2026, 9, 1).toISOString() },
+    { id: 2, match_type: "championnat", match_datetime: new Date(2026, 9, 2).toISOString() },
+    { id: 3, match_type: "championnat", match_datetime: new Date(2025, 9, 2).toISOString() },
+  ];
+  assert.deepEqual(filterMatchesForStats(ms, { season: "2026-2027", type: "all" }).map((m) => m.id), [1, 2]);
+  assert.deepEqual(filterMatchesForStats(ms, { season: "all", type: "championnat" }).map((m) => m.id), [2, 3]);
+});
+
+const R = (rater_id, ratee_id, score) => ({ match_id: 1, rater_id, ratee_id, score });
+
+test("ratingProgress: a voter is done only after rating every other sheet player", () => {
+  const p = ratingProgress([1, 2, 3], [R(1, 2, 7), R(1, 3, 6), R(2, 1, 8)]);
+  assert.deepEqual(p.doneIds, [1]);
+  assert.deepEqual(p.pendingIds, [2, 3]);
+  assert.equal(p.complete, false);
+});
+
+test("ratingProgress is complete when everyone voted", () => {
+  assert.equal(ratingProgress([1, 2], [R(1, 2, 7), R(2, 1, 8)]).complete, true);
+});
+
+test("ratingProgress never completes with fewer than 2 sheet players", () => {
+  assert.equal(ratingProgress([1], []).complete, false);
+});
+
+test("matchAverages averages received scores and ignores raters no longer on the sheet", () => {
+  const avg = matchAverages([1, 2, 3], [R(1, 2, 7), R(3, 2, 8), R(9, 2, 1), R(2, 1, 6.5)]);
+  assert.equal(avg[2], 7.5);
+  assert.equal(avg[1], 6.5);
+  assert.equal(avg[3], null);
+});
+
+test("playerRatingSeries uses validated matches only, sorted by date", () => {
+  const matches = [
+    { id: 1, match_datetime: "2026-10-10T18:00:00Z", opponent_name: "B", ratings_validated_at: "x" },
+    { id: 2, match_datetime: "2026-10-01T18:00:00Z", opponent_name: "A", ratings_validated_at: "x" },
+    { id: 3, match_datetime: "2026-10-20T18:00:00Z", opponent_name: "C", ratings_validated_at: null },
+  ];
+  const lineups = [{ match_id: 1, player_id: 1 }, { match_id: 1, player_id: 2 }, { match_id: 2, player_id: 1 }, { match_id: 2, player_id: 2 }, { match_id: 3, player_id: 1 }, { match_id: 3, player_id: 2 }];
+  const ratings = [
+    { match_id: 1, rater_id: 2, ratee_id: 1, score: 8 },
+    { match_id: 2, rater_id: 2, ratee_id: 1, score: 6 },
+    { match_id: 3, rater_id: 2, ratee_id: 1, score: 10 },
+  ];
+  const s = playerRatingSeries(matches, ratings, lineups, 1);
+  assert.deepEqual(s.map((x) => [x.matchId, x.rating, x.opponent]), [[2, 6, "A"], [1, 8, "B"]]);
+  assert.equal(averageRating(s), 7);
+  assert.equal(averageRating([]), null);
+});
+
+test("buildRatingPayload returns one row per other sheet player", () => {
+  assert.deepEqual(buildRatingPayload(5, 1, [1, 2, 3], { 2: "7.5", 3: 9 }), [
+    { match_id: 5, rater_id: 1, ratee_id: 2, score: 7.5 },
+    { match_id: 5, rater_id: 1, ratee_id: 3, score: 9 },
+  ]);
+});
+
+test("buildRatingPayload rejects a missing, out-of-range or non-half-point score", () => {
+  assert.throws(() => buildRatingPayload(5, 1, [1, 2, 3], { 2: 7 }), /note/i);
+  assert.throws(() => buildRatingPayload(5, 1, [1, 2], { 2: 11 }), /note/i);
+  assert.throws(() => buildRatingPayload(5, 1, [1, 2], { 2: 7.3 }), /note/i);
+});
+
+test("statsRoster keeps regular and occasional players only", () => {
+  assert.deepEqual(statsRoster([{ player_id: 1, role: "regulier" }, { player_id: 2, role: "invite" }, { player_id: 3, role: "occasionnel" }]), [1, 3]);
+});
+
+test("buildStatsRows adds zero rows and ratings for the roster only", () => {
+  const rows = buildStatsRows([1, 2], [{ playerId: 1, played: 2, wins: 1, draws: 0, losses: 1, goals: 1, assists: 0, decisive: 1 }, { playerId: 9, played: 1, wins: 1, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 }], { 1: 7.25 });
+  assert.deepEqual(rows.map((r) => [r.playerId, r.played, r.rating]), [[1, 2, 7.25], [2, 0, null]]);
+});
+
+test("statValue and formatStatValue handle the rating key", () => {
+  assert.equal(statValue({ rating: 7.25, played: 2 }, "rating", "pct"), 7.25);
+  assert.equal(formatStatValue(7.25, "rating", "abs"), "7.3");
+  assert.equal(formatStatValue(null, "rating", "pct"), "—");
 });
