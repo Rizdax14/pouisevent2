@@ -152,7 +152,7 @@ function FootRosterManager({ roster, reload }) {
       if (role === "") {
         await sbFetch("foot_roster", `?player_id=eq.${playerId}`, { method: "DELETE" });
       } else {
-        await SUPABASE.from("foot_roster").upsert({ player_id: playerId, role }, { onConflict: "player_id" });
+        assertUpsertOk(await SUPABASE.from("foot_roster").upsert({ player_id: playerId, role }, { onConflict: "player_id" }));
       }
       await reload();
     } catch (e) {
@@ -265,7 +265,7 @@ function FootEventTimeline({ events }) {
   );
 }
 
-function FootGoalPicker({ roster, onConfirm, onCancel, withAssist }) {
+function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
   const options = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
@@ -288,9 +288,9 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist }) {
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
         <button onClick={onCancel} style={{ flex: 1, background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "8px", cursor: "pointer" }}>Annuler</button>
         <button
-          onClick={() => playerId && onConfirm(Number(playerId), assistId ? Number(assistId) : null)}
-          disabled={!playerId}
-          style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: playerId ? "pointer" : "default", opacity: playerId ? 1 : 0.5 }}
+          onClick={() => canConfirmGoal(playerId, busy) && onConfirm(Number(playerId), assistId ? Number(assistId) : null)}
+          disabled={!canConfirmGoal(playerId, busy)}
+          style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: canConfirmGoal(playerId, busy) ? "pointer" : "default", opacity: canConfirmGoal(playerId, busy) ? 1 : 0.5 }}
         >
           Valider
         </button>
@@ -372,22 +372,23 @@ function FootLiveAdminConsole({ match, roster, events, reload }) {
   }
 
   const isLastHalf = match.current_half >= match.nb_halves;
+  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
 
   return (
     <div style={{ background: "#0d0d1c", border: "1px solid #3b82f655", borderRadius: 12, padding: 16, marginTop: 16 }}>
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, color: "#3b82f6" }}>CONSOLE ADMIN — Mi-temps {match.current_half}/{match.nb_halves}</div>
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, margin: "8px 0" }}>{String(minutesElapsed).padStart(2, "0")}:{String(elapsedSeconds % 60).padStart(2, "0")}</div>
 
-      {!running && <button onClick={startHalf} disabled={busy} style={{ width: "100%", background: "#34d399", color: "#080810", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>▶ Démarrer la mi-temps</button>}
+      {liveAction === "start" && <button onClick={startHalf} disabled={busy} style={{ width: "100%", background: "#34d399", color: "#080810", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>▶ Démarrer la mi-temps</button>}
 
-      {running && (
+      {liveAction === "playing" && (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <button onClick={() => setPicking("bl")} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But Bière Leverculsec</button>
             <button onClick={() => logGoal("goal_opponent", null, null)} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But adverse</button>
           </div>
           {picking === "bl" && (
-            <FootGoalPicker roster={roster} withAssist onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />
+            <FootGoalPicker roster={roster} withAssist busy={busy} onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />
           )}
           <button onClick={endHalf} disabled={busy} style={{ width: "100%", background: "#1e1e30", color: "#eeeef5", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginTop: 10 }}>
             {isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps"}
@@ -395,7 +396,7 @@ function FootLiveAdminConsole({ match, roster, events, reload }) {
         </>
       )}
 
-      {!running && isLastHalf && match.half_elapsed_seconds > 0 && (
+      {liveAction === "close" && (
         <button onClick={closeMatch} disabled={busy} style={{ width: "100%", background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer" }}>🏁 Clôturer le match</button>
       )}
     </div>
@@ -441,10 +442,10 @@ function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, 
   async function setMyStatus(status) {
     setSaving(true);
     try {
-      await SUPABASE.from("foot_attendance").upsert(
+      assertUpsertOk(await SUPABASE.from("foot_attendance").upsert(
         { match_id: match.id, player_id: currentPlayer.id, status },
         { onConflict: "match_id,player_id" }
-      );
+      ));
       await reload();
     } catch (e) {
       console.warn("attendance update failed", e);

@@ -7,6 +7,9 @@ const {
   computeHalfElapsedSeconds,
   buildEventTimeline,
   nextHalfState,
+  canConfirmGoal,
+  nextLiveAction,
+  assertUpsertOk,
 } = require("./foot-logic.js");
 
 test("computeFootScore counts goal_bl and goal_opponent separately", () => {
@@ -64,4 +67,42 @@ test("nextHalfState signals finish on the last half", () => {
 
 test("nextHalfState signals finish even if currentHalf somehow exceeds nbHalves", () => {
   assert.deepEqual(nextHalfState(4, 3), { type: "finish" });
+});
+
+test("canConfirmGoal is false with no player selected", () => {
+  assert.equal(canConfirmGoal("", false), false);
+});
+
+test("canConfirmGoal is false while a request is already in flight (double-click guard)", () => {
+  assert.equal(canConfirmGoal("12", true), false);
+});
+
+test("canConfirmGoal is true with a player selected and no request in flight", () => {
+  assert.equal(canConfirmGoal("12", false), true);
+});
+
+test("nextLiveAction is 'start' when the half hasn't started and isn't the finished last half", () => {
+  assert.equal(nextLiveAction(false, false, 0), "start");
+});
+
+test("nextLiveAction is 'playing' while the half is running, even on the last half", () => {
+  assert.equal(nextLiveAction(true, true, 0), "playing");
+});
+
+test("nextLiveAction is 'close' once the last half has been played and stopped", () => {
+  assert.equal(nextLiveAction(false, true, 900), "close");
+});
+
+test("nextLiveAction never returns both 'start' and 'close' for the same paused-last-half state", () => {
+  // Regression: the old UI rendered both the \"Démarrer\" and \"Clôturer\" buttons at once here.
+  const action = nextLiveAction(false, true, 900);
+  assert.notEqual(action, "start");
+});
+
+test("assertUpsertOk does nothing when there is no error", () => {
+  assert.doesNotThrow(() => assertUpsertOk({ data: [{ id: 1 }], error: null }));
+});
+
+test("assertUpsertOk throws when supabase-js returns an error object (it never rejects the promise)", () => {
+  assert.throws(() => assertUpsertOk({ data: null, error: { message: "permission denied" } }), /permission denied/);
 });

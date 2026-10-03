@@ -347,12 +347,12 @@ function FootRosterManager({
           method: "DELETE"
         });
       } else {
-        await SUPABASE.from("foot_roster").upsert({
+        assertUpsertOk(await SUPABASE.from("foot_roster").upsert({
           player_id: playerId,
           role
         }, {
           onConflict: "player_id"
-        });
+        }));
       }
       await reload();
     } catch (e) {
@@ -586,7 +586,8 @@ function FootGoalPicker({
   roster,
   onConfirm,
   onCancel,
-  withAssist
+  withAssist,
+  busy
 }) {
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
@@ -665,8 +666,8 @@ function FootGoalPicker({
       cursor: "pointer"
     }
   }, "Annuler"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => playerId && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
-    disabled: !playerId,
+    onClick: () => canConfirmGoal(playerId, busy) && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
+    disabled: !canConfirmGoal(playerId, busy),
     style: {
       flex: 1,
       background: "#3b82f6",
@@ -675,8 +676,8 @@ function FootGoalPicker({
       borderRadius: 6,
       padding: "8px",
       fontWeight: 700,
-      cursor: playerId ? "pointer" : "default",
-      opacity: playerId ? 1 : 0.5
+      cursor: canConfirmGoal(playerId, busy) ? "pointer" : "default",
+      opacity: canConfirmGoal(playerId, busy) ? 1 : 0.5
     }
   }, "Valider")));
 }
@@ -771,6 +772,7 @@ function FootLiveAdminConsole({
     }
   }
   const isLastHalf = match.current_half >= match.nb_halves;
+  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#0d0d1c",
@@ -791,7 +793,7 @@ function FootLiveAdminConsole({
       fontSize: 28,
       margin: "8px 0"
     }
-  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), !running && /*#__PURE__*/React.createElement("button", {
+  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), liveAction === "start" && /*#__PURE__*/React.createElement("button", {
     onClick: startHalf,
     disabled: busy,
     style: {
@@ -805,7 +807,7 @@ function FootLiveAdminConsole({
       cursor: "pointer",
       marginBottom: 10
     }
-  }, "\u25B6 D\xE9marrer la mi-temps"), running && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\u25B6 D\xE9marrer la mi-temps"), liveAction === "playing" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -838,6 +840,7 @@ function FootLiveAdminConsole({
   }, "\u26BD But adverse")), picking === "bl" && /*#__PURE__*/React.createElement(FootGoalPicker, {
     roster: roster,
     withAssist: true,
+    busy: busy,
     onCancel: () => setPicking(null),
     onConfirm: (playerId, assistId) => logGoal("goal_bl", playerId, assistId)
   }), /*#__PURE__*/React.createElement("button", {
@@ -854,7 +857,7 @@ function FootLiveAdminConsole({
       cursor: "pointer",
       marginTop: 10
     }
-  }, isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps")), !running && isLastHalf && match.half_elapsed_seconds > 0 && /*#__PURE__*/React.createElement("button", {
+  }, isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps")), liveAction === "close" && /*#__PURE__*/React.createElement("button", {
     onClick: closeMatch,
     disabled: busy,
     style: {
@@ -967,13 +970,13 @@ function FootScheduledView({
   async function setMyStatus(status) {
     setSaving(true);
     try {
-      await SUPABASE.from("foot_attendance").upsert({
+      assertUpsertOk(await SUPABASE.from("foot_attendance").upsert({
         match_id: match.id,
         player_id: currentPlayer.id,
         status
       }, {
         onConflict: "match_id,player_id"
-      });
+      }));
       await reload();
     } catch (e) {
       console.warn("attendance update failed", e);

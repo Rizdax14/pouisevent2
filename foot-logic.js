@@ -38,6 +38,22 @@ function nextHalfState(currentHalf, nbHalves) {
   return { type: "finish" };
 }
 
+function canConfirmGoal(playerId, busy) {
+  return !!playerId && !busy;
+}
+
+function nextLiveAction(running, isLastHalf, halfElapsedSeconds) {
+  if (running) return "playing";
+  if (isLastHalf && halfElapsedSeconds > 0) return "close";
+  return "start";
+}
+
+function assertUpsertOk(result) {
+  if (result && result.error) {
+    throw new Error(result.error.message || String(result.error));
+  }
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     computeFootScore,
@@ -45,5 +61,8 @@ if (typeof module !== "undefined" && module.exports) {
     computeHalfElapsedSeconds,
     buildEventTimeline,
     nextHalfState,
+    canConfirmGoal,
+    nextLiveAction,
+    assertUpsertOk,
   };
 }
