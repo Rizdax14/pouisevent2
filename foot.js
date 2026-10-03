@@ -552,13 +552,363 @@ function FootStartMatchConfig({
     }
   }, saving ? "Démarrage…" : "Démarrer le match"))));
 }
-function FootLiveView() {
+function FootEventTimeline({
+  events
+}) {
+  const sorted = buildEventTimeline(events);
+  if (sorted.length === 0) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13
+    }
+  }, "Aucun but pour l'instant.");
+  return /*#__PURE__*/React.createElement("div", null, sorted.map(e => {
+    const scorer = e.player_id ? PLAYERS.find(p => p.id === e.player_id) : null;
+    const assist = e.assist_player_id ? PLAYERS.find(p => p.id === e.assist_player_id) : null;
+    const label = e.type === "goal_bl" ? `⚽ ${scorer ? getDisplayName(scorer, PLAYERS) : "?"}${assist ? " (passe D: " + getDisplayName(assist, PLAYERS) + ")" : ""}` : `⚽ But adverse`;
+    return /*#__PURE__*/React.createElement("div", {
+      key: e.id,
+      style: {
+        display: "flex",
+        gap: 10,
+        padding: "5px 0",
+        fontSize: 13
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#60607a",
+        width: 50
+      }
+    }, e.half, "e \xB7 ", e.minute, "'"), /*#__PURE__*/React.createElement("span", null, label));
+  }));
+}
+function FootGoalPicker({
+  roster,
+  onConfirm,
+  onCancel,
+  withAssist
+}) {
+  const [playerId, setPlayerId] = React.useState("");
+  const [assistId, setAssistId] = React.useState("");
+  const options = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean);
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 20,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      padding: 14,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
       color: "#60607a"
     }
-  }, "Task 11");
+  }, "Buteur"), /*#__PURE__*/React.createElement("select", {
+    value: playerId,
+    onChange: e => setPlayerId(e.target.value),
+    style: {
+      display: "block",
+      width: "100%",
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "7px 10px",
+      marginTop: 4,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, getDisplayName(p, PLAYERS)))), withAssist && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#60607a"
+    }
+  }, "Passe d\xE9cisive (optionnel)"), /*#__PURE__*/React.createElement("select", {
+    value: assistId,
+    onChange: e => setAssistId(e.target.value),
+    style: {
+      display: "block",
+      width: "100%",
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "7px 10px",
+      marginTop: 4,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, getDisplayName(p, PLAYERS))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    style: {
+      flex: 1,
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "8px",
+      cursor: "pointer"
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => playerId && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
+    disabled: !playerId,
+    style: {
+      flex: 1,
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      fontWeight: 700,
+      cursor: playerId ? "pointer" : "default",
+      opacity: playerId ? 1 : 0.5
+    }
+  }, "Valider")));
+}
+function FootLiveAdminConsole({
+  match,
+  roster,
+  events,
+  reload
+}) {
+  const [now, setNow] = React.useState(Date.now());
+  const [picking, setPicking] = React.useState(null); // null | "bl" | "opponent"
+  const [busy, setBusy] = React.useState(false);
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const elapsedSeconds = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
+  const minutesElapsed = Math.floor(elapsedSeconds / 60);
+  const running = !!match.half_started_at;
+  async function logGoal(type, playerId, assistId) {
+    setBusy(true);
+    try {
+      await sbInsert("foot_match_events", {
+        match_id: match.id,
+        half: match.current_half,
+        minute: minutesElapsed,
+        type,
+        player_id: playerId,
+        assist_player_id: assistId
+      });
+      setPicking(null);
+      await reload();
+    } catch (e) {
+      console.warn("log goal failed", e);
+    }
+    setBusy(false);
+  }
+  async function startHalf() {
+    setBusy(true);
+    try {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        half_started_at: new Date().toISOString()
+      });
+      await reload();
+    } catch (e) {
+      console.warn(e);
+    }
+    setBusy(false);
+  }
+  async function endHalf() {
+    setBusy(true);
+    try {
+      const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
+      const next = nextHalfState(match.current_half, match.nb_halves);
+      if (next.type === "next") {
+        await sbUpdate("foot_matches", {
+          id: match.id
+        }, {
+          half_elapsed_seconds: 0,
+          half_started_at: null,
+          current_half: next.half
+        });
+      } else {
+        await sbUpdate("foot_matches", {
+          id: match.id
+        }, {
+          half_elapsed_seconds: frozenElapsed,
+          half_started_at: null
+        });
+      }
+      await reload();
+    } catch (e) {
+      console.warn(e);
+    }
+    setBusy(false);
+  }
+  async function closeMatch() {
+    setBusy(true);
+    try {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        status: "finished",
+        half_started_at: null
+      });
+      await reload();
+    } catch (e) {
+      console.warn(e);
+      setBusy(false);
+    }
+  }
+  const isLastHalf = match.current_half >= match.nb_halves;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #3b82f655",
+      borderRadius: 12,
+      padding: 16,
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 14,
+      color: "#3b82f6"
+    }
+  }, "CONSOLE ADMIN \u2014 Mi-temps ", match.current_half, "/", match.nb_halves), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 28,
+      margin: "8px 0"
+    }
+  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), !running && /*#__PURE__*/React.createElement("button", {
+    onClick: startHalf,
+    disabled: busy,
+    style: {
+      width: "100%",
+      background: "#34d399",
+      color: "#080810",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontWeight: 700,
+      cursor: "pointer",
+      marginBottom: 10
+    }
+  }, "\u25B6 D\xE9marrer la mi-temps"), running && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPicking("bl"),
+    disabled: busy,
+    style: {
+      flex: 1,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "10px",
+      cursor: "pointer"
+    }
+  }, "\u26BD But Bi\xE8re Leverculsec"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => logGoal("goal_opponent", null, null),
+    disabled: busy,
+    style: {
+      flex: 1,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      color: "#eeeef5",
+      padding: "10px",
+      cursor: "pointer"
+    }
+  }, "\u26BD But adverse")), picking === "bl" && /*#__PURE__*/React.createElement(FootGoalPicker, {
+    roster: roster,
+    withAssist: true,
+    onCancel: () => setPicking(null),
+    onConfirm: (playerId, assistId) => logGoal("goal_bl", playerId, assistId)
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: endHalf,
+    disabled: busy,
+    style: {
+      width: "100%",
+      background: "#1e1e30",
+      color: "#eeeef5",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontWeight: 700,
+      cursor: "pointer",
+      marginTop: 10
+    }
+  }, isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps")), !running && isLastHalf && match.half_elapsed_seconds > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: closeMatch,
+    disabled: busy,
+    style: {
+      width: "100%",
+      background: "#ef4444",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "\uD83C\uDFC1 Cl\xF4turer le match"));
+}
+function FootLiveView({
+  match,
+  roster,
+  events,
+  currentPlayer,
+  isAdmin,
+  reload
+}) {
+  const matchEvents = events.filter(e => e.match_id === match.id);
+  const score = computeFootScore(matchEvents);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 18
+    }
+  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 32,
+      margin: "10px 0"
+    }
+  }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
+    events: matchEvents
+  })), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
+    match: match,
+    roster: roster,
+    events: matchEvents,
+    reload: reload
+  }));
 }
 function FootFinishedView() {
   return /*#__PURE__*/React.createElement("div", {

@@ -243,7 +243,179 @@ function FootStartMatchConfig({ match, reload, onCancel }) {
   );
 }
 
-function FootLiveView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 11</div>; }
+function FootEventTimeline({ events }) {
+  const sorted = buildEventTimeline(events);
+  if (sorted.length === 0) return <div style={{ color: "#60607a", fontSize: 13 }}>Aucun but pour l'instant.</div>;
+  return (
+    <div>
+      {sorted.map((e) => {
+        const scorer = e.player_id ? PLAYERS.find((p) => p.id === e.player_id) : null;
+        const assist = e.assist_player_id ? PLAYERS.find((p) => p.id === e.assist_player_id) : null;
+        const label = e.type === "goal_bl"
+          ? `⚽ ${scorer ? getDisplayName(scorer, PLAYERS) : "?"}${assist ? " (passe D: " + getDisplayName(assist, PLAYERS) + ")" : ""}`
+          : `⚽ But adverse`;
+        return (
+          <div key={e.id} style={{ display: "flex", gap: 10, padding: "5px 0", fontSize: 13 }}>
+            <span style={{ color: "#60607a", width: 50 }}>{e.half}e · {e.minute}'</span>
+            <span>{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FootGoalPicker({ roster, onConfirm, onCancel, withAssist }) {
+  const [playerId, setPlayerId] = React.useState("");
+  const [assistId, setAssistId] = React.useState("");
+  const options = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
+  return (
+    <div style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, padding: 14, marginTop: 10 }}>
+      <label style={{ fontSize: 11, color: "#60607a" }}>Buteur</label>
+      <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={{ display: "block", width: "100%", background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "7px 10px", marginTop: 4, marginBottom: 10 }}>
+        <option value="">— Choisir —</option>
+        {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+      </select>
+      {withAssist && (
+        <>
+          <label style={{ fontSize: 11, color: "#60607a" }}>Passe décisive (optionnel)</label>
+          <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={{ display: "block", width: "100%", background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "7px 10px", marginTop: 4, marginBottom: 10 }}>
+            <option value="">— Aucune —</option>
+            {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+          </select>
+        </>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <button onClick={onCancel} style={{ flex: 1, background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "8px", cursor: "pointer" }}>Annuler</button>
+        <button
+          onClick={() => playerId && onConfirm(Number(playerId), assistId ? Number(assistId) : null)}
+          disabled={!playerId}
+          style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: playerId ? "pointer" : "default", opacity: playerId ? 1 : 0.5 }}
+        >
+          Valider
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FootLiveAdminConsole({ match, roster, events, reload }) {
+  const [now, setNow] = React.useState(Date.now());
+  const [picking, setPicking] = React.useState(null); // null | "bl" | "opponent"
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const elapsedSeconds = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
+  const minutesElapsed = Math.floor(elapsedSeconds / 60);
+  const running = !!match.half_started_at;
+
+  async function logGoal(type, playerId, assistId) {
+    setBusy(true);
+    try {
+      await sbInsert("foot_match_events", {
+        match_id: match.id,
+        half: match.current_half,
+        minute: minutesElapsed,
+        type,
+        player_id: playerId,
+        assist_player_id: assistId,
+      });
+      setPicking(null);
+      await reload();
+    } catch (e) {
+      console.warn("log goal failed", e);
+    }
+    setBusy(false);
+  }
+
+  async function startHalf() {
+    setBusy(true);
+    try {
+      await sbUpdate("foot_matches", { id: match.id }, { half_started_at: new Date().toISOString() });
+      await reload();
+    } catch (e) { console.warn(e); }
+    setBusy(false);
+  }
+
+  async function endHalf() {
+    setBusy(true);
+    try {
+      const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
+      const next = nextHalfState(match.current_half, match.nb_halves);
+      if (next.type === "next") {
+        await sbUpdate("foot_matches", { id: match.id }, {
+          half_elapsed_seconds: 0,
+          half_started_at: null,
+          current_half: next.half,
+        });
+      } else {
+        await sbUpdate("foot_matches", { id: match.id }, {
+          half_elapsed_seconds: frozenElapsed,
+          half_started_at: null,
+        });
+      }
+      await reload();
+    } catch (e) { console.warn(e); }
+    setBusy(false);
+  }
+
+  async function closeMatch() {
+    setBusy(true);
+    try {
+      await sbUpdate("foot_matches", { id: match.id }, { status: "finished", half_started_at: null });
+      await reload();
+    } catch (e) { console.warn(e); setBusy(false); }
+  }
+
+  const isLastHalf = match.current_half >= match.nb_halves;
+
+  return (
+    <div style={{ background: "#0d0d1c", border: "1px solid #3b82f655", borderRadius: 12, padding: 16, marginTop: 16 }}>
+      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, color: "#3b82f6" }}>CONSOLE ADMIN — Mi-temps {match.current_half}/{match.nb_halves}</div>
+      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, margin: "8px 0" }}>{String(minutesElapsed).padStart(2, "0")}:{String(elapsedSeconds % 60).padStart(2, "0")}</div>
+
+      {!running && <button onClick={startHalf} disabled={busy} style={{ width: "100%", background: "#34d399", color: "#080810", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>▶ Démarrer la mi-temps</button>}
+
+      {running && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button onClick={() => setPicking("bl")} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But Bière Leverculsec</button>
+            <button onClick={() => logGoal("goal_opponent", null, null)} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But adverse</button>
+          </div>
+          {picking === "bl" && (
+            <FootGoalPicker roster={roster} withAssist onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />
+          )}
+          <button onClick={endHalf} disabled={busy} style={{ width: "100%", background: "#1e1e30", color: "#eeeef5", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginTop: 10 }}>
+            {isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps"}
+          </button>
+        </>
+      )}
+
+      {!running && isLastHalf && match.half_elapsed_seconds > 0 && (
+        <button onClick={closeMatch} disabled={busy} style={{ width: "100%", background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer" }}>🏁 Clôturer le match</button>
+      )}
+    </div>
+  );
+}
+
+function FootLiveView({ match, roster, events, currentPlayer, isAdmin, reload }) {
+  const matchEvents = events.filter((e) => e.match_id === match.id);
+  const score = computeFootScore(matchEvents);
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, margin: "10px 0" }}>{score.bl} — {score.opponent}</div>
+        <FootEventTimeline events={matchEvents} />
+      </div>
+      {isAdmin && <FootLiveAdminConsole match={match} roster={roster} events={matchEvents} reload={reload} />}
+    </div>
+  );
+}
 function FootFinishedView() { return <div style={{ padding: 20, color: "#60607a" }}>Task 12</div>; }
 
 function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, reload, onStartMatch }) {
