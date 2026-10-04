@@ -147,3 +147,30 @@ test("ratingRows: ties broken by name", () => {
   const rows = L.ratingRows([1, 2], { 1: 7, 2: 7 }, {}, (id) => (id === 1 ? "Zoé" : "Adam"));
   assert.deepEqual(rows.map((r) => r.name), ["Adam", "Zoé"]);
 });
+
+test("zoomFramingAt keeps the canvas point under the cursor fixed", () => {
+  const f = { x: 100, y: 200, width: 400 };
+  const g = L.zoomFramingAt(f, 1.5, 300, 350);
+  assert.equal(g.width, 600);
+  // point (300,350) sits at the same relative spot of the photo before and after
+  assert.equal((300 - f.x) / f.width, (300 - g.x) / g.width);
+  assert.equal((350 - f.y) / f.width, (350 - g.y) / g.width);
+});
+
+test("zoomFramingAt: factor 1 is a no-op and bad factors are ignored", () => {
+  const f = { x: -20, y: 5, width: 300 };
+  assert.deepEqual(L.zoomFramingAt(f, 1, 10, 10), f);
+  assert.deepEqual(L.zoomFramingAt(f, 0, 10, 10), f);
+  assert.deepEqual(L.zoomFramingAt(f, NaN, 10, 10), f);
+});
+
+test("zoomFramingAt clamps the width between 20% and 800% of the reference width", () => {
+  const f = { x: 0, y: 0, width: 400 };
+  assert.equal(L.zoomFramingAt(f, 100, 0, 0, 400).width, 3200);
+  assert.equal(L.zoomFramingAt(f, 0.001, 0, 0, 400).width, 80);
+});
+
+test("framingZoomPercent: 100% is the reference width", () => {
+  assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 500 }, 500), 100);
+  assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 750 }, 500), 150);
+});

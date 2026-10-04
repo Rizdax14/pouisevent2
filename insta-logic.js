@@ -39,6 +39,20 @@ function framedRect(layout, photo, framing) {
   return { x: f.x, y: f.y, width: f.width, height: Math.round((f.width * photo.height) / photo.width) };
 }
 
+// Zoom a framing by `factor` keeping the canvas point (px, py) fixed; width is clamped to 20%–800% of refWidth when given.
+function zoomFramingAt(f, factor, px, py, refWidth) {
+  if (!(factor > 0) || !isFinite(factor)) return f;
+  let width = f.width * factor;
+  if (refWidth > 0) width = Math.min(refWidth * 8, Math.max(refWidth * 0.2, width));
+  const k = width / f.width;
+  if (k === 1) return f;
+  return { x: px - (px - f.x) * k, y: py - (py - f.y) * k, width };
+}
+
+function framingZoomPercent(f, refWidth) {
+  return Math.round((f.width / refWidth) * 100);
+}
+
 function choosePhoto(photos, playerId, kind, kit) {
   const mine = photos.filter((p) => p.player_id === playerId && p.kind === kind);
   const rank = (p) => (p.kit === kit ? 0 : 2) + (p.retouched ? 0 : 1);
@@ -156,5 +170,5 @@ function availablePosts({ matches, lineups, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, defaultFraming, framedRect, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
 }

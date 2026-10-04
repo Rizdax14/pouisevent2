@@ -38,9 +38,38 @@ async function build(kind, q) {
     const s = F.computeFootScore(ctx.events);
     return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalRows(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
   }
+  if (kind === "frame") return buildFrame(q);
   if (kind === "ratings") return buildRatings(q);
   if (kind === "rankings") return buildRankings(q);
   throw new Error(`Type inconnu : ${kind}`);
+}
+
+// Framing preview: one layout with sample text and a photo placed by ?x&y&w, or by its saved framing.
+async function buildFrame(q) {
+  const layout = q.layout;
+  if (!Object.prototype.hasOwnProperty.call(L.LAYOUTS, layout)) throw new Error("Layout inconnu");
+  const id = Number(q.photo);
+  if (!Number.isInteger(id)) throw new Error("Photo invalide");
+  const [ph] = await sbGet("foot_player_photos", `?id=eq.${id}&select=*`);
+  if (!ph) throw new Error("Photo introuvable");
+  let fr = null;
+  if (q.x !== undefined || q.y !== undefined || q.w !== undefined) {
+    fr = { x: Number(q.x), y: Number(q.y), width: Number(q.w) };
+    if (![fr.x, fr.y, fr.width].every(Number.isFinite) || fr.width <= 0) throw new Error("Cadrage invalide");
+  } else {
+    [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${layout}&select=*`);
+  }
+  const rect = L.framedRect(layout, ph, fr);
+  const photoUri = await imageDataUri(publicUrl("player-photos", ph.path));
+  const theme = THEMES[ph.kit];
+  const [w, h] = L.LAYOUTS[layout].canvas;
+  if (layout === "render") return T.maskedPhotoEl({ w, h, radius: 150, fill: "#ffffff", rect, photoUri });
+  if (layout.startsWith("podium_")) return T.maskedPhotoEl({ w, h, radius: 40, fill: "#ffffff", rect, photoUri });
+  const bg = await imageDataUri(theme.bg);
+  if (layout === "matchday") return T.matchDayEl({ bg, theme, opponent: "ADVERSAIRE", bandText: "JEUDI 19H30 | STADE | VILLE", rect, photoUri });
+  if (layout === "result") return T.resultEl({ bg, theme, opponent: "ADVERSAIRE", bl: 3, opp: 1, goals: [{ minute: 12, scorer: "Joueur", assist: "Passeur" }, { minute: 47, scorer: "Joueur", assist: null }], rect, photoUri });
+  const lines = Array.from({ length: 10 }, (_, i) => ({ number: String(i + 1), name: "Joueur" }));
+  return T.groupeEl({ bg, theme, lines, rect, photoUri });
 }
 
 async function buildRatings(q) {
@@ -116,7 +145,8 @@ async function buildRankings(q) {
 module.exports = async (req, res) => {
   try {
     const el = await build(req.query.kind, req.query);
-    const jpg = await renderJpeg(el);
+    const size = req.query.kind === "frame" && L.LAYOUTS[req.query.layout] ? L.LAYOUTS[req.query.layout].canvas : undefined;
+    const jpg = await renderJpeg(el, size);
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "no-store");
     res.status(200).send(jpg);

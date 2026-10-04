@@ -1269,6 +1269,195 @@ function FootPhotosTab({ roster, photos, reload }) {
   );
 }
 
+// Overlay boxes (canvas px) showing what covers the photo in each layout.
+// They mirror lib/insta/templates.js — keep them in sync when a template moves.
+const FRAMING_GUIDES = {
+  matchday: [
+    { label: "MATCH DAY", x: 0, y: 0, w: 1080, h: 180, font: 158 },
+    { label: "vs ADVERSAIRE", x: 360, y: 180, w: 720, h: 120 },
+    { label: "bandeau", x: 44, y: 1260, w: 992, h: 68 },
+  ],
+  result: [
+    { label: "RESULTAT", x: 0, y: 0, w: 1080, h: 200, font: 180 },
+    { label: "score", x: 400, y: 225, w: 680, h: 300 },
+    { label: "buts", x: 395, y: 625, w: 505, h: 394 },
+  ],
+  groupe: [
+    { label: "GROUPE", x: 0, y: 0, w: 1080, h: 254, font: 234 },
+    { label: "liste (10 joueurs)", x: 608, y: 300, w: 412, h: 960 },
+  ],
+  render: [],
+  podium_dos: [{ label: "n°", x: 0, y: 0, w: 78, h: 74 }, { label: "nom + valeur", x: 10, y: 384, w: 310, h: 46 }],
+  podium_celebration: [{ label: "n°", x: 0, y: 0, w: 78, h: 74 }, { label: "nom + valeur", x: 10, y: 384, w: 310, h: 46 }],
+  podium_render: [{ label: "n°", x: 0, y: 0, w: 78, h: 74 }, { label: "nom + valeur", x: 10, y: 384, w: 310, h: 46 }],
+};
+const FRAMING_LAYOUT_LABELS = [
+  ["matchday", "Match Day"], ["groupe", "Groupe"], ["result", "Résultat"], ["render", "Render (rond)"],
+  ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"],
+];
+
+function FootFramingTool({ roster, photos, framings, reload }) {
+  const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
+  const players = [...new Set(photos.map((p) => p.player_id))].map((id) => PLAYERS.find((p) => p.id === id)).filter((p) => p && roster.some((r) => r.player_id === p.id)).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const [playerId, setPlayerId] = React.useState(null);
+  const [kit, setKit] = React.useState("domicile");
+  const [layout, setLayout] = React.useState("matchday");
+  const pid = players.some((p) => p.id === playerId) ? playerId : (players[0] && players[0].id) || null;
+  const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
+  const saved = photo ? framings.find((f) => f.photo_id === photo.id && f.layout === layout) : null;
+  const L = LAYOUTS[layout];
+  const [cw, ch] = L.canvas;
+
+  const boxRef = React.useRef(null);
+  const [boxW, setBoxW] = React.useState(340);
+  React.useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => { const w = el.parentElement ? el.parentElement.clientWidth : 0; if (w) setBoxW(Math.min(w, ch > cw ? 420 : 520)); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [layout, photo && photo.id]);
+  const scale = boxW / cw;
+
+  const [fr, setFr] = React.useState(null);
+  const [msg, setMsg] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+  const [serverPreview, setServerPreview] = React.useState(null);
+  const frKey = photo ? `${photo.id}:${layout}:${saved ? `${saved.x},${saved.y},${saved.width}` : "-"}` : "none";
+  React.useEffect(() => {
+    setMsg(null); setServerPreview(null);
+    setFr(photo ? (saved ? { x: saved.x, y: saved.y, width: saved.width } : defaultFraming(layout, photo)) : null);
+  }, [frKey]);
+
+  const ref = photo ? defaultFraming(layout, photo).width : 1;
+  const rect = photo && fr ? framedRect(layout, photo, fr) : null;
+  const frRef = React.useRef(fr); frRef.current = fr;
+
+  // Pointer interactions: one pointer drags, two pointers pinch.
+  const ptrs = React.useRef(new Map());
+  const last = React.useRef(null);
+  const toCanvas = (e) => { const r = boxRef.current.getBoundingClientRect(); return { px: (e.clientX - r.left) / scale, py: (e.clientY - r.top) / scale }; };
+  function onDown(e) {
+    if (!fr) return;
+    boxRef.current.setPointerCapture && boxRef.current.setPointerCapture(e.pointerId);
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    last.current = null;
+  }
+  function onMove(e) {
+    if (!ptrs.current.has(e.pointerId) || !frRef.current) return;
+    const prev = ptrs.current.get(e.pointerId);
+    const cur = { x: e.clientX, y: e.clientY };
+    if (ptrs.current.size === 1) {
+      const f = frRef.current;
+      setFr({ ...f, x: f.x + (cur.x - prev.x) / scale, y: f.y + (cur.y - prev.y) / scale });
+      ptrs.current.set(e.pointerId, cur);
+    } else if (ptrs.current.size === 2) {
+      const other = [...ptrs.current.entries()].find(([id]) => id !== e.pointerId)[1];
+      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const d0 = dist(prev, other), d1 = dist(cur, other);
+      ptrs.current.set(e.pointerId, cur);
+      if (d0 > 0 && d1 > 0) {
+        const r = boxRef.current.getBoundingClientRect();
+        const mx = ((cur.x + other.x) / 2 - r.left) / scale, my = ((cur.y + other.y) / 2 - r.top) / scale;
+        setFr(zoomFramingAt(frRef.current, d1 / d0, mx, my, ref));
+      }
+    }
+  }
+  function onUp(e) { ptrs.current.delete(e.pointerId); }
+  function onWheel(e) {
+    if (!fr) return;
+    const { px, py } = toCanvas(e);
+    setFr(zoomFramingAt(fr, Math.exp(-e.deltaY * 0.0015), px, py, ref));
+  }
+  // React attaches wheel listeners as passive: add a native one so the page doesn't scroll while zooming.
+  const wheelRef = React.useRef(); wheelRef.current = onWheel;
+  React.useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const fn = (e) => { e.preventDefault(); wheelRef.current(e); };
+    el.addEventListener("wheel", fn, { passive: false });
+    return () => el.removeEventListener("wheel", fn);
+  }, [layout, photo && photo.id, boxW]);
+
+  const pct = fr ? framingZoomPercent(fr, ref) : 100;
+  function onSlider(e) {
+    const target = Number(e.target.value) / 100;
+    setFr(zoomFramingAt(fr, (ref * target) / fr.width, cw / 2, ch / 2, ref));
+  }
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert(
+        { photo_id: photo.id, layout, x: fr.x, y: fr.y, width: fr.width, updated_at: new Date().toISOString() },
+        { onConflict: "photo_id,layout" }
+      ));
+      await reload();
+      setMsg({ t: "success", m: "Cadrage enregistré ✓" });
+    } catch (e) { setMsg({ t: "error", m: "Erreur: " + e.message }); }
+    setSaving(false);
+  }
+  function previewServer() {
+    const q = new URLSearchParams({ kind: "frame", photo: String(photo.id), layout, x: String(Math.round(fr.x * 10) / 10), y: String(Math.round(fr.y * 10) / 10), w: String(Math.round(fr.width * 10) / 10), t: String(Date.now()) });
+    setServerPreview(`/api/insta/render?${q}`);
+  }
+
+  const sel = { ...FOOT_SELECT_STYLE, width: "100%", marginBottom: 8 };
+  const btn = (primary) => ({ flex: 1, background: primary ? "#3b82f6" : "#13131f", color: primary ? "#fff" : "#eeeef5", border: primary ? "none" : "1px solid #1e1e30", borderRadius: 8, padding: "9px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
+  const isMask = layout === "render" || layout.startsWith("podium_");
+
+  if (!players.length) return <div style={{ color: "#60607a", fontSize: 13 }}>Importez d'abord des photos (onglet Photos).</div>;
+  return (
+    <div>
+      <select style={sel} value={pid || ""} onChange={(e) => setPlayerId(Number(e.target.value))}>
+        {players.map((p) => <option key={p.id} value={p.id}>{nameOf(p)}</option>)}
+      </select>
+      <div style={{ display: "flex", gap: 8 }}>
+        <select style={sel} value={kit} onChange={(e) => setKit(e.target.value)}>
+          {INSTA_KITS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <select style={sel} value={layout} onChange={(e) => setLayout(e.target.value)}>
+          {FRAMING_LAYOUT_LABELS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+      </div>
+      {!photo && <div style={{ color: "#60607a", fontSize: 13, padding: "12px 0" }}>Aucune photo pour cet emplacement.</div>}
+      <div style={{ display: photo ? "block" : "none" }}>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div
+            ref={boxRef}
+            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+            style={{ position: "relative", width: boxW, height: ch * scale, overflow: "hidden", touchAction: "none", cursor: "grab", userSelect: "none", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222" }}
+          >
+            {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: cw * scale, height: ch * scale }} />}
+            {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale, pointerEvents: "none" }} />}
+            {(FRAMING_GUIDES[layout] || []).map((g) => (
+              <div key={g.label} style={{ position: "absolute", left: g.x * scale, top: g.y * scale, width: g.w * scale, height: g.h * scale, background: "rgba(255,255,255,0.28)", border: "1px dashed rgba(255,255,255,0.8)", color: "#fff", fontFamily: g.font ? "'Shrikhand',cursive" : "'Outfit',sans-serif", fontSize: g.font ? g.font * scale : 11, lineHeight: 1.1, display: "flex", alignItems: g.font ? "flex-start" : "center", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", pointerEvents: "none", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{g.label}</div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
+          <span style={{ fontSize: 11, color: "#60607a" }}>Zoom</span>
+          <input type="range" min={50} max={300} step={1} value={Math.min(300, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: "#eeeef5", width: 40, textAlign: "right" }}>{pct}%</span>
+        </div>
+        {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 8 }}>{msg.m}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={btn(true)} disabled={saving || !fr} onClick={save}>{saving ? "…" : "Enregistrer"}</button>
+          <button style={btn(false)} disabled={!photo} onClick={() => { setMsg(null); setFr(defaultFraming(layout, photo)); }}>Réinitialiser</button>
+          <button style={btn(false)} disabled={!fr} onClick={previewServer}>Aperçu serveur</button>
+        </div>
+        {serverPreview && (
+          <div style={{ marginTop: 14, textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: "#60607a", marginBottom: 6 }}>Aperçu serveur (rendu réel)</div>
+            <img src={serverPreview} alt="Aperçu serveur" onError={() => setMsg({ t: "error", m: "Aperçu serveur indisponible" })} style={{ maxWidth: "100%", width: boxW, borderRadius: layout === "render" ? "50%" : 0 }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FootInstaKeyBox({ onSaved }) {
   const [v, setV] = React.useState("");
   function save() {
@@ -1305,7 +1494,7 @@ function FootReseauxPage({ roster, photos, framings, reload }) {
       </div>
       {tab === "posts" && <FootPlaceholderPage label="Posts" />}
       {tab === "photos" && <FootPhotosTab roster={roster} photos={photos} reload={reload} />}
-      {tab === "cadrage" && <FootPlaceholderPage label="Cadrage" />}
+      {tab === "cadrage" && <FootFramingTool roster={roster} photos={photos} framings={framings} reload={reload} />}
     </div>
   );
 }
