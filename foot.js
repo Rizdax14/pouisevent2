@@ -317,7 +317,8 @@ function FootMatchForm({
     address: "",
     postal_code: "",
     city: "",
-    match_type: "championnat"
+    match_type: "championnat",
+    venue: "domicile"
   };
   const start = initial ? {
     ...empty,
@@ -344,6 +345,7 @@ function FootMatchForm({
       await onSubmit({
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
+        venue: f.venue === "exterieur" ? "exterieur" : "domicile",
         match_datetime: new Date(f.match_datetime).toISOString(),
         stadium_name: (f.stadium_name || "").trim() || null,
         address: (f.address || "").trim() || null,
@@ -395,7 +397,15 @@ function FootMatchForm({
     value: "championnat"
   }, "Championnat"), /*#__PURE__*/React.createElement("option", {
     value: "amical"
-  }, "Match amical")), /*#__PURE__*/React.createElement("input", {
+  }, "Match amical")), /*#__PURE__*/React.createElement("select", {
+    style: FOOT_INPUT_STYLE,
+    value: f.venue || "domicile",
+    onChange: set("venue")
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "domicile"
+  }, "Domicile"), /*#__PURE__*/React.createElement("option", {
+    value: "exterieur"
+  }, "Ext\xE9rieur")), /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Nom du stade",
     value: f.stadium_name || "",
@@ -571,7 +581,16 @@ function FootMatchCard({
       padding: "1px 5px",
       textTransform: "uppercase"
     }
-  }, match.match_type === "amical" ? "Amical" : "Championnat"), /*#__PURE__*/React.createElement("div", {
+  }, match.match_type === "amical" ? "Amical" : "Championnat"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      color: "#60607a",
+      border: "1px solid #1e1e30",
+      borderRadius: 4,
+      padding: "1px 5px",
+      textTransform: "uppercase"
+    }
+  }, match.venue === "exterieur" ? "Extérieur" : "Domicile"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: statusColor,
@@ -673,9 +692,30 @@ function FootRosterManager({
   const [saving, setSaving] = React.useState(null); // player id currently being saved
   const [search, setSearch] = React.useState("");
   const roleByPlayer = {};
+  const numberByPlayer = {};
   roster.forEach(r => {
     roleByPlayer[r.player_id] = r.role;
+    numberByPlayer[r.player_id] = r.jersey_number;
   });
+  async function setNumber(playerId, v) {
+    if (v !== "" && !/^[0-9]{1,3}$/.test(v)) {
+      console.warn("invalid jersey number", v);
+      await reload();
+      return;
+    }
+    setSaving(playerId);
+    try {
+      await sbUpdate("foot_roster", {
+        player_id: playerId
+      }, {
+        jersey_number: v || null
+      });
+      await reload();
+    } catch (e) {
+      console.warn("jersey number update failed", e);
+    }
+    setSaving(null);
+  }
   async function setRole(playerId, role) {
     setSaving(playerId);
     try {
@@ -737,7 +777,33 @@ function FootRosterManager({
     style: {
       fontSize: 13
     }
-  }, getDisplayName(p, PLAYERS)), /*#__PURE__*/React.createElement("select", {
+  }, getDisplayName(p, PLAYERS)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, roleByPlayer[p.id] && /*#__PURE__*/React.createElement("input", {
+    key: `${p.id}-${numberByPlayer[p.id] || ""}`,
+    defaultValue: numberByPlayer[p.id] || "",
+    placeholder: "n\xB0",
+    inputMode: "numeric",
+    maxLength: 3,
+    onBlur: e => {
+      const v = e.target.value.trim();
+      if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v);
+    },
+    style: {
+      width: 52,
+      marginRight: 8,
+      background: "#13131f",
+      border: "1px solid #1e1e30",
+      borderRadius: 6,
+      color: "#eeeef5",
+      padding: "5px 6px",
+      fontSize: 12,
+      textAlign: "center"
+    }
+  }), /*#__PURE__*/React.createElement("select", {
     value: roleByPlayer[p.id] || "",
     disabled: saving === p.id,
     onChange: e => setRole(p.id, e.target.value),
@@ -757,7 +823,7 @@ function FootRosterManager({
     value: "occasionnel"
   }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
     value: "invite"
-  }, "Invit\xE9")))));
+  }, "Invit\xE9"))))));
 }
 function FootAdminPage({
   roster,
@@ -786,7 +852,8 @@ function FootStartMatchConfig({
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
   const presentIds = attendance.filter(a => a.match_id === match.id && a.status === "present").map(a => a.player_id);
-  const [sheet, setSheet] = React.useState(presentIds.filter(id => roster.some(r => r.player_id === id)));
+  const existingSheet = lineupIdsFor(lineups || [], match.id);
+  const [sheet, setSheet] = React.useState(existingSheet.length ? existingSheet : presentIds.filter(id => roster.some(r => r.player_id === id)));
   const toggle = id => setSheet(sheet.includes(id) ? sheet.filter(x => x !== id) : [...sheet, id]);
   async function start() {
     setSaving(true);
@@ -879,6 +946,7 @@ function FootStartMatchConfig({
     }
   }, /*#__PURE__*/React.createElement(FootLineupChecklist, {
     roster: roster,
+    extraIds: existingSheet,
     checked: sheet,
     onToggle: toggle,
     disabled: saving
@@ -1522,7 +1590,7 @@ function FootMatchHeader({
       color: "#60607a",
       marginTop: 4
     }
-  }, new Date(match.match_datetime).toLocaleString("fr-FR"), " \xB7 ", match.match_type === "amical" ? "Amical" : "Championnat"), place && /*#__PURE__*/React.createElement("div", {
+  }, new Date(match.match_datetime).toLocaleString("fr-FR"), " \xB7 ", match.match_type === "amical" ? "Amical" : "Championnat", " \xB7 ", match.venue === "exterieur" ? "Extérieur" : "Domicile"), place && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#60607a"
@@ -1905,6 +1973,7 @@ function FootScheduledView({
   match,
   roster,
   attendance,
+  lineups,
   currentPlayer,
   isAdmin,
   reload,
@@ -1981,9 +2050,16 @@ function FootScheduledView({
       fontSize: 13,
       padding: "3px 0"
     }
-  }, nameOf(id)))))), isAdmin && /*#__PURE__*/React.createElement("button", {
+  }, nameOf(id)))))), /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups || [],
+    isAdmin: isAdmin,
+    reload: reload
+  }), isAdmin && /*#__PURE__*/React.createElement("button", {
     onClick: onStartMatch,
     style: {
+      marginTop: 16,
       width: "100%",
       background: "#3b82f6",
       color: "#fff",
@@ -2086,6 +2162,7 @@ function FootMatchDetailPage({
     match: match,
     roster: roster,
     attendance: attendance,
+    lineups: lineups,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload,

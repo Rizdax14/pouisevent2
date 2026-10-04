@@ -141,7 +141,7 @@ function formatMatchPlace(match) {
 }
 
 function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
-  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat" };
+  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile" };
   const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime) } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
@@ -159,6 +159,7 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
       await onSubmit({
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
+        venue: f.venue === "exterieur" ? "exterieur" : "domicile",
         match_datetime: new Date(f.match_datetime).toISOString(),
         stadium_name: (f.stadium_name || "").trim() || null,
         address: (f.address || "").trim() || null,
@@ -181,6 +182,10 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
       <select style={FOOT_INPUT_STYLE} value={f.match_type || "championnat"} onChange={set("match_type")}>
         <option value="championnat">Championnat</option>
         <option value="amical">Match amical</option>
+      </select>
+      <select style={FOOT_INPUT_STYLE} value={f.venue || "domicile"} onChange={set("venue")}>
+        <option value="domicile">Domicile</option>
+        <option value="exterieur">Extérieur</option>
       </select>
       <input style={FOOT_INPUT_STYLE} placeholder="Nom du stade" value={f.stadium_name || ""} onChange={set("stadium_name")} />
       <input style={FOOT_INPUT_STYLE} placeholder="Adresse" value={f.address || ""} onChange={set("address")} />
@@ -234,6 +239,7 @@ function FootMatchCard({ match, score, presentCount, rosterSize, onClick, isOnRo
         <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16 }}>Bière Leverculsec vs {match.opponent_name}</div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{ fontSize: 9, color: "#60607a", border: "1px solid #1e1e30", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{match.match_type === "amical" ? "Amical" : "Championnat"}</span>
+          <span style={{ fontSize: 9, color: "#60607a", border: "1px solid #1e1e30", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{match.venue === "exterieur" ? "Extérieur" : "Domicile"}</span>
           <div style={{ fontSize: 10, color: statusColor, textTransform: "uppercase", fontWeight: 700 }}>{statusLabel}</div>
         </div>
       </div>
@@ -299,7 +305,20 @@ function FootRosterManager({ roster, reload }) {
   const [search, setSearch] = React.useState("");
 
   const roleByPlayer = {};
-  roster.forEach((r) => { roleByPlayer[r.player_id] = r.role; });
+  const numberByPlayer = {};
+  roster.forEach((r) => { roleByPlayer[r.player_id] = r.role; numberByPlayer[r.player_id] = r.jersey_number; });
+
+  async function setNumber(playerId, v) {
+    if (v !== "" && !/^[0-9]{1,3}$/.test(v)) { console.warn("invalid jersey number", v); await reload(); return; }
+    setSaving(playerId);
+    try {
+      await sbUpdate("foot_roster", { player_id: playerId }, { jersey_number: v || null });
+      await reload();
+    } catch (e) {
+      console.warn("jersey number update failed", e);
+    }
+    setSaving(null);
+  }
 
   async function setRole(playerId, role) {
     setSaving(playerId);
@@ -328,6 +347,12 @@ function FootRosterManager({ roster, reload }) {
       {visiblePlayers.map((p) => (
         <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1e1e30" }}>
           <div style={{ fontSize: 13 }}>{getDisplayName(p, PLAYERS)}</div>
+          <div style={{ display: "flex", alignItems: "center" }}>
+          {roleByPlayer[p.id] && (
+            <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
+              style={{ width: 52, marginRight: 8, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 6px", fontSize: 12, textAlign: "center" }} />
+          )}
           <select
             value={roleByPlayer[p.id] || ""}
             disabled={saving === p.id}
@@ -339,6 +364,7 @@ function FootRosterManager({ roster, reload }) {
             <option value="occasionnel">Occasionnel</option>
             <option value="invite">Invité</option>
           </select>
+          </div>
         </div>
       ))}
     </div>
@@ -359,7 +385,8 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCa
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
   const presentIds = attendance.filter((a) => a.match_id === match.id && a.status === "present").map((a) => a.player_id);
-  const [sheet, setSheet] = React.useState(presentIds.filter((id) => roster.some((r) => r.player_id === id)));
+  const existingSheet = lineupIdsFor(lineups || [], match.id);
+  const [sheet, setSheet] = React.useState(existingSheet.length ? existingSheet : presentIds.filter((id) => roster.some((r) => r.player_id === id)));
   const toggle = (id) => setSheet(sheet.includes(id) ? sheet.filter((x) => x !== id) : [...sheet, id]);
 
   async function start() {
@@ -393,7 +420,7 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCa
         <input type="number" min={1} value={halfDuration} onChange={(e) => setHalfDuration(Number(e.target.value))} style={{ display: "block", width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 12px", marginTop: 4, marginBottom: 18 }} />
         <label style={{ fontSize: 12, color: "#60607a" }}>Feuille de match ({sheet.length})</label>
         <div style={{ margin: "6px 0 18px" }}>
-          <FootLineupChecklist roster={roster} checked={sheet} onToggle={toggle} disabled={saving} />
+          <FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onCancel} disabled={saving} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>Annuler</button>
@@ -695,7 +722,7 @@ function FootMatchHeader({ match }) {
   return (
     <>
       <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
-      <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{new Date(match.match_datetime).toLocaleString("fr-FR")} · {match.match_type === "amical" ? "Amical" : "Championnat"}</div>
+      <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{new Date(match.match_datetime).toLocaleString("fr-FR")} · {match.match_type === "amical" ? "Amical" : "Championnat"} · {match.venue === "exterieur" ? "Extérieur" : "Domicile"}</div>
       {place && <div style={{ fontSize: 12, color: "#60607a" }}>{place}</div>}
     </>
   );
@@ -842,7 +869,7 @@ function FootFinishedView({ match, roster, events, lineups, ratings, currentPlay
   );
 }
 
-function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, reload, onStartMatch }) {
+function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, reload, onStartMatch }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
   const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
@@ -891,8 +918,10 @@ function FootScheduledView({ match, roster, attendance, currentPlayer, isAdmin, 
         </div>
       )}
 
+      <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
+
       {isAdmin && (
-        <button onClick={onStartMatch} style={{ width: "100%", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={onStartMatch} style={{ marginTop: 16, width: "100%", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer" }}>
           COMMENCER LE MATCH
         </button>
       )}
@@ -947,7 +976,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
         </div>
       )}
       {match.status === "scheduled" && !startingConfig && (
-        <FootScheduledView match={match} roster={roster} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
+        <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
       )}
       {match.status === "scheduled" && startingConfig && (
         <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} reload={reload} onCancel={() => setStartingConfig(false)} />
