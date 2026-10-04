@@ -3410,10 +3410,210 @@ function FootInstaKeyBox({
     }
   }, "Enregistrer la cl\xE9"));
 }
+
+// Images of one post: Match Day + Groupe, the three ranking pages, or a single visual.
+function instaPostImages(post) {
+  const url = params => `/api/insta/render?${new URLSearchParams(params)}`;
+  if (post.kind === "matchday") return [1, 2].map(page => ({
+    label: page === 1 ? "Match Day" : "Groupe",
+    src: url({
+      kind: "matchday",
+      match: post.matchId,
+      page
+    })
+  }));
+  if (post.kind === "rankings") return RANKING_PAGES.map((pg, i) => ({
+    label: pg.heading,
+    src: url({
+      kind: "rankings",
+      season: post.season,
+      page: i + 1
+    })
+  }));
+  return [{
+    label: post.kind === "ratings" ? "Notes" : "Résultat",
+    src: url({
+      kind: post.kind,
+      match: post.matchId
+    })
+  }];
+}
+
+// Everything captionFor needs, built from the data already loaded in the app.
+function instaCaptionContext(post, {
+  matches,
+  lineups,
+  events,
+  ratings
+}) {
+  const match = matches.find(m => m.id === post.matchId);
+  const nameOf = id => postName(PLAYERS.find(p => p.id === id), PLAYERS.filter(p => lineups.some(l => l.match_id === post.matchId && l.player_id === p.id)));
+  if (post.kind === "matchday") return {
+    opponent: match.opponent_name,
+    band: matchBand(match)
+  };
+  if (post.kind === "result") {
+    const evs = events.filter(e => e.match_id === match.id);
+    const sc = computeFootScore(evs);
+    return {
+      opponent: match.opponent_name,
+      bl: sc.bl,
+      opp: sc.opponent,
+      goals: goalLines(evs, PLAYERS)
+    };
+  }
+  if (post.kind === "ratings") {
+    const sheet = lineups.filter(l => l.match_id === match.id).map(l => l.player_id);
+    const avg = matchAverages(sheet, ratings.filter(r => r.match_id === match.id));
+    const top = sheet.filter(id => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map(id => ({
+      name: nameOf(id),
+      rating: avg[id]
+    }));
+    return {
+      opponent: match.opponent_name,
+      top
+    };
+  }
+  return {
+    season: post.season
+  };
+}
+function FootPostCard({
+  post,
+  data
+}) {
+  const [caption, setCaption] = React.useState(() => captionFor(post.kind, instaCaptionContext(post, data)));
+  const [copied, setCopied] = React.useState(false);
+  const images = instaPostImages(post);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      console.warn("copy failed", e);
+    }
+  }
+  const mini = {
+    background: "#13131f",
+    border: "1px solid #1e1e30",
+    borderRadius: 6,
+    color: "#eeeef5",
+    padding: "5px 10px",
+    fontSize: 12,
+    cursor: "pointer",
+    textDecoration: "none"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 16,
+      marginBottom: 10
+    }
+  }, post.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      overflowX: "auto",
+      marginBottom: 10
+    }
+  }, images.map(im => /*#__PURE__*/React.createElement("div", {
+    key: im.label,
+    style: {
+      flex: "0 0 auto",
+      width: 200,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: im.src,
+    alt: im.label,
+    loading: "lazy",
+    style: {
+      width: 200,
+      height: 250,
+      objectFit: "cover",
+      background: "#13131f",
+      borderRadius: 8
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      margin: "4px 0"
+    }
+  }, im.label), /*#__PURE__*/React.createElement("a", {
+    href: im.src,
+    target: "_blank",
+    rel: "noreferrer",
+    style: mini
+  }, "Ouvrir")))), /*#__PURE__*/React.createElement("textarea", {
+    value: caption,
+    onChange: e => setCaption(e.target.value),
+    rows: 5,
+    style: {
+      ...FOOT_INPUT_STYLE,
+      resize: "vertical",
+      fontFamily: "inherit"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: copy,
+    style: {
+      ...mini,
+      fontWeight: 700
+    }
+  }, copied ? "Copié ✓" : "Copier la légende"));
+}
+function FootPostsTab({
+  matches,
+  lineups,
+  events,
+  ratings
+}) {
+  const posts = availablePosts({
+    matches,
+    lineups,
+    now: new Date()
+  });
+  const data = {
+    matches,
+    lineups,
+    events,
+    ratings
+  };
+  return /*#__PURE__*/React.createElement("div", null, posts.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13
+    }
+  }, "Aucun post disponible pour l'instant."), posts.map(post => /*#__PURE__*/React.createElement(FootPostCard, {
+    key: `${post.kind}-${post.matchId || post.season}`,
+    post: post,
+    data: data
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 11,
+      textAlign: "center",
+      marginTop: 8
+    }
+  }, "Publication automatique : bient\xF4t (plan 2)"));
+}
 function FootReseauxPage({
   roster,
   photos,
   framings,
+  matches,
+  lineups,
+  events,
+  ratings,
   reload
 }) {
   const [tab, setTab] = React.useState(() => readPref("foot_reseaux_tab", "photos", ["posts", "photos", "cadrage"]));
@@ -3469,8 +3669,11 @@ function FootReseauxPage({
       gap: 8,
       marginBottom: 16
     }
-  }, tabBtn("posts", "Posts"), tabBtn("photos", "Photos"), tabBtn("cadrage", "Cadrage")), tab === "posts" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
-    label: "Posts"
+  }, tabBtn("posts", "Posts"), tabBtn("photos", "Photos"), tabBtn("cadrage", "Cadrage")), tab === "posts" && /*#__PURE__*/React.createElement(FootPostsTab, {
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    ratings: ratings
   }), tab === "photos" && /*#__PURE__*/React.createElement(FootPhotosTab, {
     roster: roster,
     photos: photos,
@@ -3576,6 +3779,10 @@ function FootballApp({
     roster: roster,
     photos: photos,
     framings: framings,
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    ratings: ratings,
     reload: reloadFoot
   }), page === "rankings" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
     label: "Classement"
