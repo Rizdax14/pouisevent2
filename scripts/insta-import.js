@@ -10,8 +10,8 @@ const path = require("path");
 
 const DEFAULT_DIR = "G:\\My Drive\\leverculsec\\25 26\\PHOTOS Bière Leverculsec\\Canva\\26 27";
 const MAX_SIDE = 1600;
-const JERSEYS = { louis: "14", nolan: "02", solal: "6", timothee: "100", nathan: "11", samuel: "10", nils: "23", etienne: "28", leandre: "67", thisma: "8", maxime: "27", max: "27", juju: "4", thomas: "25" };
-const ALIASES = { max: ["maxime"], maxime: ["max"] };
+const JERSEYS = { louis: "14", nolan: "02", solal: "6", timothee: "100", nathan: "11", samuel: "10", nils: "23", etienne: "28", leandre: "67", thisma: "8", maxime: "27", max: "27", juju: "4", thomas: "25", timo: "100" };
+const ALIASES = { max: ["maxime"], maxime: ["max"], timo: ["timothee"], timothee: ["timo"] };
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
@@ -20,6 +20,7 @@ function parseFileName(file) {
   let name = file.replace(/\.png$/i, "").trim();
   const m = name.match(/^retouch[eé]e?[\s_-]*/i);
   if (m) name = name.slice(m[0].length);
+  name = name.replace(/[\s_-]+gk$/i, ""); // "Timo GK" = the goalkeeper kit shot of Timo
   return { name: name.trim(), retouched: !!m };
 }
 function kitFromDir(d) { const n = norm(d); return n === "domicile" ? "domicile" : n === "exterieur" ? "exterieur" : null; }
@@ -58,9 +59,16 @@ function scan(dir) {
     for (const kitDir of fs.readdirSync(path.join(dir, kindDir))) {
       const kit = kitFromDir(kitDir);
       if (!kit) continue;
-      for (const f of fs.readdirSync(path.join(dir, kindDir, kitDir))) {
-        const parsed = parseFileName(f);
-        if (parsed) files.push({ ...parsed, kind, kit, file: path.join(dir, kindDir, kitDir, f) });
+      const kitPath = path.join(dir, kindDir, kitDir);
+      const add = (folder, forceRetouched) => {
+        for (const f of fs.readdirSync(folder)) {
+          const parsed = parseFileName(f);
+          if (parsed) files.push({ ...parsed, retouched: parsed.retouched || forceRetouched, kind, kit, file: path.join(folder, f) });
+        }
+      };
+      add(kitPath, false);
+      for (const sub of fs.readdirSync(kitPath)) {
+        if (norm(sub) === "retouche" && fs.statSync(path.join(kitPath, sub)).isDirectory()) add(path.join(kitPath, sub), true);
       }
     }
   }

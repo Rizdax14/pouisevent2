@@ -69,3 +69,26 @@ test("storagePath mirrors photo-sign", () => {
   assert.equal(I.storagePath(3, "exterieur", "dos", true, 17), "3/exterieur/dos-retouche-17.png");
   assert.equal(I.storagePath(3, "domicile", "render", false, 17), "3/domicile/render-17.png");
 });
+
+test("parseFileName: goalkeeper suffix and nicknames", () => {
+  assert.deepEqual(I.parseFileName("Timo GK.png"), { name: "Timo", retouched: false });
+  assert.deepEqual(I.parseFileName("Nils.png"), { name: "Nils", retouched: false });
+  assert.equal(I.jerseyFor("Timo"), "100");
+});
+
+test("matchPlayer: Timo is an alias of Timothée", () => {
+  const ps = [{ id: 9, name: "Timothée Roy", display_name: null }];
+  assert.deepEqual(I.matchPlayer("Timo", ps, [9]), { id: 9 });
+});
+
+test("scan: retouched photos live in a 'retouché' subfolder", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "insta-"));
+  fs.mkdirSync(path.join(dir, "celebration", "domicile", "retouché"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "dos", "extérieur"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "celebration", "domicile", "Nils.png"), "");
+  fs.writeFileSync(path.join(dir, "celebration", "domicile", "retouché", "Nils.png"), "");
+  fs.writeFileSync(path.join(dir, "dos", "extérieur", "Timo GK.png"), "");
+  const got = I.scan(dir).map((f) => `${f.kind}/${f.kit}/${f.name}/${f.retouched}`).sort();
+  assert.deepEqual(got, ["celebration/domicile/Nils/false", "celebration/domicile/Nils/true", "dos/exterieur/Timo/false"]);
+});
