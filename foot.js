@@ -25,6 +25,10 @@ function FootballNavBar({
     l: "Statistiques",
     ic: "📊"
   }, ...(isAdmin ? [{
+    id: "reseaux",
+    l: "Réseaux",
+    ic: "📣"
+  }, {
     id: "admin",
     l: "Admin",
     ic: "🛠"
@@ -2612,6 +2616,396 @@ function FootStatsPage({
     }
   }, formatStatValue(statValue(s, c.key, mode), c.key, mode))))))));
 }
+const INSTA_KEY_STORAGE = "foot_insta_admin_key";
+function readInstaKey() {
+  try {
+    return localStorage.getItem(INSTA_KEY_STORAGE) || "";
+  } catch (e) {
+    return "";
+  }
+}
+async function instaAdminFetch(path, body) {
+  const r = await fetch(`/api/insta/${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Insta-Admin-Key": readInstaKey()
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
+  return data;
+}
+function instaPublicUrl(path) {
+  return `${SUPABASE_URL}/storage/v1/object/public/player-photos/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+const INSTA_KINDS = [["render", "Render"], ["celebration", "Célébration"], ["dos", "Dos"]];
+const INSTA_KITS = [["domicile", "Domicile"], ["exterieur", "Extérieur"]];
+const INSTA_MAX_SIDE = 1600;
+
+// Reads an image file; downsizes it so the longer side is at most INSTA_MAX_SIDE (PNG keeps transparency).
+function prepareInstaPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, INSTA_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.round(img.naturalWidth * scale),
+        height = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => blob ? resolve({
+        blob,
+        width,
+        height
+      }) : reject(new Error("Conversion de l'image impossible")), "image/png");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image illisible"));
+    };
+    img.src = url;
+  });
+}
+function FootPhotoCell({
+  playerId,
+  kit,
+  kind,
+  photos,
+  reload
+}) {
+  const mine = photos.filter(p => p.player_id === playerId && p.kit === kit && p.kind === kind);
+  const shown = mine.find(p => p.retouched) || mine[0] || null;
+  const [retouched, setRetouched] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const inputRef = React.useRef(null);
+  async function onFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const {
+        blob,
+        width,
+        height
+      } = await prepareInstaPhoto(file);
+      const {
+        uploadUrl,
+        path
+      } = await instaAdminFetch("photo-sign", {
+        player_id: playerId,
+        kit,
+        kind,
+        retouched
+      });
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "image/png",
+          "x-upsert": "true"
+        },
+        body: blob
+      });
+      if (!put.ok) throw new Error(`Envoi refusé (${put.status})`);
+      await instaAdminFetch("photo-register", {
+        player_id: playerId,
+        kit,
+        kind,
+        retouched,
+        path,
+        width,
+        height
+      });
+      await reload();
+    } catch (ex) {
+      setErr(ex.message);
+    }
+    setBusy(false);
+  }
+  async function remove() {
+    if (!shown || !window.confirm("Supprimer cette photo ?")) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await instaAdminFetch("photo-delete", {
+        id: shown.id
+      });
+      await reload();
+    } catch (ex) {
+      setErr(ex.message);
+    }
+    setBusy(false);
+  }
+  const mini = {
+    background: "#13131f",
+    border: "1px solid #1e1e30",
+    borderRadius: 6,
+    color: "#eeeef5",
+    padding: "3px 6px",
+    fontSize: 11,
+    cursor: busy ? "default" : "pointer"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#13131f",
+      borderRadius: 8,
+      padding: 6,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 64,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4
+    }
+  }, shown ? /*#__PURE__*/React.createElement("img", {
+    src: instaPublicUrl(shown.path),
+    alt: "",
+    style: {
+      maxHeight: 64,
+      maxWidth: "100%",
+      objectFit: "contain"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#60607a",
+      fontSize: 11
+    }
+  }, "\u2014")), shown && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: shown.retouched ? "#34d399" : "#60607a",
+      textTransform: "uppercase",
+      marginBottom: 4
+    }
+  }, shown.retouched ? "retouchée" : "brute"), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "file",
+    accept: "image/png",
+    onChange: onFile,
+    style: {
+      display: "none"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      justifyContent: "center",
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    disabled: busy,
+    onClick: () => inputRef.current && inputRef.current.click(),
+    style: mini
+  }, busy ? "…" : "⬆ Envoyer"), shown && /*#__PURE__*/React.createElement("button", {
+    disabled: busy,
+    onClick: remove,
+    style: {
+      ...mini,
+      color: "#ef4444"
+    }
+  }, "\uD83D\uDDD1")), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 10,
+      color: "#60607a",
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: retouched,
+    onChange: e => setRetouched(e.target.checked)
+  }), " retouch\xE9e"), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ef4444",
+      fontSize: 10,
+      marginTop: 4
+    }
+  }, err));
+}
+function FootPhotosTab({
+  roster,
+  photos,
+  reload
+}) {
+  const nameOf = p => getDisplayName(p, PLAYERS) || "";
+  const players = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  if (!players.length) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#60607a",
+      fontSize: 13
+    }
+  }, "Aucun joueur dans l'effectif.");
+  return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 15,
+      marginBottom: 8
+    }
+  }, nameOf(p)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "56px 1fr 1fr",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", null), INSTA_KITS.map(([kit, label]) => /*#__PURE__*/React.createElement("div", {
+    key: kit,
+    style: {
+      fontSize: 10,
+      color: "#60607a",
+      textTransform: "uppercase",
+      textAlign: "center"
+    }
+  }, label)), INSTA_KINDS.map(([kind, kindLabel]) => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: kind
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#60607a",
+      textTransform: "uppercase"
+    }
+  }, kindLabel), INSTA_KITS.map(([kit]) => /*#__PURE__*/React.createElement(FootPhotoCell, {
+    key: kit,
+    playerId: p.id,
+    kit: kit,
+    kind: kind,
+    photos: photos,
+    reload: reload
+  }))))))));
+}
+function FootInstaKeyBox({
+  onSaved
+}) {
+  const [v, setV] = React.useState("");
+  function save() {
+    if (!v.trim()) return;
+    try {
+      localStorage.setItem(INSTA_KEY_STORAGE, v.trim());
+    } catch (e) {}
+    onSaved();
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a",
+      marginBottom: 8
+    }
+  }, "Cl\xE9 admin R\xE9seaux (gard\xE9e uniquement dans ce navigateur, envoy\xE9e seulement \xE0 l'API du site)."), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    style: FOOT_INPUT_STYLE,
+    placeholder: "Cl\xE9 admin",
+    value: v,
+    onChange: e => setV(e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: save,
+    style: {
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 14px",
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "Enregistrer la cl\xE9"));
+}
+function FootReseauxPage({
+  roster,
+  photos,
+  framings,
+  reload
+}) {
+  const [tab, setTab] = React.useState(() => readPref("foot_reseaux_tab", "photos", ["posts", "photos", "cadrage"]));
+  const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
+  const pick = t => {
+    setTab(t);
+    writePref("foot_reseaux_tab", t);
+  };
+  const tabBtn = (id, label) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => pick(id),
+    style: {
+      flex: 1,
+      background: tab === id ? "#3b82f6" : "#13131f",
+      color: tab === id ? "#fff" : "#eeeef5",
+      border: "1px solid #1e1e30",
+      borderRadius: 8,
+      padding: "8px",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, label);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 16
+    }
+  }, !hasKey && /*#__PURE__*/React.createElement(FootInstaKeyBox, {
+    onSaved: () => setHasKey(true)
+  }), hasKey && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      try {
+        localStorage.removeItem(INSTA_KEY_STORAGE);
+      } catch (e) {}
+      setHasKey(false);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: "#60607a",
+      fontSize: 11,
+      cursor: "pointer",
+      textDecoration: "underline"
+    }
+  }, "Changer la cl\xE9 admin")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, tabBtn("posts", "Posts"), tabBtn("photos", "Photos"), tabBtn("cadrage", "Cadrage")), tab === "posts" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
+    label: "Posts"
+  }), tab === "photos" && /*#__PURE__*/React.createElement(FootPhotosTab, {
+    roster: roster,
+    photos: photos,
+    reload: reload
+  }), tab === "cadrage" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
+    label: "Cadrage"
+  }));
+}
 function FootballApp({
   currentPlayer,
   onBack
@@ -2625,14 +3019,20 @@ function FootballApp({
   const [events, setEvents] = React.useState([]);
   const [lineups, setLineups] = React.useState([]);
   const [ratings, setRatings] = React.useState([]);
+  const [photos, setPhotos] = React.useState([]);
+  const [framings, setFramings] = React.useState([]);
   const isAdmin = currentPlayer?.uid === ADMIN_UID;
   async function reloadFoot() {
-    const [r, m, a, e, l, rt] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score")]);
+    const [r, m, a, e, l, rt, ph, fr] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
+    // optional: absent until the insta migration is applied
+    sbFetch("foot_photo_framings", "?select=*").catch(() => [])]);
     setRoster(r || []);
     setMatches(m || []);
     setAttendance(a || []);
     setEvents(e || []);
     setLineups(l || []);
+    setPhotos(ph || []);
+    setFramings(fr || []);
     setRatings((rt || []).map(x => ({
       ...x,
       score: Number(x.score)
@@ -2695,6 +3095,11 @@ function FootballApp({
     reload: reloadFoot
   }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
     roster: roster,
+    reload: reloadFoot
+  }), page === "reseaux" && isAdmin && /*#__PURE__*/React.createElement(FootReseauxPage, {
+    roster: roster,
+    photos: photos,
+    framings: framings,
     reload: reloadFoot
   }), page === "rankings" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
     label: "Classement"
