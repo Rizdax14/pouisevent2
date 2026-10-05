@@ -1,53 +1,6 @@
-// foot.jsx
+// foot.jsx — screens of the football app (design system: foot-ui.jsx, tokens: foot-theme.js)
 
-function FootballNavBar({ page, setPage, onBack, isAdmin }) {
-  const m = useIsMobile();
-  const items = [
-    { id: "__back__", l: "Accueil", ic: "🏠", onClick: onBack },
-    { id: "calendar", l: "Calendrier", ic: "📅" },
-    { id: "rankings", l: "Classement", ic: "🏆" },
-    { id: "stats", l: "Statistiques", lm: "Stats", ic: "📊" },
-    ...(isAdmin ? [{ id: "reseaux", l: "Réseaux", ic: "📣" }, { id: "admin", l: "Admin", ic: "🛠" }] : []),
-  ];
-  const wrapStyle = m
-    ? { position: "fixed", bottom: 0, left: 0, right: 0, background: "#0d0d1c", borderTop: "1px solid #1e1e30", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }
-    : { background: "#0d0d1c", borderBottom: "1px solid #1e1e30", padding: "0 32px", display: "flex", gap: 0, position: "sticky", top: 0, zIndex: 100 };
-  return (
-    <nav style={wrapStyle}>
-      {items.map((item) => {
-        const active = page === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => (item.onClick ? item.onClick() : setPage(item.id))}
-            style={{
-              flex: m ? "1 1 0" : "none", minWidth: 0, background: "none", border: "none", cursor: "pointer",
-              padding: m ? "10px 1px 8px" : "16px 14px",
-              display: "flex", flexDirection: m ? "column" : "row", alignItems: "center", gap: m ? 3 : 6,
-              color: active ? "#3b82f6" : "#60607a", fontFamily: "'Outfit',sans-serif", fontSize: m ? 8 : 13, fontWeight: 600,
-              borderBottom: !m && active ? "2px solid #3b82f6" : !m ? "2px solid transparent" : "none",
-            }}
-          >
-            <span style={{ fontSize: m ? 18 : 15 }}>{item.ic}</span>
-            <span style={{ textTransform: "uppercase", letterSpacing: m ? "0" : "0.05em", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m && item.lm ? item.lm : item.l}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function FootPlaceholderPage({ label }) {
-  return (
-    <div style={{ padding: 40, textAlign: "center", color: "#60607a" }}>
-      <div style={{ fontSize: 15 }}>{label}</div>
-      <div style={{ fontSize: 11, marginTop: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>🔒 Bientôt disponible</div>
-    </div>
-  );
-}
-
-const FOOT_INPUT_STYLE = { width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, padding: "9px 12px", color: "#eeeef5", fontSize: 13, marginBottom: 10 };
-
+// ---- data helpers ------------------------------------------------------------------------------------------
 async function setMatchAttendance(matchId, playerId, status) {
   assertUpsertOk(await SUPABASE.from("foot_attendance").upsert(
     { match_id: matchId, player_id: playerId, status, responded_at: new Date().toISOString() },
@@ -82,19 +35,80 @@ function lineupIdsFor(lineups, matchId) {
   return lineups.filter((l) => l.match_id === matchId).map((l) => l.player_id);
 }
 
+function formatMatchPlace(match) {
+  const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
+  return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
+}
+
+const footNameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
+const footDayMs = 86400000;
+function footDate(iso) { return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Paris" }); }
+function footTime(iso) { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }); }
+const FOOT_OUTCOME_TONE = { V: "good", N: "warn", D: "bad" };
+const FOOT_OUTCOME_LABEL = { V: "Victoire", N: "Nul", D: "Défaite" };
+
+// ---- small shared bits ---------------------------------------------------------------------------------------
+function FootMetaChips({ match }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <FChip tone="soft">{match.venue === "exterieur" ? "Extérieur" : "Domicile"}</FChip>
+      <FChip tone="soft">{match.match_type === "amical" ? "Amical" : "Championnat"}</FChip>
+    </div>
+  );
+}
+
+function FootWhenWhere({ match, size = 14 }) {
+  const place = formatMatchPlace(match);
+  return (
+    <div style={{ display: "grid", gap: 5, fontSize: size, color: FC.muted }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)} · {footTime(match.match_datetime)}</div>
+      {place && <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span></div>}
+    </div>
+  );
+}
+
+// A player as a pill: round portrait, name, optional jersey number.
+function FootPlayerPill({ id, number, tone = "soft", dim }) {
+  const name = footNameOf(id);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: tone === "soft" ? FC.soft : "transparent", border: tone === "soft" ? "none" : `1px solid ${FC.line}`, borderRadius: 999, padding: "4px 12px 4px 4px", fontSize: 14, color: dim ? FC.muted : FC.text, maxWidth: "100%" }}>
+      <FAvatar playerId={id} name={name} size={28} />
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      {number && <span style={{ fontFamily: FF.ui, fontSize: 12, color: FC.deep, background: FC.solid, borderRadius: 999, padding: "1px 7px" }}>{number}</span>}
+    </span>
+  );
+}
+
+function FootAttendanceButtons({ myStatus, saving, onSet, compact }) {
+  const pick = (status) => (e) => { e.stopPropagation(); onSet(status); };
+  return (
+    <div style={{ display: "flex", gap: 10 }}>
+      <FBtn variant={myStatus === "present" ? "success" : "ghost"} size={compact ? "md" : "lg"} icon="check" disabled={saving} onClick={pick("present")} style={{ flex: 1 }}>Présent</FBtn>
+      <FBtn variant={myStatus === "absent" ? "danger" : "ghost"} size={compact ? "md" : "lg"} icon="x" disabled={saving} onClick={pick("absent")} style={{ flex: 1 }}>Absent</FBtn>
+    </div>
+  );
+}
+
+// ---- lineup (feuille de match) ------------------------------------------------------------------------------------
 function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled }) {
   const ids = [...new Set([...roster.map((r) => r.player_id), ...(extraIds || [])])];
+  const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
   const players = ids.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean)
     .sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
-  if (players.length === 0) return <div style={{ color: "#60607a", fontSize: 13 }}>Aucun joueur dans l'effectif.</div>;
+  if (players.length === 0) return <FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif dans l'onglet Admin." />;
   return (
-    <div>
-      {players.map((p) => (
-        <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", fontSize: 13, cursor: disabled ? "default" : "pointer" }}>
-          <input type="checkbox" checked={checked.includes(p.id)} disabled={disabled} onChange={() => onToggle(p.id)} />
-          {getDisplayName(p, PLAYERS)}
-        </label>
-      ))}
+    <div style={{ display: "grid", gap: 6 }}>
+      {players.map((p) => {
+        const on = checked.includes(p.id);
+        return (
+          <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 6px 6px", borderRadius: 16, background: on ? FC.accentSoft : FC.softer, border: `1.5px solid ${on ? FC.accent : "transparent"}`, cursor: disabled ? "default" : "pointer", fontSize: 15 }}>
+            <FAvatar playerId={p.id} name={getDisplayName(p, PLAYERS)} size={34} />
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDisplayName(p, PLAYERS)}</span>
+            {numberOf(p.id) && <span style={{ fontFamily: FF.ui, fontSize: 13, color: FC.deep }}>n°{numberOf(p.id)}</span>}
+            <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(p.id)} />
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -105,41 +119,41 @@ function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
   const toggle = (id) => setWanted(wanted.includes(id) ? wanted.filter((x) => x !== id) : [...wanted, id]);
 
   async function save() {
-    setSaving(true);
+    setSaving(true); setErr(null);
     try { await applyLineupChange(match.id, diffLineupEdit(snapshot, current, wanted)); await reload(); setEditing(false); }
-    catch (e) { console.warn("lineup save failed", e); }
+    catch (e) { console.warn("lineup save failed", e); setErr("Enregistrement impossible : " + e.message); }
     setSaving(false);
   }
 
-  const names = current.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean).map((p) => getDisplayName(p, PLAYERS));
+  const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
+  const ordered = [...current].sort((a, b) => (Number(numberOf(a)) || 999) - (Number(numberOf(b)) || 999) || footNameOf(a).localeCompare(footNameOf(b)));
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginTop: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 14 }}>Feuille de match ({current.length})</div>
-        {isAdmin && !editing && <button onClick={() => { setSnapshot(current); setWanted(current); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>✏️ Modifier</button>}
-      </div>
-      {!editing && (names.length ? <div style={{ fontSize: 13, color: "#cccce0" }}>{names.join(" · ")}</div> : <div style={{ fontSize: 13, color: "#60607a" }}>Personne sur la feuille.</div>)}
+    <FCard>
+      <FHeading right={isAdmin && !editing && <FBtn size="sm" variant="secondary" icon="pencil" onClick={() => { setSnapshot(current); setWanted(current); setEditing(true); }}>Modifier</FBtn>}>
+        Feuille de match <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>({current.length})</span>
+      </FHeading>
+      {!editing && (ordered.length
+        ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{ordered.map((id) => <FootPlayerPill key={id} id={id} number={numberOf(id)} />)}</div>
+        : <FEmpty icon="users" title="Pas encore de feuille" text={isAdmin ? "Choisis les joueurs qui seront sur la feuille de match." : "La feuille de match n'est pas encore publiée."} />)}
       {editing && (
         <>
           <FootLineupChecklist roster={roster} extraIds={current} checked={wanted} onToggle={toggle} disabled={saving} />
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button onClick={() => setEditing(false)} disabled={saving} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "8px", cursor: "pointer" }}>Annuler</button>
-            <button onClick={save} disabled={saving} style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>{saving ? "…" : "Enregistrer"}</button>
+          {err && <FMessage style={{ marginTop: 10 }}>{err}</FMessage>}
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <FBtn variant="ghost" onClick={() => setEditing(false)} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
+            <FBtn onClick={save} disabled={saving} style={{ flex: 1 }}>{saving ? "…" : `Enregistrer (${wanted.length})`}</FBtn>
           </div>
         </>
       )}
-    </div>
+    </FCard>
   );
 }
 
-function formatMatchPlace(match) {
-  const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
-  return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
-}
-
+// ---- match form (create / edit) ----------------------------------------------------------------------------------------
 function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
   const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile" };
   const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime) } : empty;
@@ -151,7 +165,7 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
 
   async function submit() {
     if (!f.opponent_name.trim() || !f.match_datetime) {
-      setMsg({ t: "error", m: "Adversaire et date/heure sont obligatoires." });
+      setMsg({ t: "bad", m: "Adversaire et date/heure sont obligatoires." });
       return;
     }
     setSaving(true);
@@ -167,90 +181,111 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
         city: (f.city || "").trim() || null,
       });
       if (resetOnSuccess) setF(empty);
-      setMsg({ t: "success", m: "Enregistré ✓" });
+      setMsg({ t: "good", m: "Enregistré ✓" });
     } catch (e) {
-      setMsg({ t: "error", m: "Erreur: " + e.message });
+      setMsg({ t: "bad", m: "Erreur : " + e.message });
     }
     setSaving(false);
   }
 
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18, marginBottom: 20 }}>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 12 }}>{title}</div>
-      <input style={FOOT_INPUT_STYLE} placeholder="Nom de l'équipe adverse" value={f.opponent_name} onChange={set("opponent_name")} />
-      <input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.match_datetime} onChange={set("match_datetime")} />
-      <select style={FOOT_INPUT_STYLE} value={f.match_type || "championnat"} onChange={set("match_type")}>
-        <option value="championnat">Championnat</option>
-        <option value="amical">Match amical</option>
-      </select>
-      <select style={FOOT_INPUT_STYLE} value={f.venue || "domicile"} onChange={set("venue")}>
-        <option value="domicile">Domicile</option>
-        <option value="exterieur">Extérieur</option>
-      </select>
-      <input style={FOOT_INPUT_STYLE} placeholder="Nom du stade" value={f.stadium_name || ""} onChange={set("stadium_name")} />
-      <input style={FOOT_INPUT_STYLE} placeholder="Adresse" value={f.address || ""} onChange={set("address")} />
-      <input style={FOOT_INPUT_STYLE} placeholder="Code postal" value={f.postal_code || ""} onChange={set("postal_code")} />
-      <input style={FOOT_INPUT_STYLE} placeholder="Ville" value={f.city || ""} onChange={set("city")} />
-      {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 10 }}>{msg.m}</div>}
+    <FCard>
+      <FHeading>{title}</FHeading>
+      <FField label="Équipe adverse"><input style={FOOT_INPUT_STYLE} placeholder="Ex. En Avant Guinguette" value={f.opponent_name} onChange={set("opponent_name")} /></FField>
+      <FField label="Date et heure"><input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.match_datetime} onChange={set("match_datetime")} /></FField>
+      <FLabel>Lieu</FLabel>
+      <FSegmented value={f.venue || "domicile"} onChange={(v) => setF({ ...f, venue: v })} options={[["domicile", "Domicile"], ["exterieur", "Extérieur"]]} style={{ marginBottom: 12 }} />
+      <FLabel>Type</FLabel>
+      <FSegmented value={f.match_type || "championnat"} onChange={(v) => setF({ ...f, match_type: v })} options={[["championnat", "Championnat"], ["amical", "Amical"]]} style={{ marginBottom: 14 }} />
+      <FField label="Stade"><input style={FOOT_INPUT_STYLE} placeholder="Nom du stade" value={f.stadium_name || ""} onChange={set("stadium_name")} /></FField>
+      <FField label="Adresse"><input style={FOOT_INPUT_STYLE} placeholder="Adresse" value={f.address || ""} onChange={set("address")} /></FField>
       <div style={{ display: "flex", gap: 10 }}>
-        {onCancel && <button onClick={onCancel} disabled={saving} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 16px", cursor: "pointer" }}>Annuler</button>}
-        <button onClick={submit} disabled={saving} style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
-          {saving ? "Enregistrement…" : submitLabel}
-        </button>
+        <FField label="Code postal" style={{ flex: "0 0 38%" }}><input style={FOOT_INPUT_STYLE} inputMode="numeric" placeholder="42000" value={f.postal_code || ""} onChange={set("postal_code")} /></FField>
+        <FField label="Ville" style={{ flex: 1 }}><input style={FOOT_INPUT_STYLE} placeholder="Ville" value={f.city || ""} onChange={set("city")} /></FField>
       </div>
-    </div>
+      {msg && <FMessage tone={msg.t}>{msg.m}</FMessage>}
+      <div style={{ display: "flex", gap: 10 }}>
+        {onCancel && <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>}
+        <FBtn onClick={submit} disabled={saving} style={{ flex: 1 }}>{saving ? "Enregistrement…" : submitLabel}</FBtn>
+      </div>
+    </FCard>
   );
 }
 
 function FootCreateMatchForm({ reload }) {
+  const [open, setOpen] = React.useState(false);
+  if (!open) return <FBtn full size="lg" icon="plus" onClick={() => setOpen(true)} style={{ marginBottom: 14 }}>Nouveau match</FBtn>;
   return (
     <FootMatchForm
-      title="Créer un match"
+      title="Nouveau match"
       submitLabel="Créer le match"
       resetOnSuccess
-      onSubmit={async (data) => { await sbInsert("foot_matches", data); await reload(); }}
+      onCancel={() => setOpen(false)}
+      onSubmit={async (data) => { await sbInsert("foot_matches", data); await reload(); setOpen(false); }}
     />
   );
 }
 
-function FootAttendanceButtons({ myStatus, saving, onSet, compact }) {
-  const base = { flex: 1, border: "1px solid #1e1e30", borderRadius: 8, padding: compact ? "7px" : "10px", cursor: "pointer", fontWeight: 700, fontSize: compact ? 12 : 13 };
+// ---- calendar ---------------------------------------------------------------------------------------------------------------
+function FootPresenceStack({ ids, total }) {
+  const shown = ids.slice(0, 6);
   return (
-    <div style={{ display: "flex", gap: compact ? 8 : 10 }}>
-      <button onClick={(e) => { e.stopPropagation(); onSet("present"); }} disabled={saving} style={{ ...base, background: myStatus === "present" ? "#34d399" : "#13131f", color: myStatus === "present" ? "#080810" : "#eeeef5" }}>
-        Présent
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); onSet("absent"); }} disabled={saving} style={{ ...base, background: myStatus === "absent" ? "#ef4444" : "#13131f", color: myStatus === "absent" ? "#080810" : "#eeeef5" }}>
-        Absent
-      </button>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex" }}>
+        {shown.map((id, i) => <span key={id} style={{ marginLeft: i ? -9 : 0, borderRadius: 20, boxShadow: `0 0 0 2px ${FC.solid}` }}><FAvatar playerId={id} name={footNameOf(id)} size={30} /></span>)}
+      </div>
+      <span style={{ fontSize: 14, color: FC.muted }}><b style={{ color: FC.text, fontFamily: FF.ui, fontSize: 16 }}>{ids.length}</b> / {total} présents</span>
     </div>
   );
 }
 
-function FootMatchCard({ match, score, presentCount, rosterSize, onClick, isOnRoster, myStatus, onSetStatus, saving }) {
-  const dt = new Date(match.match_datetime);
-  const dateLabel = dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) + " · " + dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  const statusLabel = match.status === "scheduled" ? "À venir" : match.status === "live" ? "En cours" : "Terminé";
-  const statusColor = match.status === "scheduled" ? "#60607a" : match.status === "live" ? "#ef4444" : "#34d399";
-  const place = formatMatchPlace(match);
+function FootMatchHero({ match, score, presentIds, rosterSize, onOpen, isOnRoster, myStatus, onSetStatus, saving }) {
+  const live = match.status === "live";
   return (
-    <div onClick={onClick} style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 10, cursor: "pointer" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16 }}>Bière Leverculsec vs {match.opponent_name}</div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 9, color: "#60607a", border: "1px solid #1e1e30", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{match.match_type === "amical" ? "Amical" : "Championnat"}</span>
-          <span style={{ fontSize: 9, color: "#60607a", border: "1px solid #1e1e30", borderRadius: 4, padding: "1px 5px", textTransform: "uppercase" }}>{match.venue === "exterieur" ? "Extérieur" : "Domicile"}</span>
-          <div style={{ fontSize: 10, color: statusColor, textTransform: "uppercase", fontWeight: 700 }}>{statusLabel}</div>
+    <FCard onClick={onOpen} pad={20} style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        {live ? <FChip tone="live">En direct</FChip> : <FChip tone="accent">Prochain match</FChip>}
+        <span style={{ fontFamily: FF.ui, fontSize: 14, color: FC.deep }}>{footRelative(match.match_datetime)}</span>
+      </div>
+      <div style={{ fontFamily: FF.ui, fontSize: 14, color: FC.muted, letterSpacing: "0.05em", textTransform: "uppercase" }}>Bière Leverculsec</div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ fontFamily: FF.display, fontSize: 30, lineHeight: 1.15, color: FC.deep, minWidth: 0, overflowWrap: "anywhere" }}>vs {match.opponent_name}</div>
+        {live && <div style={{ fontFamily: FF.display, fontSize: 34, color: FC.deep, whiteSpace: "nowrap" }}>{score.bl}–{score.opponent}</div>}
+      </div>
+      <FootWhenWhere match={match} />
+      <div style={{ margin: "12px 0" }}><FootMetaChips match={match} /></div>
+      {!live && (
+        <>
+          <FootPresenceStack ids={presentIds} total={rosterSize} />
+          {isOnRoster && <div style={{ marginTop: 14 }}><FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={onSetStatus} /></div>}
+        </>
+      )}
+    </FCard>
+  );
+}
+
+function FootMatchRow({ match, score, onOpen }) {
+  const finished = match.status !== "scheduled";
+  const out = finished ? footOutcome(score) : null;
+  const dt = new Date(match.match_datetime);
+  return (
+    <FCard onClick={onOpen} pad={12} style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
+      {finished ? (
+        <span title={FOOT_OUTCOME_LABEL[out]} style={{ width: 44, height: 44, borderRadius: 22, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.display, fontSize: 20, background: FC[FOOT_OUTCOME_TONE[out]], color: "#fff" }}>{out}</span>
+      ) : (
+        <span style={{ width: 44, flexShrink: 0, textAlign: "center", lineHeight: 1.05 }}>
+          <span style={{ display: "block", fontFamily: FF.display, fontSize: 22, color: FC.deep }}>{dt.toLocaleDateString("fr-FR", { day: "numeric", timeZone: "Europe/Paris" })}</span>
+          <span style={{ display: "block", fontFamily: FF.ui, fontSize: 12, color: FC.muted, textTransform: "uppercase" }}>{dt.toLocaleDateString("fr-FR", { month: "short", timeZone: "Europe/Paris" })}</span>
+        </span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: FF.ui, fontSize: 18, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{match.opponent_name}</div>
+        <div style={{ fontSize: 13, color: FC.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {finished ? footDate(match.match_datetime) : `${footDate(match.match_datetime)} · ${footTime(match.match_datetime)}`} · {match.venue === "exterieur" ? "Extérieur" : "Domicile"}{match.match_type === "amical" ? " · Amical" : ""}
         </div>
       </div>
-      <div style={{ fontSize: 12, color: "#60607a", marginBottom: 4 }}>{dateLabel}</div>
-      {place && <div style={{ fontSize: 12, color: "#60607a" }}>{place}</div>}
-      {match.status !== "scheduled" && <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 22, marginTop: 6 }}>{score.bl} — {score.opponent}</div>}
-      {match.status === "scheduled" && <div style={{ fontSize: 12, color: "#60607a", marginTop: 6, marginBottom: isOnRoster ? 10 : 0 }}>{presentCount}/{rosterSize} présents</div>}
-      {match.status === "scheduled" && isOnRoster && (
-        <FootAttendanceButtons compact myStatus={myStatus} saving={saving} onSet={onSetStatus} />
-      )}
-    </div>
+      {finished ? <div style={{ fontFamily: FF.display, fontSize: 26, color: FC.deep, whiteSpace: "nowrap" }}>{score.bl}–{score.opponent}</div> : <FIcon name="chevron" size={20} style={{ color: FC.muted }} />}
+    </FCard>
   );
 }
 
@@ -261,45 +296,43 @@ function FootCalendarPage({ matches, events, roster, attendance, nav, currentPla
 
   async function setStatus(matchId, status) {
     setSavingMatchId(matchId);
-    try {
-      await setMatchAttendance(matchId, currentPlayer.id, status);
-      await reload();
-    } catch (e) {
-      console.warn("attendance update failed", e);
-    }
+    try { await setMatchAttendance(matchId, currentPlayer.id, status); await reload(); }
+    catch (e) { console.warn("attendance update failed", e); }
     setSavingMatchId(null);
   }
 
   if (matches.length === 0) {
-    return <div style={{ padding: 40, textAlign: "center", color: "#60607a" }}>Aucun match pour l'instant.</div>;
+    return <FCard><FEmpty icon="calendar" title="Aucun match" text="Les matchs apparaîtront ici dès qu'ils seront créés." /></FCard>;
   }
+  const scoreOf = (m) => computeFootScore(events.filter((e) => e.match_id === m.id));
+  const featured = footFeaturedMatch(matches);
+  const upcoming = matches.filter((m) => m.status === "scheduled" && m !== featured).sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime));
+  const past = matches.filter((m) => m.status === "finished" || (m.status === "live" && m !== featured)).sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime));
+  const open = (m) => () => nav("matchDetail", { matchId: m.id });
+  const heroAttendance = featured ? attendance.filter((a) => a.match_id === featured.id) : [];
+  const section = (label, list) => list.length > 0 && (
+    <div style={{ marginBottom: 8 }}>
+      <FTitle size={20} style={{ marginBottom: 10 }}>{label}</FTitle>
+      {list.map((m) => <FootMatchRow key={m.id} match={m} score={scoreOf(m)} onOpen={open(m)} />)}
+    </div>
+  );
   return (
-    <div style={{ padding: 16 }}>
-      {matches.map((match) => {
-        const matchEvents = events.filter((e) => e.match_id === match.id);
-        const score = computeFootScore(matchEvents);
-        const matchAttendance = attendance.filter((a) => a.match_id === match.id);
-        const presentCount = computeAttendanceBuckets(presenceRoster, matchAttendance).present.length;
-        const myStatus = matchAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null;
-        return (
-          <FootMatchCard
-            key={match.id}
-            match={match}
-            score={score}
-            presentCount={presentCount}
-            rosterSize={presenceRoster.length}
-            onClick={() => nav("matchDetail", { matchId: match.id })}
-            isOnRoster={isOnRoster}
-            myStatus={myStatus}
-            saving={savingMatchId === match.id}
-            onSetStatus={(status) => setStatus(match.id, status)}
-          />
-        );
-      })}
+    <div className="ft-page">
+      {featured && (
+        <FootMatchHero
+          match={featured} score={scoreOf(featured)} onOpen={open(featured)}
+          presentIds={computeAttendanceBuckets(presenceRoster, heroAttendance).present} rosterSize={presenceRoster.length}
+          isOnRoster={isOnRoster} myStatus={heroAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null}
+          saving={savingMatchId === featured.id} onSetStatus={(status) => setStatus(featured.id, status)}
+        />
+      )}
+      {section("À venir", upcoming)}
+      {section("Résultats", past)}
     </div>
   );
 }
 
+// ---- roster & admin -------------------------------------------------------------------------------------------------------------
 function FootRosterManager({ roster, reload }) {
   const [saving, setSaving] = React.useState(null); // player id currently being saved
   const [search, setSearch] = React.useState("");
@@ -336,47 +369,98 @@ function FootRosterManager({ roster, reload }) {
   }
 
   const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
-  const sortedPlayers = [...PLAYERS].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  // Team members first, then everybody else (to add them).
+  const sortedPlayers = [...PLAYERS].sort((a, b) => (roleByPlayer[b.id] ? 1 : 0) - (roleByPlayer[a.id] ? 1 : 0) || nameOf(a).localeCompare(nameOf(b)));
   const visiblePlayers = filterPlayersByName(sortedPlayers, search, nameOf);
 
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18 }}>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 12 }}>Effectif ({roster.length})</div>
-      <input style={FOOT_INPUT_STYLE} placeholder="🔍 Rechercher un joueur…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      {visiblePlayers.length === 0 && <div style={{ color: "#60607a", fontSize: 13, padding: "8px 0" }}>Aucun joueur ne correspond à « {search} ».</div>}
-      {visiblePlayers.map((p) => (
-        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1e1e30" }}>
-          <div style={{ fontSize: 13 }}>{getDisplayName(p, PLAYERS)}</div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-          {roleByPlayer[p.id] && (
-            <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3}
-              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
-              style={{ width: 52, marginRight: 8, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 6px", fontSize: 12, textAlign: "center" }} />
-          )}
-          <select
-            value={roleByPlayer[p.id] || ""}
-            disabled={saving === p.id}
-            onChange={(e) => setRole(p.id, e.target.value)}
-            style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 8px", fontSize: 12 }}
-          >
-            <option value="">Pas dans l'équipe</option>
-            <option value="regulier">Régulier</option>
-            <option value="occasionnel">Occasionnel</option>
-            <option value="invite">Invité</option>
-          </select>
+    <FCard>
+      <FHeading right={<FChip tone="soft">{roster.length} joueurs</FChip>}>Effectif</FHeading>
+      <input style={FOOT_INPUT_STYLE} placeholder="Rechercher un joueur…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Rechercher un joueur" />
+      {visiblePlayers.length === 0 && <FEmpty icon="users" title="Aucun résultat" text={`Aucun joueur ne correspond à « ${search} ».`} />}
+      {visiblePlayers.map((p) => {
+        const inTeam = !!roleByPlayer[p.id];
+        return (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}`, opacity: inTeam ? 1 : 0.75 }}>
+            <FAvatar playerId={p.id} name={nameOf(p)} size={38} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
+            {inTeam && (
+              <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3} aria-label={`Numéro de ${nameOf(p)}`}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
+                style={{ ...FOOT_INPUT_STYLE, width: 58, marginBottom: 0, textAlign: "center", padding: "8px 6px", minHeight: 40, fontFamily: FF.ui }} />
+            )}
+            <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, maxWidth: 138 }}>
+              <option value="">Hors équipe</option>
+              <option value="regulier">Régulier</option>
+              <option value="occasionnel">Occasionnel</option>
+              <option value="invite">Invité</option>
+            </select>
           </div>
-        </div>
-      ))}
-    </div>
+        );
+      })}
+    </FCard>
   );
 }
 
 function FootAdminPage({ roster, reload }) {
   return (
-    <div style={{ padding: 20 }}>
+    <div className="ft-page">
       <FootCreateMatchForm reload={reload} />
       <FootRosterManager roster={roster} reload={reload} />
     </div>
+  );
+}
+
+// ---- match detail ----------------------------------------------------------------------------------------------------------------
+function footHalfLabel(n) { return n === 1 ? "1re mi-temps" : `${n}e mi-temps`; }
+
+// "1re mi-temps · 17'" — ticks every second while the half is running.
+function FootLiveClock({ match }) {
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    if (!match.half_started_at) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [match.half_started_at]);
+  const secs = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
+  const running = !!match.half_started_at;
+  return (
+    <div style={{ textAlign: "center", fontFamily: FF.ui, fontSize: 16, color: FC.deep, marginTop: 4 }}>
+      {footHalfLabel(match.current_half || 1)} · {running ? `${Math.floor(secs / 60)}'` : secs > 0 ? "terminée" : "à démarrer"}
+    </div>
+  );
+}
+
+function FootTeamMark({ name, logo }) {
+  return (
+    <div style={{ textAlign: "center", minWidth: 0 }}>
+      {logo
+        ? <img src="/logo-bl.png" alt="" style={{ width: 54, height: 54, borderRadius: 27, objectFit: "cover", background: FC.soft, display: "block", margin: "0 auto 6px" }} />
+        : <span style={{ width: 54, height: 54, borderRadius: 27, background: FC.soft, color: FC.deep, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FF.display, fontSize: 21, margin: "0 auto 6px" }}>{playerInitials(name)}</span>}
+      <div style={{ fontFamily: FF.ui, fontSize: 16, lineHeight: 1.15, overflowWrap: "anywhere" }}>{name}</div>
+    </div>
+  );
+}
+
+function FootScoreboard({ match, score }) {
+  const live = match.status === "live", finished = match.status === "finished";
+  const out = finished ? footOutcome(score) : null;
+  return (
+    <FCard pad={20}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
+        {live ? <FChip tone="live">En direct</FChip> : finished ? <FChip tone={FOOT_OUTCOME_TONE[out]}>{FOOT_OUTCOME_LABEL[out]}</FChip> : <FChip tone="accent">À venir</FChip>}
+        <span style={{ fontFamily: FF.ui, fontSize: 14, color: FC.muted }}>{footRelative(match.match_datetime)}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8 }}>
+        <FootTeamMark name="Bière Leverculsec" logo />
+        <div style={{ fontFamily: FF.display, fontSize: live || finished ? 46 : 32, color: FC.deep, whiteSpace: "nowrap", lineHeight: 1 }}>{live || finished ? `${score.bl} – ${score.opponent}` : "VS"}</div>
+        <FootTeamMark name={match.opponent_name} />
+      </div>
+      {live && <FootLiveClock match={match} />}
+      <div style={{ height: 1, background: FC.line, margin: "16px 0 12px" }} />
+      <FootWhenWhere match={match} />
+      <div style={{ marginTop: 10 }}><FootMetaChips match={match} /></div>
+    </FCard>
   );
 }
 
@@ -384,52 +468,46 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCa
   const [nbHalves, setNbHalves] = React.useState(2);
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
   const presentIds = attendance.filter((a) => a.match_id === match.id && a.status === "present").map((a) => a.player_id);
   const existingSheet = lineupIdsFor(lineups || [], match.id);
   const [sheet, setSheet] = React.useState(existingSheet.length ? existingSheet : presentIds.filter((id) => roster.some((r) => r.player_id === id)));
   const toggle = (id) => setSheet(sheet.includes(id) ? sheet.filter((x) => x !== id) : [...sheet, id]);
 
   async function start() {
-    setSaving(true);
+    setSaving(true); setErr(null);
     try {
       await saveLineup(match.id, lineupIdsFor(lineups || [], match.id), sheet);
       await sbUpdate("foot_matches", { id: match.id }, {
-        status: "live",
-        nb_halves: nbHalves,
-        half_duration_min: halfDuration,
-        current_half: 1,
-        half_started_at: null,
-        half_elapsed_seconds: 0,
+        status: "live", nb_halves: nbHalves, half_duration_min: halfDuration, current_half: 1, half_started_at: null, half_elapsed_seconds: 0,
       });
       await reload();
     } catch (e) {
       console.warn("start match failed", e);
+      setErr("Impossible de démarrer : " + e.message);
       setSaving(false);
     }
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 18 }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 14 }}>Configuration du match</div>
-        <label style={{ fontSize: 12, color: "#60607a" }}>Nombre de mi-temps</label>
-        <select value={nbHalves} onChange={(e) => setNbHalves(Number(e.target.value))} style={{ display: "block", width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 12px", marginTop: 4, marginBottom: 14 }}>
-          {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <label style={{ fontSize: 12, color: "#60607a" }}>Durée par mi-temps (minutes)</label>
-        <input type="number" min={1} value={halfDuration} onChange={(e) => setHalfDuration(Number(e.target.value))} style={{ display: "block", width: "100%", background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "9px 12px", marginTop: 4, marginBottom: 18 }} />
-        <label style={{ fontSize: 12, color: "#60607a" }}>Feuille de match ({sheet.length})</label>
-        <div style={{ margin: "6px 0 18px" }}>
-          <FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} />
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onCancel} disabled={saving} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>Annuler</button>
-          <button onClick={start} disabled={saving} style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Démarrage…" : "Démarrer le match"}
-          </button>
-        </div>
+    <FCard>
+      <FHeading>Lancer le match</FHeading>
+      <div style={{ display: "flex", gap: 10 }}>
+        <FField label="Mi-temps" style={{ flex: 1 }}>
+          <select value={nbHalves} onChange={(e) => setNbHalves(Number(e.target.value))} style={FOOT_INPUT_STYLE}>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}</select>
+        </FField>
+        <FField label="Durée (min)" style={{ flex: 1 }}>
+          <input type="number" min={1} inputMode="numeric" value={halfDuration} onChange={(e) => setHalfDuration(Number(e.target.value))} style={FOOT_INPUT_STYLE} />
+        </FField>
       </div>
-    </div>
+      <FLabel>Feuille de match ({sheet.length})</FLabel>
+      <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} /></div>
+      {err && <FMessage>{err}</FMessage>}
+      <div style={{ display: "flex", gap: 10 }}>
+        <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
+        <FBtn variant="success" icon="play" onClick={start} disabled={saving} style={{ flex: 2 }}>{saving ? "Démarrage…" : "Coup d'envoi"}</FBtn>
+      </div>
+    </FCard>
   );
 }
 
@@ -447,63 +525,40 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
   [event?.player_id, event?.assist_player_id].forEach((id) => { if (id) rosterIds.add(id); });
   const options = PLAYERS.filter((p) => rosterIds.has(p.id));
 
-  const selectStyle = { display: "block", width: "100%", background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "7px 10px", marginTop: 4, marginBottom: 10 };
-
   async function save() {
     let payload;
-    try {
-      payload = buildEventPayload({ type, half, minute, playerId, assistId });
-    } catch (e) {
-      setErr(e.message);
-      return;
-    }
-    setSaving(true);
-    setErr(null);
-    try {
-      await onSave(payload);
-    } catch (e) {
-      setErr("Erreur: " + e.message);
-      setSaving(false);
-    }
+    try { payload = buildEventPayload({ type, half, minute, playerId, assistId }); } catch (e) { setErr(e.message); return; }
+    setSaving(true); setErr(null);
+    try { await onSave(payload); } catch (e) { setErr("Erreur : " + e.message); setSaving(false); }
   }
 
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, padding: 14, margin: "6px 0" }}>
-      <label style={{ fontSize: 11, color: "#60607a" }}>Type</label>
-      <select value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
-        <option value="goal_bl">But Bière Leverculsec</option>
-        <option value="goal_opponent">But adverse</option>
-      </select>
+    <div onClick={(e) => e.stopPropagation()} style={{ background: FC.softer, border: `1.5px solid ${FC.line}`, borderRadius: 18, padding: 14, margin: "8px 0" }}>
+      <FSegmented value={type} onChange={setType} options={[["goal_bl", "Nos buts"], ["goal_opponent", "But adverse"]]} style={{ marginBottom: 12 }} />
       <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 11, color: "#60607a" }}>Mi-temps</label>
-          <input type="number" min={1} value={half} onChange={(e) => setHalf(e.target.value)} style={selectStyle} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 11, color: "#60607a" }}>Minute</label>
-          <input type="number" min={0} value={minute} onChange={(e) => setMinute(e.target.value)} style={selectStyle} />
-        </div>
+        <FField label="Mi-temps" style={{ flex: 1 }}><input type="number" min={1} inputMode="numeric" value={half} onChange={(e) => setHalf(e.target.value)} style={FOOT_INPUT_STYLE} /></FField>
+        <FField label="Minute" style={{ flex: 1 }}><input type="number" min={0} inputMode="numeric" value={minute} onChange={(e) => setMinute(e.target.value)} style={FOOT_INPUT_STYLE} /></FField>
       </div>
       {type === "goal_bl" && (
         <>
-          <label style={{ fontSize: 11, color: "#60607a" }}>Buteur</label>
-          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={selectStyle}>
-            <option value="">— Choisir —</option>
-            {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
-          </select>
-          <label style={{ fontSize: 11, color: "#60607a" }}>Passe décisive (optionnel)</label>
-          <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={selectStyle}>
-            <option value="">— Aucune —</option>
-            {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
-          </select>
+          <FField label="Buteur">
+            <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
+              <option value="">— Choisir —</option>
+              {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+            </select>
+          </FField>
+          <FField label="Passe décisive (optionnel)">
+            <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
+              <option value="">— Aucune —</option>
+              {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+            </select>
+          </FField>
         </>
       )}
-      {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 8 }}>{err}</div>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={onCancel} disabled={saving} style={{ flex: 1, background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "8px", cursor: "pointer" }}>Annuler</button>
-        <button onClick={save} disabled={saving} style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
-          {saving ? "…" : "Enregistrer"}
-        </button>
+      {err && <FMessage>{err}</FMessage>}
+      <div style={{ display: "flex", gap: 10 }}>
+        <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
+        <FBtn onClick={save} disabled={saving} style={{ flex: 1 }}>{saving ? "…" : "Enregistrer"}</FBtn>
       </div>
     </div>
   );
@@ -528,37 +583,32 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
   async function deleteEvent(e) {
     if (!window.confirm("Supprimer ce but ?")) return;
     setBusyId(e.id);
-    try {
-      await sbFetch("foot_match_events", `?id=eq.${e.id}`, { method: "DELETE" });
-      await reload();
-    } catch (err) {
-      console.warn("delete event failed", err);
-    }
+    try { await sbFetch("foot_match_events", `?id=eq.${e.id}`, { method: "DELETE" }); await reload(); }
+    catch (err) { console.warn("delete event failed", err); }
     setBusyId(null);
   }
 
-  const iconBtn = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "0 4px" };
-
   return (
     <div>
-      {sorted.length === 0 && <div style={{ color: "#60607a", fontSize: 13 }}>Aucun but pour l'instant.</div>}
+      {sorted.length === 0 && <FEmpty icon="ball" title="Aucun but" text="Les buts apparaîtront ici au fil du match." />}
       {sorted.map((e) => {
-        if (editingId === e.id) {
-          return <FootEventEditor key={e.id} event={e} roster={roster} onSave={(p) => saveEvent(e.id, p)} onCancel={() => setEditingId(null)} />;
-        }
-        const scorer = e.player_id ? PLAYERS.find((p) => p.id === e.player_id) : null;
-        const assist = e.assist_player_id ? PLAYERS.find((p) => p.id === e.assist_player_id) : null;
-        const label = e.type === "goal_bl"
-          ? `⚽ ${scorer ? getDisplayName(scorer, PLAYERS) : "?"}${assist ? " (passe D: " + getDisplayName(assist, PLAYERS) + ")" : ""}`
-          : `⚽ But adverse`;
+        if (editingId === e.id) return <FootEventEditor key={e.id} event={e} roster={roster} onSave={(p) => saveEvent(e.id, p)} onCancel={() => setEditingId(null)} />;
+        const ours = e.type === "goal_bl";
         return (
-          <div key={e.id} style={{ display: "flex", gap: 10, padding: "5px 0", fontSize: 13, alignItems: "center" }}>
-            <span style={{ color: "#60607a", width: 50 }}>{e.half}e · {e.minute}'</span>
-            <span style={{ flex: 1 }}>{label}</span>
+          <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
+            <span style={{ flex: "0 0 52px", textAlign: "center" }}>
+              <span style={{ display: "block", fontFamily: FF.display, fontSize: 18, color: FC.deep, lineHeight: 1.1 }}>{e.minute}'</span>
+              <span style={{ display: "block", fontSize: 11, color: FC.muted }}>{e.half}{e.half === 1 ? "re" : "e"} MT</span>
+            </span>
+            {ours ? <FAvatar playerId={e.player_id} name={footNameOf(e.player_id)} size={36} /> : <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.badSoft, color: FC.bad, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FIcon name="ball" size={18} /></span>}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: ours ? FC.text : FC.muted }}>{ours ? footNameOf(e.player_id) : "But adverse"}</div>
+              {ours && e.assist_player_id && <div style={{ fontSize: 13, color: FC.muted }}>Passe de {footNameOf(e.assist_player_id)}</div>}
+            </div>
             {editable && (
-              <span style={{ whiteSpace: "nowrap" }}>
-                <button title="Modifier" onClick={() => setEditingId(e.id)} disabled={busyId === e.id} style={iconBtn}>✏️</button>
-                <button title="Supprimer" onClick={() => deleteEvent(e)} disabled={busyId === e.id} style={iconBtn}>🗑️</button>
+              <span style={{ display: "inline-flex" }}>
+                <FIconBtn icon="pencil" label="Modifier le but" onClick={() => setEditingId(e.id)} disabled={busyId === e.id} />
+                <FIconBtn icon="trash" label="Supprimer le but" tone="danger" onClick={() => deleteEvent(e)} disabled={busyId === e.id} />
               </span>
             )}
           </div>
@@ -568,9 +618,7 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
         <FootEventEditor defaultHalf={match.current_half || 1} roster={roster} onSave={(p) => saveEvent("new", p)} onCancel={() => setEditingId(null)} />
       )}
       {editable && editingId !== "new" && (
-        <button onClick={() => setEditingId("new")} style={{ marginTop: 8, background: "none", border: "1px dashed #1e1e30", borderRadius: 8, color: "#60607a", padding: "7px 12px", cursor: "pointer", fontSize: 12, width: "100%" }}>
-          ➕ Ajouter un but
-        </button>
+        <FBtn variant="ghost" full size="sm" icon="plus" onClick={() => setEditingId("new")} style={{ marginTop: 10, borderStyle: "dashed" }}>Ajouter un but</FBtn>
       )}
     </div>
   );
@@ -580,31 +628,26 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
   const options = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
+  const can = canConfirmGoal(playerId, busy);
   return (
-    <div style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, padding: 14, marginTop: 10 }}>
-      <label style={{ fontSize: 11, color: "#60607a" }}>Buteur</label>
-      <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={{ display: "block", width: "100%", background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "7px 10px", marginTop: 4, marginBottom: 10 }}>
-        <option value="">— Choisir —</option>
-        {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
-      </select>
+    <div style={{ background: FC.softer, border: `1.5px solid ${FC.line}`, borderRadius: 18, padding: 14, marginTop: 10 }}>
+      <FField label="Buteur">
+        <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
+          <option value="">— Choisir —</option>
+          {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+        </select>
+      </FField>
       {withAssist && (
-        <>
-          <label style={{ fontSize: 11, color: "#60607a" }}>Passe décisive (optionnel)</label>
-          <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={{ display: "block", width: "100%", background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "7px 10px", marginTop: 4, marginBottom: 10 }}>
+        <FField label="Passe décisive (optionnel)">
+          <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
             <option value="">— Aucune —</option>
             {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
           </select>
-        </>
+        </FField>
       )}
-      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        <button onClick={onCancel} style={{ flex: 1, background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "8px", cursor: "pointer" }}>Annuler</button>
-        <button
-          onClick={() => canConfirmGoal(playerId, busy) && onConfirm(Number(playerId), assistId ? Number(assistId) : null)}
-          disabled={!canConfirmGoal(playerId, busy)}
-          style={{ flex: 1, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, padding: "8px", fontWeight: 700, cursor: canConfirmGoal(playerId, busy) ? "pointer" : "default", opacity: canConfirmGoal(playerId, busy) ? 1 : 0.5 }}
-        >
-          Valider
-        </button>
+      <div style={{ display: "flex", gap: 10 }}>
+        <FBtn variant="ghost" onClick={onCancel} style={{ flex: 1 }}>Annuler</FBtn>
+        <FBtn icon="check" onClick={() => can && onConfirm(Number(playerId), assistId ? Number(assistId) : null)} disabled={!can} style={{ flex: 1 }}>Valider</FBtn>
       </div>
     </div>
   );
@@ -629,29 +672,18 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
     try {
       await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), { type, player_id: playerId, assist_player_id: assistId }, {
         addToSheet: (ids) => addToLineup(match.id, ids),
-        writeGoal: () => sbInsert("foot_match_events", {
-          match_id: match.id,
-          half: match.current_half,
-          minute: minutesElapsed,
-          type,
-          player_id: playerId,
-          assist_player_id: assistId,
-        }),
+        writeGoal: () => sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute: minutesElapsed, type, player_id: playerId, assist_player_id: assistId }),
       });
       setPicking(null);
       await reload();
-    } catch (e) {
-      console.warn("log goal failed", e);
-    }
+    } catch (e) { console.warn("log goal failed", e); }
     setBusy(false);
   }
 
   async function startHalf() {
     setBusy(true);
-    try {
-      await sbUpdate("foot_matches", { id: match.id }, { half_started_at: new Date().toISOString() });
-      await reload();
-    } catch (e) { console.warn(e); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { half_started_at: new Date().toISOString() }); await reload(); }
+    catch (e) { console.warn(e); }
     setBusy(false);
   }
 
@@ -661,16 +693,9 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
       const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
       const next = nextHalfState(match.current_half, match.nb_halves);
       if (next.type === "next") {
-        await sbUpdate("foot_matches", { id: match.id }, {
-          half_elapsed_seconds: 0,
-          half_started_at: null,
-          current_half: next.half,
-        });
+        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: 0, half_started_at: null, current_half: next.half });
       } else {
-        await sbUpdate("foot_matches", { id: match.id }, {
-          half_elapsed_seconds: frozenElapsed,
-          half_started_at: null,
-        });
+        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: frozenElapsed, half_started_at: null });
       }
       await reload();
     } catch (e) { console.warn(e); }
@@ -679,52 +704,35 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
 
   async function closeMatch() {
     setBusy(true);
-    try {
-      await sbUpdate("foot_matches", { id: match.id }, { status: "finished", half_started_at: null });
-      await reload();
-    } catch (e) { console.warn(e); setBusy(false); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { status: "finished", half_started_at: null }); await reload(); }
+    catch (e) { console.warn(e); setBusy(false); }
   }
 
   const isLastHalf = match.current_half >= match.nb_halves;
   const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
 
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #3b82f655", borderRadius: 12, padding: 16, marginTop: 16 }}>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 14, color: "#3b82f6" }}>CONSOLE ADMIN — Mi-temps {match.current_half}/{match.nb_halves}</div>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, margin: "8px 0" }}>{String(minutesElapsed).padStart(2, "0")}:{String(elapsedSeconds % 60).padStart(2, "0")}</div>
+    <FCard style={{ border: `2px solid ${FC.accent}` }}>
+      <FHeading right={<FChip tone="accent">Console admin</FChip>}>{footHalfLabel(match.current_half)} <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>/ {match.nb_halves}</span></FHeading>
+      <div style={{ textAlign: "center", fontFamily: FF.display, fontSize: 60, lineHeight: 1.1, color: FC.deep, margin: "2px 0 14px", fontVariantNumeric: "tabular-nums" }}>
+        {String(minutesElapsed).padStart(2, "0")}:{String(elapsedSeconds % 60).padStart(2, "0")}
+      </div>
 
-      {liveAction === "start" && <button onClick={startHalf} disabled={busy} style={{ width: "100%", background: "#34d399", color: "#080810", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>▶ Démarrer la mi-temps</button>}
+      {liveAction === "start" && <FBtn variant="success" size="lg" full icon="play" disabled={busy} onClick={startHalf}>Démarrer la mi-temps</FBtn>}
 
       {liveAction === "playing" && (
         <>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button onClick={() => setPicking("bl")} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But Bière Leverculsec</button>
-            <button onClick={() => logGoal("goal_opponent", null, null)} disabled={busy} style={{ flex: 1, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "10px", cursor: "pointer" }}>⚽ But adverse</button>
+          <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+            <FBtn size="lg" icon="ball" disabled={busy} onClick={() => setPicking("bl")} style={{ flex: 1 }}>But BL</FBtn>
+            <FBtn variant="ghost" size="lg" icon="ball" disabled={busy} onClick={() => logGoal("goal_opponent", null, null)} style={{ flex: 1 }}>But adverse</FBtn>
           </div>
-          {picking === "bl" && (
-            <FootGoalPicker roster={roster} withAssist busy={busy} onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />
-          )}
-          <button onClick={endHalf} disabled={busy} style={{ width: "100%", background: "#1e1e30", color: "#eeeef5", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", marginTop: 10 }}>
-            {isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps"}
-          </button>
+          {picking === "bl" && <FootGoalPicker roster={roster} withAssist busy={busy} onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />}
+          <FBtn variant="secondary" full icon={isLastHalf ? "flag" : "pause"} disabled={busy} onClick={endHalf} style={{ marginTop: 10 }}>{isLastHalf ? "Fin de la dernière mi-temps" : "Terminer la mi-temps"}</FBtn>
         </>
       )}
 
-      {liveAction === "close" && (
-        <button onClick={closeMatch} disabled={busy} style={{ width: "100%", background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer" }}>🏁 Clôturer le match</button>
-      )}
-    </div>
-  );
-}
-
-function FootMatchHeader({ match }) {
-  const place = formatMatchPlace(match);
-  return (
-    <>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>Bière Leverculsec vs {match.opponent_name}</div>
-      <div style={{ fontSize: 12, color: "#60607a", marginTop: 4 }}>{new Date(match.match_datetime).toLocaleString("fr-FR")} · {match.match_type === "amical" ? "Amical" : "Championnat"} · {match.venue === "exterieur" ? "Extérieur" : "Domicile"}</div>
-      {place && <div style={{ fontSize: 12, color: "#60607a" }}>{place}</div>}
-    </>
+      {liveAction === "close" && <FBtn variant="danger" size="lg" full icon="flag" disabled={busy} onClick={closeMatch}>Clôturer le match</FBtn>}
+    </FCard>
   );
 }
 
@@ -732,13 +740,13 @@ function FootLiveView({ match, roster, events, lineups, currentPlayer, isAdmin, 
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 }}>
-        <FootMatchHeader match={match} />
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, margin: "10px 0" }}>{score.bl} — {score.opponent}</div>
-        <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
-      </div>
+    <div className="ft-page">
+      <FootScoreboard match={match} score={score} />
       {isAdmin && <FootLiveAdminConsole match={match} roster={roster} events={matchEvents} lineups={lineups} reload={reload} />}
+      <FCard>
+        <FHeading>Buts</FHeading>
+        <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
+      </FCard>
       <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={isAdmin} reload={reload} />
     </div>
   );
@@ -760,7 +768,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
   const [scores, setScores] = React.useState(mine);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState(null);
-  const nameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
+  const nameOf = footNameOf;
 
   async function save() {
     let rows;
@@ -777,7 +785,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
       if (result === "closed") setErr("Les notes de ce match ont déjà été validées, tes notes n'ont pas été enregistrées.");
       setEditing(false);
       await reload();
-    } catch (e) { setErr("Erreur: " + e.message); }
+    } catch (e) { setErr("Erreur : " + e.message); }
     setBusy(false);
   }
 
@@ -785,60 +793,58 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
     if (!window.confirm("Valider les notes maintenant avec les votes déjà faits ?")) return;
     setBusy(true);
     try { await sbUpdate("foot_matches", { id: match.id }, { ratings_validated_at: new Date().toISOString() }); await reload(); }
-    catch (e) { setErr("Erreur: " + e.message); }
+    catch (e) { setErr("Erreur : " + e.message); }
     setBusy(false);
   }
 
-  const card = { background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 };
-  if (sheetIds.length < 2) return <div style={card}><div style={{ color: "#60607a", fontSize: 13 }}>Pas assez de joueurs sur la feuille de match pour noter.</div></div>;
+  if (sheetIds.length < 2) return <FCard><FEmpty icon="star" title="Pas de notes" text="Il faut au moins deux joueurs sur la feuille de match pour noter." /></FCard>;
 
   const view = ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin });
   const ranked = sheetIds.map((id) => ({ id, avg: averages[id] })).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
 
   return (
-    <div style={card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15 }}>Notes du match</div>
-        <div style={{ fontSize: 11, color: validated ? "#34d399" : "#60607a", fontWeight: 700 }}>{validated ? "✓ Notes validées" : `${progress.doneIds.length} / ${sheetIds.length} ont voté`}</div>
-      </div>
+    <FCard>
+      <FHeading right={validated ? <FChip tone="good" icon="check">Validées</FChip> : <FChip tone="soft">{progress.doneIds.length} / {sheetIds.length} ont voté</FChip>}>Notes du match</FHeading>
 
       {view.showForm && (
         <div style={{ marginBottom: 14 }}>
           {sheetIds.filter((id) => id !== me).map((id) => (
-            <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #1e1e30" }}>
-              <span style={{ fontSize: 13 }}>{nameOf(id)}</span>
-              <select value={scores[id] ?? ""} disabled={busy} onChange={(e) => setScores({ ...scores, [id]: e.target.value })} style={{ background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 8px" }}>
+            <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${FC.line}` }}>
+              <FAvatar playerId={id} name={nameOf(id)} size={34} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(id)}</span>
+              <select value={scores[id] ?? ""} disabled={busy} onChange={(e) => setScores({ ...scores, [id]: e.target.value })} aria-label={`Note pour ${nameOf(id)}`} style={{ ...FOOT_SELECT_STYLE, minWidth: 82 }}>
                 <option value="">—</option>
                 {FOOT_SCORE_OPTIONS.map((s) => <option key={s} value={String(s)}>{s.toFixed(1)}</option>)}
               </select>
             </div>
           ))}
-          <button onClick={save} disabled={busy} style={{ width: "100%", marginTop: 10, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "Enregistrer mes notes"}</button>
+          <FBtn full size="lg" onClick={save} disabled={busy} style={{ marginTop: 12 }}>{busy ? "…" : "Enregistrer mes notes"}</FBtn>
         </div>
       )}
 
-      {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {err && <FMessage>{err}</FMessage>}
 
-      {view.showEditButton && (
-        <button onClick={() => { setScores(mine); setErr(null); setEditing(true); }} style={{ background: "none", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "4px 10px", cursor: "pointer", fontSize: 12, marginBottom: 10 }}>✏️ {view.editLabel}</button>
-      )}
+      {view.showEditButton && <FBtn size="sm" variant="secondary" icon="pencil" onClick={() => { setScores(mine); setErr(null); setEditing(true); }} style={{ marginBottom: 12 }}>{view.editLabel}</FBtn>}
 
-      {view.showAverages && ranked.map(({ id, avg }) => (
-        <div key={id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13 }}>
-          <span>{nameOf(id)}</span>
-          <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>{avg == null ? "—" : avg.toFixed(1)}</span>
+      {view.showAverages && ranked.map(({ id, avg }, i) => (
+        <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${FC.line}` }}>
+          <span style={{ width: 22, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: i < 3 ? FC.deep : FC.muted }}>{i + 1}</span>
+          <FAvatar playerId={id} name={nameOf(id)} size={34} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(id)}</div>
+            <div style={{ height: 6, borderRadius: 3, background: FC.soft, marginTop: 4 }}><div style={{ width: `${avg == null ? 0 : Math.max(4, (avg / 10) * 100)}%`, height: "100%", borderRadius: 3, background: FC.accent }} /></div>
+          </div>
+          <span style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, minWidth: 42, textAlign: "right" }}>{avg == null ? "—" : avg.toFixed(1)}</span>
         </div>
       ))}
-      {view.showHiddenMessage && <div style={{ fontSize: 12, color: "#60607a" }}>Les moyennes seront visibles après validation.</div>}
+      {view.showHiddenMessage && <FMessage tone="warn">Les moyennes seront visibles après validation des notes.</FMessage>}
 
       {!validated && progress.pendingIds.length > 0 && (
-        <div style={{ marginTop: 12, fontSize: 12, color: "#60607a" }}>Pas encore voté : {progress.pendingIds.map(nameOf).join(" · ")}</div>
+        <div style={{ marginTop: 12, fontSize: 13, color: FC.muted }}>Pas encore voté : {progress.pendingIds.map(nameOf).join(" · ")}</div>
       )}
 
-      {isAdmin && !validated && (
-        <button onClick={forceValidate} disabled={busy} style={{ width: "100%", marginTop: 12, background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "8px", cursor: "pointer", fontSize: 12 }}>Valider les notes maintenant</button>
-      )}
-    </div>
+      {isAdmin && !validated && <FBtn variant="ghost" full size="sm" onClick={forceValidate} disabled={busy} style={{ marginTop: 12 }}>Valider les notes maintenant</FBtn>}
+    </FCard>
   );
 }
 
@@ -847,20 +853,15 @@ function FootFinishedView({ match, roster, events, lineups, ratings, currentPlay
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {[["resume", "Résumé"], ["notes", "Notes du match"]].map(([id, l]) => (
-          <button key={id} onClick={() => setTab(id)} style={{ flex: 1, background: tab === id ? "#3b82f6" : "#13131f", color: tab === id ? "#fff" : "#60607a", border: "1px solid #1e1e30", borderRadius: 8, padding: "8px", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>{l}</button>
-        ))}
-      </div>
+    <div className="ft-page">
+      <FootScoreboard match={match} score={score} />
+      <FSegmented value={tab} onChange={setTab} options={[["resume", "Résumé", "ball"], ["notes", "Notes", "star"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "resume" && (
         <>
-          <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16 }}>
-            <FootMatchHeader match={match} />
-            <div style={{ fontSize: 10, color: "#34d399", textTransform: "uppercase", fontWeight: 700, marginTop: 4 }}>Terminé</div>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, margin: "10px 0" }}>{score.bl} — {score.opponent}</div>
+          <FCard>
+            <FHeading>Buts</FHeading>
             <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
-          </div>
+          </FCard>
           <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={isAdmin} reload={reload} />
         </>
       )}
@@ -879,52 +880,36 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
 
   async function setMyStatus(status) {
     setSaving(true);
-    try {
-      await setMatchAttendance(match.id, currentPlayer.id, status);
-      await reload();
-    } catch (e) {
-      console.warn("attendance update failed", e);
-    }
+    try { await setMatchAttendance(match.id, currentPlayer.id, status); await reload(); }
+    catch (e) { console.warn("attendance update failed", e); }
     setSaving(false);
   }
 
-  function nameOf(playerId) {
-    const p = PLAYERS.find((pl) => pl.id === playerId);
-    return p ? getDisplayName(p, PLAYERS) : "?";
-  }
-
+  const groups = [["Présents", buckets.present, "good"], ["Pas de réponse", buckets.noResponse, "plain"], ["Absents", buckets.absent, "bad"]];
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-        <FootMatchHeader match={match} />
-      </div>
+    <div className="ft-page">
+      <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
 
       {isOnRoster && (
-        <div style={{ marginBottom: 16 }}>
+        <FCard>
+          <FHeading>Ma présence</FHeading>
           <FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={setMyStatus} />
-        </div>
+        </FCard>
       )}
 
-      {presenceRoster.length === 0 ? (
-        <div style={{ color: "#60607a", fontSize: 13, marginBottom: 16 }}>Aucun joueur dans l'effectif.</div>
-      ) : (
-        <div style={{ marginBottom: 16 }}>
-          {[["Présents", buckets.present, "#34d399"], ["N'a pas répondu", buckets.noResponse, "#60607a"], ["Absents", buckets.absent, "#ef4444"]].map(([label, ids, color]) => (
-            <div key={label} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>{label} ({ids.length})</div>
-              {ids.map((id) => <div key={id} style={{ fontSize: 13, padding: "3px 0" }}>{nameOf(id)}</div>)}
-            </div>
-          ))}
-        </div>
-      )}
+      <FCard>
+        <FHeading right={<FChip tone="soft">{buckets.present.length} / {presenceRoster.length}</FChip>}>Présences</FHeading>
+        {presenceRoster.length === 0 ? <FEmpty icon="users" title="Effectif vide" text="Ajoute des joueurs à l'effectif dans l'onglet Admin." /> : groups.map(([label, ids, tone]) => (
+          <div key={label} style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 6 }}><FChip tone={tone}>{label} · {ids.length}</FChip></div>
+            {ids.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{ids.map((id) => <FootPlayerPill key={id} id={id} tone="line" dim={tone === "plain"} />)}</div>}
+          </div>
+        ))}
+      </FCard>
 
       <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
 
-      {isAdmin && (
-        <button onClick={onStartMatch} style={{ marginTop: 16, width: "100%", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer" }}>
-          COMMENCER LE MATCH
-        </button>
-      )}
+      {isAdmin && <FBtn variant="success" size="lg" full icon="play" onClick={onStartMatch}>Commencer le match</FBtn>}
     </div>
   );
 }
@@ -935,62 +920,47 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
-  if (!match) return <div style={{ padding: 20, color: "#60607a" }}>Match introuvable.</div>;
+  if (!match) return <FCard><FEmpty icon="calendar" title="Match introuvable" action={<FBtn onClick={navBack}>Retour aux matchs</FBtn>} /></FCard>;
 
   async function deleteMatch() {
     if (!window.confirm(`Supprimer définitivement le match contre ${match.opponent_name} ? Les buts et présences associés seront aussi supprimés.`)) return;
     setDeleting(true);
-    try {
-      await sbFetch("foot_matches", `?id=eq.${match.id}`, { method: "DELETE" });
-      await reload();
-      navBack();
-    } catch (e) {
-      console.warn("delete match failed", e);
-      setDeleting(false);
-    }
+    try { await sbFetch("foot_matches", `?id=eq.${match.id}`, { method: "DELETE" }); await reload(); navBack(); }
+    catch (e) { console.warn("delete match failed", e); setDeleting(false); }
   }
-
-  const topBtn = { background: "none", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "6px 12px", cursor: "pointer", fontSize: 12 };
 
   return (
     <div>
-      <div style={{ padding: "12px 20px 0", display: "flex", gap: 8 }}>
-        <button onClick={navBack} style={topBtn}>← Retour</button>
-        {isAdmin && (
-          <>
-            <span style={{ flex: 1 }} />
-            <button onClick={() => setEditingInfo(!editingInfo)} disabled={deleting} style={topBtn}>✏️ Modifier</button>
-            <button onClick={deleteMatch} disabled={deleting} style={{ ...topBtn, color: "#ef4444", borderColor: "#ef444455" }}>{deleting ? "…" : "🗑️ Supprimer"}</button>
-          </>
-        )}
-      </div>
-      {isAdmin && editingInfo && (
-        <div style={{ padding: "12px 20px 0" }}>
-          <FootMatchForm
-            title="Modifier le match"
-            submitLabel="Enregistrer"
-            initial={match}
-            onCancel={() => setEditingInfo(false)}
-            onSubmit={async (data) => { await sbUpdate("foot_matches", { id: match.id }, data); await reload(); setEditingInfo(false); }}
-          />
-        </div>
-      )}
       {match.status === "scheduled" && !startingConfig && (
         <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
       )}
       {match.status === "scheduled" && startingConfig && (
-        <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} reload={reload} onCancel={() => setStartingConfig(false)} />
+        <>
+          <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
+          <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} reload={reload} onCancel={() => setStartingConfig(false)} />
+        </>
       )}
-      {match.status === "live" && (
-        <FootLiveView match={match} roster={roster} events={events} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />
-      )}
-      {match.status === "finished" && (
-        <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} ratings={ratings} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />
+      {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
+      {match.status === "finished" && <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} ratings={ratings} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
+
+      {isAdmin && (
+        <>
+          {editingInfo ? (
+            <FootMatchForm title="Modifier le match" submitLabel="Enregistrer" initial={match} onCancel={() => setEditingInfo(false)}
+              onSubmit={async (data) => { await sbUpdate("foot_matches", { id: match.id }, data); await reload(); setEditingInfo(false); }} />
+          ) : (
+            <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+              <FBtn variant="secondary" icon="pencil" onClick={() => setEditingInfo(true)} disabled={deleting} style={{ flex: 1 }}>Modifier</FBtn>
+              <FBtn variant="ghost" icon="trash" onClick={deleteMatch} disabled={deleting} style={{ flex: 1, color: FC.bad, borderColor: withAlpha(FC.bad, 0.4), background: "rgba(255,255,255,0.9)" }}>{deleting ? "…" : "Supprimer"}</FBtn>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
+// ---- stats ---------------------------------------------------------------------------------------------------------------------------
 const FOOT_STAT_COLUMNS = [
   { key: "played", label: "MJ", title: "Joués" },
   { key: "wins", label: "V", title: "Victoires" },
@@ -1002,8 +972,6 @@ const FOOT_STAT_COLUMNS = [
   { key: "rating", label: "Note", title: "Note" },
 ];
 
-const FOOT_SELECT_STYLE = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 8, color: "#eeeef5", padding: "6px 10px", fontSize: 12 };
-
 function readPref(key, fallback, allowed) {
   try { const v = localStorage.getItem(key); return v && (!allowed || allowed.includes(v)) ? v : fallback; } catch (e) { return fallback; }
 }
@@ -1014,17 +982,17 @@ function writePref(key, value) {
 
 function FootStatTile({ title, value, rank }) {
   return (
-    <div style={{ flex: "1 1 70px", background: "#13131f", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-      <div style={{ fontSize: 10, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, lineHeight: 1.2 }}>{value}</div>
-      <div style={{ fontSize: 10, color: "#3b82f6" }}>{rank}</div>
+    <div style={{ background: FC.soft, borderRadius: 18, padding: "12px 8px", textAlign: "center", minWidth: 0 }}>
+      <div style={{ fontFamily: FF.ui, fontSize: 12, color: FC.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
+      <div style={{ fontFamily: FF.display, fontSize: 28, lineHeight: 1.25, color: FC.deep }}>{value}</div>
+      <div style={{ fontFamily: FF.ui, fontSize: 13, color: FC.muted }}>{rank}</div>
     </div>
   );
 }
 
 function FootRatingChart({ series }) {
   const [hover, setHover] = React.useState(null);
-  if (series.length < 2) return <div style={{ color: "#60607a", fontSize: 13 }}>Il faut au moins 2 matchs notés pour afficher l'évolution.</div>;
+  if (series.length < 2) return <FEmpty icon="chart" title="Pas encore de courbe" text="Il faut au moins 2 matchs notés pour afficher ton évolution." />;
   const W = 320, H = 150, L = 32, R = 12, T = 12, B = 12;
   const x = (i) => L + (i * (W - L - R)) / (series.length - 1);
   const y = (v) => T + ((10 - v) * (H - T - B)) / 9;
@@ -1033,22 +1001,22 @@ function FootRatingChart({ series }) {
   const h = hover != null ? series[hover] : null;
   return (
     <div>
-      <div style={{ minHeight: 18, textAlign: "center", fontSize: 12, color: "#eeeef5" }}>
-        {h ? <>vs {h.opponent} · <b>{h.rating.toFixed(1)}</b> · {new Date(h.date).toLocaleDateString("fr-FR")}</> : <span style={{ color: "#60607a" }}>Touche un point pour le détail</span>}
+      <div style={{ minHeight: 20, textAlign: "center", fontSize: 14, color: FC.text }}>
+        {h ? <>vs {h.opponent} · <b style={{ fontFamily: FF.display, color: FC.deep }}>{h.rating.toFixed(1)}</b> · {new Date(h.date).toLocaleDateString("fr-FR")}</> : <span style={{ color: FC.muted }}>Touche un point pour le détail</span>}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label={`Notes des derniers matchs : ${label}`}>
         {[2, 4, 6, 8, 10].map((v) => (
           <g key={v}>
-            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="#1e1e30" strokeWidth="1" />
-            <text x={L - 10} y={y(v) + 3.5} fontSize="10" fill="#60607a" textAnchor="end">{v}</text>
+            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke={FC.line} strokeWidth="1" />
+            <text x={L - 10} y={y(v) + 3.5} fontSize="10" fill={FC.muted} textAnchor="end">{v}</text>
           </g>
         ))}
-        {h && <line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke="#60607a" strokeWidth="1" strokeDasharray="2 2" />}
-        <polyline points={pts} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {h && <line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke={FC.muted} strokeWidth="1" strokeDasharray="2 2" />}
+        <polyline points={pts} fill="none" stroke={FC.accent} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
         {series.map((s, i) => (
           <g key={s.matchId} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onClick={() => setHover(hover === i ? null : i)} style={{ cursor: "pointer" }}>
-            <circle cx={x(i)} cy={y(s.rating)} r="12" fill="transparent" />
-            <circle cx={x(i)} cy={y(s.rating)} r={hover === i ? 5 : 4} fill="#3b82f6" stroke="#0d0d1c" strokeWidth="2" />
+            <circle cx={x(i)} cy={y(s.rating)} r="14" fill="transparent" />
+            <circle cx={x(i)} cy={y(s.rating)} r={hover === i ? 6 : 4.5} fill={FC.accent} stroke="#fff" strokeWidth="2" />
             <title>{`${s.opponent} : ${s.rating.toFixed(1)}`}</title>
           </g>
         ))}
@@ -1078,13 +1046,13 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map((c) => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
   const me = rows.find((r) => r.playerId === currentPlayer?.id);
   const series = currentPlayer ? playerRatingSeries(filtered, ratings, lineups, currentPlayer.id).slice(-10) : [];
-  const nameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
+  const nameOf = footNameOf;
 
   function tilesFor(keys) {
     return keys.map((k) => {
       const col = FOOT_STAT_COLUMNS.find((c) => c.key === k);
       const value = me ? formatStatValue(statValue(me, k, mode), k, mode) : "—";
-      const rank = me && ranks[k][me.playerId] ? formatRank(ranks[k][me.playerId]) : "—";
+      const rank = me && ranks[k][me.playerId] ? String(formatRank(ranks[k][me.playerId])).split(" / ")[0] : "—"; // "1er ex æquo / 13" → "1er ex æquo"
       return <FootStatTile key={k} title={col.title} value={value} rank={rank} />;
     });
   }
@@ -1094,68 +1062,147 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
   }
 
   const sorted = sortStatsRows(rows, sortKey, sortDir, mode, nameOf);
-  const card = { background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 16, marginBottom: 14 };
-  const toggleBtn = (m, label) => (
-    <button onClick={() => setMode(m)} style={{ background: mode === m ? "#3b82f6" : "#13131f", color: mode === m ? "#fff" : "#60607a", border: "1px solid #1e1e30", padding: "6px 14px", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>{label}</button>
-  );
-  const grid = "minmax(110px,1fr) repeat(8, 52px)";
+  const grid = "minmax(120px,1fr) repeat(8, 50px)";
+  const tiles = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(84px, 1fr))", gap: 8 };
 
   return (
-    <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select value={season} onChange={(e) => setSeason(e.target.value)} style={FOOT_SELECT_STYLE}>
+    <div className="ft-page">
+      <FCard pad={12}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <select value={season} onChange={(e) => setSeason(e.target.value)} aria-label="Saison" style={{ ...FOOT_SELECT_STYLE, flex: 1, minWidth: 0 }}>
             {seasonOptions.map((s) => <option key={s} value={s}>Saison {s}</option>)}
             <option value="all">Toutes les saisons</option>
           </select>
-          <select value={type} onChange={(e) => setType(e.target.value)} style={FOOT_SELECT_STYLE}>
+          <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type de match" style={{ ...FOOT_SELECT_STYLE, flex: 1, minWidth: 0 }}>
             <option value="all">Tous les matchs</option>
             <option value="championnat">Championnat</option>
             <option value="amical">Amical</option>
           </select>
         </div>
-        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden" }}>{toggleBtn("abs", "Valeurs")}{toggleBtn("pct", "%")}</div>
-      </div>
+        <FSegmented value={mode} onChange={setMode} options={[["abs", "Valeurs"], ["pct", "En %"]]} />
+      </FCard>
 
-      {!me && <div style={{ color: "#60607a", fontSize: 13, marginBottom: 10 }}>Les statistiques concernent l'effectif régulier et occasionnel.</div>}
-      {me && me.played === 0 && <div style={{ color: "#60607a", fontSize: 13, marginBottom: 10 }}>Pas encore de match terminé sur une feuille de match.</div>}
+      {!me && <FMessage tone="warn">Les statistiques concernent l'effectif régulier et occasionnel.</FMessage>}
+      {me && me.played === 0 && <FMessage tone="warn">Pas encore de match terminé sur une feuille de match.</FMessage>}
 
-      <div style={card}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 10 }}>Mes matchs</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{tilesFor(["played", "wins", "draws", "losses", "rating"])}</div>
-      </div>
-      <div style={card}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 10 }}>Mes stats offensives</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{tilesFor(["goals", "assists", "decisive"])}</div>
-      </div>
-      <div style={card}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 6 }}>Mon évolution</div>
+      <FCard>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <FAvatar playerId={currentPlayer?.id} name={currentPlayer?.name || footNameOf(currentPlayer?.id)} size={56} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, lineHeight: 1.15 }}>Mes stats</div>
+            <div style={{ fontSize: 14, color: FC.muted }}>{season === "all" ? "Toutes saisons" : `Saison ${season}`}</div>
+          </div>
+        </div>
+        <FLabel>Matchs</FLabel>
+        <div style={{ ...tiles, marginBottom: 14 }}>{tilesFor(["played", "wins", "draws", "losses", "rating"])}</div>
+        <FLabel>Attaque</FLabel>
+        <div style={tiles}>{tilesFor(["goals", "assists", "decisive"])}</div>
+      </FCard>
+
+      <FCard>
+        <FHeading>Mon évolution</FHeading>
         <FootRatingChart series={series} />
-      </div>
+      </FCard>
 
-      <div style={{ ...card, padding: 0, overflowX: "auto" }}>
-        <div style={{ minWidth: 600 }}>
-          <div style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", background: "#13131f", borderBottom: "1px solid #1e1e30", fontSize: 10, color: "#60607a", textTransform: "uppercase" }}>
-            <span>Joueur</span>
-            {FOOT_STAT_COLUMNS.map((c) => (
-              <span key={c.key} onClick={() => clickHeader(c.key)} style={{ textAlign: "center", cursor: "pointer", userSelect: "none", color: sortKey === c.key ? "#3b82f6" : "#60607a" }}>
-                {c.label}{sortKey === c.key ? (sortDir === -1 ? " ▼" : " ▲") : ""}
-              </span>
+      <FCard pad={0} style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 16px 8px" }}><FHeading style={{ marginBottom: 0 }}>Tout le monde</FHeading></div>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 560 }}>
+            <div style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", background: FC.soft, fontFamily: FF.ui, fontSize: 12, color: FC.muted, textTransform: "uppercase" }}>
+              <span style={{ position: "sticky", left: 0, zIndex: 1, background: FC.soft, marginLeft: -14, paddingLeft: 14 }}>Joueur</span>
+              {FOOT_STAT_COLUMNS.map((c) => (
+                <button key={c.key} onClick={() => clickHeader(c.key)} title={c.title} style={{ textAlign: "center", cursor: "pointer", border: "none", background: "none", fontFamily: "inherit", fontSize: "inherit", textTransform: "inherit", userSelect: "none", color: sortKey === c.key ? FC.accent : FC.muted, fontWeight: sortKey === c.key ? 700 : 400 }}>
+                  {c.label}{sortKey === c.key ? (sortDir === -1 ? " ▼" : " ▲") : ""}
+                </button>
+              ))}
+            </div>
+            {sorted.length === 0 && <div style={{ padding: 16 }}><FEmpty icon="users" title="Personne dans l'effectif" text="Les stats concernent les joueurs réguliers et occasionnels." /></div>}
+            {sorted.map((s) => (
+              <div key={s.playerId} style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "8px 14px", borderTop: `1px solid ${FC.line}`, fontSize: 15, alignItems: "center", background: s.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, position: "sticky", left: 0, zIndex: 1, marginLeft: -14, paddingLeft: 14, backgroundColor: "#fff", backgroundImage: s.playerId === currentPlayer?.id ? `linear-gradient(${FC.accentSoft}, ${FC.accentSoft})` : "none" }}>
+                  <FAvatar playerId={s.playerId} name={nameOf(s.playerId)} size={28} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(s.playerId)}</span>
+                </span>
+                {FOOT_STAT_COLUMNS.map((c) => <span key={c.key} style={{ textAlign: "center", fontFamily: FF.ui, fontSize: 16 }}>{formatStatValue(statValue(s, c.key, mode), c.key, mode)}</span>)}
+              </div>
             ))}
           </div>
-          {sorted.length === 0 && <div style={{ padding: 16, color: "#60607a", fontSize: 13 }}>Aucun joueur régulier ou occasionnel dans l'effectif.</div>}
-          {sorted.map((s) => (
-            <div key={s.playerId} style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", borderBottom: "1px solid #1e1e30", fontSize: 13, alignItems: "center", background: s.playerId === currentPlayer?.id ? "#3b82f61a" : "transparent" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(s.playerId)}</span>
-              {FOOT_STAT_COLUMNS.map((c) => <span key={c.key} style={{ textAlign: "center" }}>{formatStatValue(statValue(s, c.key, mode), c.key, mode)}</span>)}
-            </div>
-          ))}
         </div>
-      </div>
+      </FCard>
     </div>
   );
 }
 
+// ---- rankings (podium of the season) --------------------------------------------------------------------------------------------------------
+const FOOT_RANKING_TABS = [
+  { key: "goals", label: "Buts", unit: "buts", icon: "ball" },
+  { key: "assists", label: "Passe D", unit: "passes", icon: "send" },
+  { key: "rating", label: "Moyennes", unit: "", icon: "star" },
+];
+
+function FootPodiumSlot({ entry, place, size }) {
+  const first = place === 1;
+  return (
+    <div style={{ flex: 1, minWidth: 0, textAlign: "center", marginTop: first ? 0 : 26 }}>
+      <div style={{ position: "relative", display: "inline-block", marginBottom: 8 }}>
+        <FAvatar playerId={entry.playerId} name={entry.name} size={size} ring={first ? FC.accent : FC.line} />
+        <span style={{ position: "absolute", left: -6, top: -6, width: 28, height: 28, borderRadius: 14, background: FC.accent, color: "#fff", border: "3px solid #fff", fontFamily: FF.display, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{place}</span>
+      </div>
+      <div style={{ fontFamily: FF.ui, fontSize: first ? 18 : 16, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
+      <div style={{ fontFamily: FF.display, fontSize: first ? 30 : 24, color: FC.deep, lineHeight: 1.2 }}>{entry.shown}</div>
+      <div style={{ fontSize: 12, color: FC.muted }}>{entry.matches} match{entry.matches > 1 ? "s" : ""}</div>
+    </div>
+  );
+}
+
+function FootRankingsPage({ matches, lineups, events, ratings, roster, currentPlayer }) {
+  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
+  const pick = (v) => { setTab(v); writePref("foot_rank_tab", v); };
+  const season = seasonOf(new Date().toISOString());
+  const seasonMatches = filterMatchesForStats(matches, { season, type: "all" });
+  const ids = new Set(seasonMatches.map((m) => m.id));
+  const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
+  const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id))), {});
+  for (const r of rows) {
+    const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
+    r.rating = averageRating(series);
+    r.rated = series.length;
+  }
+  const byId = Object.fromEntries(rows.map((r) => [r.playerId, r]));
+  const t = FOOT_RANKING_TABS.find((x) => x.key === tab);
+  const entries = rankingEntries(rows, tab, footNameOf, 15).map((e) => ({
+    ...e, name: footNameOf(e.playerId), shown: tab === "rating" ? e.value.toFixed(1) : String(e.value), matches: tab === "rating" ? byId[e.playerId].rated : byId[e.playerId].played,
+  }));
+  const podium = entries.slice(0, 3), rest = entries.slice(3);
+  const order = podium.length === 3 ? [[podium[1], 2, 66], [podium[0], 1, 84], [podium[2], 3, 66]] : podium.map((e, i) => [e, i + 1, i === 0 ? 84 : 66]);
+
+  return (
+    <div className="ft-page">
+      <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
+      <FCard>
+        <FHeading right={<FChip tone="soft">Saison {season}</FChip>}>{t.label}</FHeading>
+        {entries.length === 0 ? (
+          <FEmpty icon="trophy" title="Pas encore de classement" text="Le classement apparaît dès qu'un match terminé compte des buts, des passes ou des notes." />
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: rest.length ? 14 : 0 }}>
+              {order.map(([e, place, size]) => <FootPodiumSlot key={e.playerId} entry={e} place={place} size={size} />)}
+            </div>
+            {rest.map((e, i) => (
+              <div key={e.playerId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", marginInline: -8, borderTop: `1px solid ${FC.line}`, borderRadius: 12, background: e.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
+                <span style={{ width: 24, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: FC.muted }}>{i + 4}</span>
+                <FAvatar playerId={e.playerId} name={e.name} size={34} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
+                <span style={{ fontSize: 12, color: FC.muted }}>{e.matches} m.</span>
+                <span style={{ fontFamily: FF.display, fontSize: 20, color: FC.deep, minWidth: 36, textAlign: "right" }}>{e.shown}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </FCard>
+    </div>
+  );
+}
 
 const INSTA_KEY_STORAGE = "foot_insta_admin_key";
 function readInstaKey() { try { return localStorage.getItem(INSTA_KEY_STORAGE) || ""; } catch (e) { return ""; } }
@@ -1224,22 +1271,21 @@ function FootPhotoCell({ playerId, kit, kind, photos, reload }) {
     setBusy(false);
   }
 
-  const mini = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "3px 6px", fontSize: 11, cursor: busy ? "default" : "pointer" };
   return (
-    <div style={{ background: "#13131f", borderRadius: 8, padding: 6, textAlign: "center" }}>
-      <div style={{ height: 64, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>
-        {shown ? <img src={instaPublicUrl(shown.path)} alt="" style={{ maxHeight: 64, maxWidth: "100%", objectFit: "contain" }} /> : <span style={{ color: "#60607a", fontSize: 11 }}>—</span>}
+    <div style={{ background: FC.softer, border: `1px solid ${FC.line}`, borderRadius: 16, padding: 8, textAlign: "center", minWidth: 0 }}>
+      <div style={{ height: 76, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6, borderRadius: 12, background: FC.soft, overflow: "hidden" }}>
+        {shown ? <img src={instaPublicUrl(shown.path)} alt="" style={{ maxHeight: 76, maxWidth: "100%", objectFit: "contain" }} /> : <FIcon name="photo" size={22} style={{ color: FC.line }} />}
       </div>
-      {shown && <div style={{ fontSize: 9, color: shown.retouched ? "#34d399" : "#60607a", textTransform: "uppercase", marginBottom: 4 }}>{shown.retouched ? "retouchée" : "brute"}</div>}
+      <div style={{ minHeight: 20, marginBottom: 4 }}>{shown && <FChip tone={shown.retouched ? "good" : "plain"} style={{ fontSize: 10, padding: "2px 8px" }}>{shown.retouched ? "retouchée" : "brute"}</FChip>}</div>
       <input ref={inputRef} type="file" accept="image/png" onChange={onFile} style={{ display: "none" }} />
-      <div style={{ display: "flex", gap: 4, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
-        <button disabled={busy} onClick={() => inputRef.current && inputRef.current.click()} style={mini}>{busy ? "…" : "⬆ Envoyer"}</button>
-        {shown && <button disabled={busy} onClick={remove} style={{ ...mini, color: "#ef4444" }}>🗑</button>}
+      <div style={{ display: "flex", gap: 4, justifyContent: "center", alignItems: "center" }}>
+        <FBtn size="sm" disabled={busy} onClick={() => inputRef.current && inputRef.current.click()} style={{ padding: "5px 12px", minHeight: 32, fontSize: 12 }}>{busy ? "…" : shown ? "Remplacer" : "Envoyer"}</FBtn>
+        {shown && <FIconBtn icon="trash" tone="danger" label="Supprimer la photo" onClick={remove} disabled={busy} style={{ width: 32, height: 32 }} />}
       </div>
-      <label style={{ display: "block", fontSize: 10, color: "#60607a", marginTop: 4 }}>
+      <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: FC.muted, marginTop: 6 }}>
         <input type="checkbox" checked={retouched} onChange={(e) => setRetouched(e.target.checked)} /> retouchée
       </label>
-      {err && <div style={{ color: "#ef4444", fontSize: 10, marginTop: 4 }}>{err}</div>}
+      {err && <FMessage style={{ marginTop: 6, fontSize: 11, padding: "5px 8px" }}>{err}</FMessage>}
     </div>
   );
 }
@@ -1247,23 +1293,28 @@ function FootPhotoCell({ playerId, kit, kind, photos, reload }) {
 function FootPhotosTab({ roster, photos, reload }) {
   const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
   const players = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  if (!players.length) return <div style={{ color: "#60607a", fontSize: 13 }}>Aucun joueur dans l'effectif.</div>;
+  if (!players.length) return <FCard><FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif (onglet Admin)." /></FCard>;
+  const count = (id) => photos.filter((ph) => ph.player_id === id).length;
   return (
     <div>
       {players.map((p) => (
-        <div key={p.id} style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 8 }}>{nameOf(p)}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 1fr)", gap: 6, alignItems: "center" }}>
+        <FCard key={p.id} pad={14}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <FAvatar playerId={p.id} name={nameOf(p)} size={40} />
+            <div style={{ flex: 1, fontFamily: FF.display, fontSize: 18, color: FC.deep }}>{nameOf(p)}</div>
+            <FChip tone={count(p.id) >= 6 ? "good" : "soft"}>{count(p.id)} / 6</FChip>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "58px minmax(0, 1fr) minmax(0, 1fr)", gap: 8, alignItems: "center" }}>
             <span />
-            {INSTA_KITS.map(([kit, label]) => <div key={kit} style={{ fontSize: 10, color: "#60607a", textTransform: "uppercase", textAlign: "center" }}>{label}</div>)}
+            {INSTA_KITS.map(([kit, label]) => <FLabel key={kit} style={{ textAlign: "center", marginBottom: 0 }}>{label}</FLabel>)}
             {INSTA_KINDS.map(([kind, kindLabel]) => (
               <React.Fragment key={kind}>
-                <div style={{ fontSize: 10, color: "#60607a", textTransform: "uppercase" }}>{kindLabel}</div>
+                <FLabel style={{ marginBottom: 0 }}>{kindLabel}</FLabel>
                 {INSTA_KITS.map(([kit]) => <FootPhotoCell key={kit} playerId={p.id} kit={kit} kind={kind} photos={photos} reload={reload} />)}
               </React.Fragment>
             ))}
           </div>
-        </div>
+        </FCard>
       ))}
     </div>
   );
@@ -1323,17 +1374,17 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
           <div key={p.id} style={{ width: W }}>
             <div
               onClick={() => onPick(p.id)}
-              style={{ position: "relative", width: W, height: ch * scale, overflow: "hidden", cursor: "pointer", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222", border: "1px solid #1e1e30", boxSizing: "border-box" }}
+              style={{ position: "relative", width: W, height: ch * scale, overflow: "hidden", cursor: "pointer", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222", border: `1px solid ${FC.line}`, boxSizing: "border-box" }}
             >
               {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: W, height: ch * scale }} />}
               {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
               {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale }} />}
-              {!photo && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#60607a", fontSize: 11, textAlign: "center", padding: 8 }}>Pas de photo</div>}
+              {!photo && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: FC.muted, fontSize: 11, textAlign: "center", padding: 8 }}>Pas de photo</div>}
               {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} />)}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 4 }}>
               <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{getDisplayName(p, PLAYERS)}</span>
-              {photo && <span style={{ fontSize: 9, color: saved ? "#34d399" : "#60607a", textTransform: "uppercase", flexShrink: 0 }}>{saved ? "réglé" : "défaut"}</span>}
+              {photo && <span style={{ fontSize: 9, color: saved ? FC.good : FC.muted, textTransform: "uppercase", flexShrink: 0 }}>{saved ? "réglé" : "défaut"}</span>}
             </div>
           </div>
         );
@@ -1470,16 +1521,13 @@ function FootFramingTool({ roster, photos, framings, reload }) {
   }
 
   const sel = { ...FOOT_SELECT_STYLE, width: "100%", marginBottom: 8 };
-  const btn = (primary) => ({ flex: "1 1 auto", background: primary ? "#3b82f6" : "#13131f", color: primary ? "#fff" : "#eeeef5", border: primary ? "none" : "1px solid #1e1e30", borderRadius: 8, padding: "9px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
+  const btn = (primary) => ({ flex: "1 1 auto", background: primary ? FC.accent : FC.soft, color: primary ? "#fff" : FC.text, border: primary ? "none" : `1px solid ${FC.line}`, borderRadius: 8, padding: "9px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
   const isMask = layout === "render" || layout.startsWith("podium_");
 
-  if (!players.length) return <div style={{ color: "#60607a", fontSize: 13 }}>Importez d'abord des photos (onglet Photos).</div>;
+  if (!players.length) return <FCard><FEmpty icon="photo" title="Aucune photo" text="Envoie d'abord des photos dans l'onglet Photos." /></FCard>;
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button style={{ ...btn(mode === "single"), padding: "7px 6px" }} onClick={() => setMode("single")}>Un joueur</button>
-        <button style={{ ...btn(mode === "compare"), padding: "7px 6px" }} onClick={() => setMode("compare")}>Comparer tous</button>
-      </div>
+    <FCard>
+      <FSegmented value={mode} onChange={setMode} options={[["single", "Un joueur"], ["compare", "Comparer tous"]]} style={{ marginBottom: 12 }} />
       {mode === "single" && (
       <select style={sel} value={pid || ""} onChange={(e) => setPlayerId(Number(e.target.value))}>
         {players.map((p) => <option key={p.id} value={p.id}>{nameOf(p)}</option>)}
@@ -1495,14 +1543,14 @@ function FootFramingTool({ roster, photos, framings, reload }) {
       </div>
       {mode === "compare" && (
         <div>
-          <label style={{ display: "block", fontSize: 12, color: "#60607a", marginBottom: 10 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: FC.muted, marginBottom: 12 }}>
             <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} /> Afficher les repères (zones couvertes par le texte)
           </label>
           <FootFramingCompare players={players} photos={photos} framings={framings} kit={kit} layout={layout} showGuides={showGuides} onPick={(id) => { setPlayerId(id); setMode("single"); }} />
-          <div style={{ fontSize: 11, color: "#60607a", textAlign: "center", marginTop: 12 }}>Touche un joueur pour ajuster son cadrage.</div>
+          <div style={{ fontSize: 11, color: FC.muted, textAlign: "center", marginTop: 12 }}>Touche un joueur pour ajuster son cadrage.</div>
         </div>
       )}
-      {mode === "single" && !photo && <div style={{ color: "#60607a", fontSize: 13, padding: "12px 0" }}>Aucune photo pour cet emplacement.</div>}
+      {mode === "single" && !photo && <FEmpty icon="photo" title="Pas de photo" text="Aucune photo pour cet emplacement : envoie-la dans l'onglet Photos." />}
       <div style={{ display: mode === "single" && photo ? "block" : "none" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <div
@@ -1516,33 +1564,33 @@ function FootFramingTool({ roster, photos, framings, reload }) {
             {(FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
-          <span style={{ fontSize: 11, color: "#60607a" }}>Zoom</span>
-          <input type="range" min={50} max={500} step={1} value={Math.min(500, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#eeeef5", width: 40, textAlign: "right" }}>{pct}%</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
+          <FLabel style={{ marginBottom: 0 }}>Zoom</FLabel>
+          <input type="range" min={50} max={500} step={1} value={Math.min(500, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} aria-label="Zoom" />
+          <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.deep, width: 48, textAlign: "right" }}>{pct}%</span>
         </div>
-        {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 8 }}>{msg.m}</div>}
+        {msg && <FMessage tone={msg.t === "error" ? "bad" : "good"}>{msg.m}</FMessage>}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button style={btn(true)} disabled={saving || !fr} onClick={save}>{saving ? "…" : "Enregistrer"}</button>
-          <button style={btn(false)} disabled={!photo} onClick={() => { setMsg(null); setFr(defaultFraming(layout, photo)); }}>Réinitialiser</button>
-          <button style={btn(false)} disabled={!fr || centering} onClick={centerPlayer}>{centering ? "…" : "Centrer le joueur"}</button>
-          <button style={btn(false)} disabled={!fr} onClick={previewServer}>Aperçu serveur</button>
+          <FBtn icon="check" disabled={saving || !fr} onClick={save} style={{ flex: "1 1 auto" }}>{saving ? "…" : "Enregistrer"}</FBtn>
+          <FBtn variant="secondary" disabled={!photo} onClick={() => { setMsg(null); setFr(defaultFraming(layout, photo)); }} style={{ flex: "1 1 auto" }}>Réinitialiser</FBtn>
+          <FBtn variant="secondary" disabled={!fr || centering} onClick={centerPlayer} style={{ flex: "1 1 auto" }}>{centering ? "…" : "Centrer le joueur"}</FBtn>
+          <FBtn variant="ghost" icon="photo" disabled={!fr} onClick={previewServer} style={{ flex: "1 1 auto" }}>Aperçu serveur</FBtn>
         </div>
         {serverPreview && (
           <div style={{ marginTop: 14, textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: "#60607a", marginBottom: 6 }}>Aperçu serveur (rendu réel)</div>
+            <FLabel>Aperçu serveur (rendu réel)</FLabel>
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
               {serverPreview.map((p) => (
                 <div key={p.label || "one"} style={{ flex: serverPreview.length > 1 ? "1 1 0" : "none", minWidth: 0, width: serverPreview.length > 1 ? undefined : boxW }}>
                   <img src={p.src} alt={`Aperçu serveur ${p.label}`.trim()} onError={() => setMsg({ t: "error", m: "Aperçu serveur indisponible" })} style={{ display: "block", width: "100%", borderRadius: layout === "render" ? "50%" : 0 }} />
-                  {p.label && <div style={{ fontSize: 11, color: "#60607a", marginTop: 4 }}>{p.label}</div>}
+                  {p.label && <div style={{ fontSize: 11, color: FC.muted, marginTop: 4 }}>{p.label}</div>}
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
-    </div>
+    </FCard>
   );
 }
 
@@ -1554,11 +1602,12 @@ function FootInstaKeyBox({ onSaved }) {
     onSaved();
   }
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: "#60607a", marginBottom: 8 }}>Clé admin Réseaux (gardée uniquement dans ce navigateur, envoyée seulement à l'API du site).</div>
-      <input type="password" style={FOOT_INPUT_STYLE} placeholder="Clé admin" value={v} onChange={(e) => setV(e.target.value)} />
-      <button onClick={save} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, cursor: "pointer" }}>Enregistrer la clé</button>
-    </div>
+    <FCard>
+      <FHeading>Clé admin</FHeading>
+      <div style={{ fontSize: 14, color: FC.muted, marginBottom: 12, lineHeight: 1.4 }}>Gardée uniquement dans ce navigateur, envoyée seulement à l'API du site.</div>
+      <input type="password" style={FOOT_INPUT_STYLE} placeholder="Clé admin" value={v} onChange={(e) => setV(e.target.value)} aria-label="Clé admin" />
+      <FBtn full onClick={save}>Enregistrer la clé</FBtn>
+    </FCard>
   );
 }
 
@@ -1593,11 +1642,11 @@ const instaPublicImageUrl = (path) => `${SUPABASE_URL}/storage/v1/object/public/
 
 function FootInstaImages({ images }) {
   return (
-    <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 8 }}>
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 10, paddingBottom: 2 }}>
       {images.map((im) => (
-        <a key={im.src} href={im.src} target="_blank" rel="noreferrer" style={{ flex: "0 0 auto", width: 120, textAlign: "center", textDecoration: "none" }}>
-          <img src={im.src} alt={im.label} loading="lazy" style={{ width: 120, height: 150, objectFit: "cover", background: "#13131f", borderRadius: 8, display: "block" }} />
-          <div style={{ fontSize: 10, color: "#60607a", marginTop: 3 }}>{im.label}</div>
+        <a key={im.src} href={im.src} target="_blank" rel="noreferrer" style={{ flex: "0 0 auto", width: 124, textAlign: "center", textDecoration: "none" }}>
+          <img src={im.src} alt={im.label} loading="lazy" style={{ width: 124, height: 155, objectFit: "cover", background: FC.soft, borderRadius: 14, display: "block", boxShadow: FC.shadowSm }} />
+          <div style={{ fontFamily: FF.ui, fontSize: 12, color: FC.muted, marginTop: 4, textTransform: "uppercase" }}>{im.label}</div>
         </a>
       ))}
     </div>
@@ -1608,9 +1657,9 @@ function FootInstaImages({ images }) {
 function FootSectionSchedule({ sec, cfg, onChange }) {
   const rule = cfg.rule;
   const set = (patch) => onChange({ ...cfg, rule: { ...rule, ...patch } });
-  const field = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 8px", fontSize: 12 };
+  const field = { ...FOOT_SELECT_STYLE };
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12, color: "#cccce0" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 15, color: FC.text }}>
       {rule.type === "weekly" ? (
         <>
           <span>Chaque</span>
@@ -1629,7 +1678,7 @@ function FootSectionSchedule({ sec, cfg, onChange }) {
       )}
       <span>à</span>
       <input type="time" value={rule.time} onChange={(e) => e.target.value && set({ time: e.target.value })} style={field} />
-      <span style={{ color: "#60607a" }}>(heure de Paris)</span>
+      <span style={{ color: FC.muted }}>(heure de Paris)</span>
     </div>
   );
 }
@@ -1659,37 +1708,35 @@ function FootInstaNext({ sec, next, cfg, data, posts, featuredId, candidates, on
   async function copy() { try { await navigator.clipboard.writeText(caption); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) { console.warn("copy failed", e); } }
 
   let badge;
-  if (!next.available) badge = ["En attente : " + next.waitingFor, "#60607a"];
-  else if (cfg.mode !== "auto") badge = ["Prêt — envoi manuel", "#3b82f6"];
-  else if (next.due) badge = ["Part au prochain passage (≤ 10 min)", "#f59e0b"];
-  else badge = [`Programmé : ${instaWhen(next.scheduledAt)}`, "#34d399"];
-  const mini = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "6px 10px", fontSize: 12, cursor: "pointer", textDecoration: "none" };
+  if (!next.available) badge = ["warn", "En attente : " + next.waitingFor];
+  else if (cfg.mode !== "auto") badge = ["accent", "Prêt — envoi manuel"];
+  else if (next.due) badge = ["warn", "Part au prochain passage (≤ 10 min)"];
+  else badge = ["good", `Programmé : ${instaWhen(next.scheduledAt)}`];
   return (
     <div>
-      <div style={{ fontSize: 13, marginBottom: 2 }}>{match ? `vs ${match.opponent_name}` : `Saison ${next.season}`}{match && <span style={{ color: "#60607a" }}> · {instaWhen(match.match_datetime)}</span>}</div>
-      <div style={{ fontSize: 11, color: badge[1], fontWeight: 700, marginBottom: 8 }}>{badge[0]}</div>
-      {failed && <div style={{ fontSize: 11, color: "#ef4444", marginBottom: 8 }}>Dernier essai échoué : {failed.error}</div>}
+      <div style={{ fontFamily: FF.ui, fontSize: 18, lineHeight: 1.2, marginBottom: 6 }}>{match ? `vs ${match.opponent_name}` : `Saison ${next.season}`}{match && <span style={{ color: FC.muted, fontSize: 14 }}> · {instaWhen(match.match_datetime)}</span>}</div>
+      <div style={{ marginBottom: 10 }}><FChip tone={badge[0]}>{badge[1]}</FChip></div>
+      {failed && <FMessage>Dernier essai échoué : {failed.error}</FMessage>}
       {next.previewable && <FootInstaImages images={images} />}
       {sec.featured && next.previewable && (
-        <label style={{ display: "block", fontSize: 11, color: "#60607a", marginBottom: 8 }}>
-          Joueur sur la photo
-          <select value={featuredId || ""} onChange={(e) => onPickPlayer(targetKey(target), e.target.value ? Number(e.target.value) : null)} style={{ ...FOOT_SELECT_STYLE, display: "block", width: "100%", marginTop: 4 }}>
+        <FField label="Joueur sur la photo">
+          <select value={featuredId || ""} onChange={(e) => onPickPlayer(targetKey(target), e.target.value ? Number(e.target.value) : null)} style={{ ...FOOT_INPUT_STYLE, marginBottom: 0 }}>
             <option value="">Automatique (rotation)</option>
             {candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          {sec.key === "matchday" && chosen && !chosen.hasDos && <span style={{ display: "block", marginTop: 4, color: "#f59e0b" }}>Pas de photo « dos » pour ce joueur : l'image Groupe sera sans joueur.</span>}
-        </label>
+          {sec.key === "matchday" && chosen && !chosen.hasDos && <FMessage tone="warn" style={{ marginTop: 8 }}>Pas de photo « dos » pour ce joueur : l'image Groupe sera sans joueur.</FMessage>}
+        </FField>
       )}
       {next.available && (
         <>
-          <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={4} style={{ ...FOOT_INPUT_STYLE, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
+          <FField label="Légende"><textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={4} style={{ ...FOOT_INPUT_STYLE, marginBottom: 0, resize: "vertical", lineHeight: 1.4 }} /></FField>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={publish} disabled={busy} style={{ ...mini, background: "#3b82f6", border: "none", color: "#fff", fontWeight: 700, opacity: busy ? 0.6 : 1 }}>{busy ? "Publication…" : "Publier maintenant"}</button>
-            <button onClick={copy} style={mini}>{copied ? "Copié ✓" : "Copier la légende"}</button>
+            <FBtn icon="send" onClick={publish} disabled={busy} style={{ flex: "1 1 auto" }}>{busy ? "Publication…" : "Publier maintenant"}</FBtn>
+            <FBtn variant="secondary" onClick={copy} style={{ flex: "1 1 auto" }}>{copied ? "Copié ✓" : "Copier la légende"}</FBtn>
           </div>
         </>
       )}
-      {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginTop: 8 }}>{msg.m}</div>}
+      {msg && <FMessage tone={msg.t === "error" ? "bad" : "good"} style={{ marginTop: 10 }}>{msg.m}</FMessage>}
     </div>
   );
 }
@@ -1701,20 +1748,20 @@ function FootInstaLast({ sec, last, data }) {
     const images = (p.image_paths || []).map((path, i) => ({ label: `${i + 1}`, src: instaPublicImageUrl(path) }));
     return (
       <div>
-        <div style={{ fontSize: 13, marginBottom: 2 }}>{m ? `vs ${m.opponent_name}` : `Saison ${p.season || ""}`}</div>
-        <div style={{ fontSize: 11, color: "#34d399", fontWeight: 700, marginBottom: 8 }}>Publié le {instaWhen(p.published_at)}</div>
+        <div style={{ fontFamily: FF.ui, fontSize: 18, lineHeight: 1.2, marginBottom: 6 }}>{m ? `vs ${m.opponent_name}` : `Saison ${p.season || ""}`}</div>
+        <div style={{ marginBottom: 10 }}><FChip tone="good" icon="check">Publié le {instaWhen(p.published_at)}</FChip></div>
         {images.length > 0 && <FootInstaImages images={images} />}
-        {p.permalink && <a href={p.permalink} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#3b82f6" }}>Voir sur Instagram ↗</a>}
+        {p.permalink && <FBtn size="sm" variant="secondary" onClick={() => window.open(p.permalink, "_blank", "noopener")}>Voir sur Instagram</FBtn>}
       </div>
     );
   }
   const m = last.matchId ? data.matches.find((x) => x.id === last.matchId) : null;
-  if (!last.available) return <div style={{ fontSize: 12, color: "#60607a" }}>Aucun post pour l'instant.</div>;
+  if (!last.available) return <div style={{ fontSize: 14, color: FC.muted }}>Aucun post pour l'instant.</div>;
   const target = { kind: sec.kind, matchId: last.matchId, season: last.season };
   return (
     <div>
-      <div style={{ fontSize: 13, marginBottom: 2 }}>{m ? `vs ${m.opponent_name}` : `Saison ${last.season}`}</div>
-      <div style={{ fontSize: 11, color: "#60607a", fontWeight: 700, marginBottom: 8 }}>Jamais publié — dernier visuel disponible</div>
+      <div style={{ fontFamily: FF.ui, fontSize: 18, lineHeight: 1.2, marginBottom: 6 }}>{m ? `vs ${m.opponent_name}` : `Saison ${last.season}`}</div>
+      <div style={{ marginBottom: 10 }}><FChip tone="plain">Jamais publié · dernier visuel</FChip></div>
       <FootInstaImages images={instaImages(sec.kind, target, instaDataKey(sec.kind, target, data))} />
     </div>
   );
@@ -1732,42 +1779,31 @@ function FootInstaSection({ sec, saved, data, posts, featured, candidates, onPic
     try { await onSave(sec.key, draft); } catch (e) { setErr(e.message); }
     setSaving(false);
   }
-  const seg = (active) => ({ flex: 1, background: active ? "#3b82f6" : "#13131f", color: active ? "#fff" : "#eeeef5", border: "1px solid #1e1e30", borderRadius: 8, padding: "7px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
-        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>{sec.label}</div>
-        <span style={{ fontSize: 10, textTransform: "uppercase", fontWeight: 700, color: saved.mode === "auto" ? "#34d399" : "#60607a", border: `1px solid ${saved.mode === "auto" ? "#34d399" : "#1e1e30"}`, borderRadius: 4, padding: "2px 6px" }}>{saved.mode === "auto" ? "Automatique" : "Manuel"}</span>
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button style={seg(draft.mode === "manual")} onClick={() => setDraft({ ...draft, mode: "manual" })}>Manuel</button>
-        <button style={seg(draft.mode === "auto")} onClick={() => setDraft({ ...draft, mode: "auto" })}>Automatique</button>
-      </div>
+    <FCard>
+      <FHeading right={<FChip tone={saved.mode === "auto" ? "good" : "plain"}>{saved.mode === "auto" ? "Automatique" : "Manuel"}</FChip>}>{sec.label}</FHeading>
+      <FSegmented value={draft.mode} onChange={(m) => setDraft({ ...draft, mode: m })} options={[["manual", "Manuel"], ["auto", "Automatique"]]} style={{ marginBottom: 12 }} />
       {draft.mode === "auto" && (
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 12 }}>
           <FootSectionSchedule sec={sec} cfg={draft} onChange={setDraft} />
-          <div style={{ fontSize: 11, color: "#60607a", marginTop: 6 }}>Seuls les créneaux à venir partent tout seuls{saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement"}. Rien d'ancien n'est publié.</div>
+          <div style={{ fontSize: 13, color: FC.muted, marginTop: 8, lineHeight: 1.4 }}>Seuls les créneaux à venir partent tout seuls{saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement"}. Rien d'ancien n'est publié.</div>
         </div>
       )}
-      {dirty && (
-        <div style={{ marginBottom: 10 }}>
-          <button onClick={save} disabled={saving} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>{saving ? "Enregistrement…" : "Enregistrer le réglage"}</button>
-        </div>
-      )}
-      {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{err}</div>}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+      {dirty && <FBtn full onClick={save} disabled={saving} style={{ marginBottom: 12 }}>{saving ? "Enregistrement…" : "Enregistrer le réglage"}</FBtn>}
+      {err && <FMessage>{err}</FMessage>}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 4 }}>
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Dernier post</div>
+          <FLabel>Dernier post</FLabel>
           <FootInstaLast sec={sec} last={state.last} data={data} />
         </div>
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Prochain post</div>
+          <FLabel>Prochain post</FLabel>
           {state.next
             ? <FootInstaNext key={`${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`} sec={sec} next={state.next} cfg={saved} data={data} posts={posts} featuredId={featured[targetKey(state.next)]} candidates={candidates} onPickPlayer={onPickPlayer} onPublished={onPublished} />
-            : <div style={{ fontSize: 12, color: "#60607a" }}>Rien de prévu pour l'instant.</div>}
+            : <div style={{ fontSize: 14, color: FC.muted }}>Rien de prévu pour l'instant.</div>}
         </div>
       </div>
-    </div>
+    </FCard>
   );
 }
 
@@ -1799,14 +1835,14 @@ function FootPostsTab({ matches, lineups, events, ratings, roster, photos }) {
     const r = await instaAdminFetch("settings", { settings: { ...settings, [key]: { mode: cfg.mode, rule: cfg.rule } } });
     setSettings(normalizeSettings(r.settings));
   }
-  if (!settings) return <div style={{ color: "#60607a", fontSize: 13 }}>Chargement…</div>;
+  if (!settings) return <><FSkeleton h={260} /><FSkeleton h={260} /></>;
   return (
     <div>
-      {loadErr && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 12 }}>Réglages indisponibles ({loadErr}). Valeurs par défaut (manuel) affichées.</div>}
+      {loadErr && <FMessage>Réglages indisponibles ({loadErr}). Valeurs par défaut (manuel) affichées.</FMessage>}
       {INSTA_SECTIONS.map((sec) => (
         <FootInstaSection key={sec.key} sec={sec} saved={settings[sec.key]} data={data} posts={instaPosts} featured={featured} candidates={candidates} onPickPlayer={pickPlayer} onSave={saveSection} onPublished={reloadPosts} />
       ))}
-      <div style={{ color: "#60607a", fontSize: 11, textAlign: "center" }}>Envoi automatique : un planificateur vérifie toutes les ~10 minutes ce qui doit partir.</div>
+      <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, textAlign: "center", textShadow: "1px 1px 0 rgba(0,0,0,0.25)" }}>Envoi automatique : un planificateur vérifie toutes les ~10 minutes ce qui doit partir.</div>
     </div>
   );
 }
@@ -1815,31 +1851,34 @@ function FootReseauxPage({ roster, photos, framings, matches, lineups, events, r
   const [tab, setTab] = React.useState(() => readPref("foot_reseaux_tab", "photos", ["posts", "photos", "cadrage"]));
   const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
   const pick = (t) => { setTab(t); writePref("foot_reseaux_tab", t); };
-  const tabBtn = (id, label) => (
-    <button key={id} onClick={() => pick(id)} style={{ flex: 1, background: tab === id ? "#3b82f6" : "#13131f", color: tab === id ? "#fff" : "#eeeef5", border: "1px solid #1e1e30", borderRadius: 8, padding: "8px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{label}</button>
-  );
   return (
-    <div style={{ padding: 16 }}>
+    <div className="ft-page">
       {!hasKey && <FootInstaKeyBox onSaved={() => setHasKey(true)} />}
-      {hasKey && (
-        <div style={{ textAlign: "right", marginBottom: 8 }}>
-          <button onClick={() => { try { localStorage.removeItem(INSTA_KEY_STORAGE); } catch (e) {} setHasKey(false); }} style={{ background: "none", border: "none", color: "#60607a", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>Changer la clé admin</button>
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {tabBtn("posts", "Posts")}{tabBtn("photos", "Photos")}{tabBtn("cadrage", "Cadrage")}
-      </div>
+      <FSegmented value={tab} onChange={pick} options={[["posts", "Posts", "send"], ["photos", "Photos", "photo"], ["cadrage", "Cadrage", "pencil"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "posts" && <FootPostsTab matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} photos={photos} />}
       {tab === "photos" && <FootPhotosTab roster={roster} photos={photos} reload={reload} />}
       {tab === "cadrage" && <FootFramingTool roster={roster} photos={photos} framings={framings} reload={reload} />}
+      {hasKey && (
+        <div style={{ textAlign: "center", marginTop: 4 }}>
+          <button onClick={() => { try { localStorage.removeItem(INSTA_KEY_STORAGE); } catch (e) {} setHasKey(false); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.9)", fontSize: 13, cursor: "pointer", textDecoration: "underline", textShadow: "1px 1px 0 rgba(0,0,0,0.25)" }}>Changer la clé admin</button>
+        </div>
+      )}
     </div>
   );
 }
 
+// ---- app shell --------------------------------------------------------------------------------------------------------------------------
+const FOOT_PAGE_TITLES = {
+  calendar: ["Matchs", "Bière Leverculsec"], rankings: ["Classement", null], stats: ["Stats", null], reseaux: ["Réseaux", "Instagram"], admin: ["Admin", "Matchs et effectif"],
+};
+
 function FootballApp({ currentPlayer, onBack }) {
+  const [theme, setThemeState] = React.useState(() => readPref("foot_theme", "green", ["green", "pink"]));
+  setFootTheme(theme); // the colour tokens must be current before any child renders
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
   const [loaded, setLoaded] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(null);
   const [roster, setRoster] = React.useState([]);
   const [matches, setMatches] = React.useState([]);
   const [attendance, setAttendance] = React.useState([]);
@@ -1850,6 +1889,15 @@ function FootballApp({ currentPlayer, onBack }) {
   const [framings, setFramings] = React.useState([]);
 
   const isAdmin = currentPlayer?.uid === ADMIN_UID;
+  const setTheme = (t) => { setThemeState(t); writePref("foot_theme", t); };
+
+  React.useEffect(() => {
+    // the browser bar follows the theme
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const previous = meta ? meta.getAttribute("content") : null;
+    if (meta) meta.setAttribute("content", FC.accent);
+    return () => { if (meta && previous) meta.setAttribute("content", previous); };
+  }, [theme]);
 
   async function reloadFoot() {
     const [r, m, a, e, l, rt, ph, fr] = await Promise.all([
@@ -1873,38 +1921,42 @@ function FootballApp({ currentPlayer, onBack }) {
   }
 
   React.useEffect(() => {
-    reloadFoot().then(() => setLoaded(true)).catch((err) => { console.warn("foot load failed", err); setLoaded(true); });
+    reloadFoot().then(() => setLoaded(true)).catch((err) => { console.warn("foot load failed", err); setLoadError(err.message); setLoaded(true); });
   }, []);
 
-  function nav(p, s = {}) { setPage(p); setSub(s); }
+  function nav(p, s = {}) { setPage(p); setSub(s); window.scrollTo && window.scrollTo(0, 0); }
 
-  if (!loaded) {
-    return <div style={{ minHeight: "100vh", background: "#080810", color: "#60607a", display: "flex", alignItems: "center", justifyContent: "center" }}>Chargement…</div>;
-  }
+  const navItems = [
+    { id: "calendar", label: "Matchs", icon: "calendar" },
+    { id: "rankings", label: "Classement", icon: "trophy" },
+    { id: "stats", label: "Stats", icon: "chart" },
+    ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone" }, { id: "admin", label: "Admin", icon: "sliders" }] : []),
+  ];
+  const detail = page === "matchDetail";
+  const openMatch = detail ? matches.find((m) => m.id === sub.matchId) : null;
+  const [title, subtitle] = detail
+    ? [openMatch ? { scheduled: "Match", live: "En direct", finished: "Résultat" }[openMatch.status] : "Match", openMatch ? `vs ${openMatch.opponent_name}` : null]
+    : FOOT_PAGE_TITLES[page] || ["Foot", null];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080810", color: "#eeeef5", fontFamily: "'Outfit',sans-serif", paddingBottom: 70 }}>
-      <FootballNavBar page={page} setPage={nav} onBack={onBack} isAdmin={isAdmin} />
-      {page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
-      {page === "matchDetail" && (
-        <FootMatchDetailPage
-          matchId={sub.matchId}
-          matches={matches}
-          roster={roster}
-          attendance={attendance}
-          events={events}
-          lineups={lineups}
-          ratings={ratings}
-          currentPlayer={currentPlayer}
-          isAdmin={isAdmin}
-          navBack={() => nav("calendar")}
-          reload={reloadFoot}
-        />
-      )}
-      {page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
-      {page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
-      {page === "rankings" && <FootPlaceholderPage label="Classement" />}
-      {page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
-    </div>
+    <FootCtx.Provider value={{ photos, framings, themeName: theme }}>
+      <FootShell wide={page === "stats" || page === "reseaux"}>
+        <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : undefined} />
+        {!loaded && <><FSkeleton h={190} /><FSkeleton h={76} /><FSkeleton h={76} /></>}
+        {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
+        {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
+        {loaded && detail && (
+          <FootMatchDetailPage
+            matchId={sub.matchId} matches={matches} roster={roster} attendance={attendance} events={events} lineups={lineups} ratings={ratings}
+            currentPlayer={currentPlayer} isAdmin={isAdmin} navBack={() => nav("calendar")} reload={reloadFoot}
+          />
+        )}
+        {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
+        {loaded && page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
+        {loaded && page === "rankings" && <FootRankingsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
+        {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
+      </FootShell>
+      <FNav page={detail ? "calendar" : page} items={navItems} onGo={nav} />
+    </FootCtx.Provider>
   );
 }

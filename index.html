@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Bière Leverculsec</title>
   <link rel="manifest" href="/manifest.json"/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&display=swap"/>
   <meta name="theme-color" content="#080810"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="BL"/>
   <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
   <style>
+    @font-face{font-family:'Shrikhand';src:url('/fonts/Shrikhand-Regular.ttf') format('truetype');font-display:swap;}
+    @font-face{font-family:'Contrail One';src:url('/fonts/ContrailOne-Regular.ttf') format('truetype');font-display:swap;}
     *{margin:0;padding:0;box-sizing:border-box;}
     body{background:#080810;color:#eeeef5;font-family:'Outfit',sans-serif;}
     #root{min-height:100vh;}
@@ -24,9 +25,12 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="utopia-events.js?v=20261003200000"></script>
-  <script src="foot-logic.js?v=20261005021119"></script>
-  <script src="insta-logic.js?v=20261005021119"></script>
-  <script src="foot.js?v=20261005021119"></script>
+  <script src="foot-logic.js?v=20261005092909"></script>
+  <script src="foot-theme.js?v=20261005092909"></script>
+  <script src="insta-logic.js?v=20261005092909"></script>
+  <script src="foot-display.js?v=20261005092909"></script>
+  <script src="foot-ui.js?v=20261005092909"></script>
+  <script src="foot.js?v=20261005092909"></script>
   <script>
     if('serviceWorker' in navigator){
       // A new version never reloads the page while it is in use: a banner offers it, and the page

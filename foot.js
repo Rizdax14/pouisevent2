@@ -1,131 +1,6 @@
-// foot.jsx
+// foot.jsx — screens of the football app (design system: foot-ui.jsx, tokens: foot-theme.js)
 
-function FootballNavBar({
-  page,
-  setPage,
-  onBack,
-  isAdmin
-}) {
-  const m = useIsMobile();
-  const items = [{
-    id: "__back__",
-    l: "Accueil",
-    ic: "🏠",
-    onClick: onBack
-  }, {
-    id: "calendar",
-    l: "Calendrier",
-    ic: "📅"
-  }, {
-    id: "rankings",
-    l: "Classement",
-    ic: "🏆"
-  }, {
-    id: "stats",
-    l: "Statistiques",
-    lm: "Stats",
-    ic: "📊"
-  }, ...(isAdmin ? [{
-    id: "reseaux",
-    l: "Réseaux",
-    ic: "📣"
-  }, {
-    id: "admin",
-    l: "Admin",
-    ic: "🛠"
-  }] : [])];
-  const wrapStyle = m ? {
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: "#0d0d1c",
-    borderTop: "1px solid #1e1e30",
-    display: "flex",
-    zIndex: 100,
-    paddingBottom: "env(safe-area-inset-bottom)"
-  } : {
-    background: "#0d0d1c",
-    borderBottom: "1px solid #1e1e30",
-    padding: "0 32px",
-    display: "flex",
-    gap: 0,
-    position: "sticky",
-    top: 0,
-    zIndex: 100
-  };
-  return /*#__PURE__*/React.createElement("nav", {
-    style: wrapStyle
-  }, items.map(item => {
-    const active = page === item.id;
-    return /*#__PURE__*/React.createElement("button", {
-      key: item.id,
-      onClick: () => item.onClick ? item.onClick() : setPage(item.id),
-      style: {
-        flex: m ? "1 1 0" : "none",
-        minWidth: 0,
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        padding: m ? "10px 1px 8px" : "16px 14px",
-        display: "flex",
-        flexDirection: m ? "column" : "row",
-        alignItems: "center",
-        gap: m ? 3 : 6,
-        color: active ? "#3b82f6" : "#60607a",
-        fontFamily: "'Outfit',sans-serif",
-        fontSize: m ? 8 : 13,
-        fontWeight: 600,
-        borderBottom: !m && active ? "2px solid #3b82f6" : !m ? "2px solid transparent" : "none"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: m ? 18 : 15
-      }
-    }, item.ic), /*#__PURE__*/React.createElement("span", {
-      style: {
-        textTransform: "uppercase",
-        letterSpacing: m ? "0" : "0.05em",
-        maxWidth: "100%",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, m && item.lm ? item.lm : item.l));
-  }));
-}
-function FootPlaceholderPage({
-  label
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 40,
-      textAlign: "center",
-      color: "#60607a"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 15
-    }
-  }, label), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      marginTop: 8,
-      textTransform: "uppercase",
-      letterSpacing: "0.1em"
-    }
-  }, "\uD83D\uDD12 Bient\xF4t disponible"));
-}
-const FOOT_INPUT_STYLE = {
-  width: "100%",
-  background: "#13131f",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  padding: "9px 12px",
-  color: "#eeeef5",
-  fontSize: 13,
-  marginBottom: 10
-};
+// ---- data helpers ------------------------------------------------------------------------------------------
 async function setMatchAttendance(matchId, playerId, status) {
   assertUpsertOk(await SUPABASE.from("foot_attendance").upsert({
     match_id: matchId,
@@ -166,6 +41,172 @@ function attendanceRoster(roster) {
 function lineupIdsFor(lineups, matchId) {
   return lineups.filter(l => l.match_id === matchId).map(l => l.player_id);
 }
+function formatMatchPlace(match) {
+  const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
+  return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
+}
+const footNameOf = id => {
+  const p = PLAYERS.find(x => x.id === id);
+  return p ? getDisplayName(p, PLAYERS) : "?";
+};
+const footDayMs = 86400000;
+function footDate(iso) {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Paris"
+  });
+}
+function footTime(iso) {
+  return new Date(iso).toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Paris"
+  });
+}
+const FOOT_OUTCOME_TONE = {
+  V: "good",
+  N: "warn",
+  D: "bad"
+};
+const FOOT_OUTCOME_LABEL = {
+  V: "Victoire",
+  N: "Nul",
+  D: "Défaite"
+};
+
+// ---- small shared bits ---------------------------------------------------------------------------------------
+function FootMetaChips({
+  match
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: "soft"
+  }, match.venue === "exterieur" ? "Extérieur" : "Domicile"), /*#__PURE__*/React.createElement(FChip, {
+    tone: "soft"
+  }, match.match_type === "amical" ? "Amical" : "Championnat"));
+}
+function FootWhenWhere({
+  match,
+  size = 14
+}) {
+  const place = formatMatchPlace(match);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gap: 5,
+      fontSize: size,
+      color: FC.muted
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "calendar",
+    size: 16
+  }), footDate(match.match_datetime), " \xB7 ", footTime(match.match_datetime)), place && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "pin",
+    size: 16,
+    style: {
+      marginTop: 1
+    }
+  }), /*#__PURE__*/React.createElement("span", null, place)));
+}
+
+// A player as a pill: round portrait, name, optional jersey number.
+function FootPlayerPill({
+  id,
+  number,
+  tone = "soft",
+  dim
+}) {
+  const name = footNameOf(id);
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      background: tone === "soft" ? FC.soft : "transparent",
+      border: tone === "soft" ? "none" : `1px solid ${FC.line}`,
+      borderRadius: 999,
+      padding: "4px 12px 4px 4px",
+      fontSize: 14,
+      color: dim ? FC.muted : FC.text,
+      maxWidth: "100%"
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: name,
+    size: 28
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, name), number && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.deep,
+      background: FC.solid,
+      borderRadius: 999,
+      padding: "1px 7px"
+    }
+  }, number));
+}
+function FootAttendanceButtons({
+  myStatus,
+  saving,
+  onSet,
+  compact
+}) {
+  const pick = status => e => {
+    e.stopPropagation();
+    onSet(status);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: myStatus === "present" ? "success" : "ghost",
+    size: compact ? "md" : "lg",
+    icon: "check",
+    disabled: saving,
+    onClick: pick("present"),
+    style: {
+      flex: 1
+    }
+  }, "Pr\xE9sent"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: myStatus === "absent" ? "danger" : "ghost",
+    size: compact ? "md" : "lg",
+    icon: "x",
+    disabled: saving,
+    onClick: pick("absent"),
+    style: {
+      flex: 1
+    }
+  }, "Absent"));
+}
+
+// ---- lineup (feuille de match) ------------------------------------------------------------------------------------
 function FootLineupChecklist({
   roster,
   extraIds,
@@ -174,29 +215,58 @@ function FootLineupChecklist({
   disabled
 }) {
   const ids = [...new Set([...roster.map(r => r.player_id), ...(extraIds || [])])];
+  const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
   const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
-  if (players.length === 0) return /*#__PURE__*/React.createElement("div", {
+  if (players.length === 0) return /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Aucun joueur",
+    text: "Ajoute des joueurs \xE0 l'effectif dans l'onglet Admin."
+  });
+  return /*#__PURE__*/React.createElement("div", {
     style: {
-      color: "#60607a",
-      fontSize: 13
+      display: "grid",
+      gap: 6
     }
-  }, "Aucun joueur dans l'effectif.");
-  return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement("label", {
-    key: p.id,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "6px 0",
-      fontSize: 13,
-      cursor: disabled ? "default" : "pointer"
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: checked.includes(p.id),
-    disabled: disabled,
-    onChange: () => onToggle(p.id)
-  }), getDisplayName(p, PLAYERS))));
+  }, players.map(p => {
+    const on = checked.includes(p.id);
+    return /*#__PURE__*/React.createElement("label", {
+      key: p.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "6px 10px 6px 6px",
+        borderRadius: 16,
+        background: on ? FC.accentSoft : FC.softer,
+        border: `1.5px solid ${on ? FC.accent : "transparent"}`,
+        cursor: disabled ? "default" : "pointer",
+        fontSize: 15
+      }
+    }, /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: p.id,
+      name: getDisplayName(p, PLAYERS),
+      size: 34
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, getDisplayName(p, PLAYERS)), numberOf(p.id) && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: FF.ui,
+        fontSize: 13,
+        color: FC.deep
+      }
+    }, "n\xB0", numberOf(p.id)), /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: on,
+      disabled: disabled,
+      onChange: () => onToggle(p.id)
+    }));
+  }));
 }
 function FootLineupSection({
   match,
@@ -210,108 +280,87 @@ function FootLineupSection({
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
   const toggle = id => setWanted(wanted.includes(id) ? wanted.filter(x => x !== id) : [...wanted, id]);
   async function save() {
     setSaving(true);
+    setErr(null);
     try {
       await applyLineupChange(match.id, diffLineupEdit(snapshot, current, wanted));
       await reload();
       setEditing(false);
     } catch (e) {
       console.warn("lineup save failed", e);
+      setErr("Enregistrement impossible : " + e.message);
     }
     setSaving(false);
   }
-  const names = current.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).map(p => getDisplayName(p, PLAYERS));
-  return /*#__PURE__*/React.createElement("div", {
+  const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
+  const ordered = [...current].sort((a, b) => (Number(numberOf(a)) || 999) - (Number(numberOf(b)) || 999) || footNameOf(a).localeCompare(footNameOf(b)));
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: isAdmin && !editing && /*#__PURE__*/React.createElement(FBtn, {
+      size: "sm",
+      variant: "secondary",
+      icon: "pencil",
+      onClick: () => {
+        setSnapshot(current);
+        setWanted(current);
+        setEditing(true);
+      }
+    }, "Modifier")
+  }, "Feuille de match ", /*#__PURE__*/React.createElement("span", {
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 16,
-      marginTop: 16
+      fontFamily: FF.ui,
+      fontSize: 15,
+      color: FC.muted
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, "(", current.length, ")")), !editing && (ordered.length ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8
+      flexWrap: "wrap",
+      gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 14
-    }
-  }, "Feuille de match (", current.length, ")"), isAdmin && !editing && /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setSnapshot(current);
-      setWanted(current);
-      setEditing(true);
-    },
-    style: {
-      background: "none",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "4px 10px",
-      cursor: "pointer",
-      fontSize: 12
-    }
-  }, "\u270F\uFE0F Modifier")), !editing && (names.length ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "#cccce0"
-    }
-  }, names.join(" · ")) : /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "#60607a"
-    }
-  }, "Personne sur la feuille.")), editing && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootLineupChecklist, {
+  }, ordered.map(id => /*#__PURE__*/React.createElement(FootPlayerPill, {
+    key: id,
+    id: id,
+    number: numberOf(id)
+  }))) : /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Pas encore de feuille",
+    text: isAdmin ? "Choisis les joueurs qui seront sur la feuille de match." : "La feuille de match n'est pas encore publiée."
+  })), editing && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootLineupChecklist, {
     roster: roster,
     extraIds: current,
     checked: wanted,
     onToggle: toggle,
     disabled: saving
-  }), /*#__PURE__*/React.createElement("div", {
+  }), err && /*#__PURE__*/React.createElement(FMessage, {
     style: {
-      display: "flex",
-      gap: 8,
       marginTop: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
     onClick: () => setEditing(false),
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "8px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
     onClick: save,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 6,
-      padding: "8px",
-      fontWeight: 700,
-      cursor: "pointer",
-      opacity: saving ? 0.6 : 1
+      flex: 1
     }
-  }, saving ? "…" : "Enregistrer"))));
+  }, saving ? "…" : `Enregistrer (${wanted.length})`))));
 }
-function formatMatchPlace(match) {
-  const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
-  return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
-}
+
+// ---- match form (create / edit) ----------------------------------------------------------------------------------------
 function FootMatchForm({
   title,
   initial,
@@ -345,7 +394,7 @@ function FootMatchForm({
   async function submit() {
     if (!f.opponent_name.trim() || !f.match_datetime) {
       setMsg({
-        t: "error",
+        t: "bad",
         m: "Adversaire et date/heure sont obligatoires."
       });
       return;
@@ -364,278 +413,362 @@ function FootMatchForm({
       });
       if (resetOnSuccess) setF(empty);
       setMsg({
-        t: "success",
+        t: "good",
         m: "Enregistré ✓"
       });
     } catch (e) {
       setMsg({
-        t: "error",
-        m: "Erreur: " + e.message
+        t: "bad",
+        m: "Erreur : " + e.message
       });
     }
     setSaving(false);
   }
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 18,
-      marginBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 16,
-      marginBottom: 12
-    }
-  }, title), /*#__PURE__*/React.createElement("input", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, title), /*#__PURE__*/React.createElement(FField, {
+    label: "\xC9quipe adverse"
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
-    placeholder: "Nom de l'\xE9quipe adverse",
+    placeholder: "Ex. En Avant Guinguette",
     value: f.opponent_name,
     onChange: set("opponent_name")
-  }), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Date et heure"
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     type: "datetime-local",
     value: f.match_datetime,
     onChange: set("match_datetime")
-  }), /*#__PURE__*/React.createElement("select", {
-    style: FOOT_INPUT_STYLE,
-    value: f.match_type || "championnat",
-    onChange: set("match_type")
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "championnat"
-  }, "Championnat"), /*#__PURE__*/React.createElement("option", {
-    value: "amical"
-  }, "Match amical")), /*#__PURE__*/React.createElement("select", {
-    style: FOOT_INPUT_STYLE,
+  })), /*#__PURE__*/React.createElement(FLabel, null, "Lieu"), /*#__PURE__*/React.createElement(FSegmented, {
     value: f.venue || "domicile",
-    onChange: set("venue")
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "domicile"
-  }, "Domicile"), /*#__PURE__*/React.createElement("option", {
-    value: "exterieur"
-  }, "Ext\xE9rieur")), /*#__PURE__*/React.createElement("input", {
+    onChange: v => setF({
+      ...f,
+      venue: v
+    }),
+    options: [["domicile", "Domicile"], ["exterieur", "Extérieur"]],
+    style: {
+      marginBottom: 12
+    }
+  }), /*#__PURE__*/React.createElement(FLabel, null, "Type"), /*#__PURE__*/React.createElement(FSegmented, {
+    value: f.match_type || "championnat",
+    onChange: v => setF({
+      ...f,
+      match_type: v
+    }),
+    options: [["championnat", "Championnat"], ["amical", "Amical"]],
+    style: {
+      marginBottom: 14
+    }
+  }), /*#__PURE__*/React.createElement(FField, {
+    label: "Stade"
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Nom du stade",
     value: f.stadium_name || "",
     onChange: set("stadium_name")
-  }), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Adresse"
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Adresse",
     value: f.address || "",
     onChange: set("address")
-  }), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement(FField, {
+    label: "Code postal",
+    style: {
+      flex: "0 0 38%"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
-    placeholder: "Code postal",
+    inputMode: "numeric",
+    placeholder: "42000",
     value: f.postal_code || "",
     onChange: set("postal_code")
-  }), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Ville",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Ville",
     value: f.city || "",
     onChange: set("city")
-  }), msg && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: msg.t === "error" ? "#ef4444" : "#34d399",
-      fontSize: 12,
-      marginBottom: 10
-    }
+  }))), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t
   }, msg.m), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
     }
-  }, onCancel && /*#__PURE__*/React.createElement("button", {
+  }, onCancel && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
     onClick: onCancel,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "9px 16px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
     onClick: submit,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "9px 16px",
-      fontWeight: 700,
-      cursor: saving ? "default" : "pointer",
-      opacity: saving ? 0.6 : 1
+      flex: 1
     }
   }, saving ? "Enregistrement…" : submitLabel)));
 }
 function FootCreateMatchForm({
   reload
 }) {
+  const [open, setOpen] = React.useState(false);
+  if (!open) return /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    size: "lg",
+    icon: "plus",
+    onClick: () => setOpen(true),
+    style: {
+      marginBottom: 14
+    }
+  }, "Nouveau match");
   return /*#__PURE__*/React.createElement(FootMatchForm, {
-    title: "Cr\xE9er un match",
+    title: "Nouveau match",
     submitLabel: "Cr\xE9er le match",
     resetOnSuccess: true,
+    onCancel: () => setOpen(false),
     onSubmit: async data => {
       await sbInsert("foot_matches", data);
       await reload();
+      setOpen(false);
     }
   });
 }
-function FootAttendanceButtons({
-  myStatus,
-  saving,
-  onSet,
-  compact
+
+// ---- calendar ---------------------------------------------------------------------------------------------------------------
+function FootPresenceStack({
+  ids,
+  total
 }) {
-  const base = {
-    flex: 1,
-    border: "1px solid #1e1e30",
-    borderRadius: 8,
-    padding: compact ? "7px" : "10px",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: compact ? 12 : 13
-  };
+  const shown = ids.slice(0, 6);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: compact ? 8 : 10
+      alignItems: "center",
+      gap: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      onSet("present");
-    },
-    disabled: saving,
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      ...base,
-      background: myStatus === "present" ? "#34d399" : "#13131f",
-      color: myStatus === "present" ? "#080810" : "#eeeef5"
+      display: "flex"
     }
-  }, "Pr\xE9sent"), /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      onSet("absent");
-    },
-    disabled: saving,
+  }, shown.map((id, i) => /*#__PURE__*/React.createElement("span", {
+    key: id,
     style: {
-      ...base,
-      background: myStatus === "absent" ? "#ef4444" : "#13131f",
-      color: myStatus === "absent" ? "#080810" : "#eeeef5"
+      marginLeft: i ? -9 : 0,
+      borderRadius: 20,
+      boxShadow: `0 0 0 2px ${FC.solid}`
     }
-  }, "Absent"));
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: footNameOf(id),
+    size: 30
+  })))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      color: FC.muted
+    }
+  }, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: FC.text,
+      fontFamily: FF.ui,
+      fontSize: 16
+    }
+  }, ids.length), " / ", total, " pr\xE9sents"));
 }
-function FootMatchCard({
+function FootMatchHero({
   match,
   score,
-  presentCount,
+  presentIds,
   rosterSize,
-  onClick,
+  onOpen,
   isOnRoster,
   myStatus,
   onSetStatus,
   saving
 }) {
-  const dt = new Date(match.match_datetime);
-  const dateLabel = dt.toLocaleDateString("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short"
-  }) + " · " + dt.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-  const statusLabel = match.status === "scheduled" ? "À venir" : match.status === "live" ? "En cours" : "Terminé";
-  const statusColor = match.status === "scheduled" ? "#60607a" : match.status === "live" ? "#ef4444" : "#34d399";
-  const place = formatMatchPlace(match);
-  return /*#__PURE__*/React.createElement("div", {
-    onClick: onClick,
+  const live = match.status === "live";
+  return /*#__PURE__*/React.createElement(FCard, {
+    onClick: onOpen,
+    pad: 20,
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 10,
-      cursor: "pointer"
+      marginBottom: 18
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 6
+      justifyContent: "space-between",
+      marginBottom: 10
+    }
+  }, live ? /*#__PURE__*/React.createElement(FChip, {
+    tone: "live"
+  }, "En direct") : /*#__PURE__*/React.createElement(FChip, {
+    tone: "accent"
+  }, "Prochain match"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      color: FC.deep
+    }
+  }, footRelative(match.match_datetime))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      color: FC.muted,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase"
+    }
+  }, "Bi\xE8re Leverculsec"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 16
+      fontFamily: FF.display,
+      fontSize: 30,
+      lineHeight: 1.15,
+      color: FC.deep,
+      minWidth: 0,
+      overflowWrap: "anywhere"
     }
-  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
+  }, "vs ", match.opponent_name), live && /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 6,
-      alignItems: "center"
+      fontFamily: FF.display,
+      fontSize: 34,
+      color: FC.deep,
+      whiteSpace: "nowrap"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, score.bl, "\u2013", score.opponent)), /*#__PURE__*/React.createElement(FootWhenWhere, {
+    match: match
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 9,
-      color: "#60607a",
-      border: "1px solid #1e1e30",
-      borderRadius: 4,
-      padding: "1px 5px",
-      textTransform: "uppercase"
+      margin: "12px 0"
     }
-  }, match.match_type === "amical" ? "Amical" : "Championnat"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(FootMetaChips, {
+    match: match
+  })), !live && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootPresenceStack, {
+    ids: presentIds,
+    total: rosterSize
+  }), isOnRoster && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 9,
-      color: "#60607a",
-      border: "1px solid #1e1e30",
-      borderRadius: 4,
-      padding: "1px 5px",
-      textTransform: "uppercase"
+      marginTop: 14
     }
-  }, match.venue === "exterieur" ? "Extérieur" : "Domicile"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: statusColor,
-      textTransform: "uppercase",
-      fontWeight: 700
-    }
-  }, statusLabel))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a",
-      marginBottom: 4
-    }
-  }, dateLabel), place && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a"
-    }
-  }, place), match.status !== "scheduled" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 22,
-      marginTop: 6
-    }
-  }, score.bl, " \u2014 ", score.opponent), match.status === "scheduled" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a",
-      marginTop: 6,
-      marginBottom: isOnRoster ? 10 : 0
-    }
-  }, presentCount, "/", rosterSize, " pr\xE9sents"), match.status === "scheduled" && isOnRoster && /*#__PURE__*/React.createElement(FootAttendanceButtons, {
-    compact: true,
+  }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
     myStatus: myStatus,
     saving: saving,
     onSet: onSetStatus
+  }))));
+}
+function FootMatchRow({
+  match,
+  score,
+  onOpen
+}) {
+  const finished = match.status !== "scheduled";
+  const out = finished ? footOutcome(score) : null;
+  const dt = new Date(match.match_datetime);
+  return /*#__PURE__*/React.createElement(FCard, {
+    onClick: onOpen,
+    pad: 12,
+    style: {
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, finished ? /*#__PURE__*/React.createElement("span", {
+    title: FOOT_OUTCOME_LABEL[out],
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      flexShrink: 0,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: FF.display,
+      fontSize: 20,
+      background: FC[FOOT_OUTCOME_TONE[out]],
+      color: "#fff"
+    }
+  }, out) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 44,
+      flexShrink: 0,
+      textAlign: "center",
+      lineHeight: 1.05
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontFamily: FF.display,
+      fontSize: 22,
+      color: FC.deep
+    }
+  }, dt.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    timeZone: "Europe/Paris"
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
+      textTransform: "uppercase"
+    }
+  }, dt.toLocaleDateString("fr-FR", {
+    month: "short",
+    timeZone: "Europe/Paris"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 18,
+      lineHeight: 1.2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, match.opponent_name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, finished ? footDate(match.match_datetime) : `${footDate(match.match_datetime)} · ${footTime(match.match_datetime)}`, " \xB7 ", match.venue === "exterieur" ? "Extérieur" : "Domicile", match.match_type === "amical" ? " · Amical" : "")), finished ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 26,
+      color: FC.deep,
+      whiteSpace: "nowrap"
+    }
+  }, score.bl, "\u2013", score.opponent) : /*#__PURE__*/React.createElement(FIcon, {
+    name: "chevron",
+    size: 20,
+    style: {
+      color: FC.muted
+    }
   }));
 }
 function FootCalendarPage({
@@ -661,40 +794,51 @@ function FootCalendarPage({
     setSavingMatchId(null);
   }
   if (matches.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: 40,
-        textAlign: "center",
-        color: "#60607a"
-      }
-    }, "Aucun match pour l'instant.");
+    return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+      icon: "calendar",
+      title: "Aucun match",
+      text: "Les matchs appara\xEEtront ici d\xE8s qu'ils seront cr\xE9\xE9s."
+    }));
   }
-  return /*#__PURE__*/React.createElement("div", {
+  const scoreOf = m => computeFootScore(events.filter(e => e.match_id === m.id));
+  const featured = footFeaturedMatch(matches);
+  const upcoming = matches.filter(m => m.status === "scheduled" && m !== featured).sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime));
+  const past = matches.filter(m => m.status === "finished" || m.status === "live" && m !== featured).sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime));
+  const open = m => () => nav("matchDetail", {
+    matchId: m.id
+  });
+  const heroAttendance = featured ? attendance.filter(a => a.match_id === featured.id) : [];
+  const section = (label, list) => list.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 16
+      marginBottom: 8
     }
-  }, matches.map(match => {
-    const matchEvents = events.filter(e => e.match_id === match.id);
-    const score = computeFootScore(matchEvents);
-    const matchAttendance = attendance.filter(a => a.match_id === match.id);
-    const presentCount = computeAttendanceBuckets(presenceRoster, matchAttendance).present.length;
-    const myStatus = matchAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null;
-    return /*#__PURE__*/React.createElement(FootMatchCard, {
-      key: match.id,
-      match: match,
-      score: score,
-      presentCount: presentCount,
-      rosterSize: presenceRoster.length,
-      onClick: () => nav("matchDetail", {
-        matchId: match.id
-      }),
-      isOnRoster: isOnRoster,
-      myStatus: myStatus,
-      saving: savingMatchId === match.id,
-      onSetStatus: status => setStatus(match.id, status)
-    });
-  }));
+  }, /*#__PURE__*/React.createElement(FTitle, {
+    size: 20,
+    style: {
+      marginBottom: 10
+    }
+  }, label), list.map(m => /*#__PURE__*/React.createElement(FootMatchRow, {
+    key: m.id,
+    match: m,
+    score: scoreOf(m),
+    onOpen: open(m)
+  })));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "ft-page"
+  }, featured && /*#__PURE__*/React.createElement(FootMatchHero, {
+    match: featured,
+    score: scoreOf(featured),
+    onOpen: open(featured),
+    presentIds: computeAttendanceBuckets(presenceRoster, heroAttendance).present,
+    rosterSize: presenceRoster.length,
+    isOnRoster: isOnRoster,
+    myStatus: heroAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null,
+    saving: savingMatchId === featured.id,
+    onSetStatus: status => setStatus(featured.id, status)
+  }), section("À venir", upcoming), section("Résultats", past));
 }
+
+// ---- roster & admin -------------------------------------------------------------------------------------------------------------
 function FootRosterManager({
   roster,
   reload
@@ -748,107 +892,239 @@ function FootRosterManager({
     setSaving(null);
   }
   const nameOf = p => getDisplayName(p, PLAYERS) || "";
-  const sortedPlayers = [...PLAYERS].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  // Team members first, then everybody else (to add them).
+  const sortedPlayers = [...PLAYERS].sort((a, b) => (roleByPlayer[b.id] ? 1 : 0) - (roleByPlayer[a.id] ? 1 : 0) || nameOf(a).localeCompare(nameOf(b)));
   const visiblePlayers = filterPlayersByName(sortedPlayers, search, nameOf);
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 18
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 16,
-      marginBottom: 12
-    }
-  }, "Effectif (", roster.length, ")"), /*#__PURE__*/React.createElement("input", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, roster.length, " joueurs")
+  }, "Effectif"), /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
-    placeholder: "\uD83D\uDD0D Rechercher un joueur\u2026",
+    placeholder: "Rechercher un joueur\u2026",
     value: search,
-    onChange: e => setSearch(e.target.value)
-  }), visiblePlayers.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13,
-      padding: "8px 0"
-    }
-  }, "Aucun joueur ne correspond \xE0 \xAB ", search, " \xBB."), visiblePlayers.map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "8px 0",
-      borderBottom: "1px solid #1e1e30"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13
-    }
-  }, getDisplayName(p, PLAYERS)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center"
-    }
-  }, roleByPlayer[p.id] && /*#__PURE__*/React.createElement("input", {
-    key: `${p.id}-${numberByPlayer[p.id] || ""}`,
-    defaultValue: numberByPlayer[p.id] || "",
-    placeholder: "n\xB0",
-    inputMode: "numeric",
-    maxLength: 3,
-    onBlur: e => {
-      const v = e.target.value.trim();
-      if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v);
-    },
-    style: {
-      width: 52,
-      marginRight: 8,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "5px 6px",
-      fontSize: 12,
-      textAlign: "center"
-    }
-  }), /*#__PURE__*/React.createElement("select", {
-    value: roleByPlayer[p.id] || "",
-    disabled: saving === p.id,
-    onChange: e => setRole(p.id, e.target.value),
-    style: {
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "5px 8px",
-      fontSize: 12
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Pas dans l'\xE9quipe"), /*#__PURE__*/React.createElement("option", {
-    value: "regulier"
-  }, "R\xE9gulier"), /*#__PURE__*/React.createElement("option", {
-    value: "occasionnel"
-  }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
-    value: "invite"
-  }, "Invit\xE9"))))));
+    onChange: e => setSearch(e.target.value),
+    "aria-label": "Rechercher un joueur"
+  }), visiblePlayers.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Aucun r\xE9sultat",
+    text: `Aucun joueur ne correspond à « ${search} ».`
+  }), visiblePlayers.map(p => {
+    const inTeam = !!roleByPlayer[p.id];
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 0",
+        borderTop: `1px solid ${FC.line}`,
+        opacity: inTeam ? 1 : 0.75
+      }
+    }, /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: p.id,
+      name: nameOf(p),
+      size: 38
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 15,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, nameOf(p)), inTeam && /*#__PURE__*/React.createElement("input", {
+      key: `${p.id}-${numberByPlayer[p.id] || ""}`,
+      defaultValue: numberByPlayer[p.id] || "",
+      placeholder: "n\xB0",
+      inputMode: "numeric",
+      maxLength: 3,
+      "aria-label": `Numéro de ${nameOf(p)}`,
+      onBlur: e => {
+        const v = e.target.value.trim();
+        if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v);
+      },
+      style: {
+        ...FOOT_INPUT_STYLE,
+        width: 58,
+        marginBottom: 0,
+        textAlign: "center",
+        padding: "8px 6px",
+        minHeight: 40,
+        fontFamily: FF.ui
+      }
+    }), /*#__PURE__*/React.createElement("select", {
+      value: roleByPlayer[p.id] || "",
+      disabled: saving === p.id,
+      onChange: e => setRole(p.id, e.target.value),
+      "aria-label": `Rôle de ${nameOf(p)}`,
+      style: {
+        ...FOOT_SELECT_STYLE,
+        maxWidth: 138
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Hors \xE9quipe"), /*#__PURE__*/React.createElement("option", {
+      value: "regulier"
+    }, "R\xE9gulier"), /*#__PURE__*/React.createElement("option", {
+      value: "occasionnel"
+    }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
+      value: "invite"
+    }, "Invit\xE9")));
+  }));
 }
 function FootAdminPage({
   roster,
   reload
 }) {
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 20
-    }
+    className: "ft-page"
   }, /*#__PURE__*/React.createElement(FootCreateMatchForm, {
     reload: reload
   }), /*#__PURE__*/React.createElement(FootRosterManager, {
     roster: roster,
     reload: reload
   }));
+}
+
+// ---- match detail ----------------------------------------------------------------------------------------------------------------
+function footHalfLabel(n) {
+  return n === 1 ? "1re mi-temps" : `${n}e mi-temps`;
+}
+
+// "1re mi-temps · 17'" — ticks every second while the half is running.
+function FootLiveClock({
+  match
+}) {
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    if (!match.half_started_at) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [match.half_started_at]);
+  const secs = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
+  const running = !!match.half_started_at;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      fontFamily: FF.ui,
+      fontSize: 16,
+      color: FC.deep,
+      marginTop: 4
+    }
+  }, footHalfLabel(match.current_half || 1), " \xB7 ", running ? `${Math.floor(secs / 60)}'` : secs > 0 ? "terminée" : "à démarrer");
+}
+function FootTeamMark({
+  name,
+  logo
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      minWidth: 0
+    }
+  }, logo ? /*#__PURE__*/React.createElement("img", {
+    src: "/logo-bl.png",
+    alt: "",
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      objectFit: "cover",
+      background: FC.soft,
+      display: "block",
+      margin: "0 auto 6px"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      background: FC.soft,
+      color: FC.deep,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: FF.display,
+      fontSize: 21,
+      margin: "0 auto 6px"
+    }
+  }, playerInitials(name)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 16,
+      lineHeight: 1.15,
+      overflowWrap: "anywhere"
+    }
+  }, name));
+}
+function FootScoreboard({
+  match,
+  score
+}) {
+  const live = match.status === "live",
+    finished = match.status === "finished";
+  const out = finished ? footOutcome(score) : null;
+  return /*#__PURE__*/React.createElement(FCard, {
+    pad: 20
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, live ? /*#__PURE__*/React.createElement(FChip, {
+    tone: "live"
+  }, "En direct") : finished ? /*#__PURE__*/React.createElement(FChip, {
+    tone: FOOT_OUTCOME_TONE[out]
+  }, FOOT_OUTCOME_LABEL[out]) : /*#__PURE__*/React.createElement(FChip, {
+    tone: "accent"
+  }, "\xC0 venir"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      color: FC.muted
+    }
+  }, footRelative(match.match_datetime))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr auto 1fr",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(FootTeamMark, {
+    name: "Bi\xE8re Leverculsec",
+    logo: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: live || finished ? 46 : 32,
+      color: FC.deep,
+      whiteSpace: "nowrap",
+      lineHeight: 1
+    }
+  }, live || finished ? `${score.bl} – ${score.opponent}` : "VS"), /*#__PURE__*/React.createElement(FootTeamMark, {
+    name: match.opponent_name
+  })), live && /*#__PURE__*/React.createElement(FootLiveClock, {
+    match: match
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 1,
+      background: FC.line,
+      margin: "16px 0 12px"
+    }
+  }), /*#__PURE__*/React.createElement(FootWhenWhere, {
+    match: match
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement(FootMetaChips, {
+    match: match
+  })));
 }
 function FootStartMatchConfig({
   match,
@@ -861,12 +1137,14 @@ function FootStartMatchConfig({
   const [nbHalves, setNbHalves] = React.useState(2);
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
   const presentIds = attendance.filter(a => a.match_id === match.id && a.status === "present").map(a => a.player_id);
   const existingSheet = lineupIdsFor(lineups || [], match.id);
   const [sheet, setSheet] = React.useState(existingSheet.length ? existingSheet : presentIds.filter(id => roster.some(r => r.player_id === id)));
   const toggle = id => setSheet(sheet.includes(id) ? sheet.filter(x => x !== id) : [...sheet, id]);
   async function start() {
     setSaving(true);
+    setErr(null);
     try {
       await saveLineup(match.id, lineupIdsFor(lineups || [], match.id), sheet);
       await sbUpdate("foot_matches", {
@@ -882,77 +1160,42 @@ function FootStartMatchConfig({
       await reload();
     } catch (e) {
       console.warn("start match failed", e);
+      setErr("Impossible de démarrer : " + e.message);
       setSaving(false);
     }
   }
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Lancer le match"), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 20
+      display: "flex",
+      gap: 10
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FField, {
+    label: "Mi-temps",
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 18
+      flex: 1
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 16,
-      marginBottom: 14
-    }
-  }, "Configuration du match"), /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 12,
-      color: "#60607a"
-    }
-  }, "Nombre de mi-temps"), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement("select", {
     value: nbHalves,
     onChange: e => setNbHalves(Number(e.target.value)),
-    style: {
-      display: "block",
-      width: "100%",
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "9px 12px",
-      marginTop: 4,
-      marginBottom: 14
-    }
+    style: FOOT_INPUT_STYLE
   }, [1, 2, 3, 4].map(n => /*#__PURE__*/React.createElement("option", {
     key: n,
     value: n
-  }, n))), /*#__PURE__*/React.createElement("label", {
+  }, n)))), /*#__PURE__*/React.createElement(FField, {
+    label: "Dur\xE9e (min)",
     style: {
-      fontSize: 12,
-      color: "#60607a"
+      flex: 1
     }
-  }, "Dur\xE9e par mi-temps (minutes)"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: 1,
+    inputMode: "numeric",
     value: halfDuration,
     onChange: e => setHalfDuration(Number(e.target.value)),
+    style: FOOT_INPUT_STYLE
+  }))), /*#__PURE__*/React.createElement(FLabel, null, "Feuille de match (", sheet.length, ")"), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "block",
-      width: "100%",
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "9px 12px",
-      marginTop: 4,
-      marginBottom: 18
-    }
-  }), /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 12,
-      color: "#60607a"
-    }
-  }, "Feuille de match (", sheet.length, ")"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      margin: "6px 0 18px"
+      margin: "0 0 16px"
     }
   }, /*#__PURE__*/React.createElement(FootLineupChecklist, {
     roster: roster,
@@ -960,38 +1203,27 @@ function FootStartMatchConfig({
     checked: sheet,
     onToggle: toggle,
     disabled: saving
-  })), /*#__PURE__*/React.createElement("div", {
+  })), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
     onClick: onCancel,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "10px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "success",
+    icon: "play",
     onClick: start,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px",
-      fontWeight: 700,
-      cursor: saving ? "default" : "pointer",
-      opacity: saving ? 0.6 : 1
+      flex: 2
     }
-  }, saving ? "Démarrage…" : "Démarrer le match"))));
+  }, saving ? "Démarrage…" : "Coup d'envoi")));
 }
 function FootEventEditor({
   event,
@@ -1014,17 +1246,6 @@ function FootEventEditor({
     if (id) rosterIds.add(id);
   });
   const options = PLAYERS.filter(p => rosterIds.has(p.id));
-  const selectStyle = {
-    display: "block",
-    width: "100%",
-    background: "#0d0d1c",
-    border: "1px solid #1e1e30",
-    borderRadius: 6,
-    color: "#eeeef5",
-    padding: "7px 10px",
-    marginTop: 4,
-    marginBottom: 10
-  };
   async function save() {
     let payload;
     try {
@@ -1044,131 +1265,94 @@ function FootEventEditor({
     try {
       await onSave(payload);
     } catch (e) {
-      setErr("Erreur: " + e.message);
+      setErr("Erreur : " + e.message);
       setSaving(false);
     }
   }
   return /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
     style: {
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
+      background: FC.softer,
+      border: `1.5px solid ${FC.line}`,
+      borderRadius: 18,
       padding: 14,
-      margin: "6px 0"
+      margin: "8px 0"
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Type"), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement(FSegmented, {
     value: type,
-    onChange: e => setType(e.target.value),
-    style: selectStyle
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "goal_bl"
-  }, "But Bi\xE8re Leverculsec"), /*#__PURE__*/React.createElement("option", {
-    value: "goal_opponent"
-  }, "But adverse")), /*#__PURE__*/React.createElement("div", {
+    onChange: setType,
+    options: [["goal_bl", "Nos buts"], ["goal_opponent", "But adverse"]],
+    style: {
+      marginBottom: 12
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FField, {
+    label: "Mi-temps",
     style: {
       flex: 1
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Mi-temps"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: 1,
+    inputMode: "numeric",
     value: half,
     onChange: e => setHalf(e.target.value),
-    style: selectStyle
-  })), /*#__PURE__*/React.createElement("div", {
+    style: FOOT_INPUT_STYLE
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Minute",
     style: {
       flex: 1
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Minute"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: 0,
+    inputMode: "numeric",
     value: minute,
     onChange: e => setMinute(e.target.value),
-    style: selectStyle
-  }))), type === "goal_bl" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Buteur"), /*#__PURE__*/React.createElement("select", {
+    style: FOOT_INPUT_STYLE
+  }))), type === "goal_bl" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FField, {
+    label: "Buteur"
+  }, /*#__PURE__*/React.createElement("select", {
     value: playerId,
     onChange: e => setPlayerId(e.target.value),
-    style: selectStyle
+    style: FOOT_INPUT_STYLE
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS)))), /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Passe d\xE9cisive (optionnel)"), /*#__PURE__*/React.createElement("select", {
+  }, getDisplayName(p, PLAYERS))))), /*#__PURE__*/React.createElement(FField, {
+    label: "Passe d\xE9cisive (optionnel)"
+  }, /*#__PURE__*/React.createElement("select", {
     value: assistId,
     onChange: e => setAssistId(e.target.value),
-    style: selectStyle
+    style: FOOT_INPUT_STYLE
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))))), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginBottom: 8
-    }
-  }, err), /*#__PURE__*/React.createElement("div", {
+  }, getDisplayName(p, PLAYERS)))))), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8
+      gap: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
     onClick: onCancel,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "8px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
     onClick: save,
     disabled: saving,
     style: {
-      flex: 1,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 6,
-      padding: "8px",
-      fontWeight: 700,
-      cursor: saving ? "default" : "pointer",
-      opacity: saving ? 0.6 : 1
+      flex: 1
     }
   }, saving ? "…" : "Enregistrer")));
 }
@@ -1209,83 +1393,113 @@ function FootEventTimeline({
     }
     setBusyId(null);
   }
-  const iconBtn = {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 13,
-    padding: "0 4px"
-  };
-  return /*#__PURE__*/React.createElement("div", null, sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13
-    }
-  }, "Aucun but pour l'instant."), sorted.map(e => {
-    if (editingId === e.id) {
-      return /*#__PURE__*/React.createElement(FootEventEditor, {
-        key: e.id,
-        event: e,
-        roster: roster,
-        onSave: p => saveEvent(e.id, p),
-        onCancel: () => setEditingId(null)
-      });
-    }
-    const scorer = e.player_id ? PLAYERS.find(p => p.id === e.player_id) : null;
-    const assist = e.assist_player_id ? PLAYERS.find(p => p.id === e.assist_player_id) : null;
-    const label = e.type === "goal_bl" ? `⚽ ${scorer ? getDisplayName(scorer, PLAYERS) : "?"}${assist ? " (passe D: " + getDisplayName(assist, PLAYERS) + ")" : ""}` : `⚽ But adverse`;
+  return /*#__PURE__*/React.createElement("div", null, sorted.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "ball",
+    title: "Aucun but",
+    text: "Les buts appara\xEEtront ici au fil du match."
+  }), sorted.map(e => {
+    if (editingId === e.id) return /*#__PURE__*/React.createElement(FootEventEditor, {
+      key: e.id,
+      event: e,
+      roster: roster,
+      onSave: p => saveEvent(e.id, p),
+      onCancel: () => setEditingId(null)
+    });
+    const ours = e.type === "goal_bl";
     return /*#__PURE__*/React.createElement("div", {
       key: e.id,
       style: {
         display: "flex",
+        alignItems: "center",
         gap: 10,
-        padding: "5px 0",
-        fontSize: 13,
-        alignItems: "center"
+        padding: "8px 0",
+        borderTop: `1px solid ${FC.line}`
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        color: "#60607a",
-        width: 50
+        flex: "0 0 52px",
+        textAlign: "center"
       }
-    }, e.half, "e \xB7 ", e.minute, "'"), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("span", {
       style: {
-        flex: 1
+        display: "block",
+        fontFamily: FF.display,
+        fontSize: 18,
+        color: FC.deep,
+        lineHeight: 1.1
       }
-    }, label), editable && /*#__PURE__*/React.createElement("span", {
+    }, e.minute, "'"), /*#__PURE__*/React.createElement("span", {
       style: {
-        whiteSpace: "nowrap"
+        display: "block",
+        fontSize: 11,
+        color: FC.muted
       }
-    }, /*#__PURE__*/React.createElement("button", {
-      title: "Modifier",
+    }, e.half, e.half === 1 ? "re" : "e", " MT")), ours ? /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: e.player_id,
+      name: footNameOf(e.player_id),
+      size: 36
+    }) : /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        background: FC.badSoft,
+        color: FC.bad,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement(FIcon, {
+      name: "ball",
+      size: 18
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 15,
+        fontWeight: 600,
+        color: ours ? FC.text : FC.muted
+      }
+    }, ours ? footNameOf(e.player_id) : "But adverse"), ours && e.assist_player_id && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: FC.muted
+      }
+    }, "Passe de ", footNameOf(e.assist_player_id))), editable && /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex"
+      }
+    }, /*#__PURE__*/React.createElement(FIconBtn, {
+      icon: "pencil",
+      label: "Modifier le but",
       onClick: () => setEditingId(e.id),
-      disabled: busyId === e.id,
-      style: iconBtn
-    }, "\u270F\uFE0F"), /*#__PURE__*/React.createElement("button", {
-      title: "Supprimer",
+      disabled: busyId === e.id
+    }), /*#__PURE__*/React.createElement(FIconBtn, {
+      icon: "trash",
+      label: "Supprimer le but",
+      tone: "danger",
       onClick: () => deleteEvent(e),
-      disabled: busyId === e.id,
-      style: iconBtn
-    }, "\uD83D\uDDD1\uFE0F")));
+      disabled: busyId === e.id
+    })));
   }), editable && editingId === "new" && /*#__PURE__*/React.createElement(FootEventEditor, {
     defaultHalf: match.current_half || 1,
     roster: roster,
     onSave: p => saveEvent("new", p),
     onCancel: () => setEditingId(null)
-  }), editable && editingId !== "new" && /*#__PURE__*/React.createElement("button", {
+  }), editable && editingId !== "new" && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    full: true,
+    size: "sm",
+    icon: "plus",
     onClick: () => setEditingId("new"),
     style: {
-      marginTop: 8,
-      background: "none",
-      border: "1px dashed #1e1e30",
-      borderRadius: 8,
-      color: "#60607a",
-      padding: "7px 12px",
-      cursor: "pointer",
-      fontSize: 12,
-      width: "100%"
+      marginTop: 10,
+      borderStyle: "dashed"
     }
-  }, "\u2795 Ajouter un but"));
+  }, "Ajouter un but"));
 }
 function FootGoalPicker({
   roster,
@@ -1297,57 +1511,32 @@ function FootGoalPicker({
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
   const options = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean);
+  const can = canConfirmGoal(playerId, busy);
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
+      background: FC.softer,
+      border: `1.5px solid ${FC.line}`,
+      borderRadius: 18,
       padding: 14,
       marginTop: 10
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Buteur"), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement(FField, {
+    label: "Buteur"
+  }, /*#__PURE__*/React.createElement("select", {
     value: playerId,
     onChange: e => setPlayerId(e.target.value),
-    style: {
-      display: "block",
-      width: "100%",
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "7px 10px",
-      marginTop: 4,
-      marginBottom: 10
-    }
+    style: FOOT_INPUT_STYLE
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS)))), withAssist && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 11,
-      color: "#60607a"
-    }
-  }, "Passe d\xE9cisive (optionnel)"), /*#__PURE__*/React.createElement("select", {
+  }, getDisplayName(p, PLAYERS))))), withAssist && /*#__PURE__*/React.createElement(FField, {
+    label: "Passe d\xE9cisive (optionnel)"
+  }, /*#__PURE__*/React.createElement("select", {
     value: assistId,
     onChange: e => setAssistId(e.target.value),
-    style: {
-      display: "block",
-      width: "100%",
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "7px 10px",
-      marginTop: 4,
-      marginBottom: 10
-    }
+    style: FOOT_INPUT_STYLE
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
@@ -1356,33 +1545,20 @@ function FootGoalPicker({
   }, getDisplayName(p, PLAYERS))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8,
-      marginTop: 6
+      gap: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
     onClick: onCancel,
     style: {
-      flex: 1,
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "8px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "Annuler"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => canConfirmGoal(playerId, busy) && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
-    disabled: !canConfirmGoal(playerId, busy),
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
+    icon: "check",
+    onClick: () => can && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
+    disabled: !can,
     style: {
-      flex: 1,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 6,
-      padding: "8px",
-      fontWeight: 700,
-      cursor: canConfirmGoal(playerId, busy) ? "pointer" : "default",
-      opacity: canConfirmGoal(playerId, busy) ? 1 : 0.5
+      flex: 1
     }
   }, "Valider")));
 }
@@ -1486,126 +1662,83 @@ function FootLiveAdminConsole({
   }
   const isLastHalf = match.current_half >= match.nb_halves;
   const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(FCard, {
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #3b82f655",
-      borderRadius: 12,
-      padding: 16,
-      marginTop: 16
+      border: `2px solid ${FC.accent}`
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "accent"
+    }, "Console admin")
+  }, footHalfLabel(match.current_half), " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 14,
-      color: "#3b82f6"
+      fontFamily: FF.ui,
+      fontSize: 15,
+      color: FC.muted
     }
-  }, "CONSOLE ADMIN \u2014 Mi-temps ", match.current_half, "/", match.nb_halves), /*#__PURE__*/React.createElement("div", {
+  }, "/ ", match.nb_halves)), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 28,
-      margin: "8px 0"
+      textAlign: "center",
+      fontFamily: FF.display,
+      fontSize: 60,
+      lineHeight: 1.1,
+      color: FC.deep,
+      margin: "2px 0 14px",
+      fontVariantNumeric: "tabular-nums"
     }
-  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), liveAction === "start" && /*#__PURE__*/React.createElement("button", {
-    onClick: startHalf,
+  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), liveAction === "start" && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "success",
+    size: "lg",
+    full: true,
+    icon: "play",
     disabled: busy,
-    style: {
-      width: "100%",
-      background: "#34d399",
-      color: "#080810",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px",
-      fontWeight: 700,
-      cursor: "pointer",
-      marginBottom: 10
-    }
-  }, "\u25B6 D\xE9marrer la mi-temps"), liveAction === "playing" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: startHalf
+  }, "D\xE9marrer la mi-temps"), liveAction === "playing" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8,
+      gap: 10,
       marginBottom: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    size: "lg",
+    icon: "ball",
+    disabled: busy,
     onClick: () => setPicking("bl"),
-    disabled: busy,
     style: {
-      flex: 1,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "10px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "\u26BD But Bi\xE8re Leverculsec"), /*#__PURE__*/React.createElement("button", {
+  }, "But BL"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    size: "lg",
+    icon: "ball",
+    disabled: busy,
     onClick: () => logGoal("goal_opponent", null, null),
-    disabled: busy,
     style: {
-      flex: 1,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "10px",
-      cursor: "pointer"
+      flex: 1
     }
-  }, "\u26BD But adverse")), picking === "bl" && /*#__PURE__*/React.createElement(FootGoalPicker, {
+  }, "But adverse")), picking === "bl" && /*#__PURE__*/React.createElement(FootGoalPicker, {
     roster: roster,
     withAssist: true,
     busy: busy,
     onCancel: () => setPicking(null),
     onConfirm: (playerId, assistId) => logGoal("goal_bl", playerId, assistId)
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: endHalf,
+  }), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
+    full: true,
+    icon: isLastHalf ? "flag" : "pause",
     disabled: busy,
+    onClick: endHalf,
     style: {
-      width: "100%",
-      background: "#1e1e30",
-      color: "#eeeef5",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px",
-      fontWeight: 700,
-      cursor: "pointer",
       marginTop: 10
     }
-  }, isLastHalf ? "🏁 Fin de la dernière mi-temps" : "⏸ Terminer la mi-temps")), liveAction === "close" && /*#__PURE__*/React.createElement("button", {
-    onClick: closeMatch,
+  }, isLastHalf ? "Fin de la dernière mi-temps" : "Terminer la mi-temps")), liveAction === "close" && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "danger",
+    size: "lg",
+    full: true,
+    icon: "flag",
     disabled: busy,
-    style: {
-      width: "100%",
-      background: "#ef4444",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px",
-      fontWeight: 700,
-      cursor: "pointer"
-    }
-  }, "\uD83C\uDFC1 Cl\xF4turer le match"));
-}
-function FootMatchHeader({
-  match
-}) {
-  const place = formatMatchPlace(match);
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
-    }
-  }, "Bi\xE8re Leverculsec vs ", match.opponent_name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a",
-      marginTop: 4
-    }
-  }, new Date(match.match_datetime).toLocaleString("fr-FR"), " \xB7 ", match.match_type === "amical" ? "Amical" : "Championnat", " \xB7 ", match.venue === "exterieur" ? "Extérieur" : "Domicile"), place && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a"
-    }
-  }, place));
+    onClick: closeMatch
+  }, "Cl\xF4turer le match"));
 }
 function FootLiveView({
   match,
@@ -1619,38 +1752,24 @@ function FootLiveView({
   const matchEvents = events.filter(e => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 16
-    }
-  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
-    match: match
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 32,
-      margin: "10px 0"
-    }
-  }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FootScoreboard, {
+    match: match,
+    score: score
+  }), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
+    match: match,
+    roster: roster,
+    events: matchEvents,
+    lineups: lineups,
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Buts"), /*#__PURE__*/React.createElement(FootEventTimeline, {
     events: matchEvents,
     editable: isAdmin,
     match: match,
     roster: roster,
     lineups: lineups,
     reload: reload
-  })), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
-    match: match,
-    roster: roster,
-    events: matchEvents,
-    lineups: lineups,
-    reload: reload
-  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+  })), /*#__PURE__*/React.createElement(FootLineupSection, {
     match: match,
     roster: roster,
     lineups: lineups,
@@ -1682,10 +1801,7 @@ function FootRatingsTab({
   const [scores, setScores] = React.useState(mine);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState(null);
-  const nameOf = id => {
-    const p = PLAYERS.find(x => x.id === id);
-    return p ? getDisplayName(p, PLAYERS) : "?";
-  };
+  const nameOf = footNameOf;
   async function save() {
     let rows;
     try {
@@ -1717,7 +1833,7 @@ function FootRatingsTab({
       setEditing(false);
       await reload();
     } catch (e) {
-      setErr("Erreur: " + e.message);
+      setErr("Erreur : " + e.message);
     }
     setBusy(false);
   }
@@ -1732,24 +1848,15 @@ function FootRatingsTab({
       });
       await reload();
     } catch (e) {
-      setErr("Erreur: " + e.message);
+      setErr("Erreur : " + e.message);
     }
     setBusy(false);
   }
-  const card = {
-    background: "#0d0d1c",
-    border: "1px solid #1e1e30",
-    borderRadius: 12,
-    padding: 16
-  };
-  if (sheetIds.length < 2) return /*#__PURE__*/React.createElement("div", {
-    style: card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13
-    }
-  }, "Pas assez de joueurs sur la feuille de match pour noter."));
+  if (sheetIds.length < 2) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "star",
+    title: "Pas de notes",
+    text: "Il faut au moins deux joueurs sur la feuille de match pour noter."
+  }));
   const view = ratingsTabView({
     validated,
     isVoter,
@@ -1761,27 +1868,14 @@ function FootRatingsTab({
     id,
     avg: averages[id]
   })).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-  return /*#__PURE__*/React.createElement("div", {
-    style: card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 15
-    }
-  }, "Notes du match"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: validated ? "#34d399" : "#60607a",
-      fontWeight: 700
-    }
-  }, validated ? "✓ Notes validées" : `${progress.doneIds.length} / ${sheetIds.length} ont voté`)), view.showForm && /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: validated ? /*#__PURE__*/React.createElement(FChip, {
+      tone: "good",
+      icon: "check"
+    }, "Valid\xE9es") : /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, progress.doneIds.length, " / ", sheetIds.length, " ont vot\xE9")
+  }, "Notes du match"), view.showForm && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -1789,14 +1883,23 @@ function FootRatingsTab({
     key: id,
     style: {
       display: "flex",
-      justifyContent: "space-between",
       alignItems: "center",
-      padding: "6px 0",
-      borderBottom: "1px solid #1e1e30"
+      gap: 10,
+      padding: "7px 0",
+      borderTop: `1px solid ${FC.line}`
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: nameOf(id),
+    size: 34
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 13
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
     }
   }, nameOf(id)), /*#__PURE__*/React.createElement("select", {
     value: scores[id] ?? "",
@@ -1805,95 +1908,110 @@ function FootRatingsTab({
       ...scores,
       [id]: e.target.value
     }),
+    "aria-label": `Note pour ${nameOf(id)}`,
     style: {
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "5px 8px"
+      ...FOOT_SELECT_STYLE,
+      minWidth: 82
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "\u2014"), FOOT_SCORE_OPTIONS.map(s => /*#__PURE__*/React.createElement("option", {
     key: s,
     value: String(s)
-  }, s.toFixed(1)))))), /*#__PURE__*/React.createElement("button", {
+  }, s.toFixed(1)))))), /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    size: "lg",
     onClick: save,
     disabled: busy,
     style: {
-      width: "100%",
-      marginTop: 10,
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px",
-      fontWeight: 700,
-      cursor: "pointer",
-      opacity: busy ? 0.6 : 1
+      marginTop: 12
     }
-  }, busy ? "…" : "Enregistrer mes notes")), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginBottom: 8
-    }
-  }, err), view.showEditButton && /*#__PURE__*/React.createElement("button", {
+  }, busy ? "…" : "Enregistrer mes notes")), err && /*#__PURE__*/React.createElement(FMessage, null, err), view.showEditButton && /*#__PURE__*/React.createElement(FBtn, {
+    size: "sm",
+    variant: "secondary",
+    icon: "pencil",
     onClick: () => {
       setScores(mine);
       setErr(null);
       setEditing(true);
     },
     style: {
-      background: "none",
-      border: "1px solid #1e1e30",
-      borderRadius: 6,
-      color: "#eeeef5",
-      padding: "4px 10px",
-      cursor: "pointer",
-      fontSize: 12,
-      marginBottom: 10
+      marginBottom: 12
     }
-  }, "\u270F\uFE0F ", view.editLabel), view.showAverages && ranked.map(({
+  }, view.editLabel), view.showAverages && ranked.map(({
     id,
     avg
-  }) => /*#__PURE__*/React.createElement("div", {
+  }, i) => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      padding: "5px 0",
-      fontSize: 13
+      alignItems: "center",
+      gap: 10,
+      padding: "7px 0",
+      borderTop: `1px solid ${FC.line}`
     }
-  }, /*#__PURE__*/React.createElement("span", null, nameOf(id)), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
+      width: 22,
+      textAlign: "center",
+      fontFamily: FF.display,
+      fontSize: 16,
+      color: i < 3 ? FC.deep : FC.muted
     }
-  }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement("div", {
+  }, i + 1), /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: nameOf(id),
+    size: 34
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#60607a"
+      flex: 1,
+      minWidth: 0
     }
-  }, "Les moyennes seront visibles apr\xE8s validation."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, nameOf(id)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 6,
+      borderRadius: 3,
+      background: FC.soft,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: `${avg == null ? 0 : Math.max(4, avg / 10 * 100)}%`,
+      height: "100%",
+      borderRadius: 3,
+      background: FC.accent
+    }
+  }))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 22,
+      color: FC.deep,
+      minWidth: 42,
+      textAlign: "right"
+    }
+  }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn"
+  }, "Les moyennes seront visibles apr\xE8s validation des notes."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
-      fontSize: 12,
-      color: "#60607a"
+      fontSize: 13,
+      color: FC.muted
     }
-  }, "Pas encore vot\xE9 : ", progress.pendingIds.map(nameOf).join(" · ")), isAdmin && !validated && /*#__PURE__*/React.createElement("button", {
+  }, "Pas encore vot\xE9 : ", progress.pendingIds.map(nameOf).join(" · ")), isAdmin && !validated && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    full: true,
+    size: "sm",
     onClick: forceValidate,
     disabled: busy,
     style: {
-      width: "100%",
-      marginTop: 12,
-      background: "#13131f",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      color: "#eeeef5",
-      padding: "8px",
-      cursor: "pointer",
-      fontSize: 12
+      marginTop: 12
     }
   }, "Valider les notes maintenant"));
 }
@@ -1911,53 +2029,19 @@ function FootFinishedView({
   const matchEvents = events.filter(e => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return /*#__PURE__*/React.createElement("div", {
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FootScoreboard, {
+    match: match,
+    score: score
+  }), /*#__PURE__*/React.createElement(FSegmented, {
+    value: tab,
+    onChange: setTab,
+    options: [["resume", "Résumé", "ball"], ["notes", "Notes", "star"]],
     style: {
-      padding: 20
+      marginBottom: 14,
+      background: "rgba(255,255,255,0.92)"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 12
-    }
-  }, [["resume", "Résumé"], ["notes", "Notes du match"]].map(([id, l]) => /*#__PURE__*/React.createElement("button", {
-    key: id,
-    onClick: () => setTab(id),
-    style: {
-      flex: 1,
-      background: tab === id ? "#3b82f6" : "#13131f",
-      color: tab === id ? "#fff" : "#60607a",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      padding: "8px",
-      fontWeight: 700,
-      cursor: "pointer",
-      fontSize: 12
-    }
-  }, l))), tab === "resume" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 16
-    }
-  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
-    match: match
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "#34d399",
-      textTransform: "uppercase",
-      fontWeight: 700,
-      marginTop: 4
-    }
-  }, "Termin\xE9"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 32,
-      margin: "10px 0"
-    }
-  }, score.bl, " \u2014 ", score.opponent), /*#__PURE__*/React.createElement(FootEventTimeline, {
+  }), tab === "resume" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Buts"), /*#__PURE__*/React.createElement(FootEventTimeline, {
     events: matchEvents,
     editable: isAdmin,
     match: match,
@@ -2005,81 +2089,62 @@ function FootScheduledView({
     }
     setSaving(false);
   }
-  function nameOf(playerId) {
-    const p = PLAYERS.find(pl => pl.id === playerId);
-    return p ? getDisplayName(p, PLAYERS) : "?";
-  }
+  const groups = [["Présents", buckets.present, "good"], ["Pas de réponse", buckets.noResponse, "plain"], ["Absents", buckets.absent, "bad"]];
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 20
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FootScoreboard, {
+    match: match,
+    score: {
+      bl: 0,
+      opponent: 0
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement(FootMatchHeader, {
-    match: match
-  })), isOnRoster && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+  }), isOnRoster && /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Ma pr\xE9sence"), /*#__PURE__*/React.createElement(FootAttendanceButtons, {
     myStatus: myStatus,
     saving: saving,
     onSet: setMyStatus
-  })), presenceRoster.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13,
-      marginBottom: 16
-    }
-  }, "Aucun joueur dans l'effectif.") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 16
-    }
-  }, [["Présents", buckets.present, "#34d399"], ["N'a pas répondu", buckets.noResponse, "#60607a"], ["Absents", buckets.absent, "#ef4444"]].map(([label, ids, color]) => /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, buckets.present.length, " / ", presenceRoster.length)
+  }, "Pr\xE9sences"), presenceRoster.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Effectif vide",
+    text: "Ajoute des joueurs \xE0 l'effectif dans l'onglet Admin."
+  }) : groups.map(([label, ids, tone]) => /*#__PURE__*/React.createElement("div", {
     key: label,
     style: {
-      marginBottom: 10
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color,
-      textTransform: "uppercase",
-      fontWeight: 700,
-      marginBottom: 4
+      marginBottom: 6
     }
-  }, label, " (", ids.length, ")"), ids.map(id => /*#__PURE__*/React.createElement("div", {
-    key: id,
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: tone
+  }, label, " \xB7 ", ids.length)), ids.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      padding: "3px 0"
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
     }
-  }, nameOf(id)))))), /*#__PURE__*/React.createElement(FootLineupSection, {
+  }, ids.map(id => /*#__PURE__*/React.createElement(FootPlayerPill, {
+    key: id,
+    id: id,
+    tone: "line",
+    dim: tone === "plain"
+  })))))), /*#__PURE__*/React.createElement(FootLineupSection, {
     match: match,
     roster: roster,
     lineups: lineups || [],
     isAdmin: isAdmin,
     reload: reload
-  }), isAdmin && /*#__PURE__*/React.createElement("button", {
-    onClick: onStartMatch,
-    style: {
-      marginTop: 16,
-      width: "100%",
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "12px",
-      fontWeight: 700,
-      cursor: "pointer"
-    }
-  }, "COMMENCER LE MATCH"));
+  }), isAdmin && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "success",
+    size: "lg",
+    full: true,
+    icon: "play",
+    onClick: onStartMatch
+  }, "Commencer le match"));
 }
 function FootMatchDetailPage({
   matchId,
@@ -2098,12 +2163,13 @@ function FootMatchDetailPage({
   const [startingConfig, setStartingConfig] = React.useState(false);
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-  if (!match) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 20,
-      color: "#60607a"
-    }
-  }, "Match introuvable.");
+  if (!match) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "calendar",
+    title: "Match introuvable",
+    action: /*#__PURE__*/React.createElement(FBtn, {
+      onClick: navBack
+    }, "Retour aux matchs")
+  }));
   async function deleteMatch() {
     if (!window.confirm(`Supprimer définitivement le match contre ${match.opponent_name} ? Les buts et présences associés seront aussi supprimés.`)) return;
     setDeleting(true);
@@ -2118,57 +2184,7 @@ function FootMatchDetailPage({
       setDeleting(false);
     }
   }
-  const topBtn = {
-    background: "none",
-    border: "1px solid #1e1e30",
-    borderRadius: 8,
-    color: "#eeeef5",
-    padding: "6px 12px",
-    cursor: "pointer",
-    fontSize: 12
-  };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "12px 20px 0",
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: navBack,
-    style: topBtn
-  }, "\u2190 Retour"), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setEditingInfo(!editingInfo),
-    disabled: deleting,
-    style: topBtn
-  }, "\u270F\uFE0F Modifier"), /*#__PURE__*/React.createElement("button", {
-    onClick: deleteMatch,
-    disabled: deleting,
-    style: {
-      ...topBtn,
-      color: "#ef4444",
-      borderColor: "#ef444455"
-    }
-  }, deleting ? "…" : "🗑️ Supprimer"))), isAdmin && editingInfo && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "12px 20px 0"
-    }
-  }, /*#__PURE__*/React.createElement(FootMatchForm, {
-    title: "Modifier le match",
-    submitLabel: "Enregistrer",
-    initial: match,
-    onCancel: () => setEditingInfo(false),
-    onSubmit: async data => {
-      await sbUpdate("foot_matches", {
-        id: match.id
-      }, data);
-      await reload();
-      setEditingInfo(false);
-    }
-  })), match.status === "scheduled" && !startingConfig && /*#__PURE__*/React.createElement(FootScheduledView, {
+  return /*#__PURE__*/React.createElement("div", null, match.status === "scheduled" && !startingConfig && /*#__PURE__*/React.createElement(FootScheduledView, {
     match: match,
     roster: roster,
     attendance: attendance,
@@ -2177,14 +2193,20 @@ function FootMatchDetailPage({
     isAdmin: isAdmin,
     reload: reload,
     onStartMatch: () => setStartingConfig(true)
-  }), match.status === "scheduled" && startingConfig && /*#__PURE__*/React.createElement(FootStartMatchConfig, {
+  }), match.status === "scheduled" && startingConfig && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootScoreboard, {
+    match: match,
+    score: {
+      bl: 0,
+      opponent: 0
+    }
+  }), /*#__PURE__*/React.createElement(FootStartMatchConfig, {
     match: match,
     roster: roster,
     attendance: attendance,
     lineups: lineups,
     reload: reload,
     onCancel: () => setStartingConfig(false)
-  }), match.status === "live" && /*#__PURE__*/React.createElement(FootLiveView, {
+  })), match.status === "live" && /*#__PURE__*/React.createElement(FootLiveView, {
     match: match,
     roster: roster,
     events: events,
@@ -2201,8 +2223,47 @@ function FootMatchDetailPage({
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload
-  }));
+  }), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, editingInfo ? /*#__PURE__*/React.createElement(FootMatchForm, {
+    title: "Modifier le match",
+    submitLabel: "Enregistrer",
+    initial: match,
+    onCancel: () => setEditingInfo(false),
+    onSubmit: async data => {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, data);
+      await reload();
+      setEditingInfo(false);
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
+    icon: "pencil",
+    onClick: () => setEditingInfo(true),
+    disabled: deleting,
+    style: {
+      flex: 1
+    }
+  }, "Modifier"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    icon: "trash",
+    onClick: deleteMatch,
+    disabled: deleting,
+    style: {
+      flex: 1,
+      color: FC.bad,
+      borderColor: withAlpha(FC.bad, 0.4),
+      background: "rgba(255,255,255,0.9)"
+    }
+  }, deleting ? "…" : "Supprimer"))));
 }
+
+// ---- stats ---------------------------------------------------------------------------------------------------------------------------
 const FOOT_STAT_COLUMNS = [{
   key: "played",
   label: "MJ",
@@ -2236,14 +2297,6 @@ const FOOT_STAT_COLUMNS = [{
   label: "Note",
   title: "Note"
 }];
-const FOOT_SELECT_STYLE = {
-  background: "#13131f",
-  border: "1px solid #1e1e30",
-  borderRadius: 8,
-  color: "#eeeef5",
-  padding: "6px 10px",
-  fontSize: 12
-};
 function readPref(key, fallback, allowed) {
   try {
     const v = localStorage.getItem(key);
@@ -2264,29 +2317,32 @@ function FootStatTile({
 }) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      flex: "1 1 70px",
-      background: "#13131f",
-      borderRadius: 10,
-      padding: "10px 8px",
-      textAlign: "center"
+      background: FC.soft,
+      borderRadius: 18,
+      padding: "12px 8px",
+      textAlign: "center",
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: "#60607a",
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
       textTransform: "uppercase",
       letterSpacing: "0.06em"
     }
   }, title), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 26,
-      lineHeight: 1.2
+      fontFamily: FF.display,
+      fontSize: 28,
+      lineHeight: 1.25,
+      color: FC.deep
     }
   }, value), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: "#3b82f6"
+      fontFamily: FF.ui,
+      fontSize: 13,
+      color: FC.muted
     }
   }, rank));
 }
@@ -2294,12 +2350,11 @@ function FootRatingChart({
   series
 }) {
   const [hover, setHover] = React.useState(null);
-  if (series.length < 2) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13
-    }
-  }, "Il faut au moins 2 matchs not\xE9s pour afficher l'\xE9volution.");
+  if (series.length < 2) return /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "chart",
+    title: "Pas encore de courbe",
+    text: "Il faut au moins 2 matchs not\xE9s pour afficher ton \xE9volution."
+  });
   const W = 320,
     H = 150,
     L = 32,
@@ -2313,14 +2368,19 @@ function FootRatingChart({
   const h = hover != null ? series[hover] : null;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      minHeight: 18,
+      minHeight: 20,
       textAlign: "center",
-      fontSize: 12,
-      color: "#eeeef5"
+      fontSize: 14,
+      color: FC.text
     }
-  }, h ? /*#__PURE__*/React.createElement(React.Fragment, null, "vs ", h.opponent, " \xB7 ", /*#__PURE__*/React.createElement("b", null, h.rating.toFixed(1)), " \xB7 ", new Date(h.date).toLocaleDateString("fr-FR")) : /*#__PURE__*/React.createElement("span", {
+  }, h ? /*#__PURE__*/React.createElement(React.Fragment, null, "vs ", h.opponent, " \xB7 ", /*#__PURE__*/React.createElement("b", {
     style: {
-      color: "#60607a"
+      fontFamily: FF.display,
+      color: FC.deep
+    }
+  }, h.rating.toFixed(1)), " \xB7 ", new Date(h.date).toLocaleDateString("fr-FR")) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.muted
     }
   }, "Touche un point pour le d\xE9tail")), /*#__PURE__*/React.createElement("svg", {
     viewBox: `0 0 ${W} ${H}`,
@@ -2338,27 +2398,27 @@ function FootRatingChart({
     x2: W - R,
     y1: y(v),
     y2: y(v),
-    stroke: "#1e1e30",
+    stroke: FC.line,
     strokeWidth: "1"
   }), /*#__PURE__*/React.createElement("text", {
     x: L - 10,
     y: y(v) + 3.5,
     fontSize: "10",
-    fill: "#60607a",
+    fill: FC.muted,
     textAnchor: "end"
   }, v))), h && /*#__PURE__*/React.createElement("line", {
     x1: x(hover),
     x2: x(hover),
     y1: T,
     y2: H - B,
-    stroke: "#60607a",
+    stroke: FC.muted,
     strokeWidth: "1",
     strokeDasharray: "2 2"
   }), /*#__PURE__*/React.createElement("polyline", {
     points: pts,
     fill: "none",
-    stroke: "#3b82f6",
-    strokeWidth: "2",
+    stroke: FC.accent,
+    strokeWidth: "3",
     strokeLinejoin: "round",
     strokeLinecap: "round"
   }), series.map((s, i) => /*#__PURE__*/React.createElement("g", {
@@ -2372,14 +2432,14 @@ function FootRatingChart({
   }, /*#__PURE__*/React.createElement("circle", {
     cx: x(i),
     cy: y(s.rating),
-    r: "12",
+    r: "14",
     fill: "transparent"
   }), /*#__PURE__*/React.createElement("circle", {
     cx: x(i),
     cy: y(s.rating),
-    r: hover === i ? 5 : 4,
-    fill: "#3b82f6",
-    stroke: "#0d0d1c",
+    r: hover === i ? 6 : 4.5,
+    fill: FC.accent,
+    stroke: "#fff",
     strokeWidth: "2"
   }), /*#__PURE__*/React.createElement("title", null, `${s.opponent} : ${s.rating.toFixed(1)}`)))));
 }
@@ -2422,15 +2482,12 @@ function FootStatsPage({
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
   const me = rows.find(r => r.playerId === currentPlayer?.id);
   const series = currentPlayer ? playerRatingSeries(filtered, ratings, lineups, currentPlayer.id).slice(-10) : [];
-  const nameOf = id => {
-    const p = PLAYERS.find(x => x.id === id);
-    return p ? getDisplayName(p, PLAYERS) : "?";
-  };
+  const nameOf = footNameOf;
   function tilesFor(keys) {
     return keys.map(k => {
       const col = FOOT_STAT_COLUMNS.find(c => c.key === k);
       const value = me ? formatStatValue(statValue(me, k, mode), k, mode) : "—";
-      const rank = me && ranks[k][me.playerId] ? formatRank(ranks[k][me.playerId]) : "—";
+      const rank = me && ranks[k][me.playerId] ? String(formatRank(ranks[k][me.playerId])).split(" / ")[0] : "—"; // "1er ex æquo / 13" → "1er ex æquo"
       return /*#__PURE__*/React.createElement(FootStatTile, {
         key: k,
         title: col.title,
@@ -2446,49 +2503,31 @@ function FootStatsPage({
     }
   }
   const sorted = sortStatsRows(rows, sortKey, sortDir, mode, nameOf);
-  const card = {
-    background: "#0d0d1c",
-    border: "1px solid #1e1e30",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14
+  const grid = "minmax(120px,1fr) repeat(8, 50px)";
+  const tiles = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(84px, 1fr))",
+    gap: 8
   };
-  const toggleBtn = (m, label) => /*#__PURE__*/React.createElement("button", {
-    onClick: () => setMode(m),
-    style: {
-      background: mode === m ? "#3b82f6" : "#13131f",
-      color: mode === m ? "#fff" : "#60607a",
-      border: "1px solid #1e1e30",
-      padding: "6px 14px",
-      cursor: "pointer",
-      fontWeight: 700,
-      fontSize: 12
-    }
-  }, label);
-  const grid = "minmax(110px,1fr) repeat(8, 52px)";
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 16,
-      maxWidth: 900,
-      margin: "0 auto"
-    }
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FCard, {
+    pad: 12
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
+      marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement("select", {
     value: season,
     onChange: e => setSeason(e.target.value),
-    style: FOOT_SELECT_STYLE
+    "aria-label": "Saison",
+    style: {
+      ...FOOT_SELECT_STYLE,
+      flex: 1,
+      minWidth: 0
+    }
   }, seasonOptions.map(s => /*#__PURE__*/React.createElement("option", {
     key: s,
     value: s
@@ -2497,78 +2536,82 @@ function FootStatsPage({
   }, "Toutes les saisons")), /*#__PURE__*/React.createElement("select", {
     value: type,
     onChange: e => setType(e.target.value),
-    style: FOOT_SELECT_STYLE
+    "aria-label": "Type de match",
+    style: {
+      ...FOOT_SELECT_STYLE,
+      flex: 1,
+      minWidth: 0
+    }
   }, /*#__PURE__*/React.createElement("option", {
     value: "all"
   }, "Tous les matchs"), /*#__PURE__*/React.createElement("option", {
     value: "championnat"
   }, "Championnat"), /*#__PURE__*/React.createElement("option", {
     value: "amical"
-  }, "Amical"))), /*#__PURE__*/React.createElement("div", {
+  }, "Amical"))), /*#__PURE__*/React.createElement(FSegmented, {
+    value: mode,
+    onChange: setMode,
+    options: [["abs", "Valeurs"], ["pct", "En %"]]
+  })), !me && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn"
+  }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && me.played === 0 && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn"
+  }, "Pas encore de match termin\xE9 sur une feuille de match."), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      borderRadius: 8,
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: currentPlayer?.id,
+    name: currentPlayer?.name || footNameOf(currentPlayer?.id),
+    size: 56
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 22,
+      color: FC.deep,
+      lineHeight: 1.15
+    }
+  }, "Mes stats"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: FC.muted
+    }
+  }, season === "all" ? "Toutes saisons" : `Saison ${season}`))), /*#__PURE__*/React.createElement(FLabel, null, "Matchs"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...tiles,
+      marginBottom: 14
+    }
+  }, tilesFor(["played", "wins", "draws", "losses", "rating"])), /*#__PURE__*/React.createElement(FLabel, null, "Attaque"), /*#__PURE__*/React.createElement("div", {
+    style: tiles
+  }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Mon \xE9volution"), /*#__PURE__*/React.createElement(FootRatingChart, {
+    series: series
+  })), /*#__PURE__*/React.createElement(FCard, {
+    pad: 0,
+    style: {
       overflow: "hidden"
     }
-  }, toggleBtn("abs", "Valeurs"), toggleBtn("pct", "%"))), !me && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13,
-      marginBottom: 10
-    }
-  }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && me.played === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13,
-      marginBottom: 10
-    }
-  }, "Pas encore de match termin\xE9 sur une feuille de match."), /*#__PURE__*/React.createElement("div", {
-    style: card
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 15,
-      marginBottom: 10
+      padding: "16px 16px 8px"
     }
-  }, "Mes matchs"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FHeading, {
     style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap"
+      marginBottom: 0
     }
-  }, tilesFor(["played", "wins", "draws", "losses", "rating"]))), /*#__PURE__*/React.createElement("div", {
-    style: card
-  }, /*#__PURE__*/React.createElement("div", {
+  }, "Tout le monde")), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 15,
-      marginBottom: 10
-    }
-  }, "Mes stats offensives"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap"
-    }
-  }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement("div", {
-    style: card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 15,
-      marginBottom: 6
-    }
-  }, "Mon \xE9volution"), /*#__PURE__*/React.createElement(FootRatingChart, {
-    series: series
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...card,
-      padding: 0,
       overflowX: "auto"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      minWidth: 600
+      minWidth: 560
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2576,51 +2619,286 @@ function FootStatsPage({
       gridTemplateColumns: grid,
       gap: 4,
       padding: "9px 14px",
-      background: "#13131f",
-      borderBottom: "1px solid #1e1e30",
-      fontSize: 10,
-      color: "#60607a",
+      background: FC.soft,
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
       textTransform: "uppercase"
     }
-  }, /*#__PURE__*/React.createElement("span", null, "Joueur"), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "sticky",
+      left: 0,
+      zIndex: 1,
+      background: FC.soft,
+      marginLeft: -14,
+      paddingLeft: 14
+    }
+  }, "Joueur"), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("button", {
     key: c.key,
     onClick: () => clickHeader(c.key),
+    title: c.title,
     style: {
       textAlign: "center",
       cursor: "pointer",
+      border: "none",
+      background: "none",
+      fontFamily: "inherit",
+      fontSize: "inherit",
+      textTransform: "inherit",
       userSelect: "none",
-      color: sortKey === c.key ? "#3b82f6" : "#60607a"
+      color: sortKey === c.key ? FC.accent : FC.muted,
+      fontWeight: sortKey === c.key ? 700 : 400
     }
   }, c.label, sortKey === c.key ? sortDir === -1 ? " ▼" : " ▲" : ""))), sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 16,
-      color: "#60607a",
-      fontSize: 13
+      padding: 16
     }
-  }, "Aucun joueur r\xE9gulier ou occasionnel dans l'effectif."), sorted.map(s => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Personne dans l'effectif",
+    text: "Les stats concernent les joueurs r\xE9guliers et occasionnels."
+  })), sorted.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.playerId,
     style: {
       display: "grid",
       gridTemplateColumns: grid,
       gap: 4,
-      padding: "9px 14px",
-      borderBottom: "1px solid #1e1e30",
-      fontSize: 13,
+      padding: "8px 14px",
+      borderTop: `1px solid ${FC.line}`,
+      fontSize: 15,
       alignItems: "center",
-      background: s.playerId === currentPlayer?.id ? "#3b82f61a" : "transparent"
+      background: s.playerId === currentPlayer?.id ? FC.accentSoft : "transparent"
     }
   }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      minWidth: 0,
+      position: "sticky",
+      left: 0,
+      zIndex: 1,
+      marginLeft: -14,
+      paddingLeft: 14,
+      backgroundColor: "#fff",
+      backgroundImage: s.playerId === currentPlayer?.id ? `linear-gradient(${FC.accentSoft}, ${FC.accentSoft})` : "none"
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: s.playerId,
+    name: nameOf(s.playerId),
+    size: 28
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, nameOf(s.playerId)), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("span", {
+  }, nameOf(s.playerId))), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("span", {
     key: c.key,
     style: {
-      textAlign: "center"
+      textAlign: "center",
+      fontFamily: FF.ui,
+      fontSize: 16
     }
-  }, formatStatValue(statValue(s, c.key, mode), c.key, mode))))))));
+  }, formatStatValue(statValue(s, c.key, mode), c.key, mode)))))))));
+}
+
+// ---- rankings (podium of the season) --------------------------------------------------------------------------------------------------------
+const FOOT_RANKING_TABS = [{
+  key: "goals",
+  label: "Buts",
+  unit: "buts",
+  icon: "ball"
+}, {
+  key: "assists",
+  label: "Passe D",
+  unit: "passes",
+  icon: "send"
+}, {
+  key: "rating",
+  label: "Moyennes",
+  unit: "",
+  icon: "star"
+}];
+function FootPodiumSlot({
+  entry,
+  place,
+  size
+}) {
+  const first = place === 1;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      textAlign: "center",
+      marginTop: first ? 0 : 26
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      display: "inline-block",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: entry.playerId,
+    name: entry.name,
+    size: size,
+    ring: first ? FC.accent : FC.line
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "absolute",
+      left: -6,
+      top: -6,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      background: FC.accent,
+      color: "#fff",
+      border: "3px solid #fff",
+      fontFamily: FF.display,
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, place)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: first ? 18 : 16,
+      lineHeight: 1.15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, entry.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: first ? 30 : 24,
+      color: FC.deep,
+      lineHeight: 1.2
+    }
+  }, entry.shown), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: FC.muted
+    }
+  }, entry.matches, " match", entry.matches > 1 ? "s" : ""));
+}
+function FootRankingsPage({
+  matches,
+  lineups,
+  events,
+  ratings,
+  roster,
+  currentPlayer
+}) {
+  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
+  const pick = v => {
+    setTab(v);
+    writePref("foot_rank_tab", v);
+  };
+  const season = seasonOf(new Date().toISOString());
+  const seasonMatches = filterMatchesForStats(matches, {
+    season,
+    type: "all"
+  });
+  const ids = new Set(seasonMatches.map(m => m.id));
+  const seasonLineups = lineups.filter(l => ids.has(l.match_id));
+  const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id))), {});
+  for (const r of rows) {
+    const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
+    r.rating = averageRating(series);
+    r.rated = series.length;
+  }
+  const byId = Object.fromEntries(rows.map(r => [r.playerId, r]));
+  const t = FOOT_RANKING_TABS.find(x => x.key === tab);
+  const entries = rankingEntries(rows, tab, footNameOf, 15).map(e => ({
+    ...e,
+    name: footNameOf(e.playerId),
+    shown: tab === "rating" ? e.value.toFixed(1) : String(e.value),
+    matches: tab === "rating" ? byId[e.playerId].rated : byId[e.playerId].played
+  }));
+  const podium = entries.slice(0, 3),
+    rest = entries.slice(3);
+  const order = podium.length === 3 ? [[podium[1], 2, 66], [podium[0], 1, 84], [podium[2], 3, 66]] : podium.map((e, i) => [e, i + 1, i === 0 ? 84 : 66]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FSegmented, {
+    value: tab,
+    onChange: pick,
+    options: FOOT_RANKING_TABS.map(x => [x.key, x.label, x.icon]),
+    style: {
+      marginBottom: 14,
+      background: "rgba(255,255,255,0.92)"
+    }
+  }), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, "Saison ", season)
+  }, t.label), entries.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "trophy",
+    title: "Pas encore de classement",
+    text: "Le classement appara\xEEt d\xE8s qu'un match termin\xE9 compte des buts, des passes ou des notes."
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: rest.length ? 14 : 0
+    }
+  }, order.map(([e, place, size]) => /*#__PURE__*/React.createElement(FootPodiumSlot, {
+    key: e.playerId,
+    entry: e,
+    place: place,
+    size: size
+  }))), rest.map((e, i) => /*#__PURE__*/React.createElement("div", {
+    key: e.playerId,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 8px",
+      marginInline: -8,
+      borderTop: `1px solid ${FC.line}`,
+      borderRadius: 12,
+      background: e.playerId === currentPlayer?.id ? FC.accentSoft : "transparent"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 24,
+      textAlign: "center",
+      fontFamily: FF.display,
+      fontSize: 16,
+      color: FC.muted
+    }
+  }, i + 4), /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: e.playerId,
+    name: e.name,
+    size: 34
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, e.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: FC.muted
+    }
+  }, e.matches, " m."), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 20,
+      color: FC.deep,
+      minWidth: 36,
+      textAlign: "right"
+    }
+  }, e.shown))))));
 }
 const INSTA_KEY_STORAGE = "foot_insta_admin_key";
 function readInstaKey() {
@@ -2749,51 +3027,52 @@ function FootPhotoCell({
     }
     setBusy(false);
   }
-  const mini = {
-    background: "#13131f",
-    border: "1px solid #1e1e30",
-    borderRadius: 6,
-    color: "#eeeef5",
-    padding: "3px 6px",
-    fontSize: 11,
-    cursor: busy ? "default" : "pointer"
-  };
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#13131f",
-      borderRadius: 8,
-      padding: 6,
-      textAlign: "center"
+      background: FC.softer,
+      border: `1px solid ${FC.line}`,
+      borderRadius: 16,
+      padding: 8,
+      textAlign: "center",
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      height: 64,
+      height: 76,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 4
+      marginBottom: 6,
+      borderRadius: 12,
+      background: FC.soft,
+      overflow: "hidden"
     }
   }, shown ? /*#__PURE__*/React.createElement("img", {
     src: instaPublicUrl(shown.path),
     alt: "",
     style: {
-      maxHeight: 64,
+      maxHeight: 76,
       maxWidth: "100%",
       objectFit: "contain"
     }
-  }) : /*#__PURE__*/React.createElement("span", {
+  }) : /*#__PURE__*/React.createElement(FIcon, {
+    name: "photo",
+    size: 22,
     style: {
-      color: "#60607a",
-      fontSize: 11
+      color: FC.line
     }
-  }, "\u2014")), shown && /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 9,
-      color: shown.retouched ? "#34d399" : "#60607a",
-      textTransform: "uppercase",
+      minHeight: 20,
       marginBottom: 4
     }
-  }, shown.retouched ? "retouchée" : "brute"), /*#__PURE__*/React.createElement("input", {
+  }, shown && /*#__PURE__*/React.createElement(FChip, {
+    tone: shown.retouched ? "good" : "plain",
+    style: {
+      fontSize: 10,
+      padding: "2px 8px"
+    }
+  }, shown.retouched ? "retouchée" : "brute")), /*#__PURE__*/React.createElement("input", {
     ref: inputRef,
     type: "file",
     accept: "image/png",
@@ -2806,36 +3085,46 @@ function FootPhotoCell({
       display: "flex",
       gap: 4,
       justifyContent: "center",
-      alignItems: "center",
-      flexWrap: "wrap"
+      alignItems: "center"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    size: "sm",
     disabled: busy,
     onClick: () => inputRef.current && inputRef.current.click(),
-    style: mini
-  }, busy ? "…" : "⬆ Envoyer"), shown && /*#__PURE__*/React.createElement("button", {
-    disabled: busy,
-    onClick: remove,
     style: {
-      ...mini,
-      color: "#ef4444"
+      padding: "5px 12px",
+      minHeight: 32,
+      fontSize: 12
     }
-  }, "\uD83D\uDDD1")), /*#__PURE__*/React.createElement("label", {
+  }, busy ? "…" : shown ? "Remplacer" : "Envoyer"), shown && /*#__PURE__*/React.createElement(FIconBtn, {
+    icon: "trash",
+    tone: "danger",
+    label: "Supprimer la photo",
+    onClick: remove,
+    disabled: busy,
     style: {
-      display: "block",
-      fontSize: 10,
-      color: "#60607a",
-      marginTop: 4
+      width: 32,
+      height: 32
+    }
+  })), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      fontSize: 12,
+      color: FC.muted,
+      marginTop: 6
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
     checked: retouched,
     onChange: e => setRetouched(e.target.checked)
-  }), " retouch\xE9e"), err && /*#__PURE__*/React.createElement("div", {
+  }), " retouch\xE9e"), err && /*#__PURE__*/React.createElement(FMessage, {
     style: {
-      color: "#ef4444",
-      fontSize: 10,
-      marginTop: 4
+      marginTop: 6,
+      fontSize: 11,
+      padding: "5px 8px"
     }
   }, err));
 }
@@ -2846,49 +3135,53 @@ function FootPhotosTab({
 }) {
   const nameOf = p => getDisplayName(p, PLAYERS) || "";
   const players = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  if (!players.length) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13
-    }
-  }, "Aucun joueur dans l'effectif.");
-  return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement("div", {
+  if (!players.length) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Aucun joueur",
+    text: "Ajoute des joueurs \xE0 l'effectif (onglet Admin)."
+  }));
+  const count = id => photos.filter(ph => ph.player_id === id).length;
+  return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement(FCard, {
     key: p.id,
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10
-    }
+    pad: 14
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 15,
-      marginBottom: 8
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
     }
-  }, nameOf(p)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: p.id,
+    name: nameOf(p),
+    size: 40
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      fontFamily: FF.display,
+      fontSize: 18,
+      color: FC.deep
+    }
+  }, nameOf(p)), /*#__PURE__*/React.createElement(FChip, {
+    tone: count(p.id) >= 6 ? "good" : "soft"
+  }, count(p.id), " / 6")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 1fr)",
-      gap: 6,
+      gridTemplateColumns: "58px minmax(0, 1fr) minmax(0, 1fr)",
+      gap: 8,
       alignItems: "center"
     }
-  }, /*#__PURE__*/React.createElement("span", null), INSTA_KITS.map(([kit, label]) => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null), INSTA_KITS.map(([kit, label]) => /*#__PURE__*/React.createElement(FLabel, {
     key: kit,
     style: {
-      fontSize: 10,
-      color: "#60607a",
-      textTransform: "uppercase",
-      textAlign: "center"
+      textAlign: "center",
+      marginBottom: 0
     }
   }, label)), INSTA_KINDS.map(([kind, kindLabel]) => /*#__PURE__*/React.createElement(React.Fragment, {
     key: kind
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FLabel, {
     style: {
-      fontSize: 10,
-      color: "#60607a",
-      textTransform: "uppercase"
+      marginBottom: 0
     }
   }, kindLabel), INSTA_KITS.map(([kit]) => /*#__PURE__*/React.createElement(FootPhotoCell, {
     key: kit,
@@ -3098,7 +3391,7 @@ function FootFramingCompare({
         cursor: "pointer",
         borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0,
         background: isMask ? "#ffffff" : "#222",
-        border: "1px solid #1e1e30",
+        border: `1px solid ${FC.line}`,
         boxSizing: "border-box"
       }
     }, !isMask && /*#__PURE__*/React.createElement("img", {
@@ -3135,7 +3428,7 @@ function FootFramingCompare({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#60607a",
+        color: FC.muted,
         fontSize: 11,
         textAlign: "center",
         padding: 8
@@ -3162,7 +3455,7 @@ function FootFramingCompare({
     }, getDisplayName(p, PLAYERS)), photo && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
-        color: saved ? "#34d399" : "#60607a",
+        color: saved ? FC.good : FC.muted,
         textTransform: "uppercase",
         flexShrink: 0
       }
@@ -3394,9 +3687,9 @@ function FootFramingTool({
   };
   const btn = primary => ({
     flex: "1 1 auto",
-    background: primary ? "#3b82f6" : "#13131f",
-    color: primary ? "#fff" : "#eeeef5",
-    border: primary ? "none" : "1px solid #1e1e30",
+    background: primary ? FC.accent : FC.soft,
+    color: primary ? "#fff" : FC.text,
+    border: primary ? "none" : `1px solid ${FC.line}`,
     borderRadius: 8,
     padding: "9px 6px",
     fontWeight: 700,
@@ -3404,31 +3697,19 @@ function FootFramingTool({
     cursor: "pointer"
   });
   const isMask = layout === "render" || layout.startsWith("podium_");
-  if (!players.length) return /*#__PURE__*/React.createElement("div", {
+  if (!players.length) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "photo",
+    title: "Aucune photo",
+    text: "Envoie d'abord des photos dans l'onglet Photos."
+  }));
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FSegmented, {
+    value: mode,
+    onChange: setMode,
+    options: [["single", "Un joueur"], ["compare", "Comparer tous"]],
     style: {
-      color: "#60607a",
-      fontSize: 13
+      marginBottom: 12
     }
-  }, "Importez d'abord des photos (onglet Photos).");
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...btn(mode === "single"),
-      padding: "7px 6px"
-    },
-    onClick: () => setMode("single")
-  }, "Un joueur"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...btn(mode === "compare"),
-      padding: "7px 6px"
-    },
-    onClick: () => setMode("compare")
-  }, "Comparer tous")), mode === "single" && /*#__PURE__*/React.createElement("select", {
+  }), mode === "single" && /*#__PURE__*/React.createElement("select", {
     style: sel,
     value: pid || "",
     onChange: e => setPlayerId(Number(e.target.value))
@@ -3456,10 +3737,12 @@ function FootFramingTool({
     value: k
   }, l)))), mode === "compare" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
-      display: "block",
-      fontSize: 12,
-      color: "#60607a",
-      marginBottom: 10
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      color: FC.muted,
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
@@ -3479,17 +3762,15 @@ function FootFramingTool({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#60607a",
+      color: FC.muted,
       textAlign: "center",
       marginTop: 12
     }
-  }, "Touche un joueur pour ajuster son cadrage.")), mode === "single" && !photo && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13,
-      padding: "12px 0"
-    }
-  }, "Aucune photo pour cet emplacement."), /*#__PURE__*/React.createElement("div", {
+  }, "Touche un joueur pour ajuster son cadrage.")), mode === "single" && !photo && /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "photo",
+    title: "Pas de photo",
+    text: "Aucune photo pour cet emplacement : envoie-la dans l'onglet Photos."
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: mode === "single" && photo ? "block" : "none"
     }
@@ -3553,12 +3834,11 @@ function FootFramingTool({
       display: "flex",
       alignItems: "center",
       gap: 10,
-      margin: "12px 0"
+      margin: "14px 0"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(FLabel, {
     style: {
-      fontSize: 11,
-      color: "#60607a"
+      marginBottom: 0
     }
   }, "Zoom"), /*#__PURE__*/React.createElement("input", {
     type: "range",
@@ -3569,57 +3849,62 @@ function FootFramingTool({
     onChange: onSlider,
     style: {
       flex: 1
-    }
+    },
+    "aria-label": "Zoom"
   }), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
-      color: "#eeeef5",
-      width: 40,
+      fontFamily: FF.ui,
+      fontSize: 15,
+      color: FC.deep,
+      width: 48,
       textAlign: "right"
     }
-  }, pct, "%")), msg && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: msg.t === "error" ? "#ef4444" : "#34d399",
-      fontSize: 12,
-      marginBottom: 8
-    }
+  }, pct, "%")), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t === "error" ? "bad" : "good"
   }, msg.m), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
       flexWrap: "wrap"
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: btn(true),
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    icon: "check",
     disabled: saving || !fr,
-    onClick: save
-  }, saving ? "…" : "Enregistrer"), /*#__PURE__*/React.createElement("button", {
-    style: btn(false),
+    onClick: save,
+    style: {
+      flex: "1 1 auto"
+    }
+  }, saving ? "…" : "Enregistrer"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
     disabled: !photo,
     onClick: () => {
       setMsg(null);
       setFr(defaultFraming(layout, photo));
+    },
+    style: {
+      flex: "1 1 auto"
     }
-  }, "R\xE9initialiser"), /*#__PURE__*/React.createElement("button", {
-    style: btn(false),
+  }, "R\xE9initialiser"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
     disabled: !fr || centering,
-    onClick: centerPlayer
-  }, centering ? "…" : "Centrer le joueur"), /*#__PURE__*/React.createElement("button", {
-    style: btn(false),
+    onClick: centerPlayer,
+    style: {
+      flex: "1 1 auto"
+    }
+  }, centering ? "…" : "Centrer le joueur"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    icon: "photo",
     disabled: !fr,
-    onClick: previewServer
+    onClick: previewServer,
+    style: {
+      flex: "1 1 auto"
+    }
   }, "Aper\xE7u serveur")), serverPreview && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 14,
       textAlign: "center"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#60607a",
-      marginBottom: 6
-    }
-  }, "Aper\xE7u serveur (rendu r\xE9el)"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FLabel, null, "Aper\xE7u serveur (rendu r\xE9el)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -3647,7 +3932,7 @@ function FootFramingTool({
   }), p.label && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#60607a",
+      color: FC.muted,
       marginTop: 4
     }
   }, p.label)))))));
@@ -3663,37 +3948,23 @@ function FootInstaKeyBox({
     } catch (e) {}
     onSaved();
   }
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Cl\xE9 admin"), /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 16
+      fontSize: 14,
+      color: FC.muted,
+      marginBottom: 12,
+      lineHeight: 1.4
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#60607a",
-      marginBottom: 8
-    }
-  }, "Cl\xE9 admin R\xE9seaux (gard\xE9e uniquement dans ce navigateur, envoy\xE9e seulement \xE0 l'API du site)."), /*#__PURE__*/React.createElement("input", {
+  }, "Gard\xE9e uniquement dans ce navigateur, envoy\xE9e seulement \xE0 l'API du site."), /*#__PURE__*/React.createElement("input", {
     type: "password",
     style: FOOT_INPUT_STYLE,
     placeholder: "Cl\xE9 admin",
     value: v,
-    onChange: e => setV(e.target.value)
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: save,
-    style: {
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "8px 14px",
-      fontWeight: 700,
-      cursor: "pointer"
-    }
+    onChange: e => setV(e.target.value),
+    "aria-label": "Cl\xE9 admin"
+  }), /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    onClick: save
   }, "Enregistrer la cl\xE9"));
 }
 
@@ -3778,7 +4049,8 @@ function FootInstaImages({
       display: "flex",
       gap: 8,
       overflowX: "auto",
-      marginBottom: 8
+      marginBottom: 10,
+      paddingBottom: 2
     }
   }, images.map(im => /*#__PURE__*/React.createElement("a", {
     key: im.src,
@@ -3787,7 +4059,7 @@ function FootInstaImages({
     rel: "noreferrer",
     style: {
       flex: "0 0 auto",
-      width: 120,
+      width: 124,
       textAlign: "center",
       textDecoration: "none"
     }
@@ -3796,18 +4068,21 @@ function FootInstaImages({
     alt: im.label,
     loading: "lazy",
     style: {
-      width: 120,
-      height: 150,
+      width: 124,
+      height: 155,
       objectFit: "cover",
-      background: "#13131f",
-      borderRadius: 8,
-      display: "block"
+      background: FC.soft,
+      borderRadius: 14,
+      display: "block",
+      boxShadow: FC.shadowSm
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: "#60607a",
-      marginTop: 3
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
+      marginTop: 4,
+      textTransform: "uppercase"
     }
   }, im.label))));
 }
@@ -3827,12 +4102,7 @@ function FootSectionSchedule({
     }
   });
   const field = {
-    background: "#13131f",
-    border: "1px solid #1e1e30",
-    borderRadius: 6,
-    color: "#eeeef5",
-    padding: "5px 8px",
-    fontSize: 12
+    ...FOOT_SELECT_STYLE
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3840,8 +4110,8 @@ function FootSectionSchedule({
       flexWrap: "wrap",
       alignItems: "center",
       gap: 8,
-      fontSize: 12,
-      color: "#cccce0"
+      fontSize: 15,
+      color: FC.text
     }
   }, rule.type === "weekly" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "Chaque"), /*#__PURE__*/React.createElement("select", {
     value: rule.weekday,
@@ -3870,7 +4140,7 @@ function FootSectionSchedule({
     style: field
   }), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#60607a"
+      color: FC.muted
     }
   }, "(heure de Paris)"));
 }
@@ -3944,103 +4214,81 @@ function FootInstaNext({
     }
   }
   let badge;
-  if (!next.available) badge = ["En attente : " + next.waitingFor, "#60607a"];else if (cfg.mode !== "auto") badge = ["Prêt — envoi manuel", "#3b82f6"];else if (next.due) badge = ["Part au prochain passage (≤ 10 min)", "#f59e0b"];else badge = [`Programmé : ${instaWhen(next.scheduledAt)}`, "#34d399"];
-  const mini = {
-    background: "#13131f",
-    border: "1px solid #1e1e30",
-    borderRadius: 6,
-    color: "#eeeef5",
-    padding: "6px 10px",
-    fontSize: 12,
-    cursor: "pointer",
-    textDecoration: "none"
-  };
+  if (!next.available) badge = ["warn", "En attente : " + next.waitingFor];else if (cfg.mode !== "auto") badge = ["accent", "Prêt — envoi manuel"];else if (next.due) badge = ["warn", "Part au prochain passage (≤ 10 min)"];else badge = ["good", `Programmé : ${instaWhen(next.scheduledAt)}`];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      marginBottom: 2
+      fontFamily: FF.ui,
+      fontSize: 18,
+      lineHeight: 1.2,
+      marginBottom: 6
     }
   }, match ? `vs ${match.opponent_name}` : `Saison ${next.season}`, match && /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#60607a"
+      color: FC.muted,
+      fontSize: 14
     }
   }, " \xB7 ", instaWhen(match.match_datetime))), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: badge[1],
-      fontWeight: 700,
-      marginBottom: 8
+      marginBottom: 10
     }
-  }, badge[0]), failed && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#ef4444",
-      marginBottom: 8
-    }
-  }, "Dernier essai \xE9chou\xE9 : ", failed.error), next.previewable && /*#__PURE__*/React.createElement(FootInstaImages, {
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: badge[0]
+  }, badge[1])), failed && /*#__PURE__*/React.createElement(FMessage, null, "Dernier essai \xE9chou\xE9 : ", failed.error), next.previewable && /*#__PURE__*/React.createElement(FootInstaImages, {
     images: images
-  }), sec.featured && next.previewable && /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: "block",
-      fontSize: 11,
-      color: "#60607a",
-      marginBottom: 8
-    }
-  }, "Joueur sur la photo", /*#__PURE__*/React.createElement("select", {
+  }), sec.featured && next.previewable && /*#__PURE__*/React.createElement(FField, {
+    label: "Joueur sur la photo"
+  }, /*#__PURE__*/React.createElement("select", {
     value: featuredId || "",
     onChange: e => onPickPlayer(targetKey(target), e.target.value ? Number(e.target.value) : null),
     style: {
-      ...FOOT_SELECT_STYLE,
-      display: "block",
-      width: "100%",
-      marginTop: 4
+      ...FOOT_INPUT_STYLE,
+      marginBottom: 0
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "Automatique (rotation)"), candidates.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
-  }, c.name))), sec.key === "matchday" && chosen && !chosen.hasDos && /*#__PURE__*/React.createElement("span", {
+  }, c.name))), sec.key === "matchday" && chosen && !chosen.hasDos && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn",
     style: {
-      display: "block",
-      marginTop: 4,
-      color: "#f59e0b"
+      marginTop: 8
     }
-  }, "Pas de photo \xAB dos \xBB pour ce joueur : l'image Groupe sera sans joueur.")), next.available && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("textarea", {
+  }, "Pas de photo \xAB dos \xBB pour ce joueur : l'image Groupe sera sans joueur.")), next.available && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FField, {
+    label: "L\xE9gende"
+  }, /*#__PURE__*/React.createElement("textarea", {
     value: caption,
     onChange: e => setCaption(e.target.value),
     rows: 4,
     style: {
       ...FOOT_INPUT_STYLE,
-      boxSizing: "border-box",
+      marginBottom: 0,
       resize: "vertical",
-      fontFamily: "inherit"
+      lineHeight: 1.4
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
       flexWrap: "wrap"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    icon: "send",
     onClick: publish,
     disabled: busy,
     style: {
-      ...mini,
-      background: "#3b82f6",
-      border: "none",
-      color: "#fff",
-      fontWeight: 700,
-      opacity: busy ? 0.6 : 1
+      flex: "1 1 auto"
     }
-  }, busy ? "Publication…" : "Publier maintenant"), /*#__PURE__*/React.createElement("button", {
+  }, busy ? "Publication…" : "Publier maintenant"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
     onClick: copy,
-    style: mini
-  }, copied ? "Copié ✓" : "Copier la légende"))), msg && /*#__PURE__*/React.createElement("div", {
     style: {
-      color: msg.t === "error" ? "#ef4444" : "#34d399",
-      fontSize: 12,
-      marginTop: 8
+      flex: "1 1 auto"
+    }
+  }, copied ? "Copié ✓" : "Copier la légende"))), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t === "error" ? "bad" : "good",
+    style: {
+      marginTop: 10
     }
   }, msg.m));
 }
@@ -4058,33 +4306,31 @@ function FootInstaLast({
     }));
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 13,
-        marginBottom: 2
+        fontFamily: FF.ui,
+        fontSize: 18,
+        lineHeight: 1.2,
+        marginBottom: 6
       }
     }, m ? `vs ${m.opponent_name}` : `Saison ${p.season || ""}`), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 11,
-        color: "#34d399",
-        fontWeight: 700,
-        marginBottom: 8
+        marginBottom: 10
       }
-    }, "Publi\xE9 le ", instaWhen(p.published_at)), images.length > 0 && /*#__PURE__*/React.createElement(FootInstaImages, {
+    }, /*#__PURE__*/React.createElement(FChip, {
+      tone: "good",
+      icon: "check"
+    }, "Publi\xE9 le ", instaWhen(p.published_at))), images.length > 0 && /*#__PURE__*/React.createElement(FootInstaImages, {
       images: images
-    }), p.permalink && /*#__PURE__*/React.createElement("a", {
-      href: p.permalink,
-      target: "_blank",
-      rel: "noreferrer",
-      style: {
-        fontSize: 12,
-        color: "#3b82f6"
-      }
-    }, "Voir sur Instagram \u2197"));
+    }), p.permalink && /*#__PURE__*/React.createElement(FBtn, {
+      size: "sm",
+      variant: "secondary",
+      onClick: () => window.open(p.permalink, "_blank", "noopener")
+    }, "Voir sur Instagram"));
   }
   const m = last.matchId ? data.matches.find(x => x.id === last.matchId) : null;
   if (!last.available) return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#60607a"
+      fontSize: 14,
+      color: FC.muted
     }
   }, "Aucun post pour l'instant.");
   const target = {
@@ -4094,17 +4340,18 @@ function FootInstaLast({
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      marginBottom: 2
+      fontFamily: FF.ui,
+      fontSize: 18,
+      lineHeight: 1.2,
+      marginBottom: 6
     }
   }, m ? `vs ${m.opponent_name}` : `Saison ${last.season}`), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: "#60607a",
-      fontWeight: 700,
-      marginBottom: 8
+      marginBottom: 10
     }
-  }, "Jamais publi\xE9 \u2014 dernier visuel disponible"), /*#__PURE__*/React.createElement(FootInstaImages, {
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: "plain"
+  }, "Jamais publi\xE9 \xB7 dernier visuel")), /*#__PURE__*/React.createElement(FootInstaImages, {
     images: instaImages(sec.kind, target, instaDataKey(sec.kind, target, data))
   }));
 }
@@ -4151,69 +4398,23 @@ function FootInstaSection({
     }
     setSaving(false);
   }
-  const seg = active => ({
-    flex: 1,
-    background: active ? "#3b82f6" : "#13131f",
-    color: active ? "#fff" : "#eeeef5",
-    border: "1px solid #1e1e30",
-    borderRadius: 8,
-    padding: "7px 6px",
-    fontWeight: 700,
-    fontSize: 12,
-    cursor: "pointer"
-  });
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 10,
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 18
-    }
-  }, sec.label), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      textTransform: "uppercase",
-      fontWeight: 700,
-      color: saved.mode === "auto" ? "#34d399" : "#60607a",
-      border: `1px solid ${saved.mode === "auto" ? "#34d399" : "#1e1e30"}`,
-      borderRadius: 4,
-      padding: "2px 6px"
-    }
-  }, saved.mode === "auto" ? "Automatique" : "Manuel")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: seg(draft.mode === "manual"),
-    onClick: () => setDraft({
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: saved.mode === "auto" ? "good" : "plain"
+    }, saved.mode === "auto" ? "Automatique" : "Manuel")
+  }, sec.label), /*#__PURE__*/React.createElement(FSegmented, {
+    value: draft.mode,
+    onChange: m => setDraft({
       ...draft,
-      mode: "manual"
-    })
-  }, "Manuel"), /*#__PURE__*/React.createElement("button", {
-    style: seg(draft.mode === "auto"),
-    onClick: () => setDraft({
-      ...draft,
-      mode: "auto"
-    })
-  }, "Automatique")), draft.mode === "auto" && /*#__PURE__*/React.createElement("div", {
+      mode: m
+    }),
+    options: [["manual", "Manuel"], ["auto", "Automatique"]],
     style: {
-      marginBottom: 10
+      marginBottom: 12
+    }
+  }), draft.mode === "auto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(FootSectionSchedule, {
     sec: sec,
@@ -4221,54 +4422,31 @@ function FootInstaSection({
     onChange: setDraft
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: "#60607a",
-      marginTop: 6
+      fontSize: 13,
+      color: FC.muted,
+      marginTop: 8,
+      lineHeight: 1.4
     }
-  }, "Seuls les cr\xE9neaux \xE0 venir partent tout seuls", saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement", ". Rien d'ancien n'est publi\xE9.")), dirty && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, "Seuls les cr\xE9neaux \xE0 venir partent tout seuls", saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement", ". Rien d'ancien n'est publi\xE9.")), dirty && /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
     onClick: save,
     disabled: saving,
     style: {
-      background: "#3b82f6",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "8px 14px",
-      fontWeight: 700,
-      fontSize: 12,
-      cursor: "pointer",
-      opacity: saving ? 0.6 : 1
+      marginBottom: 12
     }
-  }, saving ? "Enregistrement…" : "Enregistrer le réglage")), err && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginBottom: 10
-    }
-  }, err), /*#__PURE__*/React.createElement("div", {
+  }, saving ? "Enregistrement…" : "Enregistrer le réglage"), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
-      gap: 16
+      gap: 20,
+      marginTop: 4
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: "1 1 260px",
       minWidth: 0
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#60607a",
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-      marginBottom: 6
-    }
-  }, "Dernier post"), /*#__PURE__*/React.createElement(FootInstaLast, {
+  }, /*#__PURE__*/React.createElement(FLabel, null, "Dernier post"), /*#__PURE__*/React.createElement(FootInstaLast, {
     sec: sec,
     last: state.last,
     data: data
@@ -4277,15 +4455,7 @@ function FootInstaSection({
       flex: "1 1 260px",
       minWidth: 0
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#60607a",
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-      marginBottom: 6
-    }
-  }, "Prochain post"), state.next ? /*#__PURE__*/React.createElement(FootInstaNext, {
+  }, /*#__PURE__*/React.createElement(FLabel, null, "Prochain post"), state.next ? /*#__PURE__*/React.createElement(FootInstaNext, {
     key: `${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`,
     sec: sec,
     next: state.next,
@@ -4298,8 +4468,8 @@ function FootInstaSection({
     onPublished: onPublished
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#60607a"
+      fontSize: 14,
+      color: FC.muted
     }
   }, "Rien de pr\xE9vu pour l'instant."))));
 }
@@ -4366,19 +4536,12 @@ function FootPostsTab({
     });
     setSettings(normalizeSettings(r.settings));
   }
-  if (!settings) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#60607a",
-      fontSize: 13
-    }
-  }, "Chargement\u2026");
-  return /*#__PURE__*/React.createElement("div", null, loadErr && /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#ef4444",
-      fontSize: 12,
-      marginBottom: 12
-    }
-  }, "R\xE9glages indisponibles (", loadErr, "). Valeurs par d\xE9faut (manuel) affich\xE9es."), INSTA_SECTIONS.map(sec => /*#__PURE__*/React.createElement(FootInstaSection, {
+  if (!settings) return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FSkeleton, {
+    h: 260
+  }), /*#__PURE__*/React.createElement(FSkeleton, {
+    h: 260
+  }));
+  return /*#__PURE__*/React.createElement("div", null, loadErr && /*#__PURE__*/React.createElement(FMessage, null, "R\xE9glages indisponibles (", loadErr, "). Valeurs par d\xE9faut (manuel) affich\xE9es."), INSTA_SECTIONS.map(sec => /*#__PURE__*/React.createElement(FootInstaSection, {
     key: sec.key,
     sec: sec,
     saved: settings[sec.key],
@@ -4391,9 +4554,10 @@ function FootPostsTab({
     onPublished: reloadPosts
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      color: "#60607a",
-      fontSize: 11,
-      textAlign: "center"
+      color: "rgba(255,255,255,0.9)",
+      fontSize: 13,
+      textAlign: "center",
+      textShadow: "1px 1px 0 rgba(0,0,0,0.25)"
     }
   }, "Envoi automatique : un planificateur v\xE9rifie toutes les ~10 minutes ce qui doit partir."));
 }
@@ -4413,54 +4577,19 @@ function FootReseauxPage({
     setTab(t);
     writePref("foot_reseaux_tab", t);
   };
-  const tabBtn = (id, label) => /*#__PURE__*/React.createElement("button", {
-    key: id,
-    onClick: () => pick(id),
-    style: {
-      flex: 1,
-      background: tab === id ? "#3b82f6" : "#13131f",
-      color: tab === id ? "#fff" : "#eeeef5",
-      border: "1px solid #1e1e30",
-      borderRadius: 8,
-      padding: "8px",
-      fontWeight: 700,
-      fontSize: 12,
-      cursor: "pointer"
-    }
-  }, label);
   return /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 16
-    }
+    className: "ft-page"
   }, !hasKey && /*#__PURE__*/React.createElement(FootInstaKeyBox, {
     onSaved: () => setHasKey(true)
-  }), hasKey && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement(FSegmented, {
+    value: tab,
+    onChange: pick,
+    options: [["posts", "Posts", "send"], ["photos", "Photos", "photo"], ["cadrage", "Cadrage", "pencil"]],
     style: {
-      textAlign: "right",
-      marginBottom: 8
+      marginBottom: 14,
+      background: "rgba(255,255,255,0.92)"
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      try {
-        localStorage.removeItem(INSTA_KEY_STORAGE);
-      } catch (e) {}
-      setHasKey(false);
-    },
-    style: {
-      background: "none",
-      border: "none",
-      color: "#60607a",
-      fontSize: 11,
-      cursor: "pointer",
-      textDecoration: "underline"
-    }
-  }, "Changer la cl\xE9 admin")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 16
-    }
-  }, tabBtn("posts", "Posts"), tabBtn("photos", "Photos"), tabBtn("cadrage", "Cadrage")), tab === "posts" && /*#__PURE__*/React.createElement(FootPostsTab, {
+  }), tab === "posts" && /*#__PURE__*/React.createElement(FootPostsTab, {
     matches: matches,
     lineups: lineups,
     events: events,
@@ -4476,15 +4605,48 @@ function FootReseauxPage({
     photos: photos,
     framings: framings,
     reload: reload
-  }));
+  }), hasKey && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      try {
+        localStorage.removeItem(INSTA_KEY_STORAGE);
+      } catch (e) {}
+      setHasKey(false);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: "rgba(255,255,255,0.9)",
+      fontSize: 13,
+      cursor: "pointer",
+      textDecoration: "underline",
+      textShadow: "1px 1px 0 rgba(0,0,0,0.25)"
+    }
+  }, "Changer la cl\xE9 admin")));
 }
+
+// ---- app shell --------------------------------------------------------------------------------------------------------------------------
+const FOOT_PAGE_TITLES = {
+  calendar: ["Matchs", "Bière Leverculsec"],
+  rankings: ["Classement", null],
+  stats: ["Stats", null],
+  reseaux: ["Réseaux", "Instagram"],
+  admin: ["Admin", "Matchs et effectif"]
+};
 function FootballApp({
   currentPlayer,
   onBack
 }) {
+  const [theme, setThemeState] = React.useState(() => readPref("foot_theme", "green", ["green", "pink"]));
+  setFootTheme(theme); // the colour tokens must be current before any child renders
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
   const [loaded, setLoaded] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(null);
   const [roster, setRoster] = React.useState([]);
   const [matches, setMatches] = React.useState([]);
   const [attendance, setAttendance] = React.useState([]);
@@ -4494,6 +4656,19 @@ function FootballApp({
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
   const isAdmin = currentPlayer?.uid === ADMIN_UID;
+  const setTheme = t => {
+    setThemeState(t);
+    writePref("foot_theme", t);
+  };
+  React.useEffect(() => {
+    // the browser bar follows the theme
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const previous = meta ? meta.getAttribute("content") : null;
+    if (meta) meta.setAttribute("content", FC.accent);
+    return () => {
+      if (meta && previous) meta.setAttribute("content", previous);
+    };
+  }, [theme]);
   async function reloadFoot() {
     const [r, m, a, e, l, rt, ph, fr] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
     // optional: absent until the insta migration is applied
@@ -4513,39 +4688,65 @@ function FootballApp({
   React.useEffect(() => {
     reloadFoot().then(() => setLoaded(true)).catch(err => {
       console.warn("foot load failed", err);
+      setLoadError(err.message);
       setLoaded(true);
     });
   }, []);
   function nav(p, s = {}) {
     setPage(p);
     setSub(s);
+    window.scrollTo && window.scrollTo(0, 0);
   }
-  if (!loaded) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        minHeight: "100vh",
-        background: "#080810",
-        color: "#60607a",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }
-    }, "Chargement\u2026");
-  }
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      minHeight: "100vh",
-      background: "#080810",
-      color: "#eeeef5",
-      fontFamily: "'Outfit',sans-serif",
-      paddingBottom: 70
+  const navItems = [{
+    id: "calendar",
+    label: "Matchs",
+    icon: "calendar"
+  }, {
+    id: "rankings",
+    label: "Classement",
+    icon: "trophy"
+  }, {
+    id: "stats",
+    label: "Stats",
+    icon: "chart"
+  }, ...(isAdmin ? [{
+    id: "reseaux",
+    label: "Réseaux",
+    icon: "megaphone"
+  }, {
+    id: "admin",
+    label: "Admin",
+    icon: "sliders"
+  }] : [])];
+  const detail = page === "matchDetail";
+  const openMatch = detail ? matches.find(m => m.id === sub.matchId) : null;
+  const [title, subtitle] = detail ? [openMatch ? {
+    scheduled: "Match",
+    live: "En direct",
+    finished: "Résultat"
+  }[openMatch.status] : "Match", openMatch ? `vs ${openMatch.opponent_name}` : null] : FOOT_PAGE_TITLES[page] || ["Foot", null];
+  return /*#__PURE__*/React.createElement(FootCtx.Provider, {
+    value: {
+      photos,
+      framings,
+      themeName: theme
     }
-  }, /*#__PURE__*/React.createElement(FootballNavBar, {
-    page: page,
-    setPage: nav,
-    onBack: onBack,
-    isAdmin: isAdmin
-  }), page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
+  }, /*#__PURE__*/React.createElement(FootShell, {
+    wide: page === "stats" || page === "reseaux"
+  }, /*#__PURE__*/React.createElement(FTopBar, {
+    title: title,
+    subtitle: subtitle,
+    theme: theme,
+    onTheme: setTheme,
+    onHome: onBack,
+    onBack: detail ? () => nav("calendar") : undefined
+  }), !loaded && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FSkeleton, {
+    h: 190
+  }), /*#__PURE__*/React.createElement(FSkeleton, {
+    h: 76
+  }), /*#__PURE__*/React.createElement(FSkeleton, {
+    h: 76
+  })), loaded && loadError && /*#__PURE__*/React.createElement(FMessage, null, "Chargement incomplet : ", loadError), loaded && page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
     matches: matches,
     events: events,
     roster: roster,
@@ -4553,7 +4754,7 @@ function FootballApp({
     nav: nav,
     currentPlayer: currentPlayer,
     reload: reloadFoot
-  }), page === "matchDetail" && /*#__PURE__*/React.createElement(FootMatchDetailPage, {
+  }), loaded && detail && /*#__PURE__*/React.createElement(FootMatchDetailPage, {
     matchId: sub.matchId,
     matches: matches,
     roster: roster,
@@ -4565,10 +4766,10 @@ function FootballApp({
     isAdmin: isAdmin,
     navBack: () => nav("calendar"),
     reload: reloadFoot
-  }), page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
+  }), loaded && page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
     roster: roster,
     reload: reloadFoot
-  }), page === "reseaux" && isAdmin && /*#__PURE__*/React.createElement(FootReseauxPage, {
+  }), loaded && page === "reseaux" && isAdmin && /*#__PURE__*/React.createElement(FootReseauxPage, {
     roster: roster,
     photos: photos,
     framings: framings,
@@ -4577,14 +4778,23 @@ function FootballApp({
     events: events,
     ratings: ratings,
     reload: reloadFoot
-  }), page === "rankings" && /*#__PURE__*/React.createElement(FootPlaceholderPage, {
-    label: "Classement"
-  }), page === "stats" && /*#__PURE__*/React.createElement(FootStatsPage, {
+  }), loaded && page === "rankings" && /*#__PURE__*/React.createElement(FootRankingsPage, {
     matches: matches,
     lineups: lineups,
     events: events,
     ratings: ratings,
     roster: roster,
     currentPlayer: currentPlayer
+  }), loaded && page === "stats" && /*#__PURE__*/React.createElement(FootStatsPage, {
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    ratings: ratings,
+    roster: roster,
+    currentPlayer: currentPlayer
+  })), /*#__PURE__*/React.createElement(FNav, {
+    page: detail ? "calendar" : page,
+    items: navItems,
+    onGo: nav
   }));
 }
