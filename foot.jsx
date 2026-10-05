@@ -432,9 +432,13 @@ function FootLiveClock({ match }) {
 }
 
 function FootTeamMark({ name, logo }) {
+  const { themeName } = React.useContext(FootCtx);
+  const pink = logo && themeName === "pink";
   return (
     <div style={{ textAlign: "center", minWidth: 0 }}>
-      {logo
+      {pink
+        ? <img src="/logo-bl-rose.png" alt="" style={{ width: 76, height: 54, objectFit: "contain", display: "block", margin: "0 auto 6px" }} />
+        : logo
         ? <img src="/logo-bl.png" alt="" style={{ width: 54, height: 54, borderRadius: 27, objectFit: "cover", background: FC.soft, display: "block", margin: "0 auto 6px" }} />
         : <span style={{ width: 54, height: 54, borderRadius: 27, background: FC.soft, color: FC.deep, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FF.display, fontSize: 21, margin: "0 auto 6px" }}>{playerInitials(name)}</span>}
       <div style={{ fontFamily: FF.ui, fontSize: 16, lineHeight: 1.15, overflowWrap: "anywhere" }}>{name}</div>

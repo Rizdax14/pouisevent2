@@ -1019,12 +1019,26 @@ function FootTeamMark({
   name,
   logo
 }) {
+  const {
+    themeName
+  } = React.useContext(FootCtx);
+  const pink = logo && themeName === "pink";
   return /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       minWidth: 0
     }
-  }, logo ? /*#__PURE__*/React.createElement("img", {
+  }, pink ? /*#__PURE__*/React.createElement("img", {
+    src: "/logo-bl-rose.png",
+    alt: "",
+    style: {
+      width: 76,
+      height: 54,
+      objectFit: "contain",
+      display: "block",
+      margin: "0 auto 6px"
+    }
+  }) : logo ? /*#__PURE__*/React.createElement("img", {
     src: "/logo-bl.png",
     alt: "",
     style: {
