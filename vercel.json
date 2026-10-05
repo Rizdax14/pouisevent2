@@ -59,7 +59,7 @@
     "api/insta/*.js": {
       "memory": 1024,
       "maxDuration": 30,
-      "includeFiles": "{fonts/**,assets/insta/**,insta-logic.js,foot-logic.js}"
+      "includeFiles": "{fonts/**,assets/insta/**,insta-logic.js,foot-logic.js,node_modules/harfbuzzjs/**}"
     }
   }
 }
