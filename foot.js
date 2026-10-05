@@ -1131,6 +1131,7 @@ function FootStartMatchConfig({
   roster,
   attendance,
   lineups,
+  currentPlayer,
   reload,
   onCancel
 }) {
@@ -1151,6 +1152,7 @@ function FootStartMatchConfig({
         id: match.id
       }, {
         status: "live",
+        started_by: currentPlayer.id,
         nb_halves: nbHalves,
         half_duration_min: halfDuration,
         current_half: 1,
@@ -2070,6 +2072,7 @@ function FootScheduledView({
   lineups,
   currentPlayer,
   isAdmin,
+  canStart,
   reload,
   onStartMatch
 }) {
@@ -2138,7 +2141,7 @@ function FootScheduledView({
     lineups: lineups || [],
     isAdmin: isAdmin,
     reload: reload
-  }), isAdmin && /*#__PURE__*/React.createElement(FBtn, {
+  }), canStart && /*#__PURE__*/React.createElement(FBtn, {
     variant: "success",
     size: "lg",
     full: true,
@@ -2155,11 +2158,12 @@ function FootMatchDetailPage({
   lineups,
   ratings,
   currentPlayer,
-  isAdmin,
   navBack,
   reload
 }) {
   const match = matches.find(m => m.id === matchId);
+  const isAdmin = canEditMatch(match, currentPlayer);
+  const canStart = canStartMatch(match, currentPlayer);
   const [startingConfig, setStartingConfig] = React.useState(false);
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
@@ -2191,6 +2195,7 @@ function FootMatchDetailPage({
     lineups: lineups,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
+    canStart: canStart,
     reload: reload,
     onStartMatch: () => setStartingConfig(true)
   }), match.status === "scheduled" && startingConfig && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootScoreboard, {
@@ -2204,6 +2209,7 @@ function FootMatchDetailPage({
     roster: roster,
     attendance: attendance,
     lineups: lineups,
+    currentPlayer: currentPlayer,
     reload: reload,
     onCancel: () => setStartingConfig(false)
   })), match.status === "live" && /*#__PURE__*/React.createElement(FootLiveView, {
@@ -4557,7 +4563,7 @@ function FootballApp({
   const [ratings, setRatings] = React.useState([]);
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
-  const isAdmin = currentPlayer?.uid === ADMIN_UID;
+  const isAdmin = isBureau(currentPlayer);
   const setTheme = t => {
     setThemeState(t);
     writePref("foot_theme", t);
@@ -4665,7 +4671,6 @@ function FootballApp({
     lineups: lineups,
     ratings: ratings,
     currentPlayer: currentPlayer,
-    isAdmin: isAdmin,
     navBack: () => nav("calendar"),
     reload: reloadFoot
   }), loaded && page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {

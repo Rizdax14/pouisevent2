@@ -435,3 +435,32 @@ test("ratingsTabView keeps averages hidden from a sheet player before voting", (
   assert.equal(v.showForm, true);
   assert.equal(v.showAverages, false);
 });
+
+test("permissions : bureau, démarrage et édition d'un match", () => {
+  const L = require("./foot-logic.js");
+  const bureau = L.FOOT_BUREAU_UIDS.map((uid, i) => ({ id: 100 + i, uid }));
+  assert.equal(bureau.length, 5);
+  assert.ok(bureau.every((p) => L.isBureau(p)));
+  const membre = { id: 1, uid: "nils-bra" }, starter = { id: 2, uid: "emma-gar" };
+  assert.equal(L.isBureau(membre), false);
+  assert.equal(L.isBureau({ id: 9, uid: "salome-dev" }), false);
+  assert.equal(L.isBureau(null), false);
+  // tout le monde peut démarrer un match programmé
+  assert.equal(L.canStartMatch({ status: "scheduled" }, membre), true);
+  assert.equal(L.canStartMatch({ status: "live" }, membre), false);
+  assert.equal(L.canStartMatch({ status: "scheduled" }, null), false);
+  // en cours : seul celui qui l'a lancé
+  const live = { status: "live", started_by: starter.id };
+  assert.equal(L.canEditMatch(live, starter), true);
+  assert.equal(L.canEditMatch(live, membre), false);
+  assert.equal(L.canEditMatch(live, bureau[0]), false);
+  // ancien match en cours sans lanceur : le bureau
+  assert.equal(L.canEditMatch({ status: "live", started_by: null }, bureau[1]), true);
+  assert.equal(L.canEditMatch({ status: "live", started_by: null }, membre), false);
+  // terminé : le bureau, y compris pour un match lancé par un membre
+  const done = { status: "finished", started_by: starter.id };
+  assert.equal(L.canEditMatch(done, bureau[2]), true);
+  assert.equal(L.canEditMatch(done, starter), false);
+  assert.equal(L.canEditMatch({ status: "scheduled" }, bureau[3]), true);
+  assert.equal(L.canEditMatch({ status: "scheduled" }, membre), false);
+});

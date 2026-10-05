@@ -270,8 +270,31 @@ function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   };
 }
 
+// Bureau = the 5 officers (Salomé, honorary member, is not part of it).
+const FOOT_BUREAU_UIDS = ["louis-mar", "maxime-mar", "thisma-bru", "samuel-oll", "thomas-pey"];
+
+function isBureau(player) {
+  return !!player && FOOT_BUREAU_UIDS.includes(player.uid);
+}
+
+// Anyone logged in can start a scheduled match; the starter is then the only editor until the match is
+// finished, after which the bureau can edit again. Legacy live matches (no recorded starter) go to the bureau.
+function canEditMatch(match, player) {
+  if (!match || !player) return false;
+  if (match.status === "live" && match.started_by) return match.started_by === player.id;
+  return isBureau(player);
+}
+
+function canStartMatch(match, player) {
+  return !!match && !!player && match.status === "scheduled";
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
+    FOOT_BUREAU_UIDS,
+    isBureau,
+    canEditMatch,
+    canStartMatch,
     computeFootScore,
     computeAttendanceBuckets,
     computeHalfElapsedSeconds,

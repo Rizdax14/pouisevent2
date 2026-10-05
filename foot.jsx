@@ -464,7 +464,7 @@ function FootScoreboard({ match, score }) {
   );
 }
 
-function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCancel }) {
+function FootStartMatchConfig({ match, roster, attendance, lineups, currentPlayer, reload, onCancel }) {
   const [nbHalves, setNbHalves] = React.useState(2);
   const [halfDuration, setHalfDuration] = React.useState(45);
   const [saving, setSaving] = React.useState(false);
@@ -479,7 +479,7 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, reload, onCa
     try {
       await saveLineup(match.id, lineupIdsFor(lineups || [], match.id), sheet);
       await sbUpdate("foot_matches", { id: match.id }, {
-        status: "live", nb_halves: nbHalves, half_duration_min: halfDuration, current_half: 1, half_started_at: null, half_elapsed_seconds: 0,
+        status: "live", started_by: currentPlayer.id, nb_halves: nbHalves, half_duration_min: halfDuration, current_half: 1, half_started_at: null, half_elapsed_seconds: 0,
       });
       await reload();
     } catch (e) {
@@ -870,7 +870,7 @@ function FootFinishedView({ match, roster, events, lineups, ratings, currentPlay
   );
 }
 
-function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, reload, onStartMatch }) {
+function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, canStart, reload, onStartMatch }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
   const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
@@ -909,13 +909,15 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
 
       <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
 
-      {isAdmin && <FBtn variant="success" size="lg" full icon="play" onClick={onStartMatch}>Commencer le match</FBtn>}
+      {canStart && <FBtn variant="success" size="lg" full icon="play" onClick={onStartMatch}>Commencer le match</FBtn>}
     </div>
   );
 }
 
-function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lineups, ratings, currentPlayer, isAdmin, navBack, reload }) {
+function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lineups, ratings, currentPlayer, navBack, reload }) {
   const match = matches.find((m) => m.id === matchId);
+  const isAdmin = canEditMatch(match, currentPlayer);
+  const canStart = canStartMatch(match, currentPlayer);
   const [startingConfig, setStartingConfig] = React.useState(false);
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
@@ -932,12 +934,12 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   return (
     <div>
       {match.status === "scheduled" && !startingConfig && (
-        <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} onStartMatch={() => setStartingConfig(true)} />
+        <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} canStart={canStart} reload={reload} onStartMatch={() => setStartingConfig(true)} />
       )}
       {match.status === "scheduled" && startingConfig && (
         <>
           <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
-          <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} reload={reload} onCancel={() => setStartingConfig(false)} />
+          <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} reload={reload} onCancel={() => setStartingConfig(false)} />
         </>
       )}
       {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
@@ -1864,7 +1866,7 @@ function FootballApp({ currentPlayer, onBack }) {
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
 
-  const isAdmin = currentPlayer?.uid === ADMIN_UID;
+  const isAdmin = isBureau(currentPlayer);
   const setTheme = (t) => { setThemeState(t); writePref("foot_theme", t); };
 
   React.useEffect(() => {
@@ -1924,7 +1926,7 @@ function FootballApp({ currentPlayer, onBack }) {
         {loaded && detail && (
           <FootMatchDetailPage
             matchId={sub.matchId} matches={matches} roster={roster} attendance={attendance} events={events} lineups={lineups} ratings={ratings}
-            currentPlayer={currentPlayer} isAdmin={isAdmin} navBack={() => nav("calendar")} reload={reloadFoot}
+            currentPlayer={currentPlayer} navBack={() => nav("calendar")} reload={reloadFoot}
           />
         )}
         {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
