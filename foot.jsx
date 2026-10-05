@@ -1926,6 +1926,49 @@ const FOOT_PAGE_TITLES = {
   calendar: ["Matchs", "Bière Leverculsec"], rankings: ["Classement", null], stats: ["Stats", null], reseaux: ["Réseaux", "Instagram"], admin: ["Admin", "Matchs et effectif"],
 };
 
+// ---- opening screen -------------------------------------------------------------------------------------------------------------------
+const FOOT_SPLASH_STEPS = [["calendar", "Calendrier", "calendar"], ["rankings", "Classement", "trophy"], ["stats", "Stats", "chart"]];
+
+function FootSplash({ steps, leaving, theme }) {
+  const done = FOOT_SPLASH_STEPS.filter(([k]) => steps[k]).length;
+  const pct = Math.round((done / FOOT_SPLASH_STEPS.length) * 100);
+  return (
+    <div role="status" aria-live="polite" aria-label="Chargement du module foot"
+      style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 26, padding: 24, color: "#fff",
+        background: `radial-gradient(circle at 50% 30%, ${FC.accent} 0%, ${FC.deep} 78%)`, opacity: leaving ? 0 : 1, transition: "opacity 0.45s ease", pointerEvents: leaving ? "none" : "auto" }}>
+      <style>{`
+        @keyframes ftSplashBounce { 0%,100% { transform: translateY(0) scale(1,1); } 45% { transform: translateY(-34px) scale(0.98,1.02); } 50% { transform: translateY(-34px); } 92% { transform: translateY(0) scale(1.08,0.92); } }
+        @keyframes ftSplashShadow { 0%,100% { transform: scale(1); opacity: .35; } 50% { transform: scale(.6); opacity: .15; } }
+        @keyframes ftSplashIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .ft-splash-anim { animation: none !important; } }
+      `}</style>
+      <div style={{ width: 118, height: 96, background: "#fff", borderRadius: 28, boxShadow: "0 8px 0 rgba(0,0,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", animation: "ftSplashIn .5s ease both" }}>
+        <img src={theme === "pink" ? "/logo-bl-rose.png" : "/logo-bl.png"} alt="" style={{ width: theme === "pink" ? 96 : 76, height: 76, objectFit: "contain" }} />
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div className="ft-splash-anim" style={{ fontSize: 46, lineHeight: 1, animation: "ftSplashBounce 1.05s cubic-bezier(.3,0,.6,1) infinite" }} aria-hidden="true">⚽</div>
+        <div className="ft-splash-anim" style={{ width: 46, height: 8, borderRadius: 4, background: "rgba(0,0,0,0.5)", margin: "6px auto 0", animation: "ftSplashShadow 1.05s cubic-bezier(.3,0,.6,1) infinite" }} />
+      </div>
+      <div style={{ fontFamily: FF.display, fontSize: 24, letterSpacing: "0.04em", textTransform: "uppercase", textShadow: "2px 2px 0 rgba(0,0,0,0.25)" }}>Coup d'envoi…</div>
+      <div style={{ width: "min(320px, 100%)" }}>
+        <div style={{ height: 12, borderRadius: 6, background: "rgba(0,0,0,0.28)", overflow: "hidden" }}>
+          <div style={{ width: `${Math.max(8, pct)}%`, height: "100%", borderRadius: 6, background: "#fff", transition: "width .45s ease" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 }}>
+          {FOOT_SPLASH_STEPS.map(([k, label, icon]) => (
+            <div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, opacity: steps[k] ? 1 : 0.55, transition: "opacity .3s" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 17, background: steps[k] ? "#fff" : "rgba(255,255,255,0.18)", color: steps[k] ? FC.deep : "#fff", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .3s" }}>
+                <FIcon name={steps[k] ? "check" : icon} size={18} stroke={2.4} />
+              </span>
+              <span style={{ fontFamily: FF.ui, fontSize: 12, letterSpacing: "0.04em", textTransform: "uppercase" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FootballApp({ currentPlayer, onBack }) {
   const [theme, setThemeState] = React.useState(() => readPref("foot_theme", "green", ["green", "pink"]));
   setFootTheme(theme); // the colour tokens must be current before any child renders
@@ -1972,10 +2015,37 @@ function FootballApp({ currentPlayer, onBack }) {
     setPhotos(ph || []);
     setFramings(fr || []);
     setRatings((rt || []).map((x) => ({ ...x, score: Number(x.score) })));
+    return ph || [];
   }
 
+  // Opening screen: loads everything the three main pages need (calendar data, player pictures, fonts and backgrounds)
+  // so nothing pops in afterwards. The steps tick off for real; the screen stays at least MIN_MS so it never flashes.
+  const [steps, setSteps] = React.useState({ calendar: false, rankings: false, stats: false });
+  const [leaving, setLeaving] = React.useState(false);
+  const [splashOn, setSplashOn] = React.useState(true);
   React.useEffect(() => {
-    reloadFoot().then(() => setLoaded(true)).catch((err) => { console.warn("foot load failed", err); setLoadError(err.message); setLoaded(true); });
+    let alive = true;
+    const MIN_MS = 1500, started = Date.now();
+    const tick = (k) => alive && setSteps((o) => ({ ...o, [k]: true }));
+    const withTimeout = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(res, ms))]);
+    const preload = (url) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = url; });
+    (async () => {
+      let photoRows = [];
+      try { photoRows = await reloadFoot(); } catch (err) { console.warn("foot load failed", err); if (alive) setLoadError(err.message); }
+      tick("calendar");
+      const faces = photoRows.filter((x) => x.kind === "render").map((x) => instaPublicUrl(x.path));
+      await withTimeout(Promise.all(faces.map(preload)), 5000);
+      tick("rankings");
+      const bgs = ["/assets/foot/bg-green.jpg", "/assets/foot/bg-pink.jpg", "/logo-bl.png", "/logo-bl-rose.png"];
+      await withTimeout(Promise.all([document.fonts ? document.fonts.ready : null, ...bgs.map(preload)]), 4000);
+      tick("stats");
+      await new Promise((res) => setTimeout(res, Math.max(350, MIN_MS - (Date.now() - started))));
+      if (!alive) return;
+      setLoaded(true);
+      setLeaving(true);
+      setTimeout(() => alive && setSplashOn(false), 450);
+    })();
+    return () => { alive = false; };
   }, []);
 
   function nav(p, s = {}) { setPage(p); setSub(s); window.scrollTo && window.scrollTo(0, 0); }
@@ -1996,7 +2066,6 @@ function FootballApp({ currentPlayer, onBack }) {
     <FootCtx.Provider value={{ photos, framings, themeName: theme }}>
       <FootShell wide={page === "stats" || page === "reseaux"}>
         <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : undefined} />
-        {!loaded && <><FSkeleton h={190} /><FSkeleton h={76} /><FSkeleton h={76} /></>}
         {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
         {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
         {loaded && detail && (
@@ -2011,6 +2080,7 @@ function FootballApp({ currentPlayer, onBack }) {
         {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
       </FootShell>
       <FNav page={detail ? "calendar" : page} items={navItems} onGo={nav} />
+      {splashOn && <FootSplash steps={steps} leaving={leaving} theme={theme} />}
     </FootCtx.Provider>
   );
 }
