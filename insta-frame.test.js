@@ -84,3 +84,17 @@ test("the Match Day band text always fits inside its pill", () => {
     if (t.length <= 75) assert.ok(t.length * 0.68 * size <= 940, `${t.length} chars at ${size}px overflow the pill`);
   }
 });
+
+test("the Groupe list card is 70% white; the other white cards are untouched", () => {
+  const T = require("./lib/insta/templates");
+  const theme = require("./lib/insta/render").THEMES.domicile;
+  const find = (n, pred) => (n && n.props ? (pred(n) ? n : [].concat(n.props.children || []).map((c) => find(c, pred)).find(Boolean)) : null);
+  const card = (el) => find(el, (n) => n.props.style && n.props.style.left === 608 && n.props.style.top === 300);
+  const groupe = T.groupeEl({ bg: "data:,", theme, lines: [{ number: "1", name: "Louis" }], rect: null, photoUri: null });
+  assert.equal(card(groupe).props.style.background, "rgba(255,255,255,0.70)");
+  const text = find(groupe, (n) => n.props.style && n.props.style.fontFamily === "Contrail One");
+  assert.ok(!text.props.style.opacity, "the text must not fade with the card");
+  const result = T.resultEl({ bg: "data:,", theme, opponent: "X", bl: 1, opp: 0, goals: [], rect: null, photoUri: null });
+  const resCard = find(result, (n) => n.props.style && n.props.style.left === 395 && n.props.style.top === 625);
+  assert.equal(resCard.props.style.background, "rgba(255,255,255,0.94)");
+});
