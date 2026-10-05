@@ -35,6 +35,7 @@ const FOOT_ICONS = {
   trophy: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3",
   chart: "M4 20V10M10 20V4M16 20v-8M22 20H2",
   megaphone: "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11",
+  refresh: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
   sliders: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
   back: "M15 5l-7 7 7 7",
   plus: "M12 5v14M5 12h14",
@@ -269,6 +270,11 @@ function FNav({ page, items, onGo }) {
             </button>
           );
         })}
+        <button onClick={() => window.location.reload()} aria-label="Actualiser la page"
+          style={{ flex: "0 0 auto", width: 52, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: "transparent", color: FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}>
+          <FIcon name="refresh" size={21} />
+          <span style={{ fontFamily: FF.ui, fontSize: 11, letterSpacing: "0.03em", textTransform: "uppercase" }}>Actu.</span>
+        </button>
       </div>
     </nav>
   );

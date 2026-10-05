@@ -4773,6 +4773,7 @@ function FootReseauxPage({
       background: "rgba(255,255,255,0.92)"
     }
   }), tab === "posts" && /*#__PURE__*/React.createElement(FootPostsTab, {
+    key: String(hasKey),
     matches: matches,
     lineups: lineups,
     events: events,
@@ -4780,6 +4781,7 @@ function FootReseauxPage({
     roster: roster,
     photos: photos
   }), tab === "photos" && /*#__PURE__*/React.createElement(FootPhotosTab, {
+    key: String(hasKey),
     roster: roster,
     photos: photos,
     reload: reload

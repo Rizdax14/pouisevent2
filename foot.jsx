@@ -1909,8 +1909,8 @@ function FootReseauxPage({ roster, photos, framings, matches, lineups, events, r
     <div className="ft-page">
       {!hasKey && <FootInstaKeyBox onSaved={() => setHasKey(true)} />}
       <FSegmented value={tab} onChange={pick} options={[["posts", "Posts", "send"], ["photos", "Photos", "photo"], ["cadrage", "Cadrage", "pencil"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
-      {tab === "posts" && <FootPostsTab matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} photos={photos} />}
-      {tab === "photos" && <FootPhotosTab roster={roster} photos={photos} reload={reload} />}
+      {tab === "posts" && <FootPostsTab key={String(hasKey)} matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} photos={photos} />}
+      {tab === "photos" && <FootPhotosTab key={String(hasKey)} roster={roster} photos={photos} reload={reload} />}
       {tab === "cadrage" && <FootFramingTool roster={roster} photos={photos} framings={framings} reload={reload} />}
       {hasKey && (
         <div style={{ textAlign: "center", marginTop: 4 }}>
