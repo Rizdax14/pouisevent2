@@ -1096,7 +1096,7 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
         <FootRatingChart series={series} />
       </FCard>
 
-      <FootRankingsPanel seasonMatches={filtered} season={season} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />
+      <FootRankingsPanel seasonMatches={filtered} season={season} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} mode={mode} />
     </div>
   );
 }
@@ -1124,7 +1124,7 @@ function FootPodiumSlot({ entry, place, size }) {
 }
 
 // Podium of goals / assists / average rating for the matches given (the Stats page passes its filtered ones).
-function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, roster, currentPlayer }) {
+function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, roster, currentPlayer, mode = "abs" }) {
   const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
   const pick = (v) => { setTab(v); writePref("foot_rank_tab", v); };
   const ids = new Set(seasonMatches.map((m) => m.id));
@@ -1137,15 +1137,17 @@ function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, ro
   }
   const byId = Object.fromEntries(rows.map((r) => [r.playerId, r]));
   const t = FOOT_RANKING_TABS.find((x) => x.key === tab);
-  const entries = rankingEntries(rows, tab, footNameOf, 15).map((e) => ({
-    ...e, name: footNameOf(e.playerId), shown: tab === "rating" ? e.value.toFixed(1) : String(e.value), matches: tab === "rating" ? byId[e.playerId].rated : byId[e.playerId].played,
+  const pct = mode === "pct" && tab !== "rating";
+  const rankRows = pct ? rows.map((r) => ({ ...r, [tab]: statValue(r, tab, "pct") })) : rows;
+  const entries = rankingEntries(rankRows, tab, footNameOf, 15).map((e) => ({
+    ...e, name: footNameOf(e.playerId), shown: tab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, tab, pct ? "pct" : "abs"), matches: tab === "rating" ? byId[e.playerId].rated : byId[e.playerId].played,
   }));
   const podium = entries.slice(0, 3), rest = entries.slice(3);
   const order = podium.length === 3 ? [[podium[1], 2, 66], [podium[0], 1, 84], [podium[2], 3, 66]] : podium.map((e, i) => [e, i + 1, i === 0 ? 84 : 66]);
 
   return (
     <FCard>
-      <FHeading right={<FChip tone="soft">{season === "all" ? "Toutes saisons" : `Saison ${season}`}</FChip>}>Classements</FHeading>
+      <FHeading right={<FChip tone="soft">{season === "all" ? "Toutes saisons" : `Saison ${season}`}</FChip>}>{mode === "pct" && tab !== "rating" ? "Classements (par match)" : "Classements"}</FHeading>
       <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 16 }} />
       {entries.length === 0 ? (
         <FEmpty icon="trophy" title="Pas encore de classement" text={`Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : "passe décisive"} sur cette période.`} />

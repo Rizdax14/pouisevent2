@@ -2589,7 +2589,8 @@ function FootStatsPage({
     events: events,
     ratings: ratings,
     roster: roster,
-    currentPlayer: currentPlayer
+    currentPlayer: currentPlayer,
+    mode: mode
   }));
 }
 
@@ -2683,7 +2684,8 @@ function FootRankingsPanel({
   events,
   ratings,
   roster,
-  currentPlayer
+  currentPlayer,
+  mode = "abs"
 }) {
   const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
   const pick = v => {
@@ -2700,10 +2702,15 @@ function FootRankingsPanel({
   }
   const byId = Object.fromEntries(rows.map(r => [r.playerId, r]));
   const t = FOOT_RANKING_TABS.find(x => x.key === tab);
-  const entries = rankingEntries(rows, tab, footNameOf, 15).map(e => ({
+  const pct = mode === "pct" && tab !== "rating";
+  const rankRows = pct ? rows.map(r => ({
+    ...r,
+    [tab]: statValue(r, tab, "pct")
+  })) : rows;
+  const entries = rankingEntries(rankRows, tab, footNameOf, 15).map(e => ({
     ...e,
     name: footNameOf(e.playerId),
-    shown: tab === "rating" ? e.value.toFixed(1) : String(e.value),
+    shown: tab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, tab, pct ? "pct" : "abs"),
     matches: tab === "rating" ? byId[e.playerId].rated : byId[e.playerId].played
   }));
   const podium = entries.slice(0, 3),
@@ -2713,7 +2720,7 @@ function FootRankingsPanel({
     right: /*#__PURE__*/React.createElement(FChip, {
       tone: "soft"
     }, season === "all" ? "Toutes saisons" : `Saison ${season}`)
-  }, "Classements"), /*#__PURE__*/React.createElement(FSegmented, {
+  }, mode === "pct" && tab !== "rating" ? "Classements (par match)" : "Classements"), /*#__PURE__*/React.createElement(FSegmented, {
     value: tab,
     onChange: pick,
     options: FOOT_RANKING_TABS.map(x => [x.key, x.label, x.icon]),
