@@ -1617,7 +1617,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
           <FLabel style={{ marginBottom: 0 }}>Zoom</FLabel>
-          <input type="range" min={50} max={500} step={1} value={Math.min(500, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} aria-label="Zoom" />
+          <input type="range" min={50} max={800} step={1} value={Math.min(800, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} aria-label="Zoom" />
           <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.deep, width: 48, textAlign: "right" }}>{pct}%</span>
         </div>
         {msg && <FMessage tone={msg.t === "error" ? "bad" : "good"}>{msg.m}</FMessage>}

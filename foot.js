@@ -4006,9 +4006,9 @@ function FootFramingTool({
   }, "Zoom"), /*#__PURE__*/React.createElement("input", {
     type: "range",
     min: 50,
-    max: 500,
+    max: 800,
     step: 1,
-    value: Math.min(500, Math.max(50, pct)),
+    value: Math.min(800, Math.max(50, pct)),
     onChange: onSlider,
     style: {
       flex: 1
