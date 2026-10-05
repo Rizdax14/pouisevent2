@@ -1273,7 +1273,7 @@ function FootPhotosTab({ roster, photos, reload }) {
 // They mirror lib/insta/templates.js — keep them in sync when a template moves.
 const FRAMING_GUIDES = {
   matchday: [
-    { label: "MATCH DAY", x: 0, y: 0, w: 1080, h: 180, font: 158 },
+    // the player stands in front of the "MATCH DAY" title, so only the pill and band are drawn over the photo
     { label: "vs ADVERSAIRE", x: 360, y: 180, w: 720, h: 120 },
     { label: "bandeau", x: 44, y: 1260, w: 992, h: 68 },
   ],
