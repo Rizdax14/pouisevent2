@@ -3,7 +3,7 @@ const L = require("../../insta-logic.js");
 const F = require("../../foot-logic.js");
 const { loadCommon, loadMatchContext, historyFor } = require("../../lib/insta/data");
 const { publicUrl, sbGet } = require("../../lib/insta/supabase");
-const { renderJpeg, imageDataUri, THEMES } = require("../../lib/insta/render");
+const { renderJpeg, imageDataUri, placePhoto, THEMES } = require("../../lib/insta/render");
 const T = require("../../lib/insta/templates");
 
 // The player standing on a post. `kinds` lists the photo kinds of every image of the post (Match Day + Groupe: celebration and dos),
@@ -24,7 +24,8 @@ async function featuredPhoto(ctx, layout, slot, sheetIds, kinds, chosen) {
   const ph = L.photoOrDefault(ctx.photos, pid, kind, ctx.theme);
   if (!ph) return { pid, rect: null, uri: null };
   const fr = L.savedFraming(ctx.framings, ph.id, layout);
-  return { pid, rect: L.framedRect(layout, ph, fr), uri: await imageDataUri(publicUrl("player-photos", ph.path)) };
+  const placed = await placePhoto(publicUrl("player-photos", ph.path), ph, L.framedRect(layout, ph, fr), L.LAYOUTS[layout].canvas);
+  return { pid, rect: placed.rect, uri: placed.uri };
 }
 
 async function build(kind, q) {
@@ -70,8 +71,7 @@ async function buildFrame(q) {
   } else {
     [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${layout}&select=*`);
   }
-  const rect = L.framedRect(layout, ph, fr);
-  const photoUri = await imageDataUri(publicUrl("player-photos", ph.path));
+  const { uri: photoUri, rect } = await placePhoto(publicUrl("player-photos", ph.path), ph, L.framedRect(layout, ph, fr), L.LAYOUTS[layout].canvas);
   const theme = THEMES[ph.kit];
   const [w, h] = L.LAYOUTS[layout].canvas;
   if (layout === "render") return T.maskedPhotoEl({ w, h, radius: 150, fill: "#ffffff", rect, photoUri });
@@ -112,8 +112,9 @@ async function withPodiumPhotos(rows, data, layout, kit) {
     const ph = L.photoOrDefault(data.photos, r.playerId, kind, kit);
     if (!ph) return;
     const fr = L.savedFraming(data.framings, ph.id, layout);
-    r.rect = L.framedRect(layout, ph, fr);
-    r.uri = await imageDataUri(publicUrl("player-photos", ph.path));
+    const placed = await placePhoto(publicUrl("player-photos", ph.path), ph, L.framedRect(layout, ph, fr), L.LAYOUTS[layout].canvas);
+    r.rect = placed.rect;
+    r.uri = placed.uri;
   }));
   return rows;
 }
