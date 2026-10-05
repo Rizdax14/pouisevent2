@@ -82,3 +82,15 @@ test("the title is drawn before (under) the player on Match Day, Résultat and G
     assert.ok(iPhoto > 0 && iTitle > 0 && iTitle < iPhoto, `${layout}: title ${iTitle} must be under photo ${iPhoto}`);
   }
 });
+
+test("the Match Day band text always fits inside its pill", () => {
+  const { bandFontSize } = require("./lib/insta/templates");
+  const band = "JEUDI 19H30 | PARC DES SPORTS DE L'ÉTIVALLIÈRE | SAINT-ÉTIENNE";
+  assert.equal(bandFontSize("JEUDI 19H30 | STADE | VILLE"), 35); // short text keeps the full size
+  assert.ok(bandFontSize(band) < 30);
+  for (const t of ["x".repeat(20), "x".repeat(42), band, "x".repeat(70)]) {
+    const size = bandFontSize(t);
+    assert.ok(size >= 18 && size <= 35);
+    if (t.length <= 75) assert.ok(t.length * 0.68 * size <= 940, `${t.length} chars at ${size}px overflow the pill`);
+  }
+});
