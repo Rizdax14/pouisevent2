@@ -1,5 +1,5 @@
 // VERSION: bump this string to force cache clear on all clients
-const CACHE_VERSION = 'pouis-v2-' + '20261005004301';
+const CACHE_VERSION = 'pouis-v2-' + '20261005005218';
 const ASSETS = [
   '/',
   '/index.html',
@@ -43,6 +43,12 @@ self.addEventListener('fetch', e => {
   // Always go to network for Supabase
   if (url.includes('supabase.co') || url.includes('unpkg.com') || url.includes('jsdelivr')) {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+
+  // Generated visuals depend on live data: never cache them (cache-first would serve a stale render)
+  if (url.includes('/api/')) {
+    e.respondWith(fetch(e.request));
     return;
   }
 

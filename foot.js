@@ -3619,8 +3619,12 @@ function FootInstaKeyBox({
 }
 
 // Images of one post: Match Day + Groupe, the three ranking pages, or a single visual.
-function instaPostImages(post) {
-  const url = params => `/api/insta/render?${new URLSearchParams(params)}`;
+function instaPostImages(post, v) {
+  // `v` fingerprints the data behind the post: the URL changes when the match does, so the browser never reuses an outdated render.
+  const url = params => `/api/insta/render?${new URLSearchParams({
+    ...params,
+    v
+  })}`;
   if (post.kind === "matchday") return [1, 2].map(page => ({
     label: page === 1 ? "Match Day" : "Groupe",
     src: url({
@@ -3685,13 +3689,28 @@ function instaCaptionContext(post, {
     season: post.season
   };
 }
+
+// Short fingerprint of everything a post's images are drawn from.
+function instaDataKey(post, {
+  matches,
+  lineups,
+  events,
+  ratings
+}) {
+  const mid = post.matchId;
+  const slice = post.kind === "rankings" ? [matches.map(m => [m.id, m.status, m.venue, m.ratings_validated_at]), events, lineups, ratings] : [matches.filter(m => m.id === mid), lineups.filter(l => l.match_id === mid), events.filter(e => e.match_id === mid), ratings.filter(r => r.match_id === mid)];
+  const str = JSON.stringify(slice);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = (h * 33 ^ str.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
 function FootPostCard({
   post,
   data
 }) {
   const [caption, setCaption] = React.useState(() => captionFor(post.kind, instaCaptionContext(post, data)));
   const [copied, setCopied] = React.useState(false);
-  const images = instaPostImages(post);
+  const images = instaPostImages(post, instaDataKey(post, data));
   async function copy() {
     try {
       await navigator.clipboard.writeText(caption);
@@ -3802,7 +3821,7 @@ function FootPostsTab({
       fontSize: 13
     }
   }, "Aucun post disponible pour l'instant."), posts.map(post => /*#__PURE__*/React.createElement(FootPostCard, {
-    key: `${post.kind}-${post.matchId || post.season}`,
+    key: `${post.kind}-${post.matchId || post.season}-${instaDataKey(post, data)}`,
     post: post,
     data: data
   })), /*#__PURE__*/React.createElement("div", {

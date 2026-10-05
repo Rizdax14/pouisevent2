@@ -1537,8 +1537,9 @@ function FootInstaKeyBox({ onSaved }) {
 }
 
 // Images of one post: Match Day + Groupe, the three ranking pages, or a single visual.
-function instaPostImages(post) {
-  const url = (params) => `/api/insta/render?${new URLSearchParams(params)}`;
+function instaPostImages(post, v) {
+  // `v` fingerprints the data behind the post: the URL changes when the match does, so the browser never reuses an outdated render.
+  const url = (params) => `/api/insta/render?${new URLSearchParams({ ...params, v })}`;
   if (post.kind === "matchday") return [1, 2].map((page) => ({ label: page === 1 ? "Match Day" : "Groupe", src: url({ kind: "matchday", match: post.matchId, page }) }));
   if (post.kind === "rankings") return RANKING_PAGES.map((pg, i) => ({ label: pg.heading, src: url({ kind: "rankings", season: post.season, page: i + 1 }) }));
   return [{ label: post.kind === "ratings" ? "Notes" : "Résultat", src: url({ kind: post.kind, match: post.matchId }) }];
@@ -1563,10 +1564,22 @@ function instaCaptionContext(post, { matches, lineups, events, ratings }) {
   return { season: post.season };
 }
 
+// Short fingerprint of everything a post's images are drawn from.
+function instaDataKey(post, { matches, lineups, events, ratings }) {
+  const mid = post.matchId;
+  const slice = post.kind === "rankings"
+    ? [matches.map((m) => [m.id, m.status, m.venue, m.ratings_validated_at]), events, lineups, ratings]
+    : [matches.filter((m) => m.id === mid), lineups.filter((l) => l.match_id === mid), events.filter((e) => e.match_id === mid), ratings.filter((r) => r.match_id === mid)];
+  const str = JSON.stringify(slice);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 function FootPostCard({ post, data }) {
   const [caption, setCaption] = React.useState(() => captionFor(post.kind, instaCaptionContext(post, data)));
   const [copied, setCopied] = React.useState(false);
-  const images = instaPostImages(post);
+  const images = instaPostImages(post, instaDataKey(post, data));
   async function copy() {
     try { await navigator.clipboard.writeText(caption); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) { console.warn("copy failed", e); }
   }
@@ -1595,7 +1608,7 @@ function FootPostsTab({ matches, lineups, events, ratings }) {
   return (
     <div>
       {posts.length === 0 && <div style={{ color: "#60607a", fontSize: 13 }}>Aucun post disponible pour l'instant.</div>}
-      {posts.map((post) => <FootPostCard key={`${post.kind}-${post.matchId || post.season}`} post={post} data={data} />)}
+      {posts.map((post) => <FootPostCard key={`${post.kind}-${post.matchId || post.season}-${instaDataKey(post, data)}`} post={post} data={data} />)}
       <div style={{ color: "#60607a", fontSize: 11, textAlign: "center", marginTop: 8 }}>Publication automatique : bientôt (plan 2)</div>
     </div>
   );
