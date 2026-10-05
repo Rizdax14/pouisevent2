@@ -294,10 +294,11 @@ test("saveGoalWithSheet does not write the goal when the sheet write fails (no d
   assert.equal(goalWritten, false);
 });
 
-test("seasonOf maps September–August to one season label", () => {
-  assert.equal(seasonOf(new Date(2026, 8, 1).toISOString()), "2026-2027");
-  assert.equal(seasonOf(new Date(2027, 7, 31, 12).toISOString()), "2026-2027");
-  assert.equal(seasonOf(new Date(2026, 7, 31, 12).toISOString()), "2025-2026");
+test("seasonOf maps August–July to one season label", () => {
+  assert.equal(seasonOf(new Date(2026, 7, 1, 12).toISOString()), "2026-2027");
+  assert.equal(seasonOf(new Date(2026, 7, 27, 19).toISOString()), "2026-2027");
+  assert.equal(seasonOf(new Date(2027, 6, 31, 12).toISOString()), "2026-2027");
+  assert.equal(seasonOf(new Date(2026, 6, 31, 12).toISOString()), "2025-2026");
 });
 
 test("seasonsFromMatches lists distinct seasons newest first", () => {

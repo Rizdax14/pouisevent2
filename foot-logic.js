@@ -170,7 +170,7 @@ async function saveGoalWithSheet(lineupIds, payload, { addToSheet, writeGoal }) 
 
 function seasonOf(dateIso) {
   const d = new Date(dateIso);
-  const start = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+  const start = d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
   return `${start}-${start + 1}`;
 }
 
