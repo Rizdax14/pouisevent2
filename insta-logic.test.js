@@ -101,9 +101,15 @@ test("rankingRows splits into 3 then 4s", () => {
   assert.deepEqual(L.rankingRows(0), []);
 });
 
-test("captionFor builds the result caption", () => {
-  assert.equal(L.captionFor("result", { opponent: "FC Caribou", bl: 8, opp: 6, goals: ["32' Louis (Thisma)"] }), "Victoire 8-6 contre FC Caribou ⚽\n\n32' Louis (Thisma)");
-  assert.match(L.captionFor("result", { opponent: "X", bl: 1, opp: 1, goals: [] }), /^Match nul 1-1/);
+test("captionFor builds the result caption: type, score both sides, full date line", () => {
+  const c = { opponent: "FC Caribou", bl: 8, opp: 6, matchType: "championnat", dateLine: "JEUDI 8 OCTOBRE 2026 | STADE | VILLE" };
+  assert.equal(L.captionFor("result", c), "RESULTAT FSGT ⚽ Bière Leverculsec 8 vs FC Caribou 6\nJEUDI 8 OCTOBRE 2026 | STADE | VILLE");
+  assert.match(L.captionFor("result", { ...c, matchType: "amical" }), /^RESULTAT Amical ⚽ Bière Leverculsec 8 vs FC Caribou 6\n/);
+});
+
+test("captionFor ratings and rankings are fixed sentences", () => {
+  assert.equal(L.captionFor("ratings", { opponent: "FC Caribou" }), "Les notes du dernier match contre FC Caribou !");
+  assert.equal(L.captionFor("rankings", { season: "2026-2027" }), "Les classements mis à jour après cette nouvelle semaine de compétition !");
 });
 
 test("availablePosts lists matchday, result, ratings and rankings when eligible", () => {
@@ -351,8 +357,8 @@ const CD = { matches: CM, lineups: CL, events: CE, ratings: CR, players: PL, ros
 test("captionContextFor builds each caption's inputs from raw data", () => {
   assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD), { opponent: "FC Test", band: L.matchBand(CM[0]), names: ["Louis", "Nolan", "Solal"] });
   const r = L.captionContextFor("result", { matchId: 1 }, CD);
-  assert.deepEqual([r.opponent, r.bl, r.opp, r.goals], ["FC Test", 1, 1, ["12' Louis (Nolan)"]]);
-  assert.deepEqual(L.captionContextFor("ratings", { matchId: 1 }, CD).top, [{ name: "Nolan", rating: 7.5 }, { name: "Louis", rating: 6 }]);
+  assert.deepEqual([r.opponent, r.bl, r.opp, r.dateLine], ["FC Test", 1, 1, L.matchDateLine(CM[0])]);
+  assert.deepEqual(L.captionContextFor("ratings", { matchId: 1 }, CD), { opponent: "FC Test" });
   assert.deepEqual(L.captionContextFor("rankings", { season: "2026-2027" }, CD), { season: "2026-2027" });
   assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]); // the Groupe is in the same post
 });

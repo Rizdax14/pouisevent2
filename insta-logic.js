@@ -134,6 +134,13 @@ function opponentLabel(name) {
 }
 
 const JOURS = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"];
+const MOIS = ["JANVIER", "FÉVRIER", "MARS", "AVRIL", "MAI", "JUIN", "JUILLET", "AOÛT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DÉCEMBRE"];
+// "JEUDI 8 OCTOBRE 2026 | STADE | VILLE" (Paris date).
+function matchDateLine(match) {
+  const d = parisParts(new Date(match.match_datetime));
+  const place = (match.stadium_name || match.address || "").toUpperCase();
+  return [`${JOURS[d.wd]} ${d.d} ${MOIS[d.m - 1]} ${d.y}`, place, (match.city || "").toUpperCase()].filter(Boolean).join(" | ");
+}
 function matchBand(match) {
   // Paris time on purpose: the server (UTC) and the phone must print the same hour.
   const d = parisParts(new Date(match.match_datetime));
@@ -189,12 +196,9 @@ function rankingRows(n) {
 
 function captionFor(kind, c) {
   if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}`;
-  if (kind === "result") {
-    const word = c.bl > c.opp ? "Victoire" : c.bl === c.opp ? "Match nul" : "Défaite";
-    return `${word} ${c.bl}-${c.opp} contre ${c.opponent} ⚽${c.goals.length ? "\n\n" + c.goals.join("\n") : ""}`;
-  }
-  if (kind === "ratings") return `Les notes du match contre ${c.opponent} 📝${c.top.length ? "\n\n" + c.top.map((t, i) => `${i + 1}. ${t.name} ${t.rating.toFixed(1)}`).join("\n") : ""}`;
-  if (kind === "rankings") return `Classements de la saison ${c.season} 📊`;
+  if (kind === "result") return `RESULTAT ${c.matchType === "amical" ? "Amical" : "FSGT"} ⚽ Bière Leverculsec ${c.bl} vs ${c.opponent} ${c.opp}\n${c.dateLine}`;
+  if (kind === "ratings") return `Les notes du dernier match contre ${c.opponent} !`;
+  if (kind === "rankings") return "Les classements mis à jour après cette nouvelle semaine de compétition !";
   return "";
 }
 
@@ -310,11 +314,9 @@ function captionContextFor(kind, { matchId, season }, { matches, lineups, events
   if (kind === "result") {
     const evs = events.filter((e) => e.match_id === matchId);
     const sc = _footFn("computeFootScore")(evs);
-    return { opponent: match.opponent_name, bl: sc.bl, opp: sc.opponent, goals: goalLines(evs, players) };
+    return { opponent: match.opponent_name, bl: sc.bl, opp: sc.opponent, matchType: match.match_type, dateLine: matchDateLine(match) };
   }
-  const avg = _footFn("finalAverages")(match, sheet, ratings.filter((r) => r.match_id === matchId));
-  const top = sheet.filter((id) => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map((id) => ({ name: nameOf(id), rating: avg[id] }));
-  return { opponent: match.opponent_name, top };
+  return { opponent: match.opponent_name };
 }
 
 function targetKey(t) {
@@ -383,5 +385,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

@@ -186,7 +186,7 @@ test("rankings publish a 3-image carousel keyed by ISO week", async () => {
   assert.equal(w.db[0].week_key, "2026-W41");
   assert.equal(w.db[0].match_id, null);
   assert.equal(w.db[0].image_paths.length, 3);
-  assert.ok(w.log.includes("ig 3 Classements de la saison 2026-2027 📊"));
+  assert.ok(w.log.includes("ig 3 Les classements mis à jour après cette nouvelle semaine de compétition !"));
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W41", season: "2026-2027" }, { data: DATA })).status, "already_published");
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W42", season: "2026-2027" }, { data: DATA })).status, "published");
 });
