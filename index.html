@@ -24,30 +24,42 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="utopia-events.js?v=20261003200000"></script>
-  <script src="foot-logic.js?v=20261005014219"></script>
-  <script src="insta-logic.js?v=20261005014219"></script>
-  <script src="foot.js?v=20261005014219"></script>
+  <script src="foot-logic.js?v=20261005014751"></script>
+  <script src="insta-logic.js?v=20261005014751"></script>
+  <script src="foot.js?v=20261005014751"></script>
   <script>
     if('serviceWorker' in navigator){
+      // A new version never reloads the page while it is in use: a banner offers it, and the page
+      // refreshes by itself only once the app goes to the background (nothing is lost, nothing flickers).
+      var hadController=!!navigator.serviceWorker.controller;
+      var updatePending=false, reloaded=false;
+      function reloadNow(){ if(reloaded) return; reloaded=true; window.location.reload(); }
+      function showUpdateBanner(){
+        if(document.getElementById('update-banner')) return;
+        var b=document.createElement('div'); b.id='update-banner';
+        b.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:2147483647;background:#1e1e30;color:#eeeef5;border:1px solid #3b82f6;border-radius:10px;padding:10px 14px;font:600 13px Outfit,sans-serif;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.4)';
+        var t=document.createElement('span'); t.textContent='Nouvelle version disponible'; b.appendChild(t);
+        var btn=document.createElement('button'); btn.textContent='Actualiser';
+        btn.style.cssText='background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:7px 12px;font:700 12px Outfit,sans-serif;cursor:pointer';
+        btn.onclick=reloadNow; b.appendChild(btn); document.body.appendChild(b);
+      }
+      function applyUpdate(){
+        if(updatePending) return; updatePending=true;
+        if(document.hidden) reloadNow(); else showUpdateBanner();
+      }
+      document.addEventListener('visibilitychange',function(){ if(document.hidden && updatePending) reloadNow(); });
       window.addEventListener('load',()=>{
         navigator.serviceWorker.register('/sw.js').then(reg=>{
-          // Check for updates immediately
           reg.update();
-          // If a new SW is waiting, activate it right away
           reg.addEventListener('updatefound',()=>{
             const newSW=reg.installing;
             newSW.addEventListener('statechange',()=>{
-              if(newSW.state==='installed'&&navigator.serviceWorker.controller){
-                // New version available — reload to get fresh content
-                window.location.reload();
-              }
+              if(newSW.state==='installed'&&navigator.serviceWorker.controller) applyUpdate();
             });
           });
         });
-        // If controller changes (new SW took over), reload
-        navigator.serviceWorker.addEventListener('controllerchange',()=>{
-          window.location.reload();
-        });
+        // A new service worker took over an already controlled page: that is an update (not the very first install).
+        navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadController) applyUpdate(); });
       });
     }
   </script>
