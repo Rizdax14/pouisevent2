@@ -1248,8 +1248,14 @@ function FootRankingsPage() {
 const INSTA_KEY_STORAGE = "foot_insta_admin_key";
 function readInstaKey() { try { return localStorage.getItem(INSTA_KEY_STORAGE) || ""; } catch (e) { return ""; } }
 async function instaAdminFetch(path, body, method = "POST") {
-  const r = await fetch(`/api/insta/${path}`, { method, headers: { "Content-Type": "application/json", "X-Insta-Admin-Key": readInstaKey() }, body: method === "GET" ? undefined : JSON.stringify(body) });
+  const sentKey = readInstaKey();
+  const r = await fetch(`/api/insta/${path}`, { method, headers: { "Content-Type": "application/json", "X-Insta-Admin-Key": sentKey }, body: method === "GET" ? undefined : JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && sentKey) {
+    // the stored key is wrong: forget it and ask again
+    try { localStorage.removeItem(INSTA_KEY_STORAGE); } catch (e) {}
+    try { window.dispatchEvent(new Event("foot-insta-key-invalid")); } catch (e) {}
+  }
   if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
   return data;
 }
@@ -1639,18 +1645,22 @@ function FootFramingTool({ roster, photos, framings, reload }) {
   );
 }
 
-function FootInstaKeyBox({ onSaved }) {
+function FootInstaKeyBox({ onSaved, rejected }) {
   const [v, setV] = React.useState("");
+  const [show, setShow] = React.useState(false);
   function save() {
-    if (!v.trim()) return;
-    try { localStorage.setItem(INSTA_KEY_STORAGE, v.trim()); } catch (e) {}
+    const clean = v.replace(/[\s\u200B-\u200D\uFEFF]/g, ""); // spaces and invisible characters a phone keyboard may add
+    if (!clean) return;
+    try { localStorage.setItem(INSTA_KEY_STORAGE, clean); } catch (e) {}
     onSaved();
   }
   return (
     <FCard>
       <FHeading>Clé admin</FHeading>
       <div style={{ fontSize: 14, color: FC.muted, marginBottom: 12, lineHeight: 1.4 }}>Gardée uniquement dans ce navigateur, envoyée seulement à l'API du site.</div>
-      <input type="password" style={FOOT_INPUT_STYLE} placeholder="Clé admin" value={v} onChange={(e) => setV(e.target.value)} aria-label="Clé admin" />
+      {rejected && <FMessage>Cette clé a été refusée par le serveur. Vérifie-la (affiche-la avec la case ci-dessous) et réessaie.</FMessage>}
+      <input type={show ? "text" : "password"} style={FOOT_INPUT_STYLE} placeholder="Clé admin" value={v} onChange={(e) => setV(e.target.value)} aria-label="Clé admin" autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false} />
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: FC.muted, margin: "2px 0 12px" }}><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Afficher la clé</label>
       <FBtn full onClick={save}>Enregistrer la clé</FBtn>
     </FCard>
   );
@@ -1904,10 +1914,16 @@ function FootPostsTab({ matches, lineups, events, ratings, roster, photos }) {
 function FootReseauxPage({ roster, photos, framings, matches, lineups, events, ratings, reload }) {
   const [tab, setTab] = React.useState(() => readPref("foot_reseaux_tab", "photos", ["posts", "photos", "cadrage"]));
   const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
+  const [rejected, setRejected] = React.useState(false);
+  React.useEffect(() => {
+    const onBad = () => { setHasKey(false); setRejected(true); };
+    window.addEventListener("foot-insta-key-invalid", onBad);
+    return () => window.removeEventListener("foot-insta-key-invalid", onBad);
+  }, []);
   const pick = (t) => { setTab(t); writePref("foot_reseaux_tab", t); };
   return (
     <div className="ft-page">
-      {!hasKey && <FootInstaKeyBox onSaved={() => setHasKey(true)} />}
+      {!hasKey && <FootInstaKeyBox rejected={rejected} onSaved={() => { setRejected(false); setHasKey(true); }} />}
       <FSegmented value={tab} onChange={pick} options={[["posts", "Posts", "send"], ["photos", "Photos", "photo"], ["cadrage", "Cadrage", "pencil"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "posts" && <FootPostsTab key={String(hasKey)} matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} photos={photos} />}
       {tab === "photos" && <FootPhotosTab key={String(hasKey)} roster={roster} photos={photos} reload={reload} />}

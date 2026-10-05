@@ -3053,15 +3053,25 @@ function readInstaKey() {
   }
 }
 async function instaAdminFetch(path, body, method = "POST") {
+  const sentKey = readInstaKey();
   const r = await fetch(`/api/insta/${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      "X-Insta-Admin-Key": readInstaKey()
+      "X-Insta-Admin-Key": sentKey
     },
     body: method === "GET" ? undefined : JSON.stringify(body)
   });
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && sentKey) {
+    // the stored key is wrong: forget it and ask again
+    try {
+      localStorage.removeItem(INSTA_KEY_STORAGE);
+    } catch (e) {}
+    try {
+      window.dispatchEvent(new Event("foot-insta-key-invalid"));
+    } catch (e) {}
+  }
   if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
   return data;
 }
@@ -4091,13 +4101,16 @@ function FootFramingTool({
   }, p.label)))))));
 }
 function FootInstaKeyBox({
-  onSaved
+  onSaved,
+  rejected
 }) {
   const [v, setV] = React.useState("");
+  const [show, setShow] = React.useState(false);
   function save() {
-    if (!v.trim()) return;
+    const clean = v.replace(/[\s\u200B-\u200D\uFEFF]/g, ""); // spaces and invisible characters a phone keyboard may add
+    if (!clean) return;
     try {
-      localStorage.setItem(INSTA_KEY_STORAGE, v.trim());
+      localStorage.setItem(INSTA_KEY_STORAGE, clean);
     } catch (e) {}
     onSaved();
   }
@@ -4108,14 +4121,31 @@ function FootInstaKeyBox({
       marginBottom: 12,
       lineHeight: 1.4
     }
-  }, "Gard\xE9e uniquement dans ce navigateur, envoy\xE9e seulement \xE0 l'API du site."), /*#__PURE__*/React.createElement("input", {
-    type: "password",
+  }, "Gard\xE9e uniquement dans ce navigateur, envoy\xE9e seulement \xE0 l'API du site."), rejected && /*#__PURE__*/React.createElement(FMessage, null, "Cette cl\xE9 a \xE9t\xE9 refus\xE9e par le serveur. V\xE9rifie-la (affiche-la avec la case ci-dessous) et r\xE9essaie."), /*#__PURE__*/React.createElement("input", {
+    type: show ? "text" : "password",
     style: FOOT_INPUT_STYLE,
     placeholder: "Cl\xE9 admin",
     value: v,
     onChange: e => setV(e.target.value),
-    "aria-label": "Cl\xE9 admin"
-  }), /*#__PURE__*/React.createElement(FBtn, {
+    "aria-label": "Cl\xE9 admin",
+    autoCapitalize: "off",
+    autoCorrect: "off",
+    autoComplete: "off",
+    spellCheck: false
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      color: FC.muted,
+      margin: "2px 0 12px"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: show,
+    onChange: e => setShow(e.target.checked)
+  }), " Afficher la cl\xE9"), /*#__PURE__*/React.createElement(FBtn, {
     full: true,
     onClick: save
   }, "Enregistrer la cl\xE9"));
@@ -4756,6 +4786,15 @@ function FootReseauxPage({
 }) {
   const [tab, setTab] = React.useState(() => readPref("foot_reseaux_tab", "photos", ["posts", "photos", "cadrage"]));
   const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
+  const [rejected, setRejected] = React.useState(false);
+  React.useEffect(() => {
+    const onBad = () => {
+      setHasKey(false);
+      setRejected(true);
+    };
+    window.addEventListener("foot-insta-key-invalid", onBad);
+    return () => window.removeEventListener("foot-insta-key-invalid", onBad);
+  }, []);
   const pick = t => {
     setTab(t);
     writePref("foot_reseaux_tab", t);
@@ -4763,7 +4802,11 @@ function FootReseauxPage({
   return /*#__PURE__*/React.createElement("div", {
     className: "ft-page"
   }, !hasKey && /*#__PURE__*/React.createElement(FootInstaKeyBox, {
-    onSaved: () => setHasKey(true)
+    rejected: rejected,
+    onSaved: () => {
+      setRejected(false);
+      setHasKey(true);
+    }
   }), /*#__PURE__*/React.createElement(FSegmented, {
     value: tab,
     onChange: pick,
