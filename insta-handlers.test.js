@@ -124,7 +124,7 @@ test("cron: waits for data (empty sheet) and gives up after 3 failures", async (
   let log = cronSetup(s, empty);
   let r = await run();
   assert.equal(log.length, 0);
-  assert.match(r.body.report.find((x) => x.section === "matchday").action, /feuille de match/i);
+  assert.match(r.body.report.find((x) => x.section === "matchday").action, /convocation/i);
   const failing = data(); failing.posts = [1, 2, 3].map((i) => ({ id: i, kind: "matchday", match_id: 2, status: "failed" }));
   log = cronSetup(s, failing);
   r = await run();

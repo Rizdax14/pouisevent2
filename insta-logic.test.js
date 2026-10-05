@@ -248,7 +248,7 @@ test("Match Day + Groupe needs a sheet: not available (never due) until at least
   let t = L.sectionState("matchday", { ...base, lineups: [] });
   assert.equal(t.next.available, false);
   assert.equal(t.next.due, false);
-  assert.match(t.next.waitingFor, /feuille de match/i);
+  assert.match(t.next.waitingFor, /convocation/i);
   t = L.sectionState("matchday", { ...base, lineups: [{ match_id: 2, player_id: 7 }] });
   assert.equal(t.next.available, true);
   assert.equal(t.next.due, true);
@@ -484,7 +484,7 @@ test("without a sheet, the Match Day + Groupe post waits but can still be previe
   const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: L.defaultSettings(), now: NOW });
   assert.equal(t.next.available, false);
   assert.equal(t.next.previewable, true);
-  assert.match(t.next.waitingFor, /feuille de match/i);
+  assert.match(t.next.waitingFor, /convocation/i);
   const r = L.sectionState("result", { matches: [M(5, "2026-10-08T17:30:00Z", "live")], lineups: [], posts: [], settings: L.defaultSettings(), now: new Date("2026-10-08T18:00:00Z") });
   assert.equal(r.next.previewable, false);
 });
