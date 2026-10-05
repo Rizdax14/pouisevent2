@@ -4,7 +4,7 @@ function _footFn(name) { return INSTA_FOOT_LOGIC ? INSTA_FOOT_LOGIC[name] : glob
 
 const LAYOUTS = {
   matchday: { canvas: [1080, 1350], box: { x: 60, y: 230, w: 960, h: 1050 } },
-  result: { canvas: [1080, 1350], box: { x: -40, y: 260, w: 620, h: 1090 } },
+  result: { canvas: [1080, 1350], box: { x: 60, y: 230, w: 960, h: 1050 } }, // same placement as matchday
   groupe: { canvas: [1080, 1350], box: { x: -40, y: 180, w: 700, h: 1170 } },
   render: { canvas: [300, 300], box: { x: 0, y: 0, w: 300, h: 300 } },
   // Podium cards (1st place size; 2nd/3rd cards reuse it scaled down), one layout per photo kind.
@@ -20,6 +20,14 @@ const RANKING_PAGES = [
   { key: "assists", heading: "PASSE D", layout: "podium_dos" },
   { key: "rating", heading: "MOYENNES", layout: "podium_render" },
 ];
+
+// Résultat is placed exactly like Match Day, so both share one saved framing.
+const FRAMING_ALIAS = { result: "matchday" };
+function framingLayout(layout) { return FRAMING_ALIAS[layout] || layout; }
+function savedFraming(framings, photoId, layout) {
+  const key = framingLayout(layout);
+  return framings.find((f) => f.photo_id === photoId && f.layout === key) || null;
+}
 
 function defaultFraming(layout, photo) {
   const L = LAYOUTS[layout];
@@ -170,5 +178,5 @@ function availablePosts({ matches, lineups, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
 }

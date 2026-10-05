@@ -174,3 +174,23 @@ test("framingZoomPercent: 100% is the reference width", () => {
   assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 500 }, 500), 100);
   assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 750 }, 500), 150);
 });
+
+test("Résultat has exactly the same placement as Match Day", () => {
+  assert.deepEqual(L.LAYOUTS.result, L.LAYOUTS.matchday);
+  assert.deepEqual(L.defaultFraming("result", raw), L.defaultFraming("matchday", raw));
+  assert.deepEqual(L.defaultFraming("result", ret), L.defaultFraming("matchday", ret));
+});
+
+test("framingLayout: result shares the Match Day framing, other layouts are their own", () => {
+  assert.equal(L.framingLayout("result"), "matchday");
+  assert.equal(L.framingLayout("matchday"), "matchday");
+  assert.equal(L.framingLayout("groupe"), "groupe");
+  assert.equal(L.framingLayout("podium_dos"), "podium_dos");
+});
+
+test("savedFraming: Résultat reads the framing saved for Match Day", () => {
+  const rows = [{ photo_id: 1, layout: "matchday", x: 5, y: 6, width: 700 }, { photo_id: 1, layout: "groupe", x: 1, y: 2, width: 3 }];
+  assert.deepEqual(L.savedFraming(rows, 1, "result"), rows[0]);
+  assert.deepEqual(L.savedFraming(rows, 1, "groupe"), rows[1]);
+  assert.equal(L.savedFraming(rows, 2, "matchday"), null);
+});

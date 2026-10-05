@@ -1276,14 +1276,12 @@ const FRAMING_GUIDES = {
     { label: "MATCH DAY", x: 0, y: 0, w: 1080, h: 180, font: 158, behind: true }, // title: drawn behind the player, like the render
     { label: "vs ADVERSAIRE", x: 360, y: 180, w: 720, h: 120 },
     { label: "bandeau", x: 44, y: 1260, w: 992, h: 68 },
-  ],
-  result: [
-    { label: "RESULTAT", x: 0, y: 0, w: 1080, h: 200, font: 180 },
-    { label: "score", x: 400, y: 225, w: 680, h: 300 },
-    { label: "buts", x: 395, y: 625, w: 505, h: 394 },
+    // Résultat uses the very same placement: its score and goals card also sit over the player
+    { label: "Résultat : score", x: 400, y: 225, w: 680, h: 300 },
+    { label: "Résultat : buts", x: 395, y: 625, w: 505, h: 394 },
   ],
   groupe: [
-    { label: "GROUPE", x: 0, y: 0, w: 1080, h: 254, font: 234 },
+    { label: "GROUPE", x: 0, y: 0, w: 1080, h: 254, font: 234, behind: true }, // title: drawn behind the player
     { label: "liste (10 joueurs)", x: 608, y: 300, w: 412, h: 960 },
   ],
   render: [],
@@ -1292,7 +1290,7 @@ const FRAMING_GUIDES = {
   podium_render: [{ label: "n°", x: 0, y: 0, w: 78, h: 74 }, { label: "nom + valeur", x: 10, y: 384, w: 310, h: 46 }],
 };
 const FRAMING_LAYOUT_LABELS = [
-  ["matchday", "Match Day"], ["groupe", "Groupe"], ["result", "Résultat"], ["render", "Render (rond)"],
+  ["matchday", "Match Day + Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"],
   ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"],
 ];
 
@@ -1317,7 +1315,7 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, ${W}px)`, gap: 12, justifyContent: "center" }}>
       {players.map((p) => {
         const photo = choosePhoto(photos, p.id, kind, kit);
-        const saved = photo ? framings.find((f) => f.photo_id === photo.id && f.layout === layout) : null;
+        const saved = photo ? savedFraming(framings, photo.id, layout) : null;
         const rect = photo ? framedRect(layout, photo, saved) : null;
         return (
           <div key={p.id} style={{ width: W }}>
@@ -1352,7 +1350,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
   const [showGuides, setShowGuides] = React.useState(true);
   const pid = players.some((p) => p.id === playerId) ? playerId : (players[0] && players[0].id) || null;
   const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
-  const saved = photo ? framings.find((f) => f.photo_id === photo.id && f.layout === layout) : null;
+  const saved = photo ? savedFraming(framings, photo.id, layout) : null;
   const L = LAYOUTS[layout];
   const [cw, ch] = L.canvas;
 
@@ -1438,7 +1436,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
     setSaving(true); setMsg(null);
     try {
       assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert(
-        { photo_id: photo.id, layout, x: fr.x, y: fr.y, width: fr.width, updated_at: new Date().toISOString() },
+        { photo_id: photo.id, layout: framingLayout(layout), x: fr.x, y: fr.y, width: fr.width, updated_at: new Date().toISOString() },
         { onConflict: "photo_id,layout" }
       ));
       await reload();

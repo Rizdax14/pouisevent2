@@ -2925,22 +2925,16 @@ const FRAMING_GUIDES = {
     y: 1260,
     w: 992,
     h: 68
-  }],
-  result: [{
-    label: "RESULTAT",
-    x: 0,
-    y: 0,
-    w: 1080,
-    h: 200,
-    font: 180
-  }, {
-    label: "score",
+  },
+  // Résultat uses the very same placement: its score and goals card also sit over the player
+  {
+    label: "Résultat : score",
     x: 400,
     y: 225,
     w: 680,
     h: 300
   }, {
-    label: "buts",
+    label: "Résultat : buts",
     x: 395,
     y: 625,
     w: 505,
@@ -2952,8 +2946,11 @@ const FRAMING_GUIDES = {
     y: 0,
     w: 1080,
     h: 254,
-    font: 234
-  }, {
+    font: 234,
+    behind: true
+  },
+  // title: drawn behind the player
+  {
     label: "liste (10 joueurs)",
     x: 608,
     y: 300,
@@ -3001,7 +2998,7 @@ const FRAMING_GUIDES = {
     h: 46
   }]
 };
-const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day"], ["groupe", "Groupe"], ["result", "Résultat"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
+const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day + Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
 
 // One layout guide. `behind` guides (a title the player stands in front of) are drawn as plain text; the others as dashed boxes over the photo.
 function FootGuideBox({
@@ -3075,7 +3072,7 @@ function FootFramingCompare({
     }
   }, players.map(p => {
     const photo = choosePhoto(photos, p.id, kind, kit);
-    const saved = photo ? framings.find(f => f.photo_id === photo.id && f.layout === layout) : null;
+    const saved = photo ? savedFraming(framings, photo.id, layout) : null;
     const rect = photo ? framedRect(layout, photo, saved) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
@@ -3178,7 +3175,7 @@ function FootFramingTool({
   const [showGuides, setShowGuides] = React.useState(true);
   const pid = players.some(p => p.id === playerId) ? playerId : players[0] && players[0].id || null;
   const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
-  const saved = photo ? framings.find(f => f.photo_id === photo.id && f.layout === layout) : null;
+  const saved = photo ? savedFraming(framings, photo.id, layout) : null;
   const L = LAYOUTS[layout];
   const [cw, ch] = L.canvas;
   const boxRef = React.useRef(null);
@@ -3299,7 +3296,7 @@ function FootFramingTool({
     try {
       assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert({
         photo_id: photo.id,
-        layout,
+        layout: framingLayout(layout),
         x: fr.x,
         y: fr.y,
         width: fr.width,

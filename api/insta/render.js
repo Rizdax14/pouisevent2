@@ -12,7 +12,7 @@ async function featuredPhoto(ctx, layout, slot, sheetIds) {
   const pid = L.pickFeatured(withPhoto, historyFor(ctx.history, slot), ctx.match.id);
   if (!pid) return { pid: null, rect: null, uri: null };
   const ph = L.choosePhoto(ctx.photos, pid, kind, ctx.theme);
-  const fr = ctx.framings.find((f) => f.photo_id === ph.id && f.layout === layout) || null;
+  const fr = L.savedFraming(ctx.framings, ph.id, layout);
   return { pid, rect: L.framedRect(layout, ph, fr), uri: await imageDataUri(publicUrl("player-photos", ph.path)) };
 }
 
@@ -57,7 +57,7 @@ async function buildFrame(q) {
     fr = { x: Number(q.x), y: Number(q.y), width: Number(q.w) };
     if (![fr.x, fr.y, fr.width].every(Number.isFinite) || fr.width <= 0) throw new Error("Cadrage invalide");
   } else {
-    [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${layout}&select=*`);
+    [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${L.framingLayout(layout)}&select=*`);
   }
   const rect = L.framedRect(layout, ph, fr);
   const photoUri = await imageDataUri(publicUrl("player-photos", ph.path));
@@ -100,7 +100,7 @@ async function withPodiumPhotos(rows, data, layout, kit) {
   await Promise.all(rows.slice(0, 3).map(async (r) => {
     const ph = L.choosePhoto(data.photos, r.playerId, kind, kit);
     if (!ph) return;
-    const fr = data.framings.find((f) => f.photo_id === ph.id && f.layout === layout) || null;
+    const fr = L.savedFraming(data.framings, ph.id, layout);
     r.rect = L.framedRect(layout, ph, fr);
     r.uri = await imageDataUri(publicUrl("player-photos", ph.path));
   }));
