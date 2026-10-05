@@ -8,7 +8,7 @@ const T = require("../../lib/insta/templates");
 
 async function featuredPhoto(ctx, layout, slot, sheetIds) {
   const kind = L.PHOTO_KIND_FOR_LAYOUT[layout];
-  const withPhoto = sheetIds.filter((id) => L.choosePhoto(ctx.photos, id, kind, ctx.theme));
+  const withPhoto = L.featuredPool(sheetIds, ctx.roster, (id) => L.choosePhoto(ctx.photos, id, kind, ctx.theme));
   const pid = L.pickFeatured(withPhoto, historyFor(ctx.history, slot), ctx.match.id);
   if (!pid) return { pid: null, rect: null, uri: null };
   const ph = L.choosePhoto(ctx.photos, pid, kind, ctx.theme);

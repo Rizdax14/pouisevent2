@@ -73,6 +73,13 @@ function _seeded(id, seed) {
   return x;
 }
 
+// Who can be featured: players on the sheet that have a photo; with no sheet (or no photo on it) the roster, guests excluded.
+function featuredPool(sheetIds, roster, hasPhoto) {
+  const fromSheet = sheetIds.filter(hasPhoto);
+  if (fromSheet.length) return fromSheet;
+  return roster.filter((r) => r.role !== "invite").map((r) => r.player_id).filter(hasPhoto);
+}
+
 function pickFeatured(candidateIds, history, seed) {
   if (!candidateIds.length) return null;
   const last = {};
@@ -348,5 +355,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

@@ -432,3 +432,27 @@ test("manual mode ignores the activation date", () => {
   const settings = { ...L.defaultSettings(), result: { mode: "manual", rule: { type: "after_match", days: 0, time: "22:00" } } };
   assert.equal(L.sectionState("result", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-03T10:00:00Z") }).next.matchId, 1);
 });
+
+// ---------- Featured player pool: the sheet first, then the roster ----------
+test("featuredPool: sheet players with a photo come first", () => {
+  const has = (id) => [1, 2, 9].includes(id);
+  assert.deepEqual(L.featuredPool([1, 2, 3], [{ player_id: 9, role: "regulier" }], has), [1, 2]);
+});
+
+test("featuredPool: no sheet → regular and occasional roster players with a photo, never guests", () => {
+  const roster = [{ player_id: 1, role: "regulier" }, { player_id: 2, role: "occasionnel" }, { player_id: 3, role: "invite" }, { player_id: 4, role: "regulier" }];
+  const has = (id) => id !== 4;
+  assert.deepEqual(L.featuredPool([], roster, has), [1, 2]);
+});
+
+test("featuredPool: nobody on the sheet has a photo → fall back to the roster; nobody anywhere → empty", () => {
+  const roster = [{ player_id: 5, role: "regulier" }];
+  assert.deepEqual(L.featuredPool([1, 2], roster, (id) => id === 5), [5]);
+  assert.deepEqual(L.featuredPool([], roster, () => false), []);
+});
+
+test("zoom can reach 500% (and beyond via wheel up to 800%) of the reference width", () => {
+  const f = { x: 0, y: 0, width: 400 };
+  assert.equal(L.zoomFramingAt(f, 5, 0, 0, 400).width, 2000);
+  assert.equal(L.framingZoomPercent(L.zoomFramingAt(f, 5, 0, 0, 400), 400), 500);
+});

@@ -1499,7 +1499,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
           <span style={{ fontSize: 11, color: "#60607a" }}>Zoom</span>
-          <input type="range" min={50} max={300} step={1} value={Math.min(300, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} />
+          <input type="range" min={50} max={500} step={1} value={Math.min(500, Math.max(50, pct))} onChange={onSlider} style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: "#eeeef5", width: 40, textAlign: "right" }}>{pct}%</span>
         </div>
         {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 8 }}>{msg.m}</div>}
