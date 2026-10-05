@@ -1042,11 +1042,9 @@ function FootTeamMark({
     src: "/logo-bl.png",
     alt: "",
     style: {
-      width: 54,
+      width: 76,
       height: 54,
-      borderRadius: 27,
-      objectFit: "cover",
-      background: FC.soft,
+      objectFit: "contain",
       display: "block",
       margin: "0 auto 6px"
     }
@@ -4960,7 +4958,7 @@ function FootSplash({
     src: theme === "pink" ? "/logo-bl-rose.png" : "/logo-bl.png",
     alt: "",
     style: {
-      width: theme === "pink" ? 96 : 76,
+      width: 96,
       height: 76,
       objectFit: "contain"
     }

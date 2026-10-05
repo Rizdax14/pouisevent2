@@ -439,7 +439,7 @@ function FootTeamMark({ name, logo }) {
       {pink
         ? <img src="/logo-bl-rose.png" alt="" style={{ width: 76, height: 54, objectFit: "contain", display: "block", margin: "0 auto 6px" }} />
         : logo
-        ? <img src="/logo-bl.png" alt="" style={{ width: 54, height: 54, borderRadius: 27, objectFit: "cover", background: FC.soft, display: "block", margin: "0 auto 6px" }} />
+        ? <img src="/logo-bl.png" alt="" style={{ width: 76, height: 54, objectFit: "contain", display: "block", margin: "0 auto 6px" }} />
         : <span style={{ width: 54, height: 54, borderRadius: 27, background: FC.soft, color: FC.deep, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FF.display, fontSize: 21, margin: "0 auto 6px" }}>{playerInitials(name)}</span>}
       <div style={{ fontFamily: FF.ui, fontSize: 16, lineHeight: 1.15, overflowWrap: "anywhere" }}>{name}</div>
     </div>
@@ -1977,7 +1977,7 @@ function FootSplash({ steps, leaving, theme }) {
         @media (prefers-reduced-motion: reduce) { .ft-splash-anim { animation: none !important; } }
       `}</style>
       <div style={{ width: 118, height: 96, background: "#fff", borderRadius: 28, boxShadow: "0 8px 0 rgba(0,0,0,0.18)", display: "flex", alignItems: "center", justifyContent: "center", animation: "ftSplashIn .5s ease both" }}>
-        <img src={theme === "pink" ? "/logo-bl-rose.png" : "/logo-bl.png"} alt="" style={{ width: theme === "pink" ? 96 : 76, height: 76, objectFit: "contain" }} />
+        <img src={theme === "pink" ? "/logo-bl-rose.png" : "/logo-bl.png"} alt="" style={{ width: 96, height: 76, objectFit: "contain" }} />
       </div>
       <div style={{ textAlign: "center" }}>
         <div className="ft-splash-anim" style={{ fontSize: 46, lineHeight: 1, animation: "ftSplashBounce 1.05s cubic-bezier(.3,0,.6,1) infinite" }} aria-hidden="true">⚽</div>
