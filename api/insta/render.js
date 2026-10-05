@@ -21,7 +21,7 @@ async function featuredPhoto(ctx, layout, slot, sheetIds, kinds, chosen) {
   const kind = L.PHOTO_KIND_FOR_LAYOUT[layout];
   const pid = featuredId(ctx, slot, sheetIds, kinds || [kind], chosen);
   if (!pid) return { pid: null, rect: null, uri: null };
-  const ph = L.choosePhoto(ctx.photos, pid, kind, ctx.theme);
+  const ph = L.photoOrDefault(ctx.photos, pid, kind, ctx.theme);
   if (!ph) return { pid, rect: null, uri: null };
   const fr = L.savedFraming(ctx.framings, ph.id, layout);
   return { pid, rect: L.framedRect(layout, ph, fr), uri: await imageDataUri(publicUrl("player-photos", ph.path)) };
@@ -109,7 +109,7 @@ async function buildRatings(q) {
 async function withPodiumPhotos(rows, data, layout, kit) {
   const kind = L.PHOTO_KIND_FOR_LAYOUT[layout];
   await Promise.all(rows.slice(0, 3).map(async (r) => {
-    const ph = L.choosePhoto(data.photos, r.playerId, kind, kit);
+    const ph = L.photoOrDefault(data.photos, r.playerId, kind, kit);
     if (!ph) return;
     const fr = L.savedFraming(data.framings, ph.id, layout);
     r.rect = L.framedRect(layout, ph, fr);

@@ -523,3 +523,11 @@ test("result 'on_close': due as soon as the match is finished, not before, ignor
   assert.equal(done.next.scheduledAt, null);
   assert.deepEqual(L.normalizeSettings({ result: { mode: "auto", rule: { type: "on_close", days: 5, time: "x" } } }).result.rule, { type: "on_close", days: 0, time: "00:00" });
 });
+
+test("photoOrDefault: a player without render gets the default (player 0) render, never other kinds", () => {
+  const photos = [{ id: 1, player_id: 0, kind: "render", kit: "domicile", retouched: false }, { id: 2, player_id: 5, kind: "render", kit: "domicile", retouched: false }, { id: 3, player_id: 5, kind: "celebration", kit: "domicile", retouched: false }];
+  assert.equal(L.photoOrDefault(photos, 9, "render", "domicile").id, 1);
+  assert.equal(L.photoOrDefault(photos, 5, "render", "domicile").id, 2);
+  assert.equal(L.photoOrDefault(photos, 9, "celebration", "domicile"), null);
+  assert.equal(L.photoOrDefault(photos, 9, "dos", "domicile"), null);
+});

@@ -79,6 +79,12 @@ function choosePhoto(photos, playerId, kind, kit) {
   return mine.sort((a, b) => rank(a) - rank(b))[0] || null;
 }
 
+// The "unknown player" render (player_id 0) stands in for every player who has no render of their own.
+const DEFAULT_PHOTO_PLAYER_ID = 0;
+function photoOrDefault(photos, playerId, kind, kit) {
+  return choosePhoto(photos, playerId, kind, kit) || (kind === "render" ? choosePhoto(photos, DEFAULT_PHOTO_PLAYER_ID, "render", kit) : null);
+}
+
 function _seeded(id, seed) {
   let x = (id * 2654435761 + seed * 97) >>> 0;
   x ^= x >>> 13; x = Math.imul(x, 1274126177) >>> 0;
@@ -377,5 +383,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

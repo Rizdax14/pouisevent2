@@ -3258,18 +3258,25 @@ function FootPhotoCell({
     }
   }, err));
 }
+
+// Stand-in render (player_id 0) used for every player without a render of their own.
+const FOOT_UNKNOWN_PLAYER = {
+  id: DEFAULT_PHOTO_PLAYER_ID,
+  name: "Joueur inconnu (photo par défaut)"
+};
 function FootPhotosTab({
   roster,
   photos,
   reload
 }) {
-  const nameOf = p => getDisplayName(p, PLAYERS) || "";
-  const players = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  if (!players.length) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : getDisplayName(p, PLAYERS) || "";
+  const real = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  if (!real.length) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
     title: "Aucun joueur",
     text: "Ajoute des joueurs \xE0 l'effectif (onglet Admin)."
   }));
+  const players = [FOOT_UNKNOWN_PLAYER, ...real];
   const count = id => photos.filter(ph => ph.player_id === id).length;
   return /*#__PURE__*/React.createElement("div", null, players.map(p => /*#__PURE__*/React.createElement(FCard, {
     key: p.id,
@@ -3279,10 +3286,10 @@ function FootPhotosTab({
       display: "flex",
       alignItems: "center",
       gap: 10,
-      marginBottom: 12
+      marginBottom: p.id === FOOT_UNKNOWN_PLAYER.id ? 4 : 12
     }
   }, /*#__PURE__*/React.createElement(FAvatar, {
-    playerId: p.id,
+    playerId: p.id || null,
     name: nameOf(p),
     size: 40
   }), /*#__PURE__*/React.createElement("div", {
@@ -3292,7 +3299,9 @@ function FootPhotosTab({
       fontSize: 18,
       color: FC.deep
     }
-  }, nameOf(p)), /*#__PURE__*/React.createElement(FChip, {
+  }, nameOf(p)), p.id === FOOT_UNKNOWN_PLAYER.id ? /*#__PURE__*/React.createElement(FChip, {
+    tone: count(p.id) >= 1 ? "good" : "soft"
+  }, count(p.id), " / 2") : /*#__PURE__*/React.createElement(FChip, {
     tone: count(p.id) >= 6 ? "good" : "soft"
   }, count(p.id), " / 6")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3307,7 +3316,7 @@ function FootPhotosTab({
       textAlign: "center",
       marginBottom: 0
     }
-  }, label)), INSTA_KINDS.map(([kind, kindLabel]) => /*#__PURE__*/React.createElement(React.Fragment, {
+  }, label)), INSTA_KINDS.filter(([kind]) => p.id !== FOOT_UNKNOWN_PLAYER.id || kind === "render").map(([kind, kindLabel]) => /*#__PURE__*/React.createElement(React.Fragment, {
     key: kind
   }, /*#__PURE__*/React.createElement(FLabel, {
     style: {
@@ -3582,7 +3591,7 @@ function FootFramingCompare({
         overflow: "hidden",
         textOverflow: "ellipsis"
       }
-    }, getDisplayName(p, PLAYERS)), photo && /*#__PURE__*/React.createElement("span", {
+    }, p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : getDisplayName(p, PLAYERS)), photo && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         color: saved ? FC.good : FC.muted,
@@ -3598,15 +3607,15 @@ function FootFramingTool({
   framings,
   reload
 }) {
-  const nameOf = p => getDisplayName(p, PLAYERS) || "";
-  const players = [...new Set(photos.map(p => p.player_id))].map(id => PLAYERS.find(p => p.id === id)).filter(p => p && roster.some(r => r.player_id === p.id)).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : getDisplayName(p, PLAYERS) || "";
+  const players = [...new Set(photos.map(p => p.player_id))].map(id => id === FOOT_UNKNOWN_PLAYER.id ? FOOT_UNKNOWN_PLAYER : PLAYERS.find(p => p.id === id)).filter(p => p && (p.id === FOOT_UNKNOWN_PLAYER.id || roster.some(r => r.player_id === p.id))).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
   const [layout, setLayout] = React.useState("matchday");
   const [mode, setMode] = React.useState("single");
   const [showGuides, setShowGuides] = React.useState(true);
-  const pid = players.some(p => p.id === playerId) ? playerId : players[0] && players[0].id || null;
-  const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
+  const pid = players.some(p => p.id === playerId) ? playerId : players[0] ? players[0].id : null;
+  const photo = pid != null ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
   const saved = photo ? savedFraming(framings, photo.id, layout) : null;
   const L = LAYOUTS[layout];
   const [cw, ch] = L.canvas;
@@ -3841,7 +3850,7 @@ function FootFramingTool({
     }
   }), mode === "single" && /*#__PURE__*/React.createElement("select", {
     style: sel,
-    value: pid || "",
+    value: pid ?? "",
     onChange: e => setPlayerId(Number(e.target.value))
   }, players.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,

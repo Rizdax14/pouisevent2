@@ -188,7 +188,7 @@ function FSkeleton({ h = 90 }) {
 function FAvatar({ playerId, name, size = 36, ring }) {
   const { photos, framings, themeName } = React.useContext(FootCtx);
   const kit = themeName === "pink" ? "exterieur" : "domicile";
-  const ph = playerId ? choosePhoto(photos, playerId, "render", kit) : null;
+  const ph = playerId ? photoOrDefault(photos, playerId, "render", kit) : null;
   const common = { display: "inline-block", verticalAlign: "middle", width: size, height: size, borderRadius: size / 2, flexShrink: 0, overflow: "hidden", position: "relative", background: FC.soft, boxShadow: ring ? `0 0 0 3px ${ring}` : "none" };
   if (ph) {
     const r = framedRect("render", ph, savedFraming(framings || [], ph.id, "render")); // in the 300px render canvas

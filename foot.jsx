@@ -1327,24 +1327,28 @@ function FootPhotoCell({ playerId, kit, kind, photos, reload }) {
   );
 }
 
+// Stand-in render (player_id 0) used for every player without a render of their own.
+const FOOT_UNKNOWN_PLAYER = { id: DEFAULT_PHOTO_PLAYER_ID, name: "Joueur inconnu (photo par défaut)" };
+
 function FootPhotosTab({ roster, photos, reload }) {
-  const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
-  const players = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  if (!players.length) return <FCard><FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif (onglet Admin)." /></FCard>;
+  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : getDisplayName(p, PLAYERS) || "";
+  const real = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  if (!real.length) return <FCard><FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif (onglet Admin)." /></FCard>;
+  const players = [FOOT_UNKNOWN_PLAYER, ...real];
   const count = (id) => photos.filter((ph) => ph.player_id === id).length;
   return (
     <div>
       {players.map((p) => (
         <FCard key={p.id} pad={14}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <FAvatar playerId={p.id} name={nameOf(p)} size={40} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: p.id === FOOT_UNKNOWN_PLAYER.id ? 4 : 12 }}>
+            <FAvatar playerId={p.id || null} name={nameOf(p)} size={40} />
             <div style={{ flex: 1, fontFamily: FF.display, fontSize: 18, color: FC.deep }}>{nameOf(p)}</div>
-            <FChip tone={count(p.id) >= 6 ? "good" : "soft"}>{count(p.id)} / 6</FChip>
+            {p.id === FOOT_UNKNOWN_PLAYER.id ? <FChip tone={count(p.id) >= 1 ? "good" : "soft"}>{count(p.id)} / 2</FChip> : <FChip tone={count(p.id) >= 6 ? "good" : "soft"}>{count(p.id)} / 6</FChip>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "58px minmax(0, 1fr) minmax(0, 1fr)", gap: 8, alignItems: "center" }}>
             <span />
             {INSTA_KITS.map(([kit, label]) => <FLabel key={kit} style={{ textAlign: "center", marginBottom: 0 }}>{label}</FLabel>)}
-            {INSTA_KINDS.map(([kind, kindLabel]) => (
+            {INSTA_KINDS.filter(([kind]) => p.id !== FOOT_UNKNOWN_PLAYER.id || kind === "render").map(([kind, kindLabel]) => (
               <React.Fragment key={kind}>
                 <FLabel style={{ marginBottom: 0 }}>{kindLabel}</FLabel>
                 {INSTA_KITS.map(([kit]) => <FootPhotoCell key={kit} playerId={p.id} kit={kit} kind={kind} photos={photos} reload={reload} />)}
@@ -1420,7 +1424,7 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
               {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} />)}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 4 }}>
-              <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{getDisplayName(p, PLAYERS)}</span>
+              <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : getDisplayName(p, PLAYERS)}</span>
               {photo && <span style={{ fontSize: 9, color: saved ? FC.good : FC.muted, textTransform: "uppercase", flexShrink: 0 }}>{saved ? "réglé" : "défaut"}</span>}
             </div>
           </div>
@@ -1431,15 +1435,15 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
 }
 
 function FootFramingTool({ roster, photos, framings, reload }) {
-  const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
-  const players = [...new Set(photos.map((p) => p.player_id))].map((id) => PLAYERS.find((p) => p.id === id)).filter((p) => p && roster.some((r) => r.player_id === p.id)).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : getDisplayName(p, PLAYERS) || "";
+  const players = [...new Set(photos.map((p) => p.player_id))].map((id) => id === FOOT_UNKNOWN_PLAYER.id ? FOOT_UNKNOWN_PLAYER : PLAYERS.find((p) => p.id === id)).filter((p) => p && (p.id === FOOT_UNKNOWN_PLAYER.id || roster.some((r) => r.player_id === p.id))).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
   const [layout, setLayout] = React.useState("matchday");
   const [mode, setMode] = React.useState("single");
   const [showGuides, setShowGuides] = React.useState(true);
-  const pid = players.some((p) => p.id === playerId) ? playerId : (players[0] && players[0].id) || null;
-  const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
+  const pid = players.some((p) => p.id === playerId) ? playerId : players[0] ? players[0].id : null;
+  const photo = pid != null ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
   const saved = photo ? savedFraming(framings, photo.id, layout) : null;
   const L = LAYOUTS[layout];
   const [cw, ch] = L.canvas;
@@ -1566,7 +1570,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
     <FCard>
       <FSegmented value={mode} onChange={setMode} options={[["single", "Un joueur"], ["compare", "Comparer tous"]]} style={{ marginBottom: 12 }} />
       {mode === "single" && (
-      <select style={sel} value={pid || ""} onChange={(e) => setPlayerId(Number(e.target.value))}>
+      <select style={sel} value={pid ?? ""} onChange={(e) => setPlayerId(Number(e.target.value))}>
         {players.map((p) => <option key={p.id} value={p.id}>{nameOf(p)}</option>)}
       </select>
       )}

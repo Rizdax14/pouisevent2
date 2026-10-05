@@ -573,7 +573,7 @@ function FAvatar({
     themeName
   } = React.useContext(FootCtx);
   const kit = themeName === "pink" ? "exterieur" : "domicile";
-  const ph = playerId ? choosePhoto(photos, playerId, "render", kit) : null;
+  const ph = playerId ? photoOrDefault(photos, playerId, "render", kit) : null;
   const common = {
     display: "inline-block",
     verticalAlign: "middle",
