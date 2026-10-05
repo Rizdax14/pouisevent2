@@ -1562,11 +1562,11 @@ function FootInstaKeyBox({ onSaved }) {
   );
 }
 
-// Images of one post: Match Day (page 1) and Groupe (page 2) are separate posts, Classements is a 3-image carousel.
-function instaImages(kind, { matchId, season }, v) {
-  const url = (params) => `/api/insta/render?${new URLSearchParams({ ...params, v })}`;
-  if (kind === "matchday") return [{ label: "Match Day", src: url({ kind: "matchday", match: matchId, page: 1 }) }];
-  if (kind === "groupe") return [{ label: "Groupe", src: url({ kind: "matchday", match: matchId, page: 2 }) }];
+// Images of one post: Match Day + Groupe is a 2-image carousel (same player on both), Classements a 3-image one.
+// `player` is the admin's pick for the player on the photo (none = automatic rotation).
+function instaImages(kind, { matchId, season }, v, player) {
+  const url = (params) => `/api/insta/render?${new URLSearchParams({ ...params, v, ...(player ? { player } : {}) })}`;
+  if (kind === "matchday") return [{ label: "Match Day", src: url({ kind: "matchday", match: matchId, page: 1 }) }, { label: "Groupe", src: url({ kind: "matchday", match: matchId, page: 2 }) }];
   if (kind === "rankings") return RANKING_PAGES.map((pg, i) => ({ label: pg.heading, src: url({ kind: "rankings", season, page: i + 1 }) }));
   return [{ label: kind === "ratings" ? "Notes" : "Résultat", src: url({ kind, match: matchId }) }];
 }
@@ -1634,7 +1634,7 @@ function FootSectionSchedule({ sec, cfg, onChange }) {
   );
 }
 
-function FootInstaNext({ sec, next, cfg, data, posts, onPublished }) {
+function FootInstaNext({ sec, next, cfg, data, posts, featuredId, candidates, onPickPlayer, onPublished }) {
   const target = { kind: sec.kind, matchId: next.matchId, weekKey: next.weekKey, season: next.season };
   const match = next.matchId ? data.matches.find((m) => m.id === next.matchId) : null;
   const key = instaDataKey(sec.kind, target, data);
@@ -1643,7 +1643,8 @@ function FootInstaNext({ sec, next, cfg, data, posts, onPublished }) {
   const [msg, setMsg] = React.useState(null);
   const [copied, setCopied] = React.useState(false);
   const failed = posts.filter((p) => p.kind === sec.kind && p.status === "failed" && (next.weekKey ? p.week_key === next.weekKey : p.match_id === next.matchId)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-  const images = next.available ? instaImages(sec.kind, target, key) : [];
+  const images = next.previewable ? instaImages(sec.kind, target, key, featuredId) : [];
+  const chosen = candidates.find((c) => c.id === featuredId);
 
   async function publish() {
     if (!window.confirm(`Publier maintenant sur Instagram ?\n\n${caption.slice(0, 200)}`)) return;
@@ -1668,9 +1669,19 @@ function FootInstaNext({ sec, next, cfg, data, posts, onPublished }) {
       <div style={{ fontSize: 13, marginBottom: 2 }}>{match ? `vs ${match.opponent_name}` : `Saison ${next.season}`}{match && <span style={{ color: "#60607a" }}> · {instaWhen(match.match_datetime)}</span>}</div>
       <div style={{ fontSize: 11, color: badge[1], fontWeight: 700, marginBottom: 8 }}>{badge[0]}</div>
       {failed && <div style={{ fontSize: 11, color: "#ef4444", marginBottom: 8 }}>Dernier essai échoué : {failed.error}</div>}
+      {next.previewable && <FootInstaImages images={images} />}
+      {sec.featured && next.previewable && (
+        <label style={{ display: "block", fontSize: 11, color: "#60607a", marginBottom: 8 }}>
+          Joueur sur la photo
+          <select value={featuredId || ""} onChange={(e) => onPickPlayer(targetKey(target), e.target.value ? Number(e.target.value) : null)} style={{ ...FOOT_SELECT_STYLE, display: "block", width: "100%", marginTop: 4 }}>
+            <option value="">Automatique (rotation)</option>
+            {candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {sec.key === "matchday" && chosen && !chosen.hasDos && <span style={{ display: "block", marginTop: 4, color: "#f59e0b" }}>Pas de photo « dos » pour ce joueur : l'image Groupe sera sans joueur.</span>}
+        </label>
+      )}
       {next.available && (
         <>
-          <FootInstaImages images={images} />
           <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={4} style={{ ...FOOT_INPUT_STYLE, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={publish} disabled={busy} style={{ ...mini, background: "#3b82f6", border: "none", color: "#fff", fontWeight: 700, opacity: busy ? 0.6 : 1 }}>{busy ? "Publication…" : "Publier maintenant"}</button>
@@ -1709,7 +1720,7 @@ function FootInstaLast({ sec, last, data }) {
   );
 }
 
-function FootInstaSection({ sec, saved, data, posts, onSave, onPublished }) {
+function FootInstaSection({ sec, saved, data, posts, featured, candidates, onPickPlayer, onSave, onPublished }) {
   const [draft, setDraft] = React.useState(saved);
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState(null);
@@ -1752,7 +1763,7 @@ function FootInstaSection({ sec, saved, data, posts, onSave, onPublished }) {
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
           <div style={{ fontSize: 11, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Prochain post</div>
           {state.next
-            ? <FootInstaNext key={`${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`} sec={sec} next={state.next} cfg={saved} data={data} posts={posts} onPublished={onPublished} />
+            ? <FootInstaNext key={`${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`} sec={sec} next={state.next} cfg={saved} data={data} posts={posts} featuredId={featured[targetKey(state.next)]} candidates={candidates} onPickPlayer={onPickPlayer} onPublished={onPublished} />
             : <div style={{ fontSize: 12, color: "#60607a" }}>Rien de prévu pour l'instant.</div>}
         </div>
       </div>
@@ -1760,13 +1771,27 @@ function FootInstaSection({ sec, saved, data, posts, onSave, onPublished }) {
   );
 }
 
-function FootPostsTab({ matches, lineups, events, ratings }) {
+function FootPostsTab({ matches, lineups, events, ratings, roster, photos }) {
   const [settings, setSettings] = React.useState(null);
+  const [featured, setFeatured] = React.useState({});
   const [instaPosts, setInstaPosts] = React.useState([]);
   const [loadErr, setLoadErr] = React.useState(null);
   const data = { matches, lineups, events, ratings };
   const reloadPosts = () => instaAdminFetch("posts", null, "GET").then((r) => setInstaPosts(r.posts || [])).catch((e) => setLoadErr((prev) => prev || e.message));
+  // Players that can be put on a photo: roster players with a celebration photo.
+  const candidates = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean)
+    .filter((p) => photos.some((ph) => ph.player_id === p.id && ph.kind === "celebration"))
+    .map((p) => ({ id: p.id, name: getDisplayName(p, PLAYERS) || "", hasDos: photos.some((ph) => ph.player_id === p.id && ph.kind === "dos") }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  async function pickPlayer(key, id) {
+    const before = featured;
+    const next = { ...featured }; if (id) next[key] = id; else delete next[key];
+    setFeatured(next); // instant feedback; the server answer is the truth
+    try { const r = await instaAdminFetch("featured", { key, player_id: id }); setFeatured(r.featured || {}); }
+    catch (e) { setFeatured(before); setLoadErr(e.message); }
+  }
   React.useEffect(() => {
+    instaAdminFetch("featured", null, "GET").then((r) => setFeatured(r.featured || {})).catch(() => {});
     reloadPosts();
     instaAdminFetch("settings", null, "GET").then((r) => setSettings(normalizeSettings(r.settings))).catch((e) => { setLoadErr(e.message); setSettings(defaultSettings()); });
   }, []);
@@ -1779,7 +1804,7 @@ function FootPostsTab({ matches, lineups, events, ratings }) {
     <div>
       {loadErr && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 12 }}>Réglages indisponibles ({loadErr}). Valeurs par défaut (manuel) affichées.</div>}
       {INSTA_SECTIONS.map((sec) => (
-        <FootInstaSection key={sec.key} sec={sec} saved={settings[sec.key]} data={data} posts={instaPosts} onSave={saveSection} onPublished={reloadPosts} />
+        <FootInstaSection key={sec.key} sec={sec} saved={settings[sec.key]} data={data} posts={instaPosts} featured={featured} candidates={candidates} onPickPlayer={pickPlayer} onSave={saveSection} onPublished={reloadPosts} />
       ))}
       <div style={{ color: "#60607a", fontSize: 11, textAlign: "center" }}>Envoi automatique : un planificateur vérifie toutes les ~10 minutes ce qui doit partir.</div>
     </div>
@@ -1804,7 +1829,7 @@ function FootReseauxPage({ roster, photos, framings, matches, lineups, events, r
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         {tabBtn("posts", "Posts")}{tabBtn("photos", "Photos")}{tabBtn("cadrage", "Cadrage")}
       </div>
-      {tab === "posts" && <FootPostsTab matches={matches} lineups={lineups} events={events} ratings={ratings} />}
+      {tab === "posts" && <FootPostsTab matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} photos={photos} />}
       {tab === "photos" && <FootPhotosTab roster={roster} photos={photos} reload={reload} />}
       {tab === "cadrage" && <FootFramingTool roster={roster} photos={photos} framings={framings} reload={reload} />}
     </div>

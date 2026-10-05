@@ -91,7 +91,7 @@ test("refreshToken returns the new token", async () => {
 // ---------- Publisher: exactly-once publication ----------
 const { createPublisher } = require("./lib/insta/publisher");
 
-function fakeWorld({ rows = [], igFail = null, uploadFail = false } = {}) {
+function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail = false } = {}) {
   const db = rows.map((r) => ({ ...r }));
   let id = 100;
   const log = [];
@@ -108,7 +108,8 @@ function fakeWorld({ rows = [], igFail = null, uploadFail = false } = {}) {
       if (method === "DELETE") { db.splice(db.findIndex((r) => r.id === idm), 1); return null; }
       Object.assign(db.find((r) => r.id === idm), body); return [{ ...db.find((r) => r.id === idm) }];
     },
-    async renderImages(t) { log.push("render"); return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3")] : [Buffer.from("1")]; },
+    async renderImages(t) { log.push("render"); return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3")] : t.kind === "matchday" ? [Buffer.from("1"), Buffer.from("2")] : [Buffer.from("1")]; },
+    featuredId: async (t) => { if (featuredFail) throw new Error("db down"); log.push(`featured ${t.player || "auto"}`); return t.player || 21; },
     async uploadImage(p) { log.push("upload " + p); if (uploadFail) throw new Error("storage down"); },
     publicUrl: (p) => `https://pub/${p}`,
     igClient: () => ({ async publishImages({ urls, caption }) { log.push(`ig ${urls.length} ${caption}`); if (igFail) throw igFail; return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
@@ -126,7 +127,7 @@ test("publishes once: row created, images uploaded, Instagram called, row marked
   assert.equal(w.db[0].ig_media_id, "m9");
   assert.equal(w.db[0].permalink, "https://instagram.com/p/z");
   assert.match(w.db[0].image_paths[0], /^matchday\/2-\d+-1\.jpg$/);
-  assert.match(w.log.find((l) => l.startsWith("ig ")), /^ig 1 MATCH DAY/);
+  assert.match(w.log.find((l) => l.startsWith("ig ")), /^ig 2 MATCH DAY/); // Match Day + Groupe: a two-image carousel
 });
 
 test("a second publish of the same post never calls Instagram again", async () => {
@@ -141,7 +142,7 @@ test("a second publish of the same post never calls Instagram again", async () =
 test("an edited caption is used as is; an empty one falls back to the default", async () => {
   let w = fakeWorld();
   await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA, caption: "Mon texte" });
-  assert.ok(w.log.includes("ig 1 Mon texte"));
+  assert.ok(w.log.includes("ig 2 Mon texte"));
   w = fakeWorld();
   await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA, caption: "   " });
   assert.match(w.log.find((l) => l.startsWith("ig ")), /MATCH DAY/);
@@ -188,4 +189,19 @@ test("rankings publish a 3-image carousel keyed by ISO week", async () => {
   assert.ok(w.log.includes("ig 3 Classements de la saison 2026-2027 📊"));
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W41", season: "2026-2027" }, { data: DATA })).status, "already_published");
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W42", season: "2026-2027" }, { data: DATA })).status, "published");
+});
+
+test("Match Day + Groupe is published as a 2-image carousel and the featured player is recorded for the rotation", async () => {
+  const w = fakeWorld();
+  await w.pub.publishTarget({ kind: "matchday", matchId: 2, player: 5 }, { data: DATA });
+  assert.equal(w.db[0].image_paths.length, 2);
+  assert.deepEqual(w.db[0].featured, { matchday: 5 });
+  assert.ok(w.log.some((l) => /^ig 2 MATCH DAY/.test(l)));
+});
+
+test("a failure while recording the featured player never fails a published post", async () => {
+  const w = fakeWorld({ featuredFail: true });
+  const r = await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
+  assert.equal(r.status, "published");
+  assert.deepEqual(w.db[0].featured, {});
 });

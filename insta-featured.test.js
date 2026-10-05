@@ -5,6 +5,7 @@ const sharp = require("sharp");
 const supa = require("./lib/insta/supabase");
 
 let tables;
+const fetched = []; // photo files the renderer asked for: tells which player is on the visual
 supa.sbGet = async (table, query) => {
   const rows = tables[table] || [];
   const m = query.match(/\bid=eq\.(\d+)/);
@@ -13,12 +14,16 @@ supa.sbGet = async (table, query) => {
 const realFetch = global.fetch;
 test.before(async () => {
   const png = await sharp({ create: { width: 400, height: 500, channels: 4, background: { r: 200, g: 50, b: 50, alpha: 1 } } }).png().toBuffer();
-  global.fetch = async (url) => (String(url).includes("/player-photos/") ? new Response(png, { headers: { "content-type": "image/png" } }) : realFetch(url));
+  global.fetch = async (url) => {
+    if (String(url).includes("/player-photos/")) { fetched.push(decodeURIComponent(String(url).split("/player-photos/")[1])); return new Response(png, { headers: { "content-type": "image/png" } }); }
+    return realFetch(url);
+  };
 });
 test.after(() => { global.fetch = realFetch; });
 const { build } = require("./api/insta/render");
 
-const photo = (id, player, kind = "celebration", kit = "exterieur") => ({ id, player_id: player, kit, kind, retouched: false, path: `${player}/${kit}/${kind}.png`, width: 400, height: 500 });
+let uid = 0; // unique file names: the renderer caches images by URL
+const photo = (id, player, kind = "celebration", kit = "exterieur") => ({ id, player_id: player, kit, kind, retouched: false, path: `${player}/${kit}/${kind}-${++uid}.png`, width: 400, height: 500 });
 const setup = (extra = {}) => {
   tables = {
     players: [1, 2, 3].map((id) => ({ id, name: `P${id}`, display_name: `P${id}` })),
@@ -54,4 +59,33 @@ test("a guest alone has a photo → nobody is featured (guests are never picked 
 test("nobody has any photo → the visual still renders, without a player", async () => {
   setup({ foot_player_photos: [] });
   assert.ok(!hasPlayerPhoto(await build("matchday", { match: "6", page: 1 })));
+});
+
+const who = async (q) => { fetched.length = 0; await build("matchday", q); return fetched.map((p) => Number(p.split("/")[0])); };
+
+test("Match Day and Groupe feature the same player (preferring someone who has both photos)", async () => {
+  setup({ foot_player_photos: [photo(10, 1), photo(11, 2), photo(12, 2, "dos")], foot_lineups: [{ match_id: 6, player_id: 1 }, { match_id: 6, player_id: 2 }] });
+  assert.deepEqual(await who({ match: "6", page: 1 }), [2]);
+  assert.deepEqual(await who({ match: "6", page: 2 }), [2]);
+});
+
+test("an explicit choice (?player=) puts that player on both images; a missing dos photo just leaves the Groupe image bare", async () => {
+  setup({ foot_player_photos: [photo(10, 1), photo(11, 2), photo(12, 2, "dos")], foot_lineups: [{ match_id: 6, player_id: 1 }, { match_id: 6, player_id: 2 }] });
+  assert.deepEqual(await who({ match: "6", page: 1, player: "1" }), [1]);
+  assert.deepEqual(await who({ match: "6", page: 2, player: "1" }), []); // player 1 has no dos photo
+  assert.deepEqual(await who({ match: "6", page: 2, player: "2" }), [2]);
+});
+
+test("a junk ?player= is ignored (automatic rotation)", async () => {
+  setup({ foot_player_photos: [photo(10, 1)], foot_lineups: [{ match_id: 6, player_id: 1 }] });
+  assert.deepEqual(await who({ match: "6", page: 1, player: "abc" }), [1]);
+});
+
+test("rotation: the player featured last time is skipped next time", async () => {
+  setup({
+    foot_player_photos: [photo(10, 1), photo(11, 2)],
+    foot_lineups: [{ match_id: 6, player_id: 1 }, { match_id: 6, player_id: 2 }],
+    foot_insta_posts: [{ status: "published", published_at: "2026-10-01T10:00:00Z", featured: { matchday: 1 } }],
+  });
+  assert.deepEqual(await who({ match: "6", page: 1 }), [2]);
 });

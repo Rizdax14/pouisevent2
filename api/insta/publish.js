@@ -25,6 +25,12 @@ async function handler(req, res) {
       const av = L.isTargetAvailable(sec.key, match, data.lineups);
       if (!av.ok) return res.status(409).json({ error: av.why });
       target = { kind: sec.kind, matchId };
+      if (sec.featured) {
+        const asked = b.player_id === undefined ? undefined : b.player_id;
+        const saved = (await handler.deps.loadFeatured())[L.targetKey(target)];
+        const player = asked === null ? null : Number.isInteger(asked) && asked > 0 ? asked : saved;
+        if (player) target.player = player;
+      }
     }
     const publisher = await handler.deps.makePublisher();
     const r = await publisher.publishTarget(target, { caption: b.caption, data });
@@ -34,5 +40,5 @@ async function handler(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
-handler.deps = { loadPublishData: P.loadPublishData, makePublisher: P.makeRealPublisher };
+handler.deps = { loadPublishData: P.loadPublishData, makePublisher: P.makeRealPublisher, loadFeatured: () => require("../../lib/insta/featured").loadFeatured() };
 module.exports = handler;

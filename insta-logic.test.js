@@ -203,15 +203,15 @@ test("isoWeekKey follows Paris ISO weeks", () => {
 
 test("defaultSettings: every section starts manual", () => {
   const s = L.defaultSettings();
-  assert.deepEqual(Object.keys(s).sort(), ["groupe", "matchday", "rankings", "ratings", "result"]);
+  assert.deepEqual(Object.keys(s).sort(), ["matchday", "rankings", "ratings", "result"]); // Match Day + Groupe is one carousel post
   for (const k of Object.keys(s)) assert.equal(s[k].mode, "manual");
 });
 
 test("normalizeSettings keeps valid values and falls back to defaults for junk", () => {
-  const s = L.normalizeSettings({ matchday: { mode: "auto", rule: { type: "before_match", days: 1, time: "18:30" } }, groupe: { mode: "yolo", rule: { type: "nope" } }, rankings: { mode: "auto", rule: { type: "weekly", weekday: 9, time: "99:99" } }, extra: 1 });
+  const s = L.normalizeSettings({ matchday: { mode: "auto", rule: { type: "before_match", days: 1, time: "18:30" } }, groupe: { mode: "auto" }, result: { mode: "yolo", rule: { type: "nope" } }, rankings: { mode: "auto", rule: { type: "weekly", weekday: 9, time: "99:99" } }, extra: 1 });
   assert.deepEqual(s.matchday, { mode: "auto", rule: { type: "before_match", days: 1, time: "18:30" } });
-  assert.equal(s.groupe.mode, "manual");
-  assert.equal(s.groupe.rule.type, "before_match");
+  assert.equal(s.groupe, undefined); // the old separate Groupe section is gone
+  assert.equal(s.matchday.mode, "auto");
   assert.equal(s.rankings.mode, "auto");
   assert.deepEqual(s.rankings.rule, L.defaultSettings().rankings.rule);
   assert.equal(s.extra, undefined);
@@ -224,13 +224,14 @@ const auto = (section, rule) => ({ ...L.defaultSettings(), [section]: { mode: "a
 test("matchday next: nearest scheduled match; due once the slot has passed and the match has not started", () => {
   const matches = [M(1, "2026-10-01T17:30:00Z", "finished"), M(2, "2026-10-08T17:30:00Z", "scheduled"), M(3, "2026-10-15T17:30:00Z", "scheduled")];
   const rule = { type: "before_match", days: 0, time: "09:00" };
-  let t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: NOW });
+  const lineups = [2, 3].map((id) => ({ match_id: id, player_id: 7 }));
+  let t = L.sectionState("matchday", { matches, lineups, posts: [], settings: auto("matchday", rule), now: NOW });
   assert.equal(t.next.matchId, 2);
   assert.equal(t.next.scheduledAt.toISOString(), "2026-10-08T07:00:00.000Z");
   assert.equal(t.next.due, false);
-  t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T07:05:00Z") });
+  t = L.sectionState("matchday", { matches, lineups, posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T07:05:00Z") });
   assert.equal(t.next.due, true);
-  t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T17:31:00Z") });
+  t = L.sectionState("matchday", { matches, lineups, posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T17:31:00Z") });
   assert.equal(t.next.matchId, 3); // match 2 has kicked off: its Match Day post expired
 });
 
@@ -240,22 +241,22 @@ test("matchday 'days before' counts Paris calendar days", () => {
   assert.equal(t.next.scheduledAt.toISOString(), "2026-10-07T16:30:00.000Z");
 });
 
-test("groupe needs a sheet: not available (never due) until at least one player is on it", () => {
+test("Match Day + Groupe needs a sheet: not available (never due) until at least one player is on it", () => {
   const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
   const rule = { type: "before_match", days: 0, time: "09:00" };
-  const base = { matches, posts: [], settings: auto("groupe", rule), now: new Date("2026-10-08T08:00:00Z") };
-  let t = L.sectionState("groupe", { ...base, lineups: [] });
+  const base = { matches, posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T08:00:00Z") };
+  let t = L.sectionState("matchday", { ...base, lineups: [] });
   assert.equal(t.next.available, false);
   assert.equal(t.next.due, false);
   assert.match(t.next.waitingFor, /feuille de match/i);
-  t = L.sectionState("groupe", { ...base, lineups: [{ match_id: 2, player_id: 7 }] });
+  t = L.sectionState("matchday", { ...base, lineups: [{ match_id: 2, player_id: 7 }] });
   assert.equal(t.next.available, true);
   assert.equal(t.next.due, true);
 });
 
 test("manual mode is never due, even when available", () => {
   const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
-  const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: L.defaultSettings(), now: new Date("2026-10-08T08:00:00Z") });
+  const t = L.sectionState("matchday", { matches, lineups: [{ match_id: 2, player_id: 7 }], posts: [], settings: L.defaultSettings(), now: new Date("2026-10-08T08:00:00Z") });
   assert.equal(t.next.available, true);
   assert.equal(t.next.due, false);
   assert.equal(t.next.scheduledAt, null);
@@ -348,25 +349,25 @@ const CR = [{ match_id: 1, rater_id: 1, ratee_id: 2, score: 8 }, { match_id: 1, 
 const CD = { matches: CM, lineups: CL, events: CE, ratings: CR, players: PL, roster: [{ player_id: 1, jersey_number: "14" }] };
 
 test("captionContextFor builds each caption's inputs from raw data", () => {
-  assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD), { opponent: "FC Test", band: L.matchBand(CM[0]) });
+  assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD), { opponent: "FC Test", band: L.matchBand(CM[0]), names: ["Louis", "Nolan", "Solal"] });
   const r = L.captionContextFor("result", { matchId: 1 }, CD);
   assert.deepEqual([r.opponent, r.bl, r.opp, r.goals], ["FC Test", 1, 1, ["12' Louis (Nolan)"]]);
   assert.deepEqual(L.captionContextFor("ratings", { matchId: 1 }, CD).top, [{ name: "Nolan", rating: 7.5 }, { name: "Louis", rating: 6 }]);
   assert.deepEqual(L.captionContextFor("rankings", { season: "2026-2027" }, CD), { season: "2026-2027" });
-  assert.deepEqual(L.captionContextFor("groupe", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]);
+  assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]); // the Groupe is in the same post
 });
 
-test("captionFor groupe lists the players", () => {
-  const c = L.captionFor("groupe", { opponent: "FC Test", names: ["Louis", "Nolan"] });
-  assert.match(c, /FC Test/);
-  assert.match(c, /Louis · Nolan/);
+test("captionFor matchday carries the match line and the sheet", () => {
+  const c = L.captionFor("matchday", { opponent: "FC Test", band: "JEUDI 19H30 | STADE | VILLE", names: ["Louis", "Nolan"] });
+  assert.match(c, /^MATCH DAY ⚽ Bière Leverculsec vs FC Test\nJEUDI 19H30/);
+  assert.match(c, /\n\nLouis · Nolan$/);
+  assert.equal(L.captionFor("matchday", { opponent: "X", band: "B", names: [] }), "MATCH DAY ⚽ Bière Leverculsec vs X\nB");
 });
 
 test("isTargetAvailable mirrors the section rules", () => {
   const fin = { id: 1, status: "finished" }, sch = { id: 2, status: "scheduled" };
-  assert.equal(L.isTargetAvailable("matchday", sch, []).ok, true);
-  assert.equal(L.isTargetAvailable("groupe", sch, []).ok, false);
-  assert.equal(L.isTargetAvailable("groupe", sch, [{ match_id: 2, player_id: 1 }]).ok, true);
+  assert.equal(L.isTargetAvailable("matchday", sch, []).ok, false); // the carousel's Groupe image needs a sheet
+  assert.equal(L.isTargetAvailable("matchday", sch, [{ match_id: 2, player_id: 1 }]).ok, true);
   assert.equal(L.isTargetAvailable("result", sch, []).ok, false);
   assert.equal(L.isTargetAvailable("result", fin, []).ok, true);
   assert.equal(L.isTargetAvailable("ratings", fin, []).ok, false);
@@ -469,4 +470,42 @@ test("centerFramingOnPerson puts the player's centre at the canvas centre, keepi
   assert.equal(f.width, 2880);
   assert.equal(f.y, -450);
   assert.ok(Math.abs(f.x + 0.6 * f.width - 540) < 1e-9);
+});
+
+// ---------- One carousel for Match Day + Groupe, same player on both images ----------
+test("sections: Match Day + Groupe is a single section; only Match Day and Résultat feature a player", () => {
+  assert.deepEqual(L.INSTA_SECTIONS.map((x) => x.key), ["matchday", "result", "ratings", "rankings"]);
+  assert.equal(L.INSTA_SECTIONS.find((x) => x.key === "matchday").label, "Match Day + Groupe");
+  assert.deepEqual(L.INSTA_SECTIONS.filter((x) => x.featured).map((x) => x.key), ["matchday", "result"]);
+});
+
+test("without a sheet, the Match Day + Groupe post waits but can still be previewed", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
+  const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: L.defaultSettings(), now: NOW });
+  assert.equal(t.next.available, false);
+  assert.equal(t.next.previewable, true);
+  assert.match(t.next.waitingFor, /feuille de match/i);
+  const r = L.sectionState("result", { matches: [M(5, "2026-10-08T17:30:00Z", "live")], lineups: [], posts: [], settings: L.defaultSettings(), now: new Date("2026-10-08T18:00:00Z") });
+  assert.equal(r.next.previewable, false);
+});
+
+test("featuredPlayerFor: the same player for every image of a carousel", () => {
+  const has = (id, kind) => ({ 1: ["celebration"], 2: ["celebration", "dos"], 3: ["celebration", "dos"] }[id] || []).includes(kind);
+  const roster = [1, 2, 3].map((id) => ({ player_id: id, role: "regulier" }));
+  // players with BOTH photos are preferred, so Match Day (celebration) and Groupe (dos) show the same person
+  const pick = (seed) => L.featuredPlayerFor({ sheetIds: [1, 2, 3], roster, hasPhoto: has, kinds: ["celebration", "dos"], history: [], seed });
+  for (const seed of [1, 2, 3, 4, 5, 6]) assert.ok([2, 3].includes(pick(seed)), `seed ${seed}`);
+  // nobody has both: fall back to the first kind
+  assert.equal(L.featuredPlayerFor({ sheetIds: [1], roster, hasPhoto: has, kinds: ["celebration", "dos"], history: [], seed: 1 }), 1);
+  // nobody has a photo at all
+  assert.equal(L.featuredPlayerFor({ sheetIds: [], roster: [], hasPhoto: () => false, kinds: ["celebration"], history: [], seed: 1 }), null);
+});
+
+test("featuredPlayerFor: an explicit choice always wins, and rotation avoids the last featured player", () => {
+  const has = () => true;
+  const roster = [1, 2].map((id) => ({ player_id: id, role: "regulier" }));
+  assert.equal(L.featuredPlayerFor({ sheetIds: [1, 2], roster, hasPhoto: has, kinds: ["celebration"], history: [], seed: 1, chosen: 2 }), 2);
+  assert.equal(L.featuredPlayerFor({ sheetIds: [1, 2], roster, hasPhoto: has, kinds: ["celebration"], history: [{ playerId: 1, at: "2026-10-01T00:00:00Z" }], seed: 1 }), 2);
+  // a chosen player outside the sheet / without photos is still honoured (the admin knows best)
+  assert.equal(L.featuredPlayerFor({ sheetIds: [1], roster, hasPhoto: () => false, kinds: ["celebration"], history: [], seed: 1, chosen: 99 }), 99);
 });

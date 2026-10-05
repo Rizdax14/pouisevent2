@@ -6,12 +6,23 @@ const { publicUrl, sbGet } = require("../../lib/insta/supabase");
 const { renderJpeg, imageDataUri, THEMES } = require("../../lib/insta/render");
 const T = require("../../lib/insta/templates");
 
-async function featuredPhoto(ctx, layout, slot, sheetIds) {
+// The player standing on a post. `kinds` lists the photo kinds of every image of the post (Match Day + Groupe: celebration and dos),
+// so all its images show the same person; `chosen` is the admin's explicit pick (?player=).
+function featuredId(ctx, slot, sheetIds, kinds, chosen) {
+  return L.featuredPlayerFor({
+    sheetIds, roster: ctx.roster, kinds, chosen: Number.isInteger(chosen) && chosen > 0 ? chosen : null,
+    hasPhoto: (id, kind) => !!L.choosePhoto(ctx.photos, id, kind, ctx.theme),
+    history: historyFor(ctx.history, slot), seed: ctx.match.id,
+  });
+}
+const CHOSEN = (q) => (q && q.player !== undefined && /^\d+$/.test(String(q.player)) ? Number(q.player) : null);
+
+async function featuredPhoto(ctx, layout, slot, sheetIds, kinds, chosen) {
   const kind = L.PHOTO_KIND_FOR_LAYOUT[layout];
-  const withPhoto = L.featuredPool(sheetIds, ctx.roster, (id) => L.choosePhoto(ctx.photos, id, kind, ctx.theme));
-  const pid = L.pickFeatured(withPhoto, historyFor(ctx.history, slot), ctx.match.id);
+  const pid = featuredId(ctx, slot, sheetIds, kinds || [kind], chosen);
   if (!pid) return { pid: null, rect: null, uri: null };
   const ph = L.choosePhoto(ctx.photos, pid, kind, ctx.theme);
+  if (!ph) return { pid, rect: null, uri: null };
   const fr = L.savedFraming(ctx.framings, ph.id, layout);
   return { pid, rect: L.framedRect(layout, ph, fr), uri: await imageDataUri(publicUrl("player-photos", ph.path)) };
 }
@@ -23,10 +34,10 @@ async function build(kind, q) {
     const bg = await imageDataUri(theme.bg);
     const sheetIds = ctx.lineups.map((l) => l.player_id);
     if (String(q.page || "1") === "2") {
-      const f = await featuredPhoto(ctx, "groupe", "dos", sheetIds);
+      const f = await featuredPhoto(ctx, "groupe", "matchday", sheetIds, ["celebration", "dos"], CHOSEN(q));
       return T.groupeEl({ bg, theme, lines: L.groupeLines(sheetIds, ctx.roster, ctx.players), rect: f.rect, photoUri: f.uri });
     }
-    const f = await featuredPhoto(ctx, "matchday", "celebration", sheetIds);
+    const f = await featuredPhoto(ctx, "matchday", "matchday", sheetIds, ["celebration", "dos"], CHOSEN(q));
     return T.matchDayEl({ bg, theme, opponent: L.opponentLabel(ctx.match.opponent_name), bandText: L.matchBand(ctx.match), rect: f.rect, photoUri: f.uri });
   }
   if (kind === "result") {
@@ -34,7 +45,7 @@ async function build(kind, q) {
     const theme = THEMES[ctx.theme];
     const sheetIds = ctx.lineups.map((l) => l.player_id);
     // Own rotation slot so Match Day and Résultat don't always feature the same player.
-    const f = await featuredPhoto(ctx, "result", "celebration_result", sheetIds);
+    const f = await featuredPhoto(ctx, "result", "result", sheetIds, ["celebration"], CHOSEN(q));
     const s = F.computeFootScore(ctx.events);
     return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalRows(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
   }
@@ -156,5 +167,11 @@ module.exports = async (req, res) => {
 };
 module.exports.build = build;
 module.exports.featuredPhoto = featuredPhoto;
+// Who will be on a post (used to record it for the rotation): same inputs as the render itself.
+module.exports.featuredPlayerOf = async (kind, q) => {
+  const ctx = await loadMatchContext(q.match);
+  const sheetIds = ctx.lineups.map((l) => l.player_id);
+  return featuredId(ctx, kind, sheetIds, kind === "matchday" ? ["celebration", "dos"] : ["celebration"], CHOSEN(q));
+};
 module.exports.buildRankings = buildRankings;
 module.exports.buildRatings = buildRatings;

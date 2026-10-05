@@ -3697,14 +3697,18 @@ function FootInstaKeyBox({
   }, "Enregistrer la cl\xE9"));
 }
 
-// Images of one post: Match Day (page 1) and Groupe (page 2) are separate posts, Classements is a 3-image carousel.
+// Images of one post: Match Day + Groupe is a 2-image carousel (same player on both), Classements a 3-image one.
+// `player` is the admin's pick for the player on the photo (none = automatic rotation).
 function instaImages(kind, {
   matchId,
   season
-}, v) {
+}, v, player) {
   const url = params => `/api/insta/render?${new URLSearchParams({
     ...params,
-    v
+    v,
+    ...(player ? {
+      player
+    } : {})
   })}`;
   if (kind === "matchday") return [{
     label: "Match Day",
@@ -3713,8 +3717,7 @@ function instaImages(kind, {
       match: matchId,
       page: 1
     })
-  }];
-  if (kind === "groupe") return [{
+  }, {
     label: "Groupe",
     src: url({
       kind: "matchday",
@@ -3877,6 +3880,9 @@ function FootInstaNext({
   cfg,
   data,
   posts,
+  featuredId,
+  candidates,
+  onPickPlayer,
   onPublished
 }) {
   const target = {
@@ -3895,7 +3901,8 @@ function FootInstaNext({
   const [msg, setMsg] = React.useState(null);
   const [copied, setCopied] = React.useState(false);
   const failed = posts.filter(p => p.kind === sec.kind && p.status === "failed" && (next.weekKey ? p.week_key === next.weekKey : p.match_id === next.matchId)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-  const images = next.available ? instaImages(sec.kind, target, key) : [];
+  const images = next.previewable ? instaImages(sec.kind, target, key, featuredId) : [];
+  const chosen = candidates.find(c => c.id === featuredId);
   async function publish() {
     if (!window.confirm(`Publier maintenant sur Instagram ?\n\n${caption.slice(0, 200)}`)) return;
     setBusy(true);
@@ -3970,9 +3977,36 @@ function FootInstaNext({
       color: "#ef4444",
       marginBottom: 8
     }
-  }, "Dernier essai \xE9chou\xE9 : ", failed.error), next.available && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootInstaImages, {
+  }, "Dernier essai \xE9chou\xE9 : ", failed.error), next.previewable && /*#__PURE__*/React.createElement(FootInstaImages, {
     images: images
-  }), /*#__PURE__*/React.createElement("textarea", {
+  }), sec.featured && next.previewable && /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 11,
+      color: "#60607a",
+      marginBottom: 8
+    }
+  }, "Joueur sur la photo", /*#__PURE__*/React.createElement("select", {
+    value: featuredId || "",
+    onChange: e => onPickPlayer(targetKey(target), e.target.value ? Number(e.target.value) : null),
+    style: {
+      ...FOOT_SELECT_STYLE,
+      display: "block",
+      width: "100%",
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Automatique (rotation)"), candidates.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, c.name))), sec.key === "matchday" && chosen && !chosen.hasDos && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      marginTop: 4,
+      color: "#f59e0b"
+    }
+  }, "Pas de photo \xAB dos \xBB pour ce joueur : l'image Groupe sera sans joueur.")), next.available && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("textarea", {
     value: caption,
     onChange: e => setCaption(e.target.value),
     rows: 4,
@@ -4079,6 +4113,9 @@ function FootInstaSection({
   saved,
   data,
   posts,
+  featured,
+  candidates,
+  onPickPlayer,
   onSave,
   onPublished
 }) {
@@ -4255,6 +4292,9 @@ function FootInstaSection({
     cfg: saved,
     data: data,
     posts: posts,
+    featuredId: featured[targetKey(state.next)],
+    candidates: candidates,
+    onPickPlayer: onPickPlayer,
     onPublished: onPublished
   }) : /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4267,9 +4307,12 @@ function FootPostsTab({
   matches,
   lineups,
   events,
-  ratings
+  ratings,
+  roster,
+  photos
 }) {
   const [settings, setSettings] = React.useState(null);
+  const [featured, setFeatured] = React.useState({});
   const [instaPosts, setInstaPosts] = React.useState([]);
   const [loadErr, setLoadErr] = React.useState(null);
   const data = {
@@ -4279,7 +4322,32 @@ function FootPostsTab({
     ratings
   };
   const reloadPosts = () => instaAdminFetch("posts", null, "GET").then(r => setInstaPosts(r.posts || [])).catch(e => setLoadErr(prev => prev || e.message));
+  // Players that can be put on a photo: roster players with a celebration photo.
+  const candidates = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).filter(p => photos.some(ph => ph.player_id === p.id && ph.kind === "celebration")).map(p => ({
+    id: p.id,
+    name: getDisplayName(p, PLAYERS) || "",
+    hasDos: photos.some(ph => ph.player_id === p.id && ph.kind === "dos")
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  async function pickPlayer(key, id) {
+    const before = featured;
+    const next = {
+      ...featured
+    };
+    if (id) next[key] = id;else delete next[key];
+    setFeatured(next); // instant feedback; the server answer is the truth
+    try {
+      const r = await instaAdminFetch("featured", {
+        key,
+        player_id: id
+      });
+      setFeatured(r.featured || {});
+    } catch (e) {
+      setFeatured(before);
+      setLoadErr(e.message);
+    }
+  }
   React.useEffect(() => {
+    instaAdminFetch("featured", null, "GET").then(r => setFeatured(r.featured || {})).catch(() => {});
     reloadPosts();
     instaAdminFetch("settings", null, "GET").then(r => setSettings(normalizeSettings(r.settings))).catch(e => {
       setLoadErr(e.message);
@@ -4316,6 +4384,9 @@ function FootPostsTab({
     saved: settings[sec.key],
     data: data,
     posts: instaPosts,
+    featured: featured,
+    candidates: candidates,
+    onPickPlayer: pickPlayer,
     onSave: saveSection,
     onPublished: reloadPosts
   })), /*#__PURE__*/React.createElement("div", {
@@ -4393,7 +4464,9 @@ function FootReseauxPage({
     matches: matches,
     lineups: lineups,
     events: events,
-    ratings: ratings
+    ratings: ratings,
+    roster: roster,
+    photos: photos
   }), tab === "photos" && /*#__PURE__*/React.createElement(FootPhotosTab, {
     roster: roster,
     photos: photos,

@@ -92,6 +92,17 @@ function featuredPool(sheetIds, roster, hasPhoto) {
   return roster.filter((r) => r.role !== "invite").map((r) => r.player_id).filter(hasPhoto);
 }
 
+// The player standing on a post. One choice for all the images of a carousel: players who have a photo of EVERY needed kind
+// come first (so Match Day and Groupe show the same person), then those with the first kind. `chosen` (set by the admin) always wins.
+function featuredPlayerFor({ sheetIds, roster, hasPhoto, kinds, history, seed, chosen }) {
+  if (chosen) return chosen;
+  const both = (id) => kinds.every((k) => hasPhoto(id, k)), first = (id) => hasPhoto(id, kinds[0]);
+  const rosterIds = roster.filter((r) => r.role !== "invite").map((r) => r.player_id);
+  // the sheet first (both photos, then the first kind), then the roster (guests excluded)
+  const pool = [sheetIds.filter(both), sheetIds.filter(first), rosterIds.filter(both), rosterIds.filter(first)].find((p) => p.length) || [];
+  return pickFeatured(pool, history, seed);
+}
+
 function pickFeatured(candidateIds, history, seed) {
   if (!candidateIds.length) return null;
   const last = {};
@@ -171,14 +182,13 @@ function rankingRows(n) {
 }
 
 function captionFor(kind, c) {
-  if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}`;
+  if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}${c.names && c.names.length ? "\n\n" + c.names.join(" · ") : ""}`;
   if (kind === "result") {
     const word = c.bl > c.opp ? "Victoire" : c.bl === c.opp ? "Match nul" : "Défaite";
     return `${word} ${c.bl}-${c.opp} contre ${c.opponent} ⚽${c.goals.length ? "\n\n" + c.goals.join("\n") : ""}`;
   }
   if (kind === "ratings") return `Les notes du match contre ${c.opponent} 📝${c.top.length ? "\n\n" + c.top.map((t, i) => `${i + 1}. ${t.name} ${t.rating.toFixed(1)}`).join("\n") : ""}`;
   if (kind === "rankings") return `Classements de la saison ${c.season} 📊`;
-  if (kind === "groupe") return `GROUPE 🔥 Bière Leverculsec vs ${c.opponent}${c.names.length ? "\n\n" + c.names.join(" · ") : ""}`;
   return "";
 }
 
@@ -202,15 +212,14 @@ function availablePosts({ matches, lineups, now }) {
 // ---------- Publication schedule: sections, Paris time, last / next post ----------
 const INSTA_TZ = "Europe/Paris";
 const INSTA_SECTIONS = [
-  { key: "matchday", kind: "matchday", label: "Match Day", rules: ["before_match"] },
-  { key: "groupe", kind: "groupe", label: "Groupe", rules: ["before_match"] },
-  { key: "result", kind: "result", label: "Résultat", rules: ["after_match"] },
+  // Match Day + Groupe is ONE carousel post (two images, the same player on both). `featured`: the admin can pick the player.
+  { key: "matchday", kind: "matchday", label: "Match Day + Groupe", rules: ["before_match"], featured: true },
+  { key: "result", kind: "result", label: "Résultat", rules: ["after_match"], featured: true },
   { key: "ratings", kind: "ratings", label: "Notes", rules: ["after_match"] },
   { key: "rankings", kind: "rankings", label: "Classements", rules: ["weekly"] },
 ];
 const RULE_DEFAULTS = {
   matchday: { type: "before_match", days: 0, time: "09:00" },
-  groupe: { type: "before_match", days: 0, time: "12:00" },
   result: { type: "after_match", days: 0, time: "22:00" },
   ratings: { type: "after_match", days: 2, time: "12:00" },
   rankings: { type: "weekly", weekday: 2, time: "18:00" },
@@ -277,7 +286,7 @@ function normalizeSettings(raw) {
 }
 
 function isTargetAvailable(sectionKey, m, lineups) {
-  if (sectionKey === "groupe") return lineups.some((l) => l.match_id === m.id) ? { ok: true } : { ok: false, why: "Feuille de match vide" };
+  if (sectionKey === "matchday") return lineups.some((l) => l.match_id === m.id) ? { ok: true } : { ok: false, why: "Feuille de match vide" };
   if (sectionKey === "result") return m.status === "finished" ? { ok: true } : { ok: false, why: "Match pas encore terminé" };
   if (sectionKey === "ratings") return m.ratings_validated_at ? { ok: true } : { ok: false, why: m.status === "finished" ? "Notes pas encore validées" : "Match pas encore terminé" };
   return { ok: true };
@@ -290,8 +299,7 @@ function captionContextFor(kind, { matchId, season }, { matches, lineups, events
   const sheet = lineups.filter((l) => l.match_id === matchId).map((l) => l.player_id);
   const sheetPlayers = players.filter((p) => sheet.includes(p.id));
   const nameOf = (id) => postName(players.find((p) => p.id === id), sheetPlayers);
-  if (kind === "matchday") return { opponent: match.opponent_name, band: matchBand(match) };
-  if (kind === "groupe") return { opponent: match.opponent_name, names: sheet.map(nameOf) };
+  if (kind === "matchday") return { opponent: match.opponent_name, band: matchBand(match), names: sheet.map(nameOf) };
   if (kind === "result") {
     const evs = events.filter((e) => e.match_id === matchId);
     const sc = _footFn("computeFootScore")(evs);
@@ -338,7 +346,7 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
     let weekKey = isoWeekKey(slot);
     while (pubWeeks.has(weekKey)) { slotDay = addDays(slotDay, 7); slot = atTime(slotDay, rule.time); weekKey = isoWeekKey(slot); }
     const ok = finished;
-    const next = { kind: sec.kind, section: sectionKey, weekKey, season: season(slot.toISOString()), available: ok, waitingFor: ok ? null : "Aucun match terminé cette saison", scheduledAt: isAuto ? slot : null, failures: failuresFor((x) => x.week_key === weekKey) };
+    const next = { kind: sec.kind, section: sectionKey, weekKey, season: season(slot.toISOString()), available: ok, waitingFor: ok ? null : "Aucun match terminé cette saison", scheduledAt: isAuto ? slot : null, previewable: ok, failures: failuresFor((x) => x.week_key === weekKey) };
     next.due = isAuto && ok && now >= slot && now - slot < WEEKLY_GRACE_MS;
     return { section: sec, last, next };
   }
@@ -363,9 +371,9 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
     scheduledAt = slotOf(cand);
     due = av.ok && now >= scheduledAt && (rule.type === "before_match" ? now < kickoff : now - scheduledAt < AFTER_MATCH_WINDOW_MS);
   }
-  return { section: sec, last, next: { kind: sec.kind, section: sectionKey, matchId: cand.id, available: av.ok, waitingFor: av.ok ? null : av.why, scheduledAt, due, failures: failuresFor((x) => x.match_id === cand.id) } };
+  return { section: sec, last, next: { kind: sec.kind, section: sectionKey, matchId: cand.id, available: av.ok, previewable: av.ok || sectionKey === "matchday", waitingFor: av.ok ? null : av.why, scheduledAt, due, failures: failuresFor((x) => x.match_id === cand.id) } };
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }
