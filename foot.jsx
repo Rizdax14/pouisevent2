@@ -834,7 +834,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
           <span style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, minWidth: 42, textAlign: "right" }}>{avg == null ? "—" : avg.toFixed(1)}</span>
         </div>
       ))}
-      {view.showHiddenMessage && <FMessage tone="warn">Note tes coéquipiers pour voir les moyennes.</FMessage>}
+      {view.showHiddenMessage && <FMessage tone="warn">Note tes coéquipiers pour voir les moyennes, ou attends la validation par le bureau.</FMessage>}
 
       {!validated && progress.pendingIds.length > 0 && (
         <div style={{ marginTop: 12, fontSize: 13, color: FC.muted }}>Pas encore voté : {progress.pendingIds.map(nameOf).join(" · ")}</div>
@@ -873,7 +873,7 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
     try { for (const id of sheetIds) { const n = parseFinalNote(finals[id]); if (n != null) next[id] = n; } }
     catch (e) { setMsg({ t: "error", m: e.message }); return; }
     setBusy(true); setMsg(null);
-    try { await sbUpdate("foot_matches", { id: match.id }, { rating_overrides: next }); await reload(); setMsg({ t: "success", m: "Notes finales enregistrées ✓" }); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { rating_overrides: next, ratings_validated_at: match.ratings_validated_at || new Date().toISOString() }); await reload(); setMsg({ t: "success", m: "Notes finales enregistrées et validées ✓" }); }
     catch (e) { setMsg({ t: "error", m: "Erreur : " + e.message }); }
     setBusy(false);
   }
@@ -893,7 +893,7 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
       ))}
       <FBtn full size="sm" onClick={saveVotes} disabled={busy} style={{ margin: "10px 0 16px" }}>Enregistrer les notes de {footNameOf(rater)}</FBtn>
       <div style={{ fontFamily: FF.ui, fontSize: 16, marginBottom: 4 }}>Note finale par joueur</div>
-      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>Écris la note (ex : 6.1). Vide = moyenne des votes.</div>
+      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>Écris la note (ex : 6.1). Vide = moyenne des votes. Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit.</div>
       {sheetIds.map((id) => (
         <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
           <span style={{ flex: 1, fontSize: 15 }}>{footNameOf(id)}</span>
@@ -901,7 +901,7 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
           <input type="text" inputMode="decimal" placeholder="Auto" value={finals[id] ?? ""} disabled={busy} onChange={(e) => setFinals({ ...finals, [id]: e.target.value })} aria-label={`Note finale de ${footNameOf(id)}`} style={{ ...FOOT_INPUT_STYLE, width: 82, textAlign: "center" }} />
         </div>
       ))}
-      <FBtn full size="sm" onClick={saveFinals} disabled={busy} style={{ marginTop: 10 }}>Enregistrer les notes finales</FBtn>
+      <FBtn full size="sm" onClick={saveFinals} disabled={busy} style={{ marginTop: 10 }}>Enregistrer et valider les notes finales</FBtn>
       {msg && <FMessage tone={msg.t === "error" ? "bad" : "good"} style={{ marginTop: 10 }}>{msg.m}</FMessage>}
     </div>
   );

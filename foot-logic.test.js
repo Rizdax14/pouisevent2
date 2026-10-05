@@ -469,11 +469,12 @@ test("permissions : bureau, démarrage et édition d'un match", () => {
   assert.equal(L.canEditMatch({ status: "scheduled" }, membre), false);
 });
 
-test("ratingsTabView: the tables are only for people who voted (and admins), validated or not", () => {
-  assert.equal(ratingsTabView({ validated: true, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
-  assert.equal(ratingsTabView({ validated: true, isVoter: true, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
+test("ratingsTabView: before validation only voters (and admins) see the tables; once validated, everyone", () => {
+  assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
+  assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
   assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: false }).showAverages, true);
   assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: true }).showAverages, true);
+  assert.equal(ratingsTabView({ validated: true, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, true);
 });
 
 test("parseFinalNote accepts decimals, comma, empty = auto, rejects out of range", () => {

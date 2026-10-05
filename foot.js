@@ -1993,7 +1993,7 @@ function FootRatingsTab({
     }
   }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
-  }, "Note tes co\xE9quipiers pour voir les moyennes."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Note tes co\xE9quipiers pour voir les moyennes, ou attends la validation par le bureau."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       fontSize: 13,
@@ -2095,12 +2095,13 @@ function FootRatingsAdminPanel({
       await sbUpdate("foot_matches", {
         id: match.id
       }, {
-        rating_overrides: next
+        rating_overrides: next,
+        ratings_validated_at: match.ratings_validated_at || new Date().toISOString()
       });
       await reload();
       setMsg({
         t: "success",
-        m: "Notes finales enregistrées ✓"
+        m: "Notes finales enregistrées et validées ✓"
       });
     } catch (e) {
       setMsg({
@@ -2188,7 +2189,7 @@ function FootRatingsAdminPanel({
       color: FC.muted,
       marginBottom: 6
     }
-  }, "\xC9cris la note (ex : 6.1). Vide = moyenne des votes."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
+  }, "\xC9cris la note (ex : 6.1). Vide = moyenne des votes. Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
@@ -2231,7 +2232,7 @@ function FootRatingsAdminPanel({
     style: {
       marginTop: 10
     }
-  }, "Enregistrer les notes finales"), msg && /*#__PURE__*/React.createElement(FMessage, {
+  }, "Enregistrer et valider les notes finales"), msg && /*#__PURE__*/React.createElement(FMessage, {
     tone: msg.t === "error" ? "bad" : "good",
     style: {
       marginTop: 10

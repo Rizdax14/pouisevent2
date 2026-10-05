@@ -274,7 +274,7 @@ async function submitRatings({ isValidated, writeRatings }) {
 
 function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   const showForm = editing && isVoter && !validated;
-  const showAverages = !showForm && (isAdmin || (isVoter && hasVoted));
+  const showAverages = !showForm && (validated || isAdmin || (isVoter && hasVoted));
   return {
     showForm,
     showAverages,
