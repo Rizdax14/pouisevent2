@@ -134,11 +134,11 @@ function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
   return (
     <FCard>
       <FHeading right={isAdmin && !editing && <FBtn size="sm" variant="secondary" icon="pencil" onClick={() => { setSnapshot(current); setWanted(current); setEditing(true); }}>Modifier</FBtn>}>
-        Feuille de match <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>({current.length})</span>
+        Convocation <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>({current.length})</span>
       </FHeading>
       {!editing && (ordered.length
         ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{ordered.map((id) => <FootPlayerPill key={id} id={id} number={numberOf(id)} />)}</div>
-        : <FEmpty icon="users" title="Pas encore de feuille" text={isAdmin ? "Choisis les joueurs qui seront sur la feuille de match." : "La feuille de match n'est pas encore publiée."} />)}
+        : <FEmpty icon="users" title="Pas encore de convocation" text={isAdmin ? "Choisis les joueurs convoqués pour ce match." : "La convocation n'est pas encore publiée."} />)}
       {editing && (
         <>
           <FootLineupChecklist roster={roster} extraIds={current} checked={wanted} onToggle={toggle} disabled={saving} />
@@ -504,7 +504,7 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, currentPlaye
           <input type="number" min={1} inputMode="numeric" value={halfDuration} onChange={(e) => setHalfDuration(Number(e.target.value))} style={FOOT_INPUT_STYLE} />
         </FField>
       </div>
-      <FLabel>Feuille de match ({sheet.length})</FLabel>
+      <FLabel>Convocation ({sheet.length})</FLabel>
       <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} /></div>
       {err && <FMessage>{err}</FMessage>}
       <div style={{ display: "flex", gap: 10 }}>
@@ -746,12 +746,12 @@ function FootLiveView({ match, roster, events, lineups, currentPlayer, isAdmin, 
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={score} />
+      <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
       {isAdmin && <FootLiveAdminConsole match={match} roster={roster} events={matchEvents} lineups={lineups} reload={reload} />}
       <FCard>
         <FHeading>Buts</FHeading>
         <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
       </FCard>
-      <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
     </div>
   );
 }
@@ -798,7 +798,7 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
     setBusy(false);
   }
 
-  if (sheetIds.length < 2) return <FCard><FEmpty icon="star" title="Pas de notes" text="Il faut au moins deux joueurs sur la feuille de match pour noter." /></FCard>;
+  if (sheetIds.length < 2) return <FCard><FEmpty icon="star" title="Pas de notes" text="Il faut au moins deux joueurs sur la convocation pour noter." /></FCard>;
 
   const view = ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin });
   const ranked = sheetIds.map((id) => ({ id, avg: averages[id] })).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
@@ -921,11 +921,11 @@ function FootFinishedView({ match, roster, events, lineups, ratings, currentPlay
       <FSegmented value={tab} onChange={setTab} options={[["resume", "Résumé", "ball"], ["notes", "Notes", "star"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "resume" && (
         <>
+          <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
           <FCard>
             <FHeading>Buts</FHeading>
             <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
           </FCard>
-          <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
         </>
       )}
       {tab === "notes" && <FootRatingsTab match={match} lineups={lineups} ratings={ratings || []} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
@@ -953,6 +953,8 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
     <div className="ft-page">
       <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
 
+      <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
+
       {isOnRoster && (
         <FCard>
           <FHeading>Ma présence</FHeading>
@@ -969,8 +971,6 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
           </div>
         ))}
       </FCard>
-
-      <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
 
       {canStart && <FBtn variant="success" size="lg" full icon="play" onClick={onStartMatch}>Commencer le match</FBtn>}
     </div>
@@ -1140,7 +1140,7 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
       </FCard>
 
       {!me && <FMessage tone="warn">Les statistiques concernent l'effectif régulier et occasionnel.</FMessage>}
-      {me && me.played === 0 && <FMessage tone="warn">Pas encore de match terminé sur une feuille de match.</FMessage>}
+      {me && me.played === 0 && <FMessage tone="warn">Pas encore de match terminé avec une convocation.</FMessage>}
 
       <FCard>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>

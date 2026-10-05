@@ -293,7 +293,7 @@ function normalizeSettings(raw) {
 }
 
 function isTargetAvailable(sectionKey, m, lineups) {
-  if (sectionKey === "matchday") return lineups.some((l) => l.match_id === m.id) ? { ok: true } : { ok: false, why: "Feuille de match vide" };
+  if (sectionKey === "matchday") return lineups.some((l) => l.match_id === m.id) ? { ok: true } : { ok: false, why: "Convocation vide" };
   if (sectionKey === "result") return m.status === "finished" ? { ok: true } : { ok: false, why: "Match pas encore terminé" };
   if (sectionKey === "ratings") return m.ratings_validated_at ? { ok: true } : { ok: false, why: m.status === "finished" ? "Notes pas encore validées" : "Match pas encore terminé" };
   return { ok: true };

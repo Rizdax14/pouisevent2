@@ -308,7 +308,7 @@ function FootLineupSection({
         setEditing(true);
       }
     }, "Modifier")
-  }, "Feuille de match ", /*#__PURE__*/React.createElement("span", {
+  }, "Convocation ", /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: FF.ui,
       fontSize: 15,
@@ -326,8 +326,8 @@ function FootLineupSection({
     number: numberOf(id)
   }))) : /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
-    title: "Pas encore de feuille",
-    text: isAdmin ? "Choisis les joueurs qui seront sur la feuille de match." : "La feuille de match n'est pas encore publiée."
+    title: "Pas encore de convocation",
+    text: isAdmin ? "Choisis les joueurs convoqués pour ce match." : "La convocation n'est pas encore publiée."
   })), editing && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootLineupChecklist, {
     roster: roster,
     extraIds: current,
@@ -1209,7 +1209,7 @@ function FootStartMatchConfig({
     value: halfDuration,
     onChange: e => setHalfDuration(Number(e.target.value)),
     style: FOOT_INPUT_STYLE
-  }))), /*#__PURE__*/React.createElement(FLabel, null, "Feuille de match (", sheet.length, ")"), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement(FLabel, null, "Convocation (", sheet.length, ")"), /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "0 0 16px"
     }
@@ -1772,6 +1772,12 @@ function FootLiveView({
   }, /*#__PURE__*/React.createElement(FootScoreboard, {
     match: match,
     score: score
+  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups,
+    isAdmin: false,
+    reload: reload
   }), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
     match: match,
     roster: roster,
@@ -1785,13 +1791,7 @@ function FootLiveView({
     roster: roster,
     lineups: lineups,
     reload: reload
-  })), /*#__PURE__*/React.createElement(FootLineupSection, {
-    match: match,
-    roster: roster,
-    lineups: lineups,
-    isAdmin: false,
-    reload: reload
-  }));
+  })));
 }
 const FOOT_SCORE_OPTIONS = Array.from({
   length: 19
@@ -1864,7 +1864,7 @@ function FootRatingsTab({
   if (sheetIds.length < 2) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
     icon: "star",
     title: "Pas de notes",
-    text: "Il faut au moins deux joueurs sur la feuille de match pour noter."
+    text: "Il faut au moins deux joueurs sur la convocation pour noter."
   }));
   const view = ratingsTabView({
     validated,
@@ -2279,20 +2279,20 @@ function FootFinishedView({
       marginBottom: 14,
       background: "rgba(255,255,255,0.92)"
     }
-  }), tab === "resume" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Buts"), /*#__PURE__*/React.createElement(FootEventTimeline, {
+  }), tab === "resume" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups,
+    isAdmin: false,
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Buts"), /*#__PURE__*/React.createElement(FootEventTimeline, {
     events: matchEvents,
     editable: isAdmin,
     match: match,
     roster: roster,
     lineups: lineups,
     reload: reload
-  })), /*#__PURE__*/React.createElement(FootLineupSection, {
-    match: match,
-    roster: roster,
-    lineups: lineups,
-    isAdmin: false,
-    reload: reload
-  })), tab === "notes" && /*#__PURE__*/React.createElement(FootRatingsTab, {
+  }))), tab === "notes" && /*#__PURE__*/React.createElement(FootRatingsTab, {
     match: match,
     lineups: lineups,
     ratings: ratings || [],
@@ -2337,6 +2337,12 @@ function FootScheduledView({
       bl: 0,
       opponent: 0
     }
+  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+    match: match,
+    roster: roster,
+    lineups: lineups || [],
+    isAdmin: isAdmin,
+    reload: reload
   }), isOnRoster && /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Ma pr\xE9sence"), /*#__PURE__*/React.createElement(FootAttendanceButtons, {
     myStatus: myStatus,
     saving: saving,
@@ -2371,13 +2377,7 @@ function FootScheduledView({
     id: id,
     tone: "line",
     dim: tone === "plain"
-  })))))), /*#__PURE__*/React.createElement(FootLineupSection, {
-    match: match,
-    roster: roster,
-    lineups: lineups || [],
-    isAdmin: isAdmin,
-    reload: reload
-  }), canStart && /*#__PURE__*/React.createElement(FBtn, {
+  })))))), canStart && /*#__PURE__*/React.createElement(FBtn, {
     variant: "success",
     size: "lg",
     full: true,
@@ -2788,7 +2788,7 @@ function FootStatsPage({
     tone: "warn"
   }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && me.played === 0 && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
-  }, "Pas encore de match termin\xE9 sur une feuille de match."), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement("div", {
+  }, "Pas encore de match termin\xE9 avec une convocation."), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
