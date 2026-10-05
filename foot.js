@@ -2077,7 +2077,18 @@ function FootRatingsAdminPanel({
   }
   async function saveFinals() {
     const next = {};
-    for (const id of sheetIds) if (finals[id] !== "" && finals[id] != null) next[id] = Number(finals[id]);
+    try {
+      for (const id of sheetIds) {
+        const n = parseFinalNote(finals[id]);
+        if (n != null) next[id] = n;
+      }
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: e.message
+      });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -2177,7 +2188,7 @@ function FootRatingsAdminPanel({
       color: FC.muted,
       marginBottom: 6
     }
-  }, "\xAB Auto \xBB = moyenne des votes."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
+  }, "\xC9cris la note (ex : 6.1). Vide = moyenne des votes."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
@@ -2196,20 +2207,23 @@ function FootRatingsAdminPanel({
       fontSize: 12,
       color: FC.muted
     }
-  }, averages[id] == null ? "—" : averages[id].toFixed(1)), /*#__PURE__*/React.createElement("select", {
+  }, averages[id] == null ? "—" : averages[id].toFixed(1)), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "decimal",
+    placeholder: "Auto",
     value: finals[id] ?? "",
     disabled: busy,
     onChange: e => setFinals({
       ...finals,
       [id]: e.target.value
     }),
+    "aria-label": `Note finale de ${footNameOf(id)}`,
     style: {
-      ...FOOT_SELECT_STYLE,
-      minWidth: 82
+      ...FOOT_INPUT_STYLE,
+      width: 82,
+      textAlign: "center"
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Auto"), opts))), /*#__PURE__*/React.createElement(FBtn, {
+  }))), /*#__PURE__*/React.createElement(FBtn, {
     full: true,
     size: "sm",
     onClick: saveFinals,

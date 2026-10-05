@@ -475,3 +475,14 @@ test("ratingsTabView: the tables are only for people who voted (and admins), val
   assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: false }).showAverages, true);
   assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: true }).showAverages, true);
 });
+
+test("parseFinalNote accepts decimals, comma, empty = auto, rejects out of range", () => {
+  const { parseFinalNote } = require("./foot-logic.js");
+  assert.equal(parseFinalNote("6.1"), 6.1);
+  assert.equal(parseFinalNote(" 6,14 "), 6.1);
+  assert.equal(parseFinalNote(""), null);
+  assert.equal(parseFinalNote(null), null);
+  assert.throws(() => parseFinalNote("11"));
+  assert.throws(() => parseFinalNote("0.5"));
+  assert.throws(() => parseFinalNote("abc"));
+});

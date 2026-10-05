@@ -207,6 +207,15 @@ function finalAverages(match, sheetIds, matchRatings) {
   return out;
 }
 
+// A final note typed by an admin: "6.1" or "6,1", between 1 and 10, one decimal. Empty = automatic (null).
+function parseFinalNote(raw) {
+  const t = String(raw ?? "").trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 1 || n > 10) throw new Error("La note finale doit être entre 1 et 10");
+  return Math.round(n * 10) / 10;
+}
+
 function playerRatingSeries(matches, ratings, lineups, playerId) {
   const series = [];
   for (const m of matches) {
@@ -326,6 +335,7 @@ if (typeof module !== "undefined" && module.exports) {
     ratingProgress,
     matchAverages,
     finalAverages,
+    parseFinalNote,
     playerRatingSeries,
     averageRating,
     buildRatingPayload,

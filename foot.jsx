@@ -870,7 +870,8 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
   }
   async function saveFinals() {
     const next = {};
-    for (const id of sheetIds) if (finals[id] !== "" && finals[id] != null) next[id] = Number(finals[id]);
+    try { for (const id of sheetIds) { const n = parseFinalNote(finals[id]); if (n != null) next[id] = n; } }
+    catch (e) { setMsg({ t: "error", m: e.message }); return; }
     setBusy(true); setMsg(null);
     try { await sbUpdate("foot_matches", { id: match.id }, { rating_overrides: next }); await reload(); setMsg({ t: "success", m: "Notes finales enregistrées ✓" }); }
     catch (e) { setMsg({ t: "error", m: "Erreur : " + e.message }); }
@@ -892,12 +893,12 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
       ))}
       <FBtn full size="sm" onClick={saveVotes} disabled={busy} style={{ margin: "10px 0 16px" }}>Enregistrer les notes de {footNameOf(rater)}</FBtn>
       <div style={{ fontFamily: FF.ui, fontSize: 16, marginBottom: 4 }}>Note finale par joueur</div>
-      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>« Auto » = moyenne des votes.</div>
+      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>Écris la note (ex : 6.1). Vide = moyenne des votes.</div>
       {sheetIds.map((id) => (
         <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
           <span style={{ flex: 1, fontSize: 15 }}>{footNameOf(id)}</span>
           <span style={{ fontSize: 12, color: FC.muted }}>{averages[id] == null ? "—" : averages[id].toFixed(1)}</span>
-          <select value={finals[id] ?? ""} disabled={busy} onChange={(e) => setFinals({ ...finals, [id]: e.target.value })} style={{ ...FOOT_SELECT_STYLE, minWidth: 82 }}><option value="">Auto</option>{opts}</select>
+          <input type="text" inputMode="decimal" placeholder="Auto" value={finals[id] ?? ""} disabled={busy} onChange={(e) => setFinals({ ...finals, [id]: e.target.value })} aria-label={`Note finale de ${footNameOf(id)}`} style={{ ...FOOT_INPUT_STYLE, width: 82, textAlign: "center" }} />
         </div>
       ))}
       <FBtn full size="sm" onClick={saveFinals} disabled={busy} style={{ marginTop: 10 }}>Enregistrer les notes finales</FBtn>
