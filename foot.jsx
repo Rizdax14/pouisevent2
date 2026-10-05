@@ -67,12 +67,32 @@ function FootWhenWhere({ match, size = 14 }) {
   );
 }
 
+// Portrait with a small status dot in its corner: green = present, red = absent, grey = no answer yet (no dot when unknown).
+const FOOT_PRESENCE_LABEL = { present: "Présent", absent: "Absent", none: "Pas de réponse" };
+function FootPresenceAvatar({ id, name, size, status }) {
+  if (!status) return <FAvatar playerId={id} name={name} size={size} />;
+  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : FC.muted;
+  const d = Math.max(10, Math.round(size * 0.36));
+  return (
+    <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
+      <FAvatar playerId={id} name={name} size={size} />
+      <span role="img" aria-label={FOOT_PRESENCE_LABEL[status]} title={FOOT_PRESENCE_LABEL[status]} style={{ position: "absolute", right: -2, bottom: -2, width: d, height: d, borderRadius: d / 2, background: color, border: "2px solid #fff", boxSizing: "border-box" }} />
+    </span>
+  );
+}
+// player id → "present" | "absent" | "none" for one match.
+function presenceMap(attendance, matchId) {
+  const out = {};
+  for (const a of attendance || []) if (a.match_id === matchId) out[a.player_id] = a.status === "present" ? "present" : a.status === "absent" ? "absent" : "none";
+  return out;
+}
+
 // A player as a pill: round portrait, name, optional jersey number.
-function FootPlayerPill({ id, number, tone = "soft", dim }) {
+function FootPlayerPill({ id, number, tone = "soft", dim, status }) {
   const name = footNameOf(id);
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: tone === "soft" ? FC.soft : "transparent", border: tone === "soft" ? "none" : `1px solid ${FC.line}`, borderRadius: 999, padding: "4px 12px 4px 4px", fontSize: 14, color: dim ? FC.muted : FC.text, maxWidth: "100%" }}>
-      <FAvatar playerId={id} name={name} size={28} />
+      <FootPresenceAvatar id={id} name={name} size={28} status={status} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
       {number && <span style={{ fontFamily: FF.ui, fontSize: 12, color: FC.deep, background: FC.solid, borderRadius: 999, padding: "1px 7px" }}>{number}</span>}
     </span>
@@ -90,7 +110,7 @@ function FootAttendanceButtons({ myStatus, saving, onSet, compact }) {
 }
 
 // ---- lineup (feuille de match) ------------------------------------------------------------------------------------
-function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled }) {
+function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, presence }) {
   const ids = [...new Set([...roster.map((r) => r.player_id), ...(extraIds || [])])];
   const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
   const players = ids.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean)
@@ -102,7 +122,7 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled }) 
         const on = checked.includes(p.id);
         return (
           <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 6px 6px", borderRadius: 16, background: on ? FC.accentSoft : FC.softer, border: `1.5px solid ${on ? FC.accent : "transparent"}`, cursor: disabled ? "default" : "pointer", fontSize: 15 }}>
-            <FAvatar playerId={p.id} name={getDisplayName(p, PLAYERS)} size={34} />
+            <FootPresenceAvatar id={p.id} name={getDisplayName(p, PLAYERS)} size={34} status={presence ? presence[p.id] || "none" : null} />
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDisplayName(p, PLAYERS)}</span>
             {numberOf(p.id) && <span style={{ fontFamily: FF.ui, fontSize: 13, color: FC.deep }}>n°{numberOf(p.id)}</span>}
             <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(p.id)} />
@@ -113,8 +133,9 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled }) 
   );
 }
 
-function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
+function FootLineupSection({ match, roster, lineups, attendance, isAdmin, reload }) {
   const current = lineupIdsFor(lineups, match.id);
+  const presence = presenceMap(attendance, match.id);
   const [editing, setEditing] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
@@ -137,11 +158,11 @@ function FootLineupSection({ match, roster, lineups, isAdmin, reload }) {
         Convocation <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>({current.length})</span>
       </FHeading>
       {!editing && (ordered.length
-        ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{ordered.map((id) => <FootPlayerPill key={id} id={id} number={numberOf(id)} />)}</div>
+        ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{ordered.map((id) => <FootPlayerPill key={id} id={id} number={numberOf(id)} status={presence[id] || "none"} />)}</div>
         : <FEmpty icon="users" title="Pas encore de convocation" text={isAdmin ? "Choisis les joueurs convoqués pour ce match." : "La convocation n'est pas encore publiée."} />)}
       {editing && (
         <>
-          <FootLineupChecklist roster={roster} extraIds={current} checked={wanted} onToggle={toggle} disabled={saving} />
+          <FootLineupChecklist roster={roster} extraIds={current} checked={wanted} onToggle={toggle} disabled={saving} presence={presence} />
           {err && <FMessage style={{ marginTop: 10 }}>{err}</FMessage>}
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <FBtn variant="ghost" onClick={() => setEditing(false)} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
@@ -505,7 +526,7 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, currentPlaye
         </FField>
       </div>
       <FLabel>Convocation ({sheet.length})</FLabel>
-      <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} /></div>
+      <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} presence={presenceMap(attendance, match.id)} /></div>
       {err && <FMessage>{err}</FMessage>}
       <div style={{ display: "flex", gap: 10 }}>
         <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
@@ -740,13 +761,13 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   );
 }
 
-function FootLiveView({ match, roster, events, lineups, currentPlayer, isAdmin, reload }) {
+function FootLiveView({ match, roster, events, lineups, attendance, currentPlayer, isAdmin, reload }) {
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={score} />
-      <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
+      <FootLineupSection match={match} roster={roster} lineups={lineups} attendance={attendance} isAdmin={false} reload={reload} />
       {isAdmin && <FootLiveAdminConsole match={match} roster={roster} events={matchEvents} lineups={lineups} reload={reload} />}
       <FCard>
         <FHeading>Buts</FHeading>
@@ -911,7 +932,7 @@ function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
   );
 }
 
-function FootFinishedView({ match, roster, events, lineups, ratings, currentPlayer, isAdmin, reload }) {
+function FootFinishedView({ match, roster, events, lineups, attendance, ratings, currentPlayer, isAdmin, reload }) {
   const [tab, setTab] = React.useState("resume");
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
@@ -921,7 +942,7 @@ function FootFinishedView({ match, roster, events, lineups, ratings, currentPlay
       <FSegmented value={tab} onChange={setTab} options={[["resume", "Résumé", "ball"], ["notes", "Notes", "star"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "resume" && (
         <>
-          <FootLineupSection match={match} roster={roster} lineups={lineups} isAdmin={false} reload={reload} />
+          <FootLineupSection match={match} roster={roster} lineups={lineups} attendance={attendance} isAdmin={false} reload={reload} />
           <FCard>
             <FHeading>Buts</FHeading>
             <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
@@ -953,7 +974,7 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
     <div className="ft-page">
       <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
 
-      <FootLineupSection match={match} roster={roster} lineups={lineups || []} isAdmin={isAdmin} reload={reload} />
+      <FootLineupSection match={match} roster={roster} lineups={lineups || []} attendance={attendance} isAdmin={isAdmin} reload={reload} />
 
       {isOnRoster && (
         <FCard>
@@ -1005,8 +1026,8 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
           <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} reload={reload} onCancel={() => setStartingConfig(false)} />
         </>
       )}
-      {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
-      {match.status === "finished" && <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} ratings={ratings} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
+      {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
+      {match.status === "finished" && <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} ratings={ratings} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
 
       {isAdmin && (
         <>

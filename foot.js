@@ -128,12 +128,66 @@ function FootWhenWhere({
   }), /*#__PURE__*/React.createElement("span", null, place)));
 }
 
+// Portrait with a small status dot in its corner: green = present, red = absent, grey = no answer yet (no dot when unknown).
+const FOOT_PRESENCE_LABEL = {
+  present: "Présent",
+  absent: "Absent",
+  none: "Pas de réponse"
+};
+function FootPresenceAvatar({
+  id,
+  name,
+  size,
+  status
+}) {
+  if (!status) return /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: name,
+    size: size
+  });
+  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : FC.muted;
+  const d = Math.max(10, Math.round(size * 0.36));
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: "relative",
+      display: "inline-flex",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: name,
+    size: size
+  }), /*#__PURE__*/React.createElement("span", {
+    role: "img",
+    "aria-label": FOOT_PRESENCE_LABEL[status],
+    title: FOOT_PRESENCE_LABEL[status],
+    style: {
+      position: "absolute",
+      right: -2,
+      bottom: -2,
+      width: d,
+      height: d,
+      borderRadius: d / 2,
+      background: color,
+      border: "2px solid #fff",
+      boxSizing: "border-box"
+    }
+  }));
+}
+// player id → "present" | "absent" | "none" for one match.
+function presenceMap(attendance, matchId) {
+  const out = {};
+  for (const a of attendance || []) if (a.match_id === matchId) out[a.player_id] = a.status === "present" ? "present" : a.status === "absent" ? "absent" : "none";
+  return out;
+}
+
 // A player as a pill: round portrait, name, optional jersey number.
 function FootPlayerPill({
   id,
   number,
   tone = "soft",
-  dim
+  dim,
+  status
 }) {
   const name = footNameOf(id);
   return /*#__PURE__*/React.createElement("span", {
@@ -149,10 +203,11 @@ function FootPlayerPill({
       color: dim ? FC.muted : FC.text,
       maxWidth: "100%"
     }
-  }, /*#__PURE__*/React.createElement(FAvatar, {
-    playerId: id,
+  }, /*#__PURE__*/React.createElement(FootPresenceAvatar, {
+    id: id,
     name: name,
-    size: 28
+    size: 28,
+    status: status
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       overflow: "hidden",
@@ -212,7 +267,8 @@ function FootLineupChecklist({
   extraIds,
   checked,
   onToggle,
-  disabled
+  disabled,
+  presence
 }) {
   const ids = [...new Set([...roster.map(r => r.player_id), ...(extraIds || [])])];
   const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
@@ -242,10 +298,11 @@ function FootLineupChecklist({
         cursor: disabled ? "default" : "pointer",
         fontSize: 15
       }
-    }, /*#__PURE__*/React.createElement(FAvatar, {
-      playerId: p.id,
+    }, /*#__PURE__*/React.createElement(FootPresenceAvatar, {
+      id: p.id,
       name: getDisplayName(p, PLAYERS),
-      size: 34
+      size: 34,
+      status: presence ? presence[p.id] || "none" : null
     }), /*#__PURE__*/React.createElement("span", {
       style: {
         flex: 1,
@@ -272,10 +329,12 @@ function FootLineupSection({
   match,
   roster,
   lineups,
+  attendance,
   isAdmin,
   reload
 }) {
   const current = lineupIdsFor(lineups, match.id);
+  const presence = presenceMap(attendance, match.id);
   const [editing, setEditing] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
@@ -323,7 +382,8 @@ function FootLineupSection({
   }, ordered.map(id => /*#__PURE__*/React.createElement(FootPlayerPill, {
     key: id,
     id: id,
-    number: numberOf(id)
+    number: numberOf(id),
+    status: presence[id] || "none"
   }))) : /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
     title: "Pas encore de convocation",
@@ -333,7 +393,8 @@ function FootLineupSection({
     extraIds: current,
     checked: wanted,
     onToggle: toggle,
-    disabled: saving
+    disabled: saving,
+    presence: presence
   }), err && /*#__PURE__*/React.createElement(FMessage, {
     style: {
       marginTop: 10
@@ -1216,7 +1277,8 @@ function FootStartMatchConfig({
     extraIds: existingSheet,
     checked: sheet,
     onToggle: toggle,
-    disabled: saving
+    disabled: saving,
+    presence: presenceMap(attendance, match.id)
   })), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1759,6 +1821,7 @@ function FootLiveView({
   roster,
   events,
   lineups,
+  attendance,
   currentPlayer,
   isAdmin,
   reload
@@ -1774,6 +1837,7 @@ function FootLiveView({
     match: match,
     roster: roster,
     lineups: lineups,
+    attendance: attendance,
     isAdmin: false,
     reload: reload
   }), isAdmin && /*#__PURE__*/React.createElement(FootLiveAdminConsole, {
@@ -2256,6 +2320,7 @@ function FootFinishedView({
   roster,
   events,
   lineups,
+  attendance,
   ratings,
   currentPlayer,
   isAdmin,
@@ -2281,6 +2346,7 @@ function FootFinishedView({
     match: match,
     roster: roster,
     lineups: lineups,
+    attendance: attendance,
     isAdmin: false,
     reload: reload
   }), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Buts"), /*#__PURE__*/React.createElement(FootEventTimeline, {
@@ -2339,6 +2405,7 @@ function FootScheduledView({
     match: match,
     roster: roster,
     lineups: lineups || [],
+    attendance: attendance,
     isAdmin: isAdmin,
     reload: reload
   }), isOnRoster && /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Ma pr\xE9sence"), /*#__PURE__*/React.createElement(FootAttendanceButtons, {
@@ -2451,6 +2518,7 @@ function FootMatchDetailPage({
     roster: roster,
     events: events,
     lineups: lineups,
+    attendance: attendance,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload
@@ -2459,6 +2527,7 @@ function FootMatchDetailPage({
     roster: roster,
     events: events,
     lineups: lineups,
+    attendance: attendance,
     ratings: ratings,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
