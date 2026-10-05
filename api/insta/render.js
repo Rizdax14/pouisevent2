@@ -98,7 +98,7 @@ async function buildRatings(q) {
   for (const id of sheetIds) seasonAvg[id] = F.averageRating(F.playerRatingSeries(seasonMatches, ratings, lineups, id));
   const sheetPlayers = ctx.players.filter((p) => sheetIds.includes(p.id));
   const nameOf = (id) => L.postName(ctx.players.find((p) => p.id === id), sheetPlayers);
-  const rows = L.ratingRows(sheetIds, F.matchAverages(sheetIds, ctx.ratings), seasonAvg, nameOf);
+  const rows = L.ratingRows(sheetIds, F.finalAverages(ctx.match, sheetIds, ctx.ratings), seasonAvg, nameOf);
   // Top 3 get their "dos" photo on the podium; missing photos fall back to initials in the template.
   await withPodiumPhotos(rows, ctx, "podium_dos", ctx.theme);
   const s = F.computeFootScore(ctx.events);

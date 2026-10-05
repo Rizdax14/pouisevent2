@@ -1775,7 +1775,7 @@ function FootLiveView({
     match: match,
     roster: roster,
     lineups: lineups,
-    isAdmin: isAdmin,
+    isAdmin: false,
     reload: reload
   }));
 }
@@ -1793,7 +1793,7 @@ function FootRatingsTab({
   const sheetIds = lineupIdsFor(lineups, match.id);
   const mr = ratings.filter(r => r.match_id === match.id);
   const progress = ratingProgress(sheetIds, mr);
-  const averages = matchAverages(sheetIds, mr);
+  const averages = finalAverages(match, sheetIds, mr);
   const validated = !!match.ratings_validated_at;
   const me = currentPlayer?.id;
   const isVoter = sheetIds.includes(me);
@@ -1816,20 +1816,13 @@ function FootRatingsTab({
     setErr(null);
     try {
       const result = await submitRatings({
-        sheetIds,
         isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
         writeRatings: async () => assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map(r => ({
           ...r,
           updated_at: new Date().toISOString()
         })), {
           onConflict: "match_id,rater_id,ratee_id"
-        })),
-        readRatings: () => sbFetch("foot_ratings", `?match_id=eq.${match.id}&select=rater_id,ratee_id,score`),
-        markValidated: () => sbUpdate("foot_matches", {
-          id: match.id
-        }, {
-          ratings_validated_at: new Date().toISOString()
-        })
+        }))
       });
       if (result === "closed") setErr("Les notes de ce match ont déjà été validées, tes notes n'ont pas été enregistrées.");
       setEditing(false);
@@ -1840,7 +1833,7 @@ function FootRatingsTab({
     setBusy(false);
   }
   async function forceValidate() {
-    if (!window.confirm("Valider les notes maintenant avec les votes déjà faits ?")) return;
+    if (!window.confirm("Valider les notes avec les votes déjà faits ? Les joueurs ne pourront plus les modifier.")) return;
     setBusy(true);
     try {
       await sbUpdate("foot_matches", {
@@ -2000,14 +1993,14 @@ function FootRatingsTab({
     }
   }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
-  }, "Les moyennes seront visibles apr\xE8s validation des notes."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Note tes co\xE9quipiers pour voir les moyennes."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       fontSize: 13,
       color: FC.muted
     }
   }, "Pas encore vot\xE9 : ", progress.pendingIds.map(nameOf).join(" · ")), isAdmin && !validated && /*#__PURE__*/React.createElement(FBtn, {
-    variant: "ghost",
+    variant: "success",
     full: true,
     size: "sm",
     onClick: forceValidate,
@@ -2015,7 +2008,221 @@ function FootRatingsTab({
     style: {
       marginTop: 12
     }
-  }, "Valider les notes maintenant"));
+  }, "Valider les notes"), isAdmin && /*#__PURE__*/React.createElement(FootRatingsAdminPanel, {
+    match: match,
+    sheetIds: sheetIds,
+    mr: mr,
+    averages: averages,
+    reload: reload
+  }));
+}
+
+// Bureau only: edit any player's votes and the final note of each player. Nobody else ever sees this table.
+function FootRatingsAdminPanel({
+  match,
+  sheetIds,
+  mr,
+  averages,
+  reload
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [rater, setRater] = React.useState(sheetIds[0]);
+  const [scores, setScores] = React.useState({});
+  const [finals, setFinals] = React.useState({});
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const over = match.rating_overrides || {};
+  React.useEffect(() => {
+    setScores(Object.fromEntries(mr.filter(r => r.rater_id === rater).map(r => [r.ratee_id, String(r.score)])));
+  }, [rater, mr.length, open]);
+  React.useEffect(() => {
+    setFinals(Object.fromEntries(sheetIds.map(id => [id, over[id] != null ? String(over[id]) : ""])));
+  }, [match.rating_overrides, open]);
+  if (!open) return /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
+    full: true,
+    size: "sm",
+    icon: "sliders",
+    onClick: () => setOpen(true),
+    style: {
+      marginTop: 10
+    }
+  }, "Tableau des notes (bureau)");
+  async function saveVotes() {
+    const rows = sheetIds.filter(id => id !== rater && scores[id] !== undefined && scores[id] !== "").map(id => ({
+      match_id: match.id,
+      rater_id: rater,
+      ratee_id: id,
+      score: Number(scores[id]),
+      updated_at: new Date().toISOString()
+    }));
+    setBusy(true);
+    setMsg(null);
+    try {
+      if (rows.length) assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows, {
+        onConflict: "match_id,rater_id,ratee_id"
+      }));
+      await reload();
+      setMsg({
+        t: "success",
+        m: "Notes enregistrées ✓"
+      });
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Erreur : " + e.message
+      });
+    }
+    setBusy(false);
+  }
+  async function saveFinals() {
+    const next = {};
+    for (const id of sheetIds) if (finals[id] !== "" && finals[id] != null) next[id] = Number(finals[id]);
+    setBusy(true);
+    setMsg(null);
+    try {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        rating_overrides: next
+      });
+      await reload();
+      setMsg({
+        t: "success",
+        m: "Notes finales enregistrées ✓"
+      });
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Erreur : " + e.message
+      });
+    }
+    setBusy(false);
+  }
+  const opts = FOOT_SCORE_OPTIONS.map(x => /*#__PURE__*/React.createElement("option", {
+    key: x,
+    value: String(x)
+  }, x.toFixed(1)));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      paddingTop: 12,
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FBtn, {
+      size: "sm",
+      variant: "ghost",
+      onClick: () => setOpen(false)
+    }, "Fermer")
+  }, "Tableau des notes"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 10
+    }
+  }, "Visible et modifiable uniquement par le bureau."), /*#__PURE__*/React.createElement(FField, {
+    label: "Notes donn\xE9es par"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: rater,
+    onChange: e => setRater(Number(e.target.value)),
+    style: FOOT_SELECT_STYLE
+  }, sheetIds.map(id => /*#__PURE__*/React.createElement("option", {
+    key: id,
+    value: id
+  }, footNameOf(id))))), sheetIds.filter(id => id !== rater).map(id => /*#__PURE__*/React.createElement("div", {
+    key: id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "6px 0",
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 15
+    }
+  }, footNameOf(id)), /*#__PURE__*/React.createElement("select", {
+    value: scores[id] ?? "",
+    disabled: busy,
+    onChange: e => setScores({
+      ...scores,
+      [id]: e.target.value
+    }),
+    style: {
+      ...FOOT_SELECT_STYLE,
+      minWidth: 82
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014"), opts))), /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    size: "sm",
+    onClick: saveVotes,
+    disabled: busy,
+    style: {
+      margin: "10px 0 16px"
+    }
+  }, "Enregistrer les notes de ", footNameOf(rater)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 16,
+      marginBottom: 4
+    }
+  }, "Note finale par joueur"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 6
+    }
+  }, "\xAB Auto \xBB = moyenne des votes."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
+    key: id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "6px 0",
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 15
+    }
+  }, footNameOf(id)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: FC.muted
+    }
+  }, averages[id] == null ? "—" : averages[id].toFixed(1)), /*#__PURE__*/React.createElement("select", {
+    value: finals[id] ?? "",
+    disabled: busy,
+    onChange: e => setFinals({
+      ...finals,
+      [id]: e.target.value
+    }),
+    style: {
+      ...FOOT_SELECT_STYLE,
+      minWidth: 82
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Auto"), opts))), /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    size: "sm",
+    onClick: saveFinals,
+    disabled: busy,
+    style: {
+      marginTop: 10
+    }
+  }, "Enregistrer les notes finales"), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t === "error" ? "bad" : "good",
+    style: {
+      marginTop: 10
+    }
+  }, msg.m));
 }
 function FootFinishedView({
   match,
@@ -2054,7 +2261,7 @@ function FootFinishedView({
     match: match,
     roster: roster,
     lineups: lineups,
-    isAdmin: isAdmin,
+    isAdmin: false,
     reload: reload
   })), tab === "notes" && /*#__PURE__*/React.createElement(FootRatingsTab, {
     match: match,

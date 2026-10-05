@@ -199,13 +199,21 @@ function matchAverages(sheetIds, matchRatings) {
   return out;
 }
 
+// Average per player, with the final notes an admin may have set by hand on the match (rating_overrides: {playerId: score}).
+function finalAverages(match, sheetIds, matchRatings) {
+  const out = matchAverages(sheetIds, matchRatings);
+  const over = (match && match.rating_overrides) || {};
+  for (const id of sheetIds) if (over[id] != null && over[id] !== "") out[id] = Number(over[id]);
+  return out;
+}
+
 function playerRatingSeries(matches, ratings, lineups, playerId) {
   const series = [];
   for (const m of matches) {
     if (!m.ratings_validated_at) continue;
     const sheet = lineups.filter((l) => l.match_id === m.id).map((l) => l.player_id);
     if (!sheet.includes(playerId)) continue;
-    const rating = matchAverages(sheet, ratings.filter((r) => r.match_id === m.id))[playerId];
+    const rating = finalAverages(m, sheet, ratings.filter((r) => r.match_id === m.id))[playerId];
     if (rating == null) continue;
     series.push({ matchId: m.id, date: m.match_datetime, opponent: m.opponent_name, rating });
   }
@@ -248,19 +256,16 @@ function sortStatsRows(rows, key, dir, mode, nameOf) {
   });
 }
 
-async function submitRatings({ sheetIds, isValidated, writeRatings, readRatings, markValidated }) {
+// Saving a vote never validates the ratings: an admin does that by hand.
+async function submitRatings({ isValidated, writeRatings }) {
   if (await isValidated()) return "closed";
   await writeRatings();
-  if (ratingProgress(sheetIds, (await readRatings()) || []).complete) {
-    await markValidated();
-    return "validated";
-  }
   return "saved";
 }
 
 function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   const showForm = editing && isVoter && !validated;
-  const showAverages = !showForm && (validated || isAdmin || (isVoter && hasVoted));
+  const showAverages = !showForm && (isAdmin || (isVoter && hasVoted));
   return {
     showForm,
     showAverages,
@@ -320,6 +325,7 @@ if (typeof module !== "undefined" && module.exports) {
     filterMatchesForStats,
     ratingProgress,
     matchAverages,
+    finalAverages,
     playerRatingSeries,
     averageRating,
     buildRatingPayload,

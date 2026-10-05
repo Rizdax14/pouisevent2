@@ -306,7 +306,7 @@ function captionContextFor(kind, { matchId, season }, { matches, lineups, events
     const sc = _footFn("computeFootScore")(evs);
     return { opponent: match.opponent_name, bl: sc.bl, opp: sc.opponent, goals: goalLines(evs, players) };
   }
-  const avg = _footFn("matchAverages")(sheet, ratings.filter((r) => r.match_id === matchId));
+  const avg = _footFn("finalAverages")(match, sheet, ratings.filter((r) => r.match_id === matchId));
   const top = sheet.filter((id) => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map((id) => ({ name: nameOf(id), rating: avg[id] }));
   return { opponent: match.opponent_name, top };
 }

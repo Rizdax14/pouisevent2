@@ -400,21 +400,25 @@ test("sortStatsRows breaks ties by name", () => {
 
 test("submitRatings refuses to write once the match is already validated", async () => {
   let wrote = false;
-  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => true, writeRatings: async () => { wrote = true; }, readRatings: async () => [], markValidated: async () => {} });
+  const r = await submitRatings({ isValidated: async () => true, writeRatings: async () => { wrote = true; } });
   assert.equal(r, "closed");
   assert.equal(wrote, false);
 });
 
-test("submitRatings validates when the fresh ratings are complete", async () => {
-  let validated = false;
-  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => false, writeRatings: async () => {}, readRatings: async () => [{ rater_id: 1, ratee_id: 2 }, { rater_id: 2, ratee_id: 1 }], markValidated: async () => { validated = true; } });
-  assert.equal(r, "validated");
-  assert.equal(validated, true);
+test("submitRatings only saves, even when every vote is in (an admin validates)", async () => {
+  let wrote = false;
+  const r = await submitRatings({ isValidated: async () => false, writeRatings: async () => { wrote = true; } });
+  assert.equal(r, "saved");
+  assert.equal(wrote, true);
 });
 
-test("submitRatings only saves when others still have to vote", async () => {
-  const r = await submitRatings({ sheetIds: [1, 2], isValidated: async () => false, writeRatings: async () => {}, readRatings: async () => [{ rater_id: 1, ratee_id: 2 }], markValidated: async () => { throw new Error("should not validate"); } });
-  assert.equal(r, "saved");
+test("finalAverages applies the admin's hand-set final notes", () => {
+  const { finalAverages } = require("./foot-logic.js");
+  const rs = [{ rater_id: 1, ratee_id: 2, score: 6 }, { rater_id: 3, ratee_id: 2, score: 8 }, { rater_id: 2, ratee_id: 1, score: 5 }];
+  assert.equal(finalAverages({}, [1, 2, 3], rs)[2], 7);
+  const f = finalAverages({ rating_overrides: { 2: 9.5 } }, [1, 2, 3], rs);
+  assert.equal(f[2], 9.5);
+  assert.equal(f[1], 5);
 });
 
 test("ratingsTabView hides the form once validated, even if it was open", () => {
@@ -463,4 +467,11 @@ test("permissions : bureau, démarrage et édition d'un match", () => {
   assert.equal(L.canEditMatch(done, starter), false);
   assert.equal(L.canEditMatch({ status: "scheduled" }, bureau[3]), true);
   assert.equal(L.canEditMatch({ status: "scheduled" }, membre), false);
+});
+
+test("ratingsTabView: the tables are only for people who voted (and admins), validated or not", () => {
+  assert.equal(ratingsTabView({ validated: true, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
+  assert.equal(ratingsTabView({ validated: true, isVoter: true, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
+  assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: false }).showAverages, true);
+  assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: true }).showAverages, true);
 });
