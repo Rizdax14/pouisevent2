@@ -2999,6 +2999,122 @@ const FRAMING_GUIDES = {
   }]
 };
 const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day"], ["groupe", "Groupe"], ["result", "Résultat"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
+
+// Every player's photo for one kit + layout, framed as saved (or by default), to compare them side by side.
+function FootFramingCompare({
+  players,
+  photos,
+  framings,
+  kit,
+  layout,
+  showGuides,
+  onPick
+}) {
+  const [cw, ch] = LAYOUTS[layout].canvas;
+  const W = 150,
+    scale = W / cw;
+  const isMask = layout === "render" || layout.startsWith("podium_");
+  const kind = PHOTO_KIND_FOR_LAYOUT[layout];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: `repeat(auto-fill, ${W}px)`,
+      gap: 12,
+      justifyContent: "center"
+    }
+  }, players.map(p => {
+    const photo = choosePhoto(photos, p.id, kind, kit);
+    const saved = photo ? framings.find(f => f.photo_id === photo.id && f.layout === layout) : null;
+    const rect = photo ? framedRect(layout, photo, saved) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        width: W
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => onPick(p.id),
+      style: {
+        position: "relative",
+        width: W,
+        height: ch * scale,
+        overflow: "hidden",
+        cursor: "pointer",
+        borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0,
+        background: isMask ? "#ffffff" : "#222",
+        border: "1px solid #1e1e30",
+        boxSizing: "border-box"
+      }
+    }, !isMask && /*#__PURE__*/React.createElement("img", {
+      src: `/assets/insta/bg-${photo ? photo.kit : kit}.jpg`,
+      alt: "",
+      draggable: false,
+      style: {
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: W,
+        height: ch * scale
+      }
+    }), photo && rect && /*#__PURE__*/React.createElement("img", {
+      src: instaPublicUrl(photo.path),
+      alt: "",
+      draggable: false,
+      style: {
+        position: "absolute",
+        left: rect.x * scale,
+        top: rect.y * scale,
+        width: rect.width * scale,
+        height: rect.height * scale
+      }
+    }), !photo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#60607a",
+        fontSize: 11,
+        textAlign: "center",
+        padding: 8
+      }
+    }, "Pas de photo"), showGuides && (FRAMING_GUIDES[layout] || []).map(g => /*#__PURE__*/React.createElement("div", {
+      key: g.label,
+      style: {
+        position: "absolute",
+        left: g.x * scale,
+        top: g.y * scale,
+        width: g.w * scale,
+        height: g.h * scale,
+        background: "rgba(255,255,255,0.28)",
+        border: "1px dashed rgba(255,255,255,0.8)",
+        pointerEvents: "none"
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 4,
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, getDisplayName(p, PLAYERS)), photo && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: saved ? "#34d399" : "#60607a",
+        textTransform: "uppercase",
+        flexShrink: 0
+      }
+    }, saved ? "réglé" : "défaut")));
+  }));
+}
 function FootFramingTool({
   roster,
   photos,
@@ -3010,6 +3126,8 @@ function FootFramingTool({
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
   const [layout, setLayout] = React.useState("matchday");
+  const [mode, setMode] = React.useState("single");
+  const [showGuides, setShowGuides] = React.useState(true);
   const pid = players.some(p => p.id === playerId) ? playerId : players[0] && players[0].id || null;
   const photo = pid ? choosePhoto(photos, pid, PHOTO_KIND_FOR_LAYOUT[layout], kit) : null;
   const saved = photo ? framings.find(f => f.photo_id === photo.id && f.layout === layout) : null;
@@ -3189,7 +3307,25 @@ function FootFramingTool({
       fontSize: 13
     }
   }, "Importez d'abord des photos (onglet Photos).");
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("select", {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...btn(mode === "single"),
+      padding: "7px 6px"
+    },
+    onClick: () => setMode("single")
+  }, "Un joueur"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...btn(mode === "compare"),
+      padding: "7px 6px"
+    },
+    onClick: () => setMode("compare")
+  }, "Comparer tous")), mode === "single" && /*#__PURE__*/React.createElement("select", {
     style: sel,
     value: pid || "",
     onChange: e => setPlayerId(Number(e.target.value))
@@ -3215,7 +3351,36 @@ function FootFramingTool({
   }, FRAMING_LAYOUT_LABELS.map(([k, l]) => /*#__PURE__*/React.createElement("option", {
     key: k,
     value: k
-  }, l)))), !photo && /*#__PURE__*/React.createElement("div", {
+  }, l)))), mode === "compare" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      fontSize: 12,
+      color: "#60607a",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showGuides,
+    onChange: e => setShowGuides(e.target.checked)
+  }), " Afficher les rep\xE8res (zones couvertes par le texte)"), /*#__PURE__*/React.createElement(FootFramingCompare, {
+    players: players,
+    photos: photos,
+    framings: framings,
+    kit: kit,
+    layout: layout,
+    showGuides: showGuides,
+    onPick: id => {
+      setPlayerId(id);
+      setMode("single");
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      textAlign: "center",
+      marginTop: 12
+    }
+  }, "Touche un joueur pour ajuster son cadrage.")), mode === "single" && !photo && /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13,
@@ -3223,7 +3388,7 @@ function FootFramingTool({
     }
   }, "Aucune photo pour cet emplacement."), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: photo ? "block" : "none"
+      display: mode === "single" && photo ? "block" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
