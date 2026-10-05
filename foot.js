@@ -2903,8 +2903,16 @@ function FootPhotosTab({
 // Overlay boxes (canvas px) showing what covers the photo in each layout.
 // They mirror lib/insta/templates.js — keep them in sync when a template moves.
 const FRAMING_GUIDES = {
-  matchday: [
-  // the player stands in front of the "MATCH DAY" title, so only the pill and band are drawn over the photo
+  matchday: [{
+    label: "MATCH DAY",
+    x: 0,
+    y: 0,
+    w: 1080,
+    h: 180,
+    font: 158,
+    behind: true
+  },
+  // title: drawn behind the player, like the render
   {
     label: "vs ADVERSAIRE",
     x: 360,
@@ -2995,6 +3003,54 @@ const FRAMING_GUIDES = {
 };
 const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day"], ["groupe", "Groupe"], ["result", "Résultat"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
 
+// One layout guide. `behind` guides (a title the player stands in front of) are drawn as plain text; the others as dashed boxes over the photo.
+function FootGuideBox({
+  g,
+  scale,
+  text
+}) {
+  const pos = {
+    position: "absolute",
+    left: g.x * scale,
+    top: g.y * scale,
+    width: g.w * scale,
+    height: g.h * scale,
+    pointerEvents: "none"
+  };
+  if (g.behind) {
+    return text ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...pos,
+        fontFamily: "'Shrikhand',cursive",
+        fontSize: g.font * scale,
+        lineHeight: 1.2,
+        display: "flex",
+        justifyContent: "center",
+        whiteSpace: "nowrap",
+        color: "#fff",
+        textShadow: `${4 * scale}px ${7 * scale}px ${8 * scale}px rgba(0,0,0,0.28)`
+      }
+    }, g.label) : null;
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...pos,
+      background: "rgba(255,255,255,0.28)",
+      border: "1px dashed rgba(255,255,255,0.8)",
+      color: "#fff",
+      fontFamily: g.font ? "'Shrikhand',cursive" : "'Outfit',sans-serif",
+      fontSize: text ? g.font ? g.font * scale : 11 : 0,
+      lineHeight: 1.1,
+      display: "flex",
+      alignItems: g.font ? "flex-start" : "center",
+      justifyContent: "center",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textShadow: "0 1px 3px rgba(0,0,0,0.5)"
+    }
+  }, text ? g.label : null);
+}
+
 // Every player's photo for one kit + layout, framed as saved (or by default), to compare them side by side.
 function FootFramingCompare({
   players,
@@ -3050,7 +3106,12 @@ function FootFramingCompare({
         width: W,
         height: ch * scale
       }
-    }), photo && rect && /*#__PURE__*/React.createElement("img", {
+    }), showGuides && (FRAMING_GUIDES[layout] || []).filter(g => g.behind).map(g => /*#__PURE__*/React.createElement(FootGuideBox, {
+      key: g.label,
+      g: g,
+      scale: scale,
+      text: true
+    })), photo && rect && /*#__PURE__*/React.createElement("img", {
       src: instaPublicUrl(photo.path),
       alt: "",
       draggable: false,
@@ -3073,18 +3134,10 @@ function FootFramingCompare({
         textAlign: "center",
         padding: 8
       }
-    }, "Pas de photo"), showGuides && (FRAMING_GUIDES[layout] || []).map(g => /*#__PURE__*/React.createElement("div", {
+    }, "Pas de photo"), showGuides && (FRAMING_GUIDES[layout] || []).filter(g => !g.behind).map(g => /*#__PURE__*/React.createElement(FootGuideBox, {
       key: g.label,
-      style: {
-        position: "absolute",
-        left: g.x * scale,
-        top: g.y * scale,
-        width: g.w * scale,
-        height: g.h * scale,
-        background: "rgba(255,255,255,0.28)",
-        border: "1px dashed rgba(255,255,255,0.8)",
-        pointerEvents: "none"
-      }
+      g: g,
+      scale: scale
     }))), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -3418,7 +3471,12 @@ function FootFramingTool({
       width: cw * scale,
       height: ch * scale
     }
-  }), photo && rect && /*#__PURE__*/React.createElement("img", {
+  }), (FRAMING_GUIDES[layout] || []).filter(g => g.behind).map(g => /*#__PURE__*/React.createElement(FootGuideBox, {
+    key: g.label,
+    g: g,
+    scale: scale,
+    text: true
+  })), photo && rect && /*#__PURE__*/React.createElement("img", {
     src: instaPublicUrl(photo.path),
     alt: "",
     draggable: false,
@@ -3430,29 +3488,12 @@ function FootFramingTool({
       height: rect.height * scale,
       pointerEvents: "none"
     }
-  }), (FRAMING_GUIDES[layout] || []).map(g => /*#__PURE__*/React.createElement("div", {
+  }), (FRAMING_GUIDES[layout] || []).filter(g => !g.behind).map(g => /*#__PURE__*/React.createElement(FootGuideBox, {
     key: g.label,
-    style: {
-      position: "absolute",
-      left: g.x * scale,
-      top: g.y * scale,
-      width: g.w * scale,
-      height: g.h * scale,
-      background: "rgba(255,255,255,0.28)",
-      border: "1px dashed rgba(255,255,255,0.8)",
-      color: "#fff",
-      fontFamily: g.font ? "'Shrikhand',cursive" : "'Outfit',sans-serif",
-      fontSize: g.font ? g.font * scale : 11,
-      lineHeight: 1.1,
-      display: "flex",
-      alignItems: g.font ? "flex-start" : "center",
-      justifyContent: "center",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      pointerEvents: "none",
-      textShadow: "0 1px 3px rgba(0,0,0,0.5)"
-    }
-  }, g.label)))), /*#__PURE__*/React.createElement("div", {
+    g: g,
+    scale: scale,
+    text: true
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",

@@ -1273,7 +1273,7 @@ function FootPhotosTab({ roster, photos, reload }) {
 // They mirror lib/insta/templates.js — keep them in sync when a template moves.
 const FRAMING_GUIDES = {
   matchday: [
-    // the player stands in front of the "MATCH DAY" title, so only the pill and band are drawn over the photo
+    { label: "MATCH DAY", x: 0, y: 0, w: 1080, h: 180, font: 158, behind: true }, // title: drawn behind the player, like the render
     { label: "vs ADVERSAIRE", x: 360, y: 180, w: 720, h: 120 },
     { label: "bandeau", x: 44, y: 1260, w: 992, h: 68 },
   ],
@@ -1296,6 +1296,17 @@ const FRAMING_LAYOUT_LABELS = [
   ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"],
 ];
 
+// One layout guide. `behind` guides (a title the player stands in front of) are drawn as plain text; the others as dashed boxes over the photo.
+function FootGuideBox({ g, scale, text }) {
+  const pos = { position: "absolute", left: g.x * scale, top: g.y * scale, width: g.w * scale, height: g.h * scale, pointerEvents: "none" };
+  if (g.behind) {
+    return text ? <div style={{ ...pos, fontFamily: "'Shrikhand',cursive", fontSize: g.font * scale, lineHeight: 1.2, display: "flex", justifyContent: "center", whiteSpace: "nowrap", color: "#fff", textShadow: `${4 * scale}px ${7 * scale}px ${8 * scale}px rgba(0,0,0,0.28)` }}>{g.label}</div> : null;
+  }
+  return (
+    <div style={{ ...pos, background: "rgba(255,255,255,0.28)", border: "1px dashed rgba(255,255,255,0.8)", color: "#fff", fontFamily: g.font ? "'Shrikhand',cursive" : "'Outfit',sans-serif", fontSize: text ? (g.font ? g.font * scale : 11) : 0, lineHeight: 1.1, display: "flex", alignItems: g.font ? "flex-start" : "center", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{text ? g.label : null}</div>
+  );
+}
+
 // Every player's photo for one kit + layout, framed as saved (or by default), to compare them side by side.
 function FootFramingCompare({ players, photos, framings, kit, layout, showGuides, onPick }) {
   const [cw, ch] = LAYOUTS[layout].canvas;
@@ -1315,11 +1326,10 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
               style={{ position: "relative", width: W, height: ch * scale, overflow: "hidden", cursor: "pointer", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222", border: "1px solid #1e1e30", boxSizing: "border-box" }}
             >
               {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: W, height: ch * scale }} />}
+              {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
               {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale }} />}
               {!photo && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#60607a", fontSize: 11, textAlign: "center", padding: 8 }}>Pas de photo</div>}
-              {showGuides && (FRAMING_GUIDES[layout] || []).map((g) => (
-                <div key={g.label} style={{ position: "absolute", left: g.x * scale, top: g.y * scale, width: g.w * scale, height: g.h * scale, background: "rgba(255,255,255,0.28)", border: "1px dashed rgba(255,255,255,0.8)", pointerEvents: "none" }} />
-              ))}
+              {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} />)}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 4 }}>
               <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{getDisplayName(p, PLAYERS)}</span>
@@ -1483,10 +1493,9 @@ function FootFramingTool({ roster, photos, framings, reload }) {
             style={{ position: "relative", width: boxW, height: ch * scale, overflow: "hidden", touchAction: "none", cursor: "grab", userSelect: "none", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222" }}
           >
             {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: cw * scale, height: ch * scale }} />}
+            {(FRAMING_GUIDES[layout] || []).filter((g) => g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
             {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale, pointerEvents: "none" }} />}
-            {(FRAMING_GUIDES[layout] || []).map((g) => (
-              <div key={g.label} style={{ position: "absolute", left: g.x * scale, top: g.y * scale, width: g.w * scale, height: g.h * scale, background: "rgba(255,255,255,0.28)", border: "1px dashed rgba(255,255,255,0.8)", color: "#fff", fontFamily: g.font ? "'Shrikhand',cursive" : "'Outfit',sans-serif", fontSize: g.font ? g.font * scale : 11, lineHeight: 1.1, display: "flex", alignItems: g.font ? "flex-start" : "center", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", pointerEvents: "none", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>{g.label}</div>
-            ))}
+            {(FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
