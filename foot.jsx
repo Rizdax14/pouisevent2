@@ -1445,8 +1445,9 @@ function FootFramingTool({ roster, photos, framings, reload }) {
     setSaving(false);
   }
   function previewServer() {
-    const q = new URLSearchParams({ kind: "frame", photo: String(photo.id), layout, x: String(Math.round(fr.x * 10) / 10), y: String(Math.round(fr.y * 10) / 10), w: String(Math.round(fr.width * 10) / 10), t: String(Date.now()) });
-    setServerPreview(`/api/insta/render?${q}`);
+    const url = (l) => `/api/insta/render?${new URLSearchParams({ kind: "frame", photo: String(photo.id), layout: l, x: String(Math.round(fr.x * 10) / 10), y: String(Math.round(fr.y * 10) / 10), w: String(Math.round(fr.width * 10) / 10), t: String(Date.now()) })}`;
+    // Match Day and Résultat share one placement: show both renders side by side.
+    setServerPreview(layout === "matchday" ? [{ label: "Match Day", src: url("matchday") }, { label: "Résultat", src: url("result") }] : [{ label: "", src: url(layout) }]);
   }
 
   const sel = { ...FOOT_SELECT_STYLE, width: "100%", marginBottom: 8 };
@@ -1510,7 +1511,14 @@ function FootFramingTool({ roster, photos, framings, reload }) {
         {serverPreview && (
           <div style={{ marginTop: 14, textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "#60607a", marginBottom: 6 }}>Aperçu serveur (rendu réel)</div>
-            <img src={serverPreview} alt="Aperçu serveur" onError={() => setMsg({ t: "error", m: "Aperçu serveur indisponible" })} style={{ maxWidth: "100%", width: boxW, borderRadius: layout === "render" ? "50%" : 0 }} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+              {serverPreview.map((p) => (
+                <div key={p.label || "one"} style={{ flex: serverPreview.length > 1 ? "1 1 0" : "none", minWidth: 0, width: serverPreview.length > 1 ? undefined : boxW }}>
+                  <img src={p.src} alt={`Aperçu serveur ${p.label}`.trim()} onError={() => setMsg({ t: "error", m: "Aperçu serveur indisponible" })} style={{ display: "block", width: "100%", borderRadius: layout === "render" ? "50%" : 0 }} />
+                  {p.label && <div style={{ fontSize: 11, color: "#60607a", marginTop: 4 }}>{p.label}</div>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

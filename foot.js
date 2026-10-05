@@ -3318,16 +3318,26 @@ function FootFramingTool({
     setSaving(false);
   }
   function previewServer() {
-    const q = new URLSearchParams({
+    const url = l => `/api/insta/render?${new URLSearchParams({
       kind: "frame",
       photo: String(photo.id),
-      layout,
+      layout: l,
       x: String(Math.round(fr.x * 10) / 10),
       y: String(Math.round(fr.y * 10) / 10),
       w: String(Math.round(fr.width * 10) / 10),
       t: String(Date.now())
-    });
-    setServerPreview(`/api/insta/render?${q}`);
+    })}`;
+    // Match Day and Résultat share one placement: show both renders side by side.
+    setServerPreview(layout === "matchday" ? [{
+      label: "Match Day",
+      src: url("matchday")
+    }, {
+      label: "Résultat",
+      src: url("result")
+    }] : [{
+      label: "",
+      src: url(layout)
+    }]);
   }
   const sel = {
     ...FOOT_SELECT_STYLE,
@@ -3556,19 +3566,38 @@ function FootFramingTool({
       color: "#60607a",
       marginBottom: 6
     }
-  }, "Aper\xE7u serveur (rendu r\xE9el)"), /*#__PURE__*/React.createElement("img", {
-    src: serverPreview,
-    alt: "Aper\xE7u serveur",
+  }, "Aper\xE7u serveur (rendu r\xE9el)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, serverPreview.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.label || "one",
+    style: {
+      flex: serverPreview.length > 1 ? "1 1 0" : "none",
+      minWidth: 0,
+      width: serverPreview.length > 1 ? undefined : boxW
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.src,
+    alt: `Aperçu serveur ${p.label}`.trim(),
     onError: () => setMsg({
       t: "error",
       m: "Aperçu serveur indisponible"
     }),
     style: {
-      maxWidth: "100%",
-      width: boxW,
+      display: "block",
+      width: "100%",
       borderRadius: layout === "render" ? "50%" : 0
     }
-  }))));
+  }), p.label && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      marginTop: 4
+    }
+  }, p.label)))))));
 }
 function FootInstaKeyBox({
   onSaved
