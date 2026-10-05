@@ -2455,8 +2455,6 @@ function FootStatsPage({
   const [mode, setModeState] = React.useState(() => readPref("foot_stats_mode", "abs", ["abs", "pct"]));
   const [season, setSeasonState] = React.useState(() => readPref("foot_stats_season", currentSeason));
   const [type, setTypeState] = React.useState(() => readPref("foot_stats_type", "all", ["all", "amical", "championnat"]));
-  const [sortKey, setSortKey] = React.useState("played");
-  const [sortDir, setSortDir] = React.useState(-1);
   const setMode = v => {
     setModeState(v);
     writePref("foot_stats_mode", v);
@@ -2496,14 +2494,6 @@ function FootStatsPage({
       });
     });
   }
-  function clickHeader(key) {
-    if (key === sortKey) setSortDir(-sortDir);else {
-      setSortKey(key);
-      setSortDir(-1);
-    }
-  }
-  const sorted = sortStatsRows(rows, sortKey, sortDir, mode, nameOf);
-  const grid = "minmax(120px,1fr) repeat(8, 50px)";
   const tiles = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(84px, 1fr))",
@@ -2592,116 +2582,15 @@ function FootStatsPage({
     style: tiles
   }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Mon \xE9volution"), /*#__PURE__*/React.createElement(FootRatingChart, {
     series: series
-  })), /*#__PURE__*/React.createElement(FCard, {
-    pad: 0,
-    style: {
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "16px 16px 8px"
-    }
-  }, /*#__PURE__*/React.createElement(FHeading, {
-    style: {
-      marginBottom: 0
-    }
-  }, "Tout le monde")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowX: "auto"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      minWidth: 560
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: grid,
-      gap: 4,
-      padding: "9px 14px",
-      background: FC.soft,
-      fontFamily: FF.ui,
-      fontSize: 12,
-      color: FC.muted,
-      textTransform: "uppercase"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      position: "sticky",
-      left: 0,
-      zIndex: 1,
-      background: FC.soft,
-      marginLeft: -14,
-      paddingLeft: 14
-    }
-  }, "Joueur"), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("button", {
-    key: c.key,
-    onClick: () => clickHeader(c.key),
-    title: c.title,
-    style: {
-      textAlign: "center",
-      cursor: "pointer",
-      border: "none",
-      background: "none",
-      fontFamily: "inherit",
-      fontSize: "inherit",
-      textTransform: "inherit",
-      userSelect: "none",
-      color: sortKey === c.key ? FC.accent : FC.muted,
-      fontWeight: sortKey === c.key ? 700 : 400
-    }
-  }, c.label, sortKey === c.key ? sortDir === -1 ? " ▼" : " ▲" : ""))), sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 16
-    }
-  }, /*#__PURE__*/React.createElement(FEmpty, {
-    icon: "users",
-    title: "Personne dans l'effectif",
-    text: "Les stats concernent les joueurs r\xE9guliers et occasionnels."
-  })), sorted.map(s => /*#__PURE__*/React.createElement("div", {
-    key: s.playerId,
-    style: {
-      display: "grid",
-      gridTemplateColumns: grid,
-      gap: 4,
-      padding: "8px 14px",
-      borderTop: `1px solid ${FC.line}`,
-      fontSize: 15,
-      alignItems: "center",
-      background: s.playerId === currentPlayer?.id ? FC.accentSoft : "transparent"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      minWidth: 0,
-      position: "sticky",
-      left: 0,
-      zIndex: 1,
-      marginLeft: -14,
-      paddingLeft: 14,
-      backgroundColor: "#fff",
-      backgroundImage: s.playerId === currentPlayer?.id ? `linear-gradient(${FC.accentSoft}, ${FC.accentSoft})` : "none"
-    }
-  }, /*#__PURE__*/React.createElement(FAvatar, {
-    playerId: s.playerId,
-    name: nameOf(s.playerId),
-    size: 28
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }
-  }, nameOf(s.playerId))), FOOT_STAT_COLUMNS.map(c => /*#__PURE__*/React.createElement("span", {
-    key: c.key,
-    style: {
-      textAlign: "center",
-      fontFamily: FF.ui,
-      fontSize: 16
-    }
-  }, formatStatValue(statValue(s, c.key, mode), c.key, mode)))))))));
+  })), /*#__PURE__*/React.createElement(FootRankingsPanel, {
+    seasonMatches: filtered,
+    season: season,
+    lineups: lineups,
+    events: events,
+    ratings: ratings,
+    roster: roster,
+    currentPlayer: currentPlayer
+  }));
 }
 
 // ---- rankings (podium of the season) --------------------------------------------------------------------------------------------------------
@@ -2785,8 +2674,11 @@ function FootPodiumSlot({
     }
   }, entry.matches, " match", entry.matches > 1 ? "s" : ""));
 }
-function FootRankingsPage({
-  matches,
+
+// Podium of goals / assists / average rating for the matches given (the Stats page passes its filtered ones).
+function FootRankingsPanel({
+  seasonMatches,
+  season,
   lineups,
   events,
   ratings,
@@ -2798,11 +2690,6 @@ function FootRankingsPage({
     setTab(v);
     writePref("foot_rank_tab", v);
   };
-  const season = seasonOf(new Date().toISOString());
-  const seasonMatches = filterMatchesForStats(matches, {
-    season,
-    type: "all"
-  });
   const ids = new Set(seasonMatches.map(m => m.id));
   const seasonLineups = lineups.filter(l => ids.has(l.match_id));
   const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id))), {});
@@ -2822,24 +2709,21 @@ function FootRankingsPage({
   const podium = entries.slice(0, 3),
     rest = entries.slice(3);
   const order = podium.length === 3 ? [[podium[1], 2, 66], [podium[0], 1, 84], [podium[2], 3, 66]] : podium.map((e, i) => [e, i + 1, i === 0 ? 84 : 66]);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "ft-page"
-  }, /*#__PURE__*/React.createElement(FSegmented, {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, season === "all" ? "Toutes saisons" : `Saison ${season}`)
+  }, "Classements"), /*#__PURE__*/React.createElement(FSegmented, {
     value: tab,
     onChange: pick,
     options: FOOT_RANKING_TABS.map(x => [x.key, x.label, x.icon]),
     style: {
-      marginBottom: 14,
-      background: "rgba(255,255,255,0.92)"
+      marginBottom: 16
     }
-  }), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
-    right: /*#__PURE__*/React.createElement(FChip, {
-      tone: "soft"
-    }, "Saison ", season)
-  }, t.label), entries.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
+  }), entries.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
     icon: "trophy",
     title: "Pas encore de classement",
-    text: "Le classement appara\xEEt d\xE8s qu'un match termin\xE9 compte des buts, des passes ou des notes."
+    text: `Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : "passe décisive"} sur cette période.`
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2898,7 +2782,18 @@ function FootRankingsPage({
       minWidth: 36,
       textAlign: "right"
     }
-  }, e.shown))))));
+  }, e.shown)))));
+}
+
+// The Classement page is kept for later: empty for now.
+function FootRankingsPage() {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "trophy",
+    title: "Bient\xF4t disponible",
+    text: "Cette page arrive bient\xF4t."
+  })));
 }
 const INSTA_KEY_STORAGE = "foot_insta_admin_key";
 function readInstaKey() {
@@ -4778,14 +4673,7 @@ function FootballApp({
     events: events,
     ratings: ratings,
     reload: reloadFoot
-  }), loaded && page === "rankings" && /*#__PURE__*/React.createElement(FootRankingsPage, {
-    matches: matches,
-    lineups: lineups,
-    events: events,
-    ratings: ratings,
-    roster: roster,
-    currentPlayer: currentPlayer
-  }), loaded && page === "stats" && /*#__PURE__*/React.createElement(FootStatsPage, {
+  }), loaded && page === "rankings" && /*#__PURE__*/React.createElement(FootRankingsPage, null), loaded && page === "stats" && /*#__PURE__*/React.createElement(FootStatsPage, {
     matches: matches,
     lineups: lineups,
     events: events,

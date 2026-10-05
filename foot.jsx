@@ -1030,8 +1030,6 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
   const [mode, setModeState] = React.useState(() => readPref("foot_stats_mode", "abs", ["abs", "pct"]));
   const [season, setSeasonState] = React.useState(() => readPref("foot_stats_season", currentSeason));
   const [type, setTypeState] = React.useState(() => readPref("foot_stats_type", "all", ["all", "amical", "championnat"]));
-  const [sortKey, setSortKey] = React.useState("played");
-  const [sortDir, setSortDir] = React.useState(-1);
   const setMode = (v) => { setModeState(v); writePref("foot_stats_mode", v); };
   const setSeason = (v) => { setSeasonState(v); writePref("foot_stats_season", v); };
   const setType = (v) => { setTypeState(v); writePref("foot_stats_type", v); };
@@ -1057,12 +1055,6 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
     });
   }
 
-  function clickHeader(key) {
-    if (key === sortKey) setSortDir(-sortDir); else { setSortKey(key); setSortDir(-1); }
-  }
-
-  const sorted = sortStatsRows(rows, sortKey, sortDir, mode, nameOf);
-  const grid = "minmax(120px,1fr) repeat(8, 50px)";
   const tiles = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(84px, 1fr))", gap: 8 };
 
   return (
@@ -1104,31 +1096,7 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
         <FootRatingChart series={series} />
       </FCard>
 
-      <FCard pad={0} style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 16px 8px" }}><FHeading style={{ marginBottom: 0 }}>Tout le monde</FHeading></div>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 560 }}>
-            <div style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "9px 14px", background: FC.soft, fontFamily: FF.ui, fontSize: 12, color: FC.muted, textTransform: "uppercase" }}>
-              <span style={{ position: "sticky", left: 0, zIndex: 1, background: FC.soft, marginLeft: -14, paddingLeft: 14 }}>Joueur</span>
-              {FOOT_STAT_COLUMNS.map((c) => (
-                <button key={c.key} onClick={() => clickHeader(c.key)} title={c.title} style={{ textAlign: "center", cursor: "pointer", border: "none", background: "none", fontFamily: "inherit", fontSize: "inherit", textTransform: "inherit", userSelect: "none", color: sortKey === c.key ? FC.accent : FC.muted, fontWeight: sortKey === c.key ? 700 : 400 }}>
-                  {c.label}{sortKey === c.key ? (sortDir === -1 ? " ▼" : " ▲") : ""}
-                </button>
-              ))}
-            </div>
-            {sorted.length === 0 && <div style={{ padding: 16 }}><FEmpty icon="users" title="Personne dans l'effectif" text="Les stats concernent les joueurs réguliers et occasionnels." /></div>}
-            {sorted.map((s) => (
-              <div key={s.playerId} style={{ display: "grid", gridTemplateColumns: grid, gap: 4, padding: "8px 14px", borderTop: `1px solid ${FC.line}`, fontSize: 15, alignItems: "center", background: s.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, position: "sticky", left: 0, zIndex: 1, marginLeft: -14, paddingLeft: 14, backgroundColor: "#fff", backgroundImage: s.playerId === currentPlayer?.id ? `linear-gradient(${FC.accentSoft}, ${FC.accentSoft})` : "none" }}>
-                  <FAvatar playerId={s.playerId} name={nameOf(s.playerId)} size={28} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(s.playerId)}</span>
-                </span>
-                {FOOT_STAT_COLUMNS.map((c) => <span key={c.key} style={{ textAlign: "center", fontFamily: FF.ui, fontSize: 16 }}>{formatStatValue(statValue(s, c.key, mode), c.key, mode)}</span>)}
-              </div>
-            ))}
-          </div>
-        </div>
-      </FCard>
+      <FootRankingsPanel seasonMatches={filtered} season={season} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />
     </div>
   );
 }
@@ -1155,11 +1123,10 @@ function FootPodiumSlot({ entry, place, size }) {
   );
 }
 
-function FootRankingsPage({ matches, lineups, events, ratings, roster, currentPlayer }) {
+// Podium of goals / assists / average rating for the matches given (the Stats page passes its filtered ones).
+function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, roster, currentPlayer }) {
   const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
   const pick = (v) => { setTab(v); writePref("foot_rank_tab", v); };
-  const season = seasonOf(new Date().toISOString());
-  const seasonMatches = filterMatchesForStats(matches, { season, type: "all" });
   const ids = new Set(seasonMatches.map((m) => m.id));
   const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
   const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id))), {});
@@ -1177,29 +1144,36 @@ function FootRankingsPage({ matches, lineups, events, ratings, roster, currentPl
   const order = podium.length === 3 ? [[podium[1], 2, 66], [podium[0], 1, 84], [podium[2], 3, 66]] : podium.map((e, i) => [e, i + 1, i === 0 ? 84 : 66]);
 
   return (
-    <div className="ft-page">
-      <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
-      <FCard>
-        <FHeading right={<FChip tone="soft">Saison {season}</FChip>}>{t.label}</FHeading>
-        {entries.length === 0 ? (
-          <FEmpty icon="trophy" title="Pas encore de classement" text="Le classement apparaît dès qu'un match terminé compte des buts, des passes ou des notes." />
-        ) : (
-          <>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: rest.length ? 14 : 0 }}>
-              {order.map(([e, place, size]) => <FootPodiumSlot key={e.playerId} entry={e} place={place} size={size} />)}
+    <FCard>
+      <FHeading right={<FChip tone="soft">{season === "all" ? "Toutes saisons" : `Saison ${season}`}</FChip>}>Classements</FHeading>
+      <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 16 }} />
+      {entries.length === 0 ? (
+        <FEmpty icon="trophy" title="Pas encore de classement" text={`Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : "passe décisive"} sur cette période.`} />
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: rest.length ? 14 : 0 }}>
+            {order.map(([e, place, size]) => <FootPodiumSlot key={e.playerId} entry={e} place={place} size={size} />)}
+          </div>
+          {rest.map((e, i) => (
+            <div key={e.playerId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", marginInline: -8, borderTop: `1px solid ${FC.line}`, borderRadius: 12, background: e.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
+              <span style={{ width: 24, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: FC.muted }}>{i + 4}</span>
+              <FAvatar playerId={e.playerId} name={e.name} size={34} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
+              <span style={{ fontSize: 12, color: FC.muted }}>{e.matches} m.</span>
+              <span style={{ fontFamily: FF.display, fontSize: 20, color: FC.deep, minWidth: 36, textAlign: "right" }}>{e.shown}</span>
             </div>
-            {rest.map((e, i) => (
-              <div key={e.playerId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", marginInline: -8, borderTop: `1px solid ${FC.line}`, borderRadius: 12, background: e.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
-                <span style={{ width: 24, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: FC.muted }}>{i + 4}</span>
-                <FAvatar playerId={e.playerId} name={e.name} size={34} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
-                <span style={{ fontSize: 12, color: FC.muted }}>{e.matches} m.</span>
-                <span style={{ fontFamily: FF.display, fontSize: 20, color: FC.deep, minWidth: 36, textAlign: "right" }}>{e.shown}</span>
-              </div>
-            ))}
-          </>
-        )}
-      </FCard>
+          ))}
+        </>
+      )}
+    </FCard>
+  );
+}
+
+// The Classement page is kept for later: empty for now.
+function FootRankingsPage() {
+  return (
+    <div className="ft-page">
+      <FCard><FEmpty icon="trophy" title="Bientôt disponible" text="Cette page arrive bientôt." /></FCard>
     </div>
   );
 }
@@ -1953,7 +1927,7 @@ function FootballApp({ currentPlayer, onBack }) {
         )}
         {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
         {loaded && page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
-        {loaded && page === "rankings" && <FootRankingsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
+        {loaded && page === "rankings" && <FootRankingsPage />}
         {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
       </FootShell>
       <FNav page={detail ? "calendar" : page} items={navItems} onGo={nav} />
