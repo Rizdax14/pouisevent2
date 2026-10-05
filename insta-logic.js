@@ -3,8 +3,9 @@ var INSTA_FOOT_LOGIC = typeof module !== "undefined" && module.exports ? require
 function _footFn(name) { return INSTA_FOOT_LOGIC ? INSTA_FOOT_LOGIC[name] : globalThis[name]; }
 
 const LAYOUTS = {
-  matchday: { canvas: [1080, 1350], box: { x: 60, y: 230, w: 960, h: 1050 } },
-  result: { canvas: [1080, 1350], box: { x: 60, y: 230, w: 960, h: 1050 } }, // same placement as matchday
+  // Same size as Résultat, but perfectly centred on the canvas (Résultat sits on the left, leaving room for the score).
+  matchday: { canvas: [1080, 1350], box: { x: 230, y: 260, w: 620, h: 1090 } },
+  result: { canvas: [1080, 1350], box: { x: -40, y: 260, w: 620, h: 1090 } },
   groupe: { canvas: [1080, 1350], box: { x: -40, y: 180, w: 700, h: 1170 } },
   render: { canvas: [300, 300], box: { x: 0, y: 0, w: 300, h: 300 } },
   // Podium cards (1st place size; 2nd/3rd cards reuse it scaled down), one layout per photo kind.
@@ -21,12 +22,23 @@ const RANKING_PAGES = [
   { key: "rating", heading: "MOYENNES", layout: "podium_render" },
 ];
 
-// Résultat is placed exactly like Match Day, so both share one saved framing.
-const FRAMING_ALIAS = { result: "matchday" };
-function framingLayout(layout) { return FRAMING_ALIAS[layout] || layout; }
 function savedFraming(framings, photoId, layout) {
-  const key = framingLayout(layout);
-  return framings.find((f) => f.photo_id === photoId && f.layout === key) || null;
+  return framings.find((f) => f.photo_id === photoId && f.layout === layout) || null;
+}
+
+// Horizontal centre (0..1) of the player in a cut-out photo: the middle of its opaque pixels (alpha above `threshold`).
+function personCenterRatio(rgba, width, height, threshold = 40) {
+  let min = width, max = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (rgba[(y * width + x) * 4 + 3] > threshold) { if (x < min) min = x; if (x > max) max = x; }
+    }
+  }
+  return max < 0 ? 0.5 : (min + max + 1) / 2 / width;
+}
+// Slide a framing sideways so the player (at `ratio` of the photo width) stands in the middle of the canvas.
+function centerFramingOnPerson(f, canvasWidth, ratio) {
+  return { ...f, x: canvasWidth / 2 - ratio * f.width };
 }
 
 function defaultFraming(layout, photo) {
@@ -355,5 +367,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, featuredPool, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

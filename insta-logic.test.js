@@ -12,9 +12,9 @@ test("defaultFraming: retouched photos fill the canvas", () => {
 test("defaultFraming: raw photos fit the layout box, bottom-aligned and centred", () => {
   const f = L.defaultFraming("matchday", raw);
   const h = f.width * raw.height / raw.width;
-  assert.ok(f.width <= 960 + 1e-9 && h <= 1050 + 1e-9);
-  assert.equal(Math.round(f.y + h), 230 + 1050);
-  assert.equal(Math.round(f.x + f.width / 2), 60 + 480);
+  assert.ok(f.width <= 620 + 1e-9 && h <= 1090 + 1e-9);
+  assert.equal(Math.round(f.y + h), 260 + 1090); // bottom of the canvas
+  assert.equal(Math.round(f.x + f.width / 2), 540); // perfectly centred
 });
 
 test("defaultFraming: render covers the circle", () => {
@@ -179,26 +179,6 @@ test("zoomFramingAt clamps the width between 20% and 800% of the reference width
 test("framingZoomPercent: 100% is the reference width", () => {
   assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 500 }, 500), 100);
   assert.equal(L.framingZoomPercent({ x: 0, y: 0, width: 750 }, 500), 150);
-});
-
-test("Résultat has exactly the same placement as Match Day", () => {
-  assert.deepEqual(L.LAYOUTS.result, L.LAYOUTS.matchday);
-  assert.deepEqual(L.defaultFraming("result", raw), L.defaultFraming("matchday", raw));
-  assert.deepEqual(L.defaultFraming("result", ret), L.defaultFraming("matchday", ret));
-});
-
-test("framingLayout: result shares the Match Day framing, other layouts are their own", () => {
-  assert.equal(L.framingLayout("result"), "matchday");
-  assert.equal(L.framingLayout("matchday"), "matchday");
-  assert.equal(L.framingLayout("groupe"), "groupe");
-  assert.equal(L.framingLayout("podium_dos"), "podium_dos");
-});
-
-test("savedFraming: Résultat reads the framing saved for Match Day", () => {
-  const rows = [{ photo_id: 1, layout: "matchday", x: 5, y: 6, width: 700 }, { photo_id: 1, layout: "groupe", x: 1, y: 2, width: 3 }];
-  assert.deepEqual(L.savedFraming(rows, 1, "result"), rows[0]);
-  assert.deepEqual(L.savedFraming(rows, 1, "groupe"), rows[1]);
-  assert.equal(L.savedFraming(rows, 2, "matchday"), null);
 });
 
 // ---------- Publication schedule: sections, Paris time, last / next post ----------
@@ -455,4 +435,38 @@ test("zoom can reach 500% (and beyond via wheel up to 800%) of the reference wid
   const f = { x: 0, y: 0, width: 400 };
   assert.equal(L.zoomFramingAt(f, 5, 0, 0, 400).width, 2000);
   assert.equal(L.framingZoomPercent(L.zoomFramingAt(f, 5, 0, 0, 400), 400), 500);
+});
+
+// ---------- Match Day and Résultat are independent again ----------
+test("Match Day and Résultat have the same default size; Match Day is perfectly centred, Résultat sits on the left", () => {
+  const md = L.defaultFraming("matchday", raw), rs = L.defaultFraming("result", raw);
+  assert.ok(Math.abs(md.width - rs.width) < 1e-9, "same size");
+  assert.ok(Math.abs(md.x + md.width / 2 - 540) < 1e-9, "Match Day is centred on the 1080px canvas");
+  assert.ok(rs.x + rs.width / 2 < 540, "Résultat leaves room for the score on the right");
+  assert.equal(md.y + (md.width * raw.height) / raw.width, rs.y + (rs.width * raw.height) / raw.width); // both bottom-aligned
+});
+
+test("savedFraming reads exactly the layout asked: Résultat no longer borrows Match Day's", () => {
+  const rows = [{ photo_id: 1, layout: "matchday", x: 5, y: 6, width: 700 }, { photo_id: 1, layout: "result", x: 9, y: 8, width: 600 }];
+  assert.deepEqual(L.savedFraming(rows, 1, "result"), rows[1]);
+  assert.deepEqual(L.savedFraming(rows, 1, "matchday"), rows[0]);
+  assert.equal(L.savedFraming([rows[0]], 1, "result"), null);
+});
+
+// ---------- Centring the player (not the image) ----------
+const rgba = (w, h, fill) => { const a = new Uint8ClampedArray(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (fill(x, y)) a[(y * w + x) * 4 + 3] = 255; return a; };
+
+test("personCenterRatio: horizontal centre of the opaque pixels, ignoring faint pixels", () => {
+  const px = rgba(100, 50, (x) => x >= 60 && x < 90); // the player stands in the right part of the image
+  assert.equal(L.personCenterRatio(px, 100, 50), 0.75);
+  const faint = rgba(100, 50, (x) => x >= 20 && x < 40); faint[(10 * 100 + 95) * 4 + 3] = 5; // a nearly transparent speck on the right
+  assert.equal(L.personCenterRatio(faint, 100, 50), 0.3);
+  assert.equal(L.personCenterRatio(rgba(10, 10, () => false), 10, 10), 0.5); // empty image: image centre
+});
+
+test("centerFramingOnPerson puts the player's centre at the canvas centre, keeping size and height", () => {
+  const f = L.centerFramingOnPerson({ x: -1158, y: -450, width: 2880 }, 1080, 0.6);
+  assert.equal(f.width, 2880);
+  assert.equal(f.y, -450);
+  assert.ok(Math.abs(f.x + 0.6 * f.width - 540) < 1e-9);
 });

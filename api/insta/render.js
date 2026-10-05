@@ -57,7 +57,7 @@ async function buildFrame(q) {
     fr = { x: Number(q.x), y: Number(q.y), width: Number(q.w) };
     if (![fr.x, fr.y, fr.width].every(Number.isFinite) || fr.width <= 0) throw new Error("Cadrage invalide");
   } else {
-    [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${L.framingLayout(layout)}&select=*`);
+    [fr = null] = await sbGet("foot_photo_framings", `?photo_id=eq.${id}&layout=eq.${layout}&select=*`);
   }
   const rect = L.framedRect(layout, ph, fr);
   const photoUri = await imageDataUri(publicUrl("player-photos", ph.path));

@@ -2915,9 +2915,9 @@ const FRAMING_GUIDES = {
   // title: drawn behind the player, like the render
   {
     label: "vs ADVERSAIRE",
-    x: 360,
-    y: 180,
-    w: 720,
+    x: 340,
+    y: 1118,
+    w: 400,
     h: 120
   }, {
     label: "bandeau",
@@ -2925,16 +2925,25 @@ const FRAMING_GUIDES = {
     y: 1260,
     w: 992,
     h: 68
+  }],
+  result: [{
+    label: "RESULTAT",
+    x: 0,
+    y: 0,
+    w: 1080,
+    h: 200,
+    font: 180,
+    behind: true
   },
-  // Résultat uses the very same placement: its score and goals card also sit over the player
+  // title: drawn behind the player
   {
-    label: "Résultat : score",
+    label: "score",
     x: 400,
     y: 225,
     w: 680,
     h: 300
   }, {
-    label: "Résultat : buts",
+    label: "buts",
     x: 395,
     y: 625,
     w: 505,
@@ -2998,7 +3007,7 @@ const FRAMING_GUIDES = {
     h: 46
   }]
 };
-const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day + Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
+const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day"], ["result", "Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
 
 // One layout guide. `behind` guides (a title the player stands in front of) are drawn as plain text; the others as dashed boxes over the photo.
 function FootGuideBox({
@@ -3195,6 +3204,7 @@ function FootFramingTool({
   const [fr, setFr] = React.useState(null);
   const [msg, setMsg] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const [centering, setCentering] = React.useState(false);
   const [serverPreview, setServerPreview] = React.useState(null);
   const frKey = photo ? `${photo.id}:${layout}:${saved ? `${saved.x},${saved.y},${saved.width}` : "-"}` : "none";
   React.useEffect(() => {
@@ -3296,7 +3306,7 @@ function FootFramingTool({
     try {
       assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert({
         photo_id: photo.id,
-        layout: framingLayout(layout),
+        layout,
         x: fr.x,
         y: fr.y,
         width: fr.width,
@@ -3317,26 +3327,64 @@ function FootFramingTool({
     }
     setSaving(false);
   }
+  // Slides the photo sideways so the player himself (not the picture) stands in the middle of the canvas.
+  async function centerPlayer() {
+    setCentering(true);
+    setMsg(null);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error("Photo illisible"));
+        i.src = instaPublicUrl(photo.path);
+      });
+      const W = 240,
+        H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
+      const c = document.createElement("canvas");
+      c.width = W;
+      c.height = H;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, W, H);
+      setFr(centerFramingOnPerson(fr, cw, personCenterRatio(ctx.getImageData(0, 0, W, H).data, W, H)));
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Centrage impossible : " + e.message
+      });
+    }
+    setCentering(false);
+  }
   function previewServer() {
-    const url = l => `/api/insta/render?${new URLSearchParams({
+    const url = (l, withFraming) => `/api/insta/render?${new URLSearchParams({
       kind: "frame",
       photo: String(photo.id),
       layout: l,
-      x: String(Math.round(fr.x * 10) / 10),
-      y: String(Math.round(fr.y * 10) / 10),
-      w: String(Math.round(fr.width * 10) / 10),
+      ...(withFraming ? {
+        x: String(Math.round(fr.x * 10) / 10),
+        y: String(Math.round(fr.y * 10) / 10),
+        w: String(Math.round(fr.width * 10) / 10)
+      } : {}),
       t: String(Date.now())
     })}`;
-    // Match Day and Résultat share one placement: show both renders side by side.
-    setServerPreview(layout === "matchday" ? [{
-      label: "Match Day",
-      src: url("matchday")
+    // Match Day and Résultat are framed separately: show the one being adjusted next to the other, as saved.
+    const other = {
+      matchday: "result",
+      result: "matchday"
+    }[layout];
+    const name = {
+      matchday: "Match Day",
+      result: "Résultat"
+    };
+    setServerPreview(other ? [{
+      label: `${name[layout]} (réglage en cours)`,
+      src: url(layout, true)
     }, {
-      label: "Résultat",
-      src: url("result")
+      label: `${name[other]} (enregistré)`,
+      src: url(other, false)
     }] : [{
       label: "",
-      src: url(layout)
+      src: url(layout, true)
     }]);
   }
   const sel = {
@@ -3345,7 +3393,7 @@ function FootFramingTool({
     marginBottom: 8
   };
   const btn = primary => ({
-    flex: 1,
+    flex: "1 1 auto",
     background: primary ? "#3b82f6" : "#13131f",
     color: primary ? "#fff" : "#eeeef5",
     border: primary ? "none" : "1px solid #1e1e30",
@@ -3538,7 +3586,8 @@ function FootFramingTool({
   }, msg.m), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8
+      gap: 8,
+      flexWrap: "wrap"
     }
   }, /*#__PURE__*/React.createElement("button", {
     style: btn(true),
@@ -3552,6 +3601,10 @@ function FootFramingTool({
       setFr(defaultFraming(layout, photo));
     }
   }, "R\xE9initialiser"), /*#__PURE__*/React.createElement("button", {
+    style: btn(false),
+    disabled: !fr || centering,
+    onClick: centerPlayer
+  }, centering ? "…" : "Centrer le joueur"), /*#__PURE__*/React.createElement("button", {
     style: btn(false),
     disabled: !fr,
     onClick: previewServer

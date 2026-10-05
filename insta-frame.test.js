@@ -35,7 +35,7 @@ test("every layout renders at its own canvas size, with and without a saved fram
   for (const layout of Object.keys(L.LAYOUTS)) {
     const a = await frame({ photo: "5", layout });
     assert.deepEqual([a.w, a.h], L.LAYOUTS[layout].canvas, layout);
-    framings = [{ photo_id: 5, layout: L.framingLayout(layout), x: 10, y: 20, width: 300 }];
+    framings = [{ photo_id: 5, layout, x: 10, y: 20, width: 300 }];
     const b = await frame({ photo: "5", layout });
     assert.deepEqual([b.w, b.h], L.LAYOUTS[layout].canvas, layout);
     assert.notDeepEqual(a.jpg, b.jpg, `${layout}: saved framing must change the picture`);
@@ -61,16 +61,6 @@ test("invalid inputs are rejected with an error, not rendered", async () => {
   await assert.rejects(() => R.build("frame", { photo: "5", layout: "render", x: "a", y: "0", w: "100" }), /Cadrage invalide/);
   await assert.rejects(() => R.build("frame", { photo: "5", layout: "render", x: "0", y: "0", w: "0" }), /Cadrage invalide/);
   await assert.rejects(() => R.build("frame", { photo: "5", layout: "render", x: "0" }), /Cadrage invalide/);
-});
-
-test("Résultat and Match Day render the photo at the same place", async () => {
-  const geo = async (layout) => {
-    const el = await R.build("frame", { photo: "5", layout, x: "100", y: "50", w: "700" });
-    const find = (n) => (n && n.props ? (n.type === "img" && /^data:image\/png/.test(n.props.src || "") ? n : [].concat(n.props.children || []).map(find).find(Boolean)) : null);
-    const img = find(el);
-    return { l: img.props.style.left, t: img.props.style.top, w: img.props.style.width };
-  };
-  assert.deepEqual(await geo("result"), await geo("matchday"));
 });
 
 test("the title is drawn before (under) the player on Match Day, Résultat and Groupe", async () => {

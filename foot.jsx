@@ -1274,11 +1274,13 @@ function FootPhotosTab({ roster, photos, reload }) {
 const FRAMING_GUIDES = {
   matchday: [
     { label: "MATCH DAY", x: 0, y: 0, w: 1080, h: 180, font: 158, behind: true }, // title: drawn behind the player, like the render
-    { label: "vs ADVERSAIRE", x: 360, y: 180, w: 720, h: 120 },
+    { label: "vs ADVERSAIRE", x: 340, y: 1118, w: 400, h: 120 },
     { label: "bandeau", x: 44, y: 1260, w: 992, h: 68 },
-    // Résultat uses the very same placement: its score and goals card also sit over the player
-    { label: "Résultat : score", x: 400, y: 225, w: 680, h: 300 },
-    { label: "Résultat : buts", x: 395, y: 625, w: 505, h: 394 },
+  ],
+  result: [
+    { label: "RESULTAT", x: 0, y: 0, w: 1080, h: 200, font: 180, behind: true }, // title: drawn behind the player
+    { label: "score", x: 400, y: 225, w: 680, h: 300 },
+    { label: "buts", x: 395, y: 625, w: 505, h: 394 },
   ],
   groupe: [
     { label: "GROUPE", x: 0, y: 0, w: 1080, h: 254, font: 234, behind: true }, // title: drawn behind the player
@@ -1290,7 +1292,7 @@ const FRAMING_GUIDES = {
   podium_render: [{ label: "n°", x: 0, y: 0, w: 78, h: 74 }, { label: "nom + valeur", x: 10, y: 384, w: 310, h: 46 }],
 };
 const FRAMING_LAYOUT_LABELS = [
-  ["matchday", "Match Day + Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"],
+  ["matchday", "Match Day"], ["result", "Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"],
   ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"],
 ];
 
@@ -1369,6 +1371,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
   const [fr, setFr] = React.useState(null);
   const [msg, setMsg] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const [centering, setCentering] = React.useState(false);
   const [serverPreview, setServerPreview] = React.useState(null);
   const frKey = photo ? `${photo.id}:${layout}:${saved ? `${saved.x},${saved.y},${saved.width}` : "-"}` : "none";
   React.useEffect(() => {
@@ -1436,7 +1439,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
     setSaving(true); setMsg(null);
     try {
       assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert(
-        { photo_id: photo.id, layout: framingLayout(layout), x: fr.x, y: fr.y, width: fr.width, updated_at: new Date().toISOString() },
+        { photo_id: photo.id, layout, x: fr.x, y: fr.y, width: fr.width, updated_at: new Date().toISOString() },
         { onConflict: "photo_id,layout" }
       ));
       await reload();
@@ -1444,14 +1447,30 @@ function FootFramingTool({ roster, photos, framings, reload }) {
     } catch (e) { setMsg({ t: "error", m: "Erreur: " + e.message }); }
     setSaving(false);
   }
+  // Slides the photo sideways so the player himself (not the picture) stands in the middle of the canvas.
+  async function centerPlayer() {
+    setCentering(true); setMsg(null);
+    try {
+      const img = await new Promise((resolve, reject) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => resolve(i); i.onerror = () => reject(new Error("Photo illisible")); i.src = instaPublicUrl(photo.path); });
+      const W = 240, H = Math.max(1, Math.round((W * img.naturalHeight) / img.naturalWidth));
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, W, H);
+      setFr(centerFramingOnPerson(fr, cw, personCenterRatio(ctx.getImageData(0, 0, W, H).data, W, H)));
+    } catch (e) { setMsg({ t: "error", m: "Centrage impossible : " + e.message }); }
+    setCentering(false);
+  }
   function previewServer() {
-    const url = (l) => `/api/insta/render?${new URLSearchParams({ kind: "frame", photo: String(photo.id), layout: l, x: String(Math.round(fr.x * 10) / 10), y: String(Math.round(fr.y * 10) / 10), w: String(Math.round(fr.width * 10) / 10), t: String(Date.now()) })}`;
-    // Match Day and Résultat share one placement: show both renders side by side.
-    setServerPreview(layout === "matchday" ? [{ label: "Match Day", src: url("matchday") }, { label: "Résultat", src: url("result") }] : [{ label: "", src: url(layout) }]);
+    const url = (l, withFraming) => `/api/insta/render?${new URLSearchParams({ kind: "frame", photo: String(photo.id), layout: l, ...(withFraming ? { x: String(Math.round(fr.x * 10) / 10), y: String(Math.round(fr.y * 10) / 10), w: String(Math.round(fr.width * 10) / 10) } : {}), t: String(Date.now()) })}`;
+    // Match Day and Résultat are framed separately: show the one being adjusted next to the other, as saved.
+    const other = { matchday: "result", result: "matchday" }[layout];
+    const name = { matchday: "Match Day", result: "Résultat" };
+    setServerPreview(other
+      ? [{ label: `${name[layout]} (réglage en cours)`, src: url(layout, true) }, { label: `${name[other]} (enregistré)`, src: url(other, false) }]
+      : [{ label: "", src: url(layout, true) }]);
   }
 
   const sel = { ...FOOT_SELECT_STYLE, width: "100%", marginBottom: 8 };
-  const btn = (primary) => ({ flex: 1, background: primary ? "#3b82f6" : "#13131f", color: primary ? "#fff" : "#eeeef5", border: primary ? "none" : "1px solid #1e1e30", borderRadius: 8, padding: "9px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
+  const btn = (primary) => ({ flex: "1 1 auto", background: primary ? "#3b82f6" : "#13131f", color: primary ? "#fff" : "#eeeef5", border: primary ? "none" : "1px solid #1e1e30", borderRadius: 8, padding: "9px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
   const isMask = layout === "render" || layout.startsWith("podium_");
 
   if (!players.length) return <div style={{ color: "#60607a", fontSize: 13 }}>Importez d'abord des photos (onglet Photos).</div>;
@@ -1503,9 +1522,10 @@ function FootFramingTool({ roster, photos, framings, reload }) {
           <span style={{ fontSize: 11, color: "#eeeef5", width: 40, textAlign: "right" }}>{pct}%</span>
         </div>
         {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginBottom: 8 }}>{msg.m}</div>}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button style={btn(true)} disabled={saving || !fr} onClick={save}>{saving ? "…" : "Enregistrer"}</button>
           <button style={btn(false)} disabled={!photo} onClick={() => { setMsg(null); setFr(defaultFraming(layout, photo)); }}>Réinitialiser</button>
+          <button style={btn(false)} disabled={!fr || centering} onClick={centerPlayer}>{centering ? "…" : "Centrer le joueur"}</button>
           <button style={btn(false)} disabled={!fr} onClick={previewServer}>Aperçu serveur</button>
         </div>
         {serverPreview && (
