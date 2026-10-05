@@ -99,10 +99,11 @@ function opponentLabel(name) {
 
 const JOURS = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"];
 function matchBand(match) {
-  const d = new Date(match.match_datetime);
-  const time = `${String(d.getHours()).padStart(2, "0")}H${String(d.getMinutes()).padStart(2, "0")}`;
+  // Paris time on purpose: the server (UTC) and the phone must print the same hour.
+  const d = parisParts(new Date(match.match_datetime));
+  const time = `${String(d.hh).padStart(2, "0")}H${String(d.mm).padStart(2, "0")}`;
   const place = (match.stadium_name || match.address || "").toUpperCase();
-  return [`${JOURS[d.getDay()]} ${time}`, place, (match.city || "").toUpperCase()].filter(Boolean).join(" | ");
+  return [`${JOURS[d.wd]} ${time}`, place, (match.city || "").toUpperCase()].filter(Boolean).join(" | ");
 }
 
 function groupeLines(sheetIds, roster, players) {
@@ -158,6 +159,7 @@ function captionFor(kind, c) {
   }
   if (kind === "ratings") return `Les notes du match contre ${c.opponent} 📝${c.top.length ? "\n\n" + c.top.map((t, i) => `${i + 1}. ${t.name} ${t.rating.toFixed(1)}`).join("\n") : ""}`;
   if (kind === "rankings") return `Classements de la saison ${c.season} 📊`;
+  if (kind === "groupe") return `GROUPE 🔥 Bière Leverculsec vs ${c.opponent}${c.names.length ? "\n\n" + c.names.join(" · ") : ""}`;
   return "";
 }
 
@@ -177,6 +179,174 @@ function availablePosts({ matches, lineups, now }) {
   return out;
 }
 
+
+// ---------- Publication schedule: sections, Paris time, last / next post ----------
+const INSTA_TZ = "Europe/Paris";
+const INSTA_SECTIONS = [
+  { key: "matchday", kind: "matchday", label: "Match Day", rules: ["before_match"] },
+  { key: "groupe", kind: "groupe", label: "Groupe", rules: ["before_match"] },
+  { key: "result", kind: "result", label: "Résultat", rules: ["after_match"] },
+  { key: "ratings", kind: "ratings", label: "Notes", rules: ["after_match"] },
+  { key: "rankings", kind: "rankings", label: "Classements", rules: ["weekly"] },
+];
+const RULE_DEFAULTS = {
+  matchday: { type: "before_match", days: 0, time: "09:00" },
+  groupe: { type: "before_match", days: 0, time: "12:00" },
+  result: { type: "after_match", days: 0, time: "22:00" },
+  ratings: { type: "after_match", days: 2, time: "12:00" },
+  rankings: { type: "weekly", weekday: 2, time: "18:00" },
+};
+// How long a slot stays valid after its time: weekly posts 24h, post-match posts 7 days; before-match posts end at kick-off.
+const WEEKLY_GRACE_MS = 24 * 3600 * 1000;
+const AFTER_MATCH_WINDOW_MS = 7 * 24 * 3600 * 1000;
+
+function parisParts(date) {
+  const f = new Intl.DateTimeFormat("en-GB", { timeZone: INSTA_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short", hourCycle: "h23" });
+  const p = {};
+  for (const x of f.formatToParts(date)) p[x.type] = x.value;
+  return { y: +p.year, m: +p.month, d: +p.day, hh: +p.hour, mm: +p.minute, wd: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday) };
+}
+// Paris wall-clock time → instant (handles the DST switch).
+function parisToDate(y, m, d, hh, mm) {
+  const want = Date.UTC(y, m - 1, d, hh, mm);
+  let t = want;
+  for (let i = 0; i < 2; i++) {
+    const p = parisParts(new Date(t));
+    t += want - Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm);
+  }
+  return new Date(t);
+}
+function addDays(parts, n) {
+  const d = new Date(Date.UTC(parts.y, parts.m - 1, parts.d + n));
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+function isoWeekKey(date) {
+  const p = parisParts(date);
+  const d = new Date(Date.UTC(p.y, p.m - 1, p.d));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+function atTime(day, time) { const [hh, mm] = time.split(":").map(Number); return parisToDate(day.y, day.m, day.d, hh, mm); }
+
+function defaultSettings() {
+  const out = {};
+  for (const sec of INSTA_SECTIONS) out[sec.key] = { mode: "manual", rule: { ...RULE_DEFAULTS[sec.key] } };
+  return out;
+}
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function normalizeRule(sec, rule) {
+  const def = RULE_DEFAULTS[sec.key];
+  if (!rule || !sec.rules.includes(rule.type)) return { ...def };
+  const time = TIME_RE.test(rule.time) ? rule.time : def.time;
+  if (rule.type === "weekly") return { type: "weekly", weekday: Number.isInteger(rule.weekday) && rule.weekday >= 0 && rule.weekday <= 6 ? rule.weekday : def.weekday, time };
+  const days = Number.isInteger(rule.days) && rule.days >= 0 && rule.days <= 14 ? rule.days : def.days;
+  return { type: rule.type, days, time };
+}
+function normalizeSettings(raw) {
+  const out = {};
+  for (const sec of INSTA_SECTIONS) {
+    const r = raw && raw[sec.key];
+    const mode = r && r.mode === "auto" ? "auto" : "manual";
+    out[sec.key] = { mode, rule: normalizeRule(sec, r && r.rule) };
+    // Automatic posts only cover slots after the moment automatic mode was switched on.
+    if (mode === "auto" && r.since && !isNaN(new Date(r.since))) out[sec.key].since = new Date(r.since).toISOString();
+  }
+  return out;
+}
+
+function isTargetAvailable(sectionKey, m, lineups) {
+  if (sectionKey === "groupe") return lineups.some((l) => l.match_id === m.id) ? { ok: true } : { ok: false, why: "Feuille de match vide" };
+  if (sectionKey === "result") return m.status === "finished" ? { ok: true } : { ok: false, why: "Match pas encore terminé" };
+  if (sectionKey === "ratings") return m.ratings_validated_at ? { ok: true } : { ok: false, why: m.status === "finished" ? "Notes pas encore validées" : "Match pas encore terminé" };
+  return { ok: true };
+}
+
+// Inputs of captionFor, built from raw rows (same code in the app and on the server).
+function captionContextFor(kind, { matchId, season }, { matches, lineups, events, ratings, players }) {
+  if (kind === "rankings") return { season };
+  const match = matches.find((m) => m.id === matchId);
+  const sheet = lineups.filter((l) => l.match_id === matchId).map((l) => l.player_id);
+  const sheetPlayers = players.filter((p) => sheet.includes(p.id));
+  const nameOf = (id) => postName(players.find((p) => p.id === id), sheetPlayers);
+  if (kind === "matchday") return { opponent: match.opponent_name, band: matchBand(match) };
+  if (kind === "groupe") return { opponent: match.opponent_name, names: sheet.map(nameOf) };
+  if (kind === "result") {
+    const evs = events.filter((e) => e.match_id === matchId);
+    const sc = _footFn("computeFootScore")(evs);
+    return { opponent: match.opponent_name, bl: sc.bl, opp: sc.opponent, goals: goalLines(evs, players) };
+  }
+  const avg = _footFn("matchAverages")(sheet, ratings.filter((r) => r.match_id === matchId));
+  const top = sheet.filter((id) => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map((id) => ({ name: nameOf(id), rating: avg[id] }));
+  return { opponent: match.opponent_name, top };
+}
+
+function targetKey(t) {
+  return t.weekKey ? `${t.kind}:week:${t.weekKey}` : `${t.kind}:match:${t.matchId}`;
+}
+
+// Everything the UI and the cron need about one section: its last post and its next one.
+function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
+  const sec = INSTA_SECTIONS.find((x) => x.key === sectionKey);
+  const cfg = (settings && settings[sectionKey]) || defaultSettings()[sectionKey];
+  const rule = cfg.rule, isAuto = cfg.mode === "auto";
+  const since = isAuto && cfg.since ? new Date(cfg.since) : null;
+  const mine = posts.filter((p) => p.kind === sec.kind);
+  const published = mine.filter((p) => p.status === "published").sort((a, b) => String(b.published_at).localeCompare(String(a.published_at)));
+  const failuresFor = (pred) => mine.filter((p) => p.status === "failed" && pred(p)).length;
+  const byDate = [...matches].sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime));
+  const season = _footFn("seasonOf");
+  const hasSheet = (m) => lineups.some((l) => l.match_id === m.id);
+
+  const available = (m) => isTargetAvailable(sectionKey, m, lineups);
+
+  const last = published[0] ? { published: true, post: published[0], matchId: published[0].match_id, weekKey: published[0].week_key } : { published: false };
+
+  if (sectionKey === "rankings") {
+    const finished = matches.some((m) => m.status === "finished");
+    const seasonNow = season(now.toISOString());
+    const pubWeeks = new Set(published.map((p) => p.week_key));
+    if (!last.published) { last.season = seasonNow; last.available = finished; }
+    // The slot that just passed (if still inside its grace window and unpublished), otherwise the next one.
+    const p = parisParts(now);
+    const todayDay = addDays(p, (rule.weekday - p.wd + 7) % 7);
+    const todayAt = atTime(todayDay, rule.time);
+    const past = todayAt <= now ? { day: todayDay, at: todayAt } : (() => { const d = addDays(todayDay, -7); return { day: d, at: atTime(d, rule.time) }; })();
+    const upcoming = todayAt > now ? { day: todayDay, at: todayAt } : (() => { const d = addDays(todayDay, 7); return { day: d, at: atTime(d, rule.time) }; })();
+    let { day: slotDay, at: slot } = now - past.at < WEEKLY_GRACE_MS && !pubWeeks.has(isoWeekKey(past.at)) && (!since || past.at >= since) ? past : upcoming;
+    let weekKey = isoWeekKey(slot);
+    while (pubWeeks.has(weekKey)) { slotDay = addDays(slotDay, 7); slot = atTime(slotDay, rule.time); weekKey = isoWeekKey(slot); }
+    const ok = finished;
+    const next = { kind: sec.kind, section: sectionKey, weekKey, season: season(slot.toISOString()), available: ok, waitingFor: ok ? null : "Aucun match terminé cette saison", scheduledAt: isAuto ? slot : null, failures: failuresFor((x) => x.week_key === weekKey) };
+    next.due = isAuto && ok && now >= slot && now - slot < WEEKLY_GRACE_MS;
+    return { section: sec, last, next };
+  }
+
+  // Match-based sections
+  const isPublishedFor = (m) => published.some((p) => p.match_id === m.id);
+  if (!last.published) {
+    const pool = byDate.filter((m) => available(m).ok && (m.status !== "scheduled" || new Date(m.match_datetime) <= now));
+    const fb = pool[pool.length - 1];
+    if (fb) { last.matchId = fb.id; last.available = true; }
+  }
+  const slotOf = (m) => atTime(addDays(parisParts(new Date(m.match_datetime)), rule.type === "before_match" ? -rule.days : rule.days), rule.time);
+  const pool2 = sec.rules[0] === "before_match"
+    ? byDate.filter((m) => m.status === "scheduled" && new Date(m.match_datetime) > now && !isPublishedFor(m))
+    : byDate.filter((m) => !isPublishedFor(m) && now - new Date(m.match_datetime) < AFTER_MATCH_WINDOW_MS && (m.status !== "scheduled" || new Date(m.match_datetime) > now - AFTER_MATCH_WINDOW_MS));
+  const cand = pool2.find((m) => !since || slotOf(m) >= since) || null;
+  if (!cand) return { section: sec, last, next: null };
+  const av = available(cand);
+  const kickoff = new Date(cand.match_datetime);
+  let scheduledAt = null, due = false;
+  if (isAuto) {
+    scheduledAt = slotOf(cand);
+    due = av.ok && now >= scheduledAt && (rule.type === "before_match" ? now < kickoff : now - scheduledAt < AFTER_MATCH_WINDOW_MS);
+  }
+  return { section: sec, last, next: { kind: sec.kind, section: sectionKey, matchId: cand.id, available: av.ok, waitingFor: av.ok ? null : av.why, scheduledAt, due, failures: failuresFor((x) => x.match_id === cand.id) } };
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, framingLayout, savedFraming, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, pickFeatured, postName, opponentLabel, matchBand, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

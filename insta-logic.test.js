@@ -60,9 +60,15 @@ test("opponentLabel abbreviates long names", () => {
 });
 
 test("matchBand formats day, time, stadium and city", () => {
-  const m = { match_datetime: new Date(2026, 9, 8, 19, 30).toISOString(), stadium_name: "L'Étivallière", city: "Saint-Étienne", address: "x" };
+  const m = { match_datetime: "2026-10-08T17:30:00Z", stadium_name: "L'Étivallière", city: "Saint-Étienne", address: "x" };
   assert.equal(L.matchBand(m), "JEUDI 19H30 | L'ÉTIVALLIÈRE | SAINT-ÉTIENNE");
   assert.equal(L.matchBand({ ...m, stadium_name: null }), "JEUDI 19H30 | X | SAINT-ÉTIENNE");
+});
+
+test("matchBand always shows Paris time, whatever the server's timezone (summer, winter, near midnight)", () => {
+  assert.match(L.matchBand({ match_datetime: "2026-10-08T17:30:00+00:00" }), /^JEUDI 19H30/); // CEST
+  assert.match(L.matchBand({ match_datetime: "2026-12-10T18:30:00Z" }), /^JEUDI 19H30/); // CET
+  assert.match(L.matchBand({ match_datetime: "2026-10-08T22:30:00Z" }), /^VENDREDI 00H30/); // past midnight in Paris
 });
 
 test("groupeLines sorts by jersey number then name, numberless last", () => {
@@ -193,4 +199,236 @@ test("savedFraming: Résultat reads the framing saved for Match Day", () => {
   assert.deepEqual(L.savedFraming(rows, 1, "result"), rows[0]);
   assert.deepEqual(L.savedFraming(rows, 1, "groupe"), rows[1]);
   assert.equal(L.savedFraming(rows, 2, "matchday"), null);
+});
+
+// ---------- Publication schedule: sections, Paris time, last / next post ----------
+const NOW = new Date("2026-10-06T10:00:00Z"); // Tuesday 12:00 in Paris (CEST)
+
+test("parisToDate converts a Paris wall-clock time to the right instant (summer and winter)", () => {
+  assert.equal(L.parisToDate(2026, 7, 14, 9, 30).toISOString(), "2026-07-14T07:30:00.000Z");
+  assert.equal(L.parisToDate(2026, 12, 14, 9, 30).toISOString(), "2026-12-14T08:30:00.000Z");
+  assert.equal(L.parisToDate(2026, 10, 25, 12, 0).toISOString(), "2026-10-25T11:00:00.000Z"); // DST ended that morning
+});
+
+test("parisParts reads weekday and wall clock in Paris", () => {
+  assert.deepEqual(L.parisParts(NOW), { y: 2026, m: 10, d: 6, hh: 12, mm: 0, wd: 2 });
+  assert.equal(L.parisParts(new Date("2026-10-06T22:30:00Z")).d, 7); // already past midnight in Paris
+});
+
+test("isoWeekKey follows Paris ISO weeks", () => {
+  assert.equal(L.isoWeekKey(new Date("2026-10-06T10:00:00Z")), "2026-W41");
+  assert.equal(L.isoWeekKey(new Date("2026-01-01T10:00:00Z")), "2026-W01");
+  assert.equal(L.isoWeekKey(new Date("2027-01-03T10:00:00Z")), "2026-W53");
+});
+
+test("defaultSettings: every section starts manual", () => {
+  const s = L.defaultSettings();
+  assert.deepEqual(Object.keys(s).sort(), ["groupe", "matchday", "rankings", "ratings", "result"]);
+  for (const k of Object.keys(s)) assert.equal(s[k].mode, "manual");
+});
+
+test("normalizeSettings keeps valid values and falls back to defaults for junk", () => {
+  const s = L.normalizeSettings({ matchday: { mode: "auto", rule: { type: "before_match", days: 1, time: "18:30" } }, groupe: { mode: "yolo", rule: { type: "nope" } }, rankings: { mode: "auto", rule: { type: "weekly", weekday: 9, time: "99:99" } }, extra: 1 });
+  assert.deepEqual(s.matchday, { mode: "auto", rule: { type: "before_match", days: 1, time: "18:30" } });
+  assert.equal(s.groupe.mode, "manual");
+  assert.equal(s.groupe.rule.type, "before_match");
+  assert.equal(s.rankings.mode, "auto");
+  assert.deepEqual(s.rankings.rule, L.defaultSettings().rankings.rule);
+  assert.equal(s.extra, undefined);
+  assert.deepEqual(L.normalizeSettings(null), L.defaultSettings());
+});
+
+const M = (id, iso, status, extra = {}) => ({ id, opponent_name: `Adv${id}`, match_datetime: iso, status, ...extra });
+const auto = (section, rule) => ({ ...L.defaultSettings(), [section]: { mode: "auto", rule } });
+
+test("matchday next: nearest scheduled match; due once the slot has passed and the match has not started", () => {
+  const matches = [M(1, "2026-10-01T17:30:00Z", "finished"), M(2, "2026-10-08T17:30:00Z", "scheduled"), M(3, "2026-10-15T17:30:00Z", "scheduled")];
+  const rule = { type: "before_match", days: 0, time: "09:00" };
+  let t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: NOW });
+  assert.equal(t.next.matchId, 2);
+  assert.equal(t.next.scheduledAt.toISOString(), "2026-10-08T07:00:00.000Z");
+  assert.equal(t.next.due, false);
+  t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T07:05:00Z") });
+  assert.equal(t.next.due, true);
+  t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", rule), now: new Date("2026-10-08T17:31:00Z") });
+  assert.equal(t.next.matchId, 3); // match 2 has kicked off: its Match Day post expired
+});
+
+test("matchday 'days before' counts Paris calendar days", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
+  const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: auto("matchday", { type: "before_match", days: 1, time: "18:30" }), now: NOW });
+  assert.equal(t.next.scheduledAt.toISOString(), "2026-10-07T16:30:00.000Z");
+});
+
+test("groupe needs a sheet: not available (never due) until at least one player is on it", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
+  const rule = { type: "before_match", days: 0, time: "09:00" };
+  const base = { matches, posts: [], settings: auto("groupe", rule), now: new Date("2026-10-08T08:00:00Z") };
+  let t = L.sectionState("groupe", { ...base, lineups: [] });
+  assert.equal(t.next.available, false);
+  assert.equal(t.next.due, false);
+  assert.match(t.next.waitingFor, /feuille de match/i);
+  t = L.sectionState("groupe", { ...base, lineups: [{ match_id: 2, player_id: 7 }] });
+  assert.equal(t.next.available, true);
+  assert.equal(t.next.due, true);
+});
+
+test("manual mode is never due, even when available", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
+  const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings: L.defaultSettings(), now: new Date("2026-10-08T08:00:00Z") });
+  assert.equal(t.next.available, true);
+  assert.equal(t.next.due, false);
+  assert.equal(t.next.scheduledAt, null);
+});
+
+test("result: due after the slot on a finished match, with a 7-day window; waits for the match to finish", () => {
+  const rule = { type: "after_match", days: 0, time: "22:00" };
+  const live = [M(5, "2026-10-06T08:00:00Z", "live")];
+  let t = L.sectionState("result", { matches: live, lineups: [], posts: [], settings: auto("result", rule), now: NOW });
+  assert.equal(t.next.matchId, 5);
+  assert.equal(t.next.available, false);
+  assert.match(t.next.waitingFor, /terminé/i);
+  const done = [M(5, "2026-10-06T08:00:00Z", "finished")];
+  t = L.sectionState("result", { matches: done, lineups: [], posts: [], settings: auto("result", rule), now: NOW });
+  assert.equal(t.next.due, false); // slot is 22:00 Paris
+  t = L.sectionState("result", { matches: done, lineups: [], posts: [], settings: auto("result", rule), now: new Date("2026-10-06T20:30:00Z") });
+  assert.equal(t.next.due, true);
+  t = L.sectionState("result", { matches: done, lineups: [], posts: [], settings: auto("result", rule), now: new Date("2026-10-20T20:30:00Z") });
+  assert.equal(t.next, null); // older than 7 days: not pushed automatically
+});
+
+test("ratings need validated notes", () => {
+  const rule = { type: "after_match", days: 2, time: "12:00" };
+  const base = { lineups: [], posts: [], settings: auto("ratings", rule), now: new Date("2026-10-10T12:30:00Z") };
+  let t = L.sectionState("ratings", { ...base, matches: [M(5, "2026-10-08T08:00:00Z", "finished")] });
+  assert.equal(t.next.available, false);
+  assert.match(t.next.waitingFor, /notes/i);
+  t = L.sectionState("ratings", { ...base, matches: [M(5, "2026-10-08T08:00:00Z", "finished", { ratings_validated_at: "2026-10-09T10:00:00Z" })] });
+  assert.equal(t.next.due, true);
+});
+
+test("a published post is the 'last', is excluded from 'next', and keeps its link", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled"), M(3, "2026-10-15T17:30:00Z", "scheduled")];
+  const posts = [{ id: 1, kind: "matchday", match_id: 2, status: "published", published_at: "2026-10-08T07:00:10Z", permalink: "https://instagram.com/p/x", image_paths: ["a.jpg"] }];
+  const t = L.sectionState("matchday", { matches, lineups: [], posts, settings: auto("matchday", { type: "before_match", days: 0, time: "09:00" }), now: new Date("2026-10-08T08:00:00Z") });
+  assert.equal(t.last.published, true);
+  assert.equal(t.last.post.permalink, "https://instagram.com/p/x");
+  assert.equal(t.next.matchId, 3);
+});
+
+test("failed or publishing rows do not count as published", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled")];
+  const posts = [{ id: 1, kind: "matchday", match_id: 2, status: "failed", error: "boom" }];
+  const t = L.sectionState("matchday", { matches, lineups: [], posts, settings: L.defaultSettings(), now: NOW });
+  assert.equal(t.next.matchId, 2);
+  assert.equal(t.next.failures, 1);
+});
+
+test("without any published post, 'last' falls back to the latest available match", () => {
+  const matches = [M(1, "2026-09-24T17:30:00Z", "finished"), M(2, "2026-10-01T17:30:00Z", "finished"), M(3, "2026-10-15T17:30:00Z", "scheduled")];
+  const t = L.sectionState("result", { matches, lineups: [], posts: [], settings: L.defaultSettings(), now: NOW });
+  assert.equal(t.last.published, false);
+  assert.equal(t.last.matchId, 2);
+});
+
+test("rankings: weekly slot, due within 24h after it, one per ISO week", () => {
+  const matches = [M(1, "2026-10-01T17:30:00Z", "finished")];
+  const rule = { type: "weekly", weekday: 2, time: "18:00" }; // Tuesday
+  const mk = (now, posts = []) => L.sectionState("rankings", { matches, lineups: [], posts, settings: auto("rankings", rule), now });
+  let t = mk(NOW); // Tuesday 12:00 Paris: slot is at 18:00
+  assert.equal(t.next.scheduledAt.toISOString(), "2026-10-06T16:00:00.000Z");
+  assert.equal(t.next.due, false);
+  assert.equal(t.next.weekKey, "2026-W41");
+  t = mk(new Date("2026-10-06T16:10:00Z"));
+  assert.equal(t.next.due, true);
+  t = mk(new Date("2026-10-06T16:10:00Z"), [{ kind: "rankings", week_key: "2026-W41", status: "published", published_at: "2026-10-06T16:01:00Z" }]);
+  assert.equal(t.next.weekKey, "2026-W42");
+  assert.equal(t.next.due, false);
+  assert.equal(t.last.published, true);
+  t = mk(new Date("2026-10-08T10:00:00Z")); // Thursday: slot missed by more than 24h → wait for next Tuesday
+  assert.equal(t.next.weekKey, "2026-W42");
+});
+
+test("rankings are not available before any finished match", () => {
+  const t = L.sectionState("rankings", { matches: [M(2, "2026-10-08T17:30:00Z", "scheduled")], lineups: [], posts: [], settings: auto("rankings", { type: "weekly", weekday: 2, time: "18:00" }), now: NOW });
+  assert.equal(t.next.available, false);
+});
+
+test("targetKey identifies a post uniquely", () => {
+  assert.equal(L.targetKey({ kind: "matchday", matchId: 2 }), "matchday:match:2");
+  assert.equal(L.targetKey({ kind: "rankings", weekKey: "2026-W41" }), "rankings:week:2026-W41");
+});
+
+// ---------- Captions context shared by the app and the server ----------
+const PL = [{ id: 1, name: "Louis", display_name: "Louis" }, { id: 2, name: "Nolan", display_name: "Nolan" }, { id: 3, name: "Solal", display_name: "Solal" }];
+const CM = [{ id: 1, opponent_name: "FC Test", match_datetime: "2026-10-08T15:30:00Z", status: "finished", stadium_name: "Stade Y", city: "Paris" }];
+const CL = [1, 2, 3].map((p) => ({ match_id: 1, player_id: p }));
+const CE = [{ match_id: 1, type: "goal_bl", half: 1, minute: 12, player_id: 1, assist_player_id: 2 }, { match_id: 1, type: "goal_opponent", half: 1, minute: 30 }];
+const CR = [{ match_id: 1, rater_id: 1, ratee_id: 2, score: 8 }, { match_id: 1, rater_id: 3, ratee_id: 2, score: 7 }, { match_id: 1, rater_id: 2, ratee_id: 1, score: 6 }];
+const CD = { matches: CM, lineups: CL, events: CE, ratings: CR, players: PL, roster: [{ player_id: 1, jersey_number: "14" }] };
+
+test("captionContextFor builds each caption's inputs from raw data", () => {
+  assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD), { opponent: "FC Test", band: L.matchBand(CM[0]) });
+  const r = L.captionContextFor("result", { matchId: 1 }, CD);
+  assert.deepEqual([r.opponent, r.bl, r.opp, r.goals], ["FC Test", 1, 1, ["12' Louis (Nolan)"]]);
+  assert.deepEqual(L.captionContextFor("ratings", { matchId: 1 }, CD).top, [{ name: "Nolan", rating: 7.5 }, { name: "Louis", rating: 6 }]);
+  assert.deepEqual(L.captionContextFor("rankings", { season: "2026-2027" }, CD), { season: "2026-2027" });
+  assert.deepEqual(L.captionContextFor("groupe", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]);
+});
+
+test("captionFor groupe lists the players", () => {
+  const c = L.captionFor("groupe", { opponent: "FC Test", names: ["Louis", "Nolan"] });
+  assert.match(c, /FC Test/);
+  assert.match(c, /Louis · Nolan/);
+});
+
+test("isTargetAvailable mirrors the section rules", () => {
+  const fin = { id: 1, status: "finished" }, sch = { id: 2, status: "scheduled" };
+  assert.equal(L.isTargetAvailable("matchday", sch, []).ok, true);
+  assert.equal(L.isTargetAvailable("groupe", sch, []).ok, false);
+  assert.equal(L.isTargetAvailable("groupe", sch, [{ match_id: 2, player_id: 1 }]).ok, true);
+  assert.equal(L.isTargetAvailable("result", sch, []).ok, false);
+  assert.equal(L.isTargetAvailable("result", fin, []).ok, true);
+  assert.equal(L.isTargetAvailable("ratings", fin, []).ok, false);
+  assert.equal(L.isTargetAvailable("ratings", { ...fin, ratings_validated_at: "x" }, []).ok, true);
+});
+
+// ---------- Activation date: switching to automatic never posts the past ----------
+test("normalizeSettings keeps a valid activation date and drops junk", () => {
+  const ok = L.normalizeSettings({ matchday: { mode: "auto", since: "2026-10-08T07:00:00.000Z", rule: { type: "before_match", days: 0, time: "09:00" } } });
+  assert.equal(ok.matchday.since, "2026-10-08T07:00:00.000Z");
+  assert.equal(L.normalizeSettings({ matchday: { mode: "auto", since: "not a date" } }).matchday.since, undefined);
+  assert.equal(L.normalizeSettings({ matchday: { mode: "manual", since: "2026-10-08T07:00:00.000Z" } }).matchday.since, undefined);
+});
+
+test("auto: a slot that passed before the activation is skipped (matchday)", () => {
+  const matches = [M(2, "2026-10-08T17:30:00Z", "scheduled"), M(3, "2026-10-15T17:30:00Z", "scheduled")];
+  const settings = { ...L.defaultSettings(), matchday: { mode: "auto", since: "2026-10-08T08:00:00.000Z", rule: { type: "before_match", days: 0, time: "09:00" } } };
+  // match 2's slot (09:00 Paris = 07:00Z) was before the activation (08:00Z): the next automatic one is match 3
+  const t = L.sectionState("matchday", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-08T08:30:00Z") });
+  assert.equal(t.next.matchId, 3);
+  assert.equal(t.next.due, false);
+});
+
+test("auto: an old unpublished result is not posted when automatic mode is switched on", () => {
+  const matches = [M(1, "2026-10-01T15:30:00Z", "finished"), M(5, "2026-10-08T08:00:00Z", "finished")];
+  const settings = { ...L.defaultSettings(), result: { mode: "auto", since: "2026-10-08T07:00:00.000Z", rule: { type: "after_match", days: 0, time: "22:00" } } };
+  const t = L.sectionState("result", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-08T21:00:00Z") });
+  assert.equal(t.next.matchId, 5); // match 1's slot (Oct 1) predates the activation
+  const later = L.sectionState("result", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-08T20:30:00Z") });
+  assert.equal(later.next.due, true);
+});
+
+test("auto: a weekly slot before the activation is not posted late", () => {
+  const matches = [M(1, "2026-10-01T17:30:00Z", "finished")];
+  const settings = { ...L.defaultSettings(), rankings: { mode: "auto", since: "2026-10-06T16:05:00.000Z", rule: { type: "weekly", weekday: 2, time: "18:00" } } };
+  const t = L.sectionState("rankings", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-06T16:10:00Z") }); // slot 16:00Z passed 5 min before activation
+  assert.equal(t.next.weekKey, "2026-W42");
+  assert.equal(t.next.due, false);
+});
+
+test("manual mode ignores the activation date", () => {
+  const matches = [M(1, "2026-10-01T15:30:00Z", "finished")];
+  const settings = { ...L.defaultSettings(), result: { mode: "manual", rule: { type: "after_match", days: 0, time: "22:00" } } };
+  assert.equal(L.sectionState("result", { matches, lineups: [], posts: [], settings, now: new Date("2026-10-03T10:00:00Z") }).next.matchId, 1);
 });

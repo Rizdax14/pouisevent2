@@ -1159,8 +1159,8 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
 
 const INSTA_KEY_STORAGE = "foot_insta_admin_key";
 function readInstaKey() { try { return localStorage.getItem(INSTA_KEY_STORAGE) || ""; } catch (e) { return ""; } }
-async function instaAdminFetch(path, body) {
-  const r = await fetch(`/api/insta/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Insta-Admin-Key": readInstaKey() }, body: JSON.stringify(body) });
+async function instaAdminFetch(path, body, method = "POST") {
+  const r = await fetch(`/api/insta/${path}`, { method, headers: { "Content-Type": "application/json", "X-Insta-Admin-Key": readInstaKey() }, body: method === "GET" ? undefined : JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
   return data;
@@ -1542,38 +1542,20 @@ function FootInstaKeyBox({ onSaved }) {
   );
 }
 
-// Images of one post: Match Day + Groupe, the three ranking pages, or a single visual.
-function instaPostImages(post, v) {
-  // `v` fingerprints the data behind the post: the URL changes when the match does, so the browser never reuses an outdated render.
+// Images of one post: Match Day (page 1) and Groupe (page 2) are separate posts, Classements is a 3-image carousel.
+function instaImages(kind, { matchId, season }, v) {
   const url = (params) => `/api/insta/render?${new URLSearchParams({ ...params, v })}`;
-  if (post.kind === "matchday") return [1, 2].map((page) => ({ label: page === 1 ? "Match Day" : "Groupe", src: url({ kind: "matchday", match: post.matchId, page }) }));
-  if (post.kind === "rankings") return RANKING_PAGES.map((pg, i) => ({ label: pg.heading, src: url({ kind: "rankings", season: post.season, page: i + 1 }) }));
-  return [{ label: post.kind === "ratings" ? "Notes" : "Résultat", src: url({ kind: post.kind, match: post.matchId }) }];
+  if (kind === "matchday") return [{ label: "Match Day", src: url({ kind: "matchday", match: matchId, page: 1 }) }];
+  if (kind === "groupe") return [{ label: "Groupe", src: url({ kind: "matchday", match: matchId, page: 2 }) }];
+  if (kind === "rankings") return RANKING_PAGES.map((pg, i) => ({ label: pg.heading, src: url({ kind: "rankings", season, page: i + 1 }) }));
+  return [{ label: kind === "ratings" ? "Notes" : "Résultat", src: url({ kind, match: matchId }) }];
 }
 
-// Everything captionFor needs, built from the data already loaded in the app.
-function instaCaptionContext(post, { matches, lineups, events, ratings }) {
-  const match = matches.find((m) => m.id === post.matchId);
-  const nameOf = (id) => postName(PLAYERS.find((p) => p.id === id), PLAYERS.filter((p) => lineups.some((l) => l.match_id === post.matchId && l.player_id === p.id)));
-  if (post.kind === "matchday") return { opponent: match.opponent_name, band: matchBand(match) };
-  if (post.kind === "result") {
-    const evs = events.filter((e) => e.match_id === match.id);
-    const sc = computeFootScore(evs);
-    return { opponent: match.opponent_name, bl: sc.bl, opp: sc.opponent, goals: goalLines(evs, PLAYERS) };
-  }
-  if (post.kind === "ratings") {
-    const sheet = lineups.filter((l) => l.match_id === match.id).map((l) => l.player_id);
-    const avg = matchAverages(sheet, ratings.filter((r) => r.match_id === match.id));
-    const top = sheet.filter((id) => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map((id) => ({ name: nameOf(id), rating: avg[id] }));
-    return { opponent: match.opponent_name, top };
-  }
-  return { season: post.season };
-}
-
-// Short fingerprint of everything a post's images are drawn from.
-function instaDataKey(post, { matches, lineups, events, ratings }) {
-  const mid = post.matchId;
-  const slice = post.kind === "rankings"
+// Short fingerprint of everything a post's images and caption are drawn from: the URL changes when the match does,
+// so the browser never reuses an outdated render.
+function instaDataKey(kind, target, { matches, lineups, events, ratings }) {
+  const mid = target.matchId;
+  const slice = kind === "rankings"
     ? [matches.map((m) => [m.id, m.status, m.venue, m.ratings_validated_at]), events, lineups, ratings]
     : [matches.filter((m) => m.id === mid), lineups.filter((l) => l.match_id === mid), events.filter((e) => e.match_id === mid), ratings.filter((r) => r.match_id === mid)];
   const str = JSON.stringify(slice);
@@ -1582,40 +1564,204 @@ function instaDataKey(post, { matches, lineups, events, ratings }) {
   return h.toString(36);
 }
 
-function FootPostCard({ post, data }) {
-  const [caption, setCaption] = React.useState(() => captionFor(post.kind, instaCaptionContext(post, data)));
-  const [copied, setCopied] = React.useState(false);
-  const images = instaPostImages(post, instaDataKey(post, data));
-  async function copy() {
-    try { await navigator.clipboard.writeText(caption); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) { console.warn("copy failed", e); }
-  }
-  const mini = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 10px", fontSize: 12, cursor: "pointer", textDecoration: "none" };
+const INSTA_DAY_LABELS = ["le jour même", "la veille", "2 jours avant", "3 jours avant", "4 jours avant", "5 jours avant", "6 jours avant"];
+const INSTA_AFTER_LABELS = ["le jour même", "le lendemain", "2 jours après", "3 jours après", "4 jours après", "5 jours après", "6 jours après"];
+const INSTA_WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const INSTA_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const instaWhen = (d) => d ? new Date(d).toLocaleString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const instaPublicImageUrl = (path) => `${SUPABASE_URL}/storage/v1/object/public/insta-posts/${path.split("/").map(encodeURIComponent).join("/")}`;
+
+function FootInstaImages({ images }) {
   return (
-    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 14, marginBottom: 14 }}>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, marginBottom: 10 }}>{post.label}</div>
-      <div style={{ display: "flex", gap: 10, overflowX: "auto", marginBottom: 10 }}>
-        {images.map((im) => (
-          <div key={im.label} style={{ flex: "0 0 auto", width: 200, textAlign: "center" }}>
-            <img src={im.src} alt={im.label} loading="lazy" style={{ width: 200, height: 250, objectFit: "cover", background: "#13131f", borderRadius: 8 }} />
-            <div style={{ fontSize: 11, color: "#60607a", margin: "4px 0" }}>{im.label}</div>
-            <a href={im.src} target="_blank" rel="noreferrer" style={mini}>Ouvrir</a>
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 8 }}>
+      {images.map((im) => (
+        <a key={im.src} href={im.src} target="_blank" rel="noreferrer" style={{ flex: "0 0 auto", width: 120, textAlign: "center", textDecoration: "none" }}>
+          <img src={im.src} alt={im.label} loading="lazy" style={{ width: 120, height: 150, objectFit: "cover", background: "#13131f", borderRadius: 8, display: "block" }} />
+          <div style={{ fontSize: 10, color: "#60607a", marginTop: 3 }}>{im.label}</div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// How and when a section is sent: manual, or automatic with a slot.
+function FootSectionSchedule({ sec, cfg, onChange }) {
+  const rule = cfg.rule;
+  const set = (patch) => onChange({ ...cfg, rule: { ...rule, ...patch } });
+  const field = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "5px 8px", fontSize: 12 };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12, color: "#cccce0" }}>
+      {rule.type === "weekly" ? (
+        <>
+          <span>Chaque</span>
+          <select value={rule.weekday} onChange={(e) => set({ weekday: Number(e.target.value) })} style={field}>
+            {INSTA_WEEKDAY_ORDER.map((d) => <option key={d} value={d}>{INSTA_WEEKDAYS[d]}</option>)}
+          </select>
+        </>
+      ) : (
+        <>
+          <span>Envoyer</span>
+          <select value={rule.days} onChange={(e) => set({ days: Number(e.target.value) })} style={field}>
+            {(rule.type === "before_match" ? INSTA_DAY_LABELS : INSTA_AFTER_LABELS).map((l, i) => <option key={i} value={i}>{l}</option>)}
+          </select>
+          <span>du match</span>
+        </>
+      )}
+      <span>à</span>
+      <input type="time" value={rule.time} onChange={(e) => e.target.value && set({ time: e.target.value })} style={field} />
+      <span style={{ color: "#60607a" }}>(heure de Paris)</span>
+    </div>
+  );
+}
+
+function FootInstaNext({ sec, next, cfg, data, posts, onPublished }) {
+  const target = { kind: sec.kind, matchId: next.matchId, weekKey: next.weekKey, season: next.season };
+  const match = next.matchId ? data.matches.find((m) => m.id === next.matchId) : null;
+  const key = instaDataKey(sec.kind, target, data);
+  const [caption, setCaption] = React.useState(() => next.available ? captionFor(sec.kind, captionContextFor(sec.kind, target, { ...data, players: PLAYERS })) : "");
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const [copied, setCopied] = React.useState(false);
+  const failed = posts.filter((p) => p.kind === sec.kind && p.status === "failed" && (next.weekKey ? p.week_key === next.weekKey : p.match_id === next.matchId)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+  const images = next.available ? instaImages(sec.kind, target, key) : [];
+
+  async function publish() {
+    if (!window.confirm(`Publier maintenant sur Instagram ?\n\n${caption.slice(0, 200)}`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await instaAdminFetch("publish", { section: sec.key, match_id: next.matchId, week_key: next.weekKey, season: next.season, caption });
+      setMsg(r.status === "published" ? { t: "success", m: "Publié ✓" } : r.status === "in_progress" ? { t: "error", m: "Une publication est déjà en cours" } : { t: "success", m: "Déjà publié" });
+      await onPublished();
+    } catch (e) { setMsg({ t: "error", m: e.message }); }
+    setBusy(false);
+  }
+  async function copy() { try { await navigator.clipboard.writeText(caption); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) { console.warn("copy failed", e); } }
+
+  let badge;
+  if (!next.available) badge = ["En attente : " + next.waitingFor, "#60607a"];
+  else if (cfg.mode !== "auto") badge = ["Prêt — envoi manuel", "#3b82f6"];
+  else if (next.due) badge = ["Part au prochain passage (≤ 10 min)", "#f59e0b"];
+  else badge = [`Programmé : ${instaWhen(next.scheduledAt)}`, "#34d399"];
+  const mini = { background: "#13131f", border: "1px solid #1e1e30", borderRadius: 6, color: "#eeeef5", padding: "6px 10px", fontSize: 12, cursor: "pointer", textDecoration: "none" };
+  return (
+    <div>
+      <div style={{ fontSize: 13, marginBottom: 2 }}>{match ? `vs ${match.opponent_name}` : `Saison ${next.season}`}{match && <span style={{ color: "#60607a" }}> · {instaWhen(match.match_datetime)}</span>}</div>
+      <div style={{ fontSize: 11, color: badge[1], fontWeight: 700, marginBottom: 8 }}>{badge[0]}</div>
+      {failed && <div style={{ fontSize: 11, color: "#ef4444", marginBottom: 8 }}>Dernier essai échoué : {failed.error}</div>}
+      {next.available && (
+        <>
+          <FootInstaImages images={images} />
+          <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={4} style={{ ...FOOT_INPUT_STYLE, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={publish} disabled={busy} style={{ ...mini, background: "#3b82f6", border: "none", color: "#fff", fontWeight: 700, opacity: busy ? 0.6 : 1 }}>{busy ? "Publication…" : "Publier maintenant"}</button>
+            <button onClick={copy} style={mini}>{copied ? "Copié ✓" : "Copier la légende"}</button>
           </div>
-        ))}
+        </>
+      )}
+      {msg && <div style={{ color: msg.t === "error" ? "#ef4444" : "#34d399", fontSize: 12, marginTop: 8 }}>{msg.m}</div>}
+    </div>
+  );
+}
+
+function FootInstaLast({ sec, last, data }) {
+  if (last.published) {
+    const p = last.post;
+    const m = p.match_id ? data.matches.find((x) => x.id === p.match_id) : null;
+    const images = (p.image_paths || []).map((path, i) => ({ label: `${i + 1}`, src: instaPublicImageUrl(path) }));
+    return (
+      <div>
+        <div style={{ fontSize: 13, marginBottom: 2 }}>{m ? `vs ${m.opponent_name}` : `Saison ${p.season || ""}`}</div>
+        <div style={{ fontSize: 11, color: "#34d399", fontWeight: 700, marginBottom: 8 }}>Publié le {instaWhen(p.published_at)}</div>
+        {images.length > 0 && <FootInstaImages images={images} />}
+        {p.permalink && <a href={p.permalink} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#3b82f6" }}>Voir sur Instagram ↗</a>}
       </div>
-      <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={5} style={{ ...FOOT_INPUT_STYLE, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
-      <button onClick={copy} style={{ ...mini, fontWeight: 700 }}>{copied ? "Copié ✓" : "Copier la légende"}</button>
+    );
+  }
+  const m = last.matchId ? data.matches.find((x) => x.id === last.matchId) : null;
+  if (!last.available) return <div style={{ fontSize: 12, color: "#60607a" }}>Aucun post pour l'instant.</div>;
+  const target = { kind: sec.kind, matchId: last.matchId, season: last.season };
+  return (
+    <div>
+      <div style={{ fontSize: 13, marginBottom: 2 }}>{m ? `vs ${m.opponent_name}` : `Saison ${last.season}`}</div>
+      <div style={{ fontSize: 11, color: "#60607a", fontWeight: 700, marginBottom: 8 }}>Jamais publié — dernier visuel disponible</div>
+      <FootInstaImages images={instaImages(sec.kind, target, instaDataKey(sec.kind, target, data))} />
+    </div>
+  );
+}
+
+function FootInstaSection({ sec, saved, data, posts, onSave, onPublished }) {
+  const [draft, setDraft] = React.useState(saved);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => { setDraft(saved); }, [JSON.stringify(saved)]);
+  const dirty = JSON.stringify({ m: draft.mode, r: draft.rule }) !== JSON.stringify({ m: saved.mode, r: saved.rule });
+  const state = sectionState(sec.key, { matches: data.matches, lineups: data.lineups, posts, settings: { [sec.key]: saved }, now: new Date() });
+  async function save() {
+    setSaving(true); setErr(null);
+    try { await onSave(sec.key, draft); } catch (e) { setErr(e.message); }
+    setSaving(false);
+  }
+  const seg = (active) => ({ flex: 1, background: active ? "#3b82f6" : "#13131f", color: active ? "#fff" : "#eeeef5", border: "1px solid #1e1e30", borderRadius: 8, padding: "7px 6px", fontWeight: 700, fontSize: 12, cursor: "pointer" });
+  return (
+    <div style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18 }}>{sec.label}</div>
+        <span style={{ fontSize: 10, textTransform: "uppercase", fontWeight: 700, color: saved.mode === "auto" ? "#34d399" : "#60607a", border: `1px solid ${saved.mode === "auto" ? "#34d399" : "#1e1e30"}`, borderRadius: 4, padding: "2px 6px" }}>{saved.mode === "auto" ? "Automatique" : "Manuel"}</span>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button style={seg(draft.mode === "manual")} onClick={() => setDraft({ ...draft, mode: "manual" })}>Manuel</button>
+        <button style={seg(draft.mode === "auto")} onClick={() => setDraft({ ...draft, mode: "auto" })}>Automatique</button>
+      </div>
+      {draft.mode === "auto" && (
+        <div style={{ marginBottom: 10 }}>
+          <FootSectionSchedule sec={sec} cfg={draft} onChange={setDraft} />
+          <div style={{ fontSize: 11, color: "#60607a", marginTop: 6 }}>Seuls les créneaux à venir partent tout seuls{saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement"}. Rien d'ancien n'est publié.</div>
+        </div>
+      )}
+      {dirty && (
+        <div style={{ marginBottom: 10 }}>
+          <button onClick={save} disabled={saving} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>{saving ? "Enregistrement…" : "Enregistrer le réglage"}</button>
+        </div>
+      )}
+      {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{err}</div>}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Dernier post</div>
+          <FootInstaLast sec={sec} last={state.last} data={data} />
+        </div>
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: "#60607a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Prochain post</div>
+          {state.next
+            ? <FootInstaNext key={`${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`} sec={sec} next={state.next} cfg={saved} data={data} posts={posts} onPublished={onPublished} />
+            : <div style={{ fontSize: 12, color: "#60607a" }}>Rien de prévu pour l'instant.</div>}
+        </div>
+      </div>
     </div>
   );
 }
 
 function FootPostsTab({ matches, lineups, events, ratings }) {
-  const posts = availablePosts({ matches, lineups, now: new Date() });
+  const [settings, setSettings] = React.useState(null);
+  const [instaPosts, setInstaPosts] = React.useState([]);
+  const [loadErr, setLoadErr] = React.useState(null);
   const data = { matches, lineups, events, ratings };
+  const reloadPosts = () => instaAdminFetch("posts", null, "GET").then((r) => setInstaPosts(r.posts || [])).catch((e) => setLoadErr((prev) => prev || e.message));
+  React.useEffect(() => {
+    reloadPosts();
+    instaAdminFetch("settings", null, "GET").then((r) => setSettings(normalizeSettings(r.settings))).catch((e) => { setLoadErr(e.message); setSettings(defaultSettings()); });
+  }, []);
+  async function saveSection(key, cfg) {
+    const r = await instaAdminFetch("settings", { settings: { ...settings, [key]: { mode: cfg.mode, rule: cfg.rule } } });
+    setSettings(normalizeSettings(r.settings));
+  }
+  if (!settings) return <div style={{ color: "#60607a", fontSize: 13 }}>Chargement…</div>;
   return (
     <div>
-      {posts.length === 0 && <div style={{ color: "#60607a", fontSize: 13 }}>Aucun post disponible pour l'instant.</div>}
-      {posts.map((post) => <FootPostCard key={`${post.kind}-${post.matchId || post.season}-${instaDataKey(post, data)}`} post={post} data={data} />)}
-      <div style={{ color: "#60607a", fontSize: 11, textAlign: "center", marginTop: 8 }}>Publication automatique : bientôt (plan 2)</div>
+      {loadErr && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 12 }}>Réglages indisponibles ({loadErr}). Valeurs par défaut (manuel) affichées.</div>}
+      {INSTA_SECTIONS.map((sec) => (
+        <FootInstaSection key={sec.key} sec={sec} saved={settings[sec.key]} data={data} posts={instaPosts} onSave={saveSection} onPublished={reloadPosts} />
+      ))}
+      <div style={{ color: "#60607a", fontSize: 11, textAlign: "center" }}>Envoi automatique : un planificateur vérifie toutes les ~10 minutes ce qui doit partir.</div>
     </div>
   );
 }

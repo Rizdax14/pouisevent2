@@ -2630,14 +2630,14 @@ function readInstaKey() {
     return "";
   }
 }
-async function instaAdminFetch(path, body) {
+async function instaAdminFetch(path, body, method = "POST") {
   const r = await fetch(`/api/insta/${path}`, {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": "application/json",
       "X-Insta-Admin-Key": readInstaKey()
     },
-    body: JSON.stringify(body)
+    body: method === "GET" ? undefined : JSON.stringify(body)
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
@@ -3644,99 +3644,236 @@ function FootInstaKeyBox({
   }, "Enregistrer la cl\xE9"));
 }
 
-// Images of one post: Match Day + Groupe, the three ranking pages, or a single visual.
-function instaPostImages(post, v) {
-  // `v` fingerprints the data behind the post: the URL changes when the match does, so the browser never reuses an outdated render.
+// Images of one post: Match Day (page 1) and Groupe (page 2) are separate posts, Classements is a 3-image carousel.
+function instaImages(kind, {
+  matchId,
+  season
+}, v) {
   const url = params => `/api/insta/render?${new URLSearchParams({
     ...params,
     v
   })}`;
-  if (post.kind === "matchday") return [1, 2].map(page => ({
-    label: page === 1 ? "Match Day" : "Groupe",
+  if (kind === "matchday") return [{
+    label: "Match Day",
     src: url({
       kind: "matchday",
-      match: post.matchId,
-      page
+      match: matchId,
+      page: 1
     })
-  }));
-  if (post.kind === "rankings") return RANKING_PAGES.map((pg, i) => ({
+  }];
+  if (kind === "groupe") return [{
+    label: "Groupe",
+    src: url({
+      kind: "matchday",
+      match: matchId,
+      page: 2
+    })
+  }];
+  if (kind === "rankings") return RANKING_PAGES.map((pg, i) => ({
     label: pg.heading,
     src: url({
       kind: "rankings",
-      season: post.season,
+      season,
       page: i + 1
     })
   }));
   return [{
-    label: post.kind === "ratings" ? "Notes" : "Résultat",
+    label: kind === "ratings" ? "Notes" : "Résultat",
     src: url({
-      kind: post.kind,
-      match: post.matchId
+      kind,
+      match: matchId
     })
   }];
 }
 
-// Everything captionFor needs, built from the data already loaded in the app.
-function instaCaptionContext(post, {
+// Short fingerprint of everything a post's images and caption are drawn from: the URL changes when the match does,
+// so the browser never reuses an outdated render.
+function instaDataKey(kind, target, {
   matches,
   lineups,
   events,
   ratings
 }) {
-  const match = matches.find(m => m.id === post.matchId);
-  const nameOf = id => postName(PLAYERS.find(p => p.id === id), PLAYERS.filter(p => lineups.some(l => l.match_id === post.matchId && l.player_id === p.id)));
-  if (post.kind === "matchday") return {
-    opponent: match.opponent_name,
-    band: matchBand(match)
-  };
-  if (post.kind === "result") {
-    const evs = events.filter(e => e.match_id === match.id);
-    const sc = computeFootScore(evs);
-    return {
-      opponent: match.opponent_name,
-      bl: sc.bl,
-      opp: sc.opponent,
-      goals: goalLines(evs, PLAYERS)
-    };
-  }
-  if (post.kind === "ratings") {
-    const sheet = lineups.filter(l => l.match_id === match.id).map(l => l.player_id);
-    const avg = matchAverages(sheet, ratings.filter(r => r.match_id === match.id));
-    const top = sheet.filter(id => avg[id] != null).sort((a, b) => avg[b] - avg[a]).slice(0, 3).map(id => ({
-      name: nameOf(id),
-      rating: avg[id]
-    }));
-    return {
-      opponent: match.opponent_name,
-      top
-    };
-  }
-  return {
-    season: post.season
-  };
-}
-
-// Short fingerprint of everything a post's images are drawn from.
-function instaDataKey(post, {
-  matches,
-  lineups,
-  events,
-  ratings
-}) {
-  const mid = post.matchId;
-  const slice = post.kind === "rankings" ? [matches.map(m => [m.id, m.status, m.venue, m.ratings_validated_at]), events, lineups, ratings] : [matches.filter(m => m.id === mid), lineups.filter(l => l.match_id === mid), events.filter(e => e.match_id === mid), ratings.filter(r => r.match_id === mid)];
+  const mid = target.matchId;
+  const slice = kind === "rankings" ? [matches.map(m => [m.id, m.status, m.venue, m.ratings_validated_at]), events, lineups, ratings] : [matches.filter(m => m.id === mid), lineups.filter(l => l.match_id === mid), events.filter(e => e.match_id === mid), ratings.filter(r => r.match_id === mid)];
   const str = JSON.stringify(slice);
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = (h * 33 ^ str.charCodeAt(i)) >>> 0;
   return h.toString(36);
 }
-function FootPostCard({
-  post,
-  data
+const INSTA_DAY_LABELS = ["le jour même", "la veille", "2 jours avant", "3 jours avant", "4 jours avant", "5 jours avant", "6 jours avant"];
+const INSTA_AFTER_LABELS = ["le jour même", "le lendemain", "2 jours après", "3 jours après", "4 jours après", "5 jours après", "6 jours après"];
+const INSTA_WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const INSTA_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const instaWhen = d => d ? new Date(d).toLocaleString("fr-FR", {
+  timeZone: "Europe/Paris",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit"
+}) : "";
+const instaPublicImageUrl = path => `${SUPABASE_URL}/storage/v1/object/public/insta-posts/${path.split("/").map(encodeURIComponent).join("/")}`;
+function FootInstaImages({
+  images
 }) {
-  const [caption, setCaption] = React.useState(() => captionFor(post.kind, instaCaptionContext(post, data)));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      overflowX: "auto",
+      marginBottom: 8
+    }
+  }, images.map(im => /*#__PURE__*/React.createElement("a", {
+    key: im.src,
+    href: im.src,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      flex: "0 0 auto",
+      width: 120,
+      textAlign: "center",
+      textDecoration: "none"
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: im.src,
+    alt: im.label,
+    loading: "lazy",
+    style: {
+      width: 120,
+      height: 150,
+      objectFit: "cover",
+      background: "#13131f",
+      borderRadius: 8,
+      display: "block"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#60607a",
+      marginTop: 3
+    }
+  }, im.label))));
+}
+
+// How and when a section is sent: manual, or automatic with a slot.
+function FootSectionSchedule({
+  sec,
+  cfg,
+  onChange
+}) {
+  const rule = cfg.rule;
+  const set = patch => onChange({
+    ...cfg,
+    rule: {
+      ...rule,
+      ...patch
+    }
+  });
+  const field = {
+    background: "#13131f",
+    border: "1px solid #1e1e30",
+    borderRadius: 6,
+    color: "#eeeef5",
+    padding: "5px 8px",
+    fontSize: 12
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 12,
+      color: "#cccce0"
+    }
+  }, rule.type === "weekly" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "Chaque"), /*#__PURE__*/React.createElement("select", {
+    value: rule.weekday,
+    onChange: e => set({
+      weekday: Number(e.target.value)
+    }),
+    style: field
+  }, INSTA_WEEKDAY_ORDER.map(d => /*#__PURE__*/React.createElement("option", {
+    key: d,
+    value: d
+  }, INSTA_WEEKDAYS[d])))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "Envoyer"), /*#__PURE__*/React.createElement("select", {
+    value: rule.days,
+    onChange: e => set({
+      days: Number(e.target.value)
+    }),
+    style: field
+  }, (rule.type === "before_match" ? INSTA_DAY_LABELS : INSTA_AFTER_LABELS).map((l, i) => /*#__PURE__*/React.createElement("option", {
+    key: i,
+    value: i
+  }, l))), /*#__PURE__*/React.createElement("span", null, "du match")), /*#__PURE__*/React.createElement("span", null, "\xE0"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: rule.time,
+    onChange: e => e.target.value && set({
+      time: e.target.value
+    }),
+    style: field
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#60607a"
+    }
+  }, "(heure de Paris)"));
+}
+function FootInstaNext({
+  sec,
+  next,
+  cfg,
+  data,
+  posts,
+  onPublished
+}) {
+  const target = {
+    kind: sec.kind,
+    matchId: next.matchId,
+    weekKey: next.weekKey,
+    season: next.season
+  };
+  const match = next.matchId ? data.matches.find(m => m.id === next.matchId) : null;
+  const key = instaDataKey(sec.kind, target, data);
+  const [caption, setCaption] = React.useState(() => next.available ? captionFor(sec.kind, captionContextFor(sec.kind, target, {
+    ...data,
+    players: PLAYERS
+  })) : "");
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
   const [copied, setCopied] = React.useState(false);
-  const images = instaPostImages(post, instaDataKey(post, data));
+  const failed = posts.filter(p => p.kind === sec.kind && p.status === "failed" && (next.weekKey ? p.week_key === next.weekKey : p.match_id === next.matchId)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+  const images = next.available ? instaImages(sec.kind, target, key) : [];
+  async function publish() {
+    if (!window.confirm(`Publier maintenant sur Instagram ?\n\n${caption.slice(0, 200)}`)) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await instaAdminFetch("publish", {
+        section: sec.key,
+        match_id: next.matchId,
+        week_key: next.weekKey,
+        season: next.season,
+        caption
+      });
+      setMsg(r.status === "published" ? {
+        t: "success",
+        m: "Publié ✓"
+      } : r.status === "in_progress" ? {
+        t: "error",
+        m: "Une publication est déjà en cours"
+      } : {
+        t: "success",
+        m: "Déjà publié"
+      });
+      await onPublished();
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: e.message
+      });
+    }
+    setBusy(false);
+  }
   async function copy() {
     try {
       await navigator.clipboard.writeText(caption);
@@ -3746,83 +3883,332 @@ function FootPostCard({
       console.warn("copy failed", e);
     }
   }
+  let badge;
+  if (!next.available) badge = ["En attente : " + next.waitingFor, "#60607a"];else if (cfg.mode !== "auto") badge = ["Prêt — envoi manuel", "#3b82f6"];else if (next.due) badge = ["Part au prochain passage (≤ 10 min)", "#f59e0b"];else badge = [`Programmé : ${instaWhen(next.scheduledAt)}`, "#34d399"];
   const mini = {
     background: "#13131f",
     border: "1px solid #1e1e30",
     borderRadius: 6,
     color: "#eeeef5",
-    padding: "5px 10px",
+    padding: "6px 10px",
     fontSize: 12,
     cursor: "pointer",
     textDecoration: "none"
   };
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#0d0d1c",
-      border: "1px solid #1e1e30",
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 14
+      fontSize: 13,
+      marginBottom: 2
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, match ? `vs ${match.opponent_name}` : `Saison ${next.season}`, match && /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Bebas Neue',sans-serif",
-      fontSize: 16,
-      marginBottom: 10
+      color: "#60607a"
     }
-  }, post.label), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10,
-      overflowX: "auto",
-      marginBottom: 10
-    }
-  }, images.map(im => /*#__PURE__*/React.createElement("div", {
-    key: im.label,
-    style: {
-      flex: "0 0 auto",
-      width: 200,
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("img", {
-    src: im.src,
-    alt: im.label,
-    loading: "lazy",
-    style: {
-      width: 200,
-      height: 250,
-      objectFit: "cover",
-      background: "#13131f",
-      borderRadius: 8
-    }
-  }), /*#__PURE__*/React.createElement("div", {
+  }, " \xB7 ", instaWhen(match.match_datetime))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#60607a",
-      margin: "4px 0"
+      color: badge[1],
+      fontWeight: 700,
+      marginBottom: 8
     }
-  }, im.label), /*#__PURE__*/React.createElement("a", {
-    href: im.src,
-    target: "_blank",
-    rel: "noreferrer",
-    style: mini
-  }, "Ouvrir")))), /*#__PURE__*/React.createElement("textarea", {
+  }, badge[0]), failed && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#ef4444",
+      marginBottom: 8
+    }
+  }, "Dernier essai \xE9chou\xE9 : ", failed.error), next.available && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootInstaImages, {
+    images: images
+  }), /*#__PURE__*/React.createElement("textarea", {
     value: caption,
     onChange: e => setCaption(e.target.value),
-    rows: 5,
+    rows: 4,
     style: {
       ...FOOT_INPUT_STYLE,
       boxSizing: "border-box",
       resize: "vertical",
       fontFamily: "inherit"
     }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: copy,
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: publish,
+    disabled: busy,
     style: {
       ...mini,
-      fontWeight: 700
+      background: "#3b82f6",
+      border: "none",
+      color: "#fff",
+      fontWeight: 700,
+      opacity: busy ? 0.6 : 1
     }
-  }, copied ? "Copié ✓" : "Copier la légende"));
+  }, busy ? "Publication…" : "Publier maintenant"), /*#__PURE__*/React.createElement("button", {
+    onClick: copy,
+    style: mini
+  }, copied ? "Copié ✓" : "Copier la légende"))), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: msg.t === "error" ? "#ef4444" : "#34d399",
+      fontSize: 12,
+      marginTop: 8
+    }
+  }, msg.m));
+}
+function FootInstaLast({
+  sec,
+  last,
+  data
+}) {
+  if (last.published) {
+    const p = last.post;
+    const m = p.match_id ? data.matches.find(x => x.id === p.match_id) : null;
+    const images = (p.image_paths || []).map((path, i) => ({
+      label: `${i + 1}`,
+      src: instaPublicImageUrl(path)
+    }));
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        marginBottom: 2
+      }
+    }, m ? `vs ${m.opponent_name}` : `Saison ${p.season || ""}`), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#34d399",
+        fontWeight: 700,
+        marginBottom: 8
+      }
+    }, "Publi\xE9 le ", instaWhen(p.published_at)), images.length > 0 && /*#__PURE__*/React.createElement(FootInstaImages, {
+      images: images
+    }), p.permalink && /*#__PURE__*/React.createElement("a", {
+      href: p.permalink,
+      target: "_blank",
+      rel: "noreferrer",
+      style: {
+        fontSize: 12,
+        color: "#3b82f6"
+      }
+    }, "Voir sur Instagram \u2197"));
+  }
+  const m = last.matchId ? data.matches.find(x => x.id === last.matchId) : null;
+  if (!last.available) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, "Aucun post pour l'instant.");
+  const target = {
+    kind: sec.kind,
+    matchId: last.matchId,
+    season: last.season
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      marginBottom: 2
+    }
+  }, m ? `vs ${m.opponent_name}` : `Saison ${last.season}`), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "Jamais publi\xE9 \u2014 dernier visuel disponible"), /*#__PURE__*/React.createElement(FootInstaImages, {
+    images: instaImages(sec.kind, target, instaDataKey(sec.kind, target, data))
+  }));
+}
+function FootInstaSection({
+  sec,
+  saved,
+  data,
+  posts,
+  onSave,
+  onPublished
+}) {
+  const [draft, setDraft] = React.useState(saved);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => {
+    setDraft(saved);
+  }, [JSON.stringify(saved)]);
+  const dirty = JSON.stringify({
+    m: draft.mode,
+    r: draft.rule
+  }) !== JSON.stringify({
+    m: saved.mode,
+    r: saved.rule
+  });
+  const state = sectionState(sec.key, {
+    matches: data.matches,
+    lineups: data.lineups,
+    posts,
+    settings: {
+      [sec.key]: saved
+    },
+    now: new Date()
+  });
+  async function save() {
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave(sec.key, draft);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setSaving(false);
+  }
+  const seg = active => ({
+    flex: 1,
+    background: active ? "#3b82f6" : "#13131f",
+    color: active ? "#fff" : "#eeeef5",
+    border: "1px solid #1e1e30",
+    borderRadius: 8,
+    padding: "7px 6px",
+    fontWeight: 700,
+    fontSize: 12,
+    cursor: "pointer"
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#0d0d1c",
+      border: "1px solid #1e1e30",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',sans-serif",
+      fontSize: 18
+    }
+  }, sec.label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      textTransform: "uppercase",
+      fontWeight: 700,
+      color: saved.mode === "auto" ? "#34d399" : "#60607a",
+      border: `1px solid ${saved.mode === "auto" ? "#34d399" : "#1e1e30"}`,
+      borderRadius: 4,
+      padding: "2px 6px"
+    }
+  }, saved.mode === "auto" ? "Automatique" : "Manuel")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: seg(draft.mode === "manual"),
+    onClick: () => setDraft({
+      ...draft,
+      mode: "manual"
+    })
+  }, "Manuel"), /*#__PURE__*/React.createElement("button", {
+    style: seg(draft.mode === "auto"),
+    onClick: () => setDraft({
+      ...draft,
+      mode: "auto"
+    })
+  }, "Automatique")), draft.mode === "auto" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement(FootSectionSchedule, {
+    sec: sec,
+    cfg: draft,
+    onChange: setDraft
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      marginTop: 6
+    }
+  }, "Seuls les cr\xE9neaux \xE0 venir partent tout seuls", saved.mode === "auto" && saved.since ? ` (activé le ${instaWhen(saved.since)})` : ", à partir de l'enregistrement", ". Rien d'ancien n'est publi\xE9.")), dirty && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: save,
+    disabled: saving,
+    style: {
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 14px",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      opacity: saving ? 0.6 : 1
+    }
+  }, saving ? "Enregistrement…" : "Enregistrer le réglage")), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ef4444",
+      fontSize: 12,
+      marginBottom: 10
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: "1 1 260px",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      marginBottom: 6
+    }
+  }, "Dernier post"), /*#__PURE__*/React.createElement(FootInstaLast, {
+    sec: sec,
+    last: state.last,
+    data: data
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: "1 1 260px",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#60607a",
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      marginBottom: 6
+    }
+  }, "Prochain post"), state.next ? /*#__PURE__*/React.createElement(FootInstaNext, {
+    key: `${targetKey(state.next)}-${instaDataKey(sec.kind, state.next, data)}`,
+    sec: sec,
+    next: state.next,
+    cfg: saved,
+    data: data,
+    posts: posts,
+    onPublished: onPublished
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#60607a"
+    }
+  }, "Rien de pr\xE9vu pour l'instant."))));
 }
 function FootPostsTab({
   matches,
@@ -3830,34 +4216,62 @@ function FootPostsTab({
   events,
   ratings
 }) {
-  const posts = availablePosts({
-    matches,
-    lineups,
-    now: new Date()
-  });
+  const [settings, setSettings] = React.useState(null);
+  const [instaPosts, setInstaPosts] = React.useState([]);
+  const [loadErr, setLoadErr] = React.useState(null);
   const data = {
     matches,
     lineups,
     events,
     ratings
   };
-  return /*#__PURE__*/React.createElement("div", null, posts.length === 0 && /*#__PURE__*/React.createElement("div", {
+  const reloadPosts = () => instaAdminFetch("posts", null, "GET").then(r => setInstaPosts(r.posts || [])).catch(e => setLoadErr(prev => prev || e.message));
+  React.useEffect(() => {
+    reloadPosts();
+    instaAdminFetch("settings", null, "GET").then(r => setSettings(normalizeSettings(r.settings))).catch(e => {
+      setLoadErr(e.message);
+      setSettings(defaultSettings());
+    });
+  }, []);
+  async function saveSection(key, cfg) {
+    const r = await instaAdminFetch("settings", {
+      settings: {
+        ...settings,
+        [key]: {
+          mode: cfg.mode,
+          rule: cfg.rule
+        }
+      }
+    });
+    setSettings(normalizeSettings(r.settings));
+  }
+  if (!settings) return /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 13
     }
-  }, "Aucun post disponible pour l'instant."), posts.map(post => /*#__PURE__*/React.createElement(FootPostCard, {
-    key: `${post.kind}-${post.matchId || post.season}-${instaDataKey(post, data)}`,
-    post: post,
-    data: data
+  }, "Chargement\u2026");
+  return /*#__PURE__*/React.createElement("div", null, loadErr && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "#ef4444",
+      fontSize: 12,
+      marginBottom: 12
+    }
+  }, "R\xE9glages indisponibles (", loadErr, "). Valeurs par d\xE9faut (manuel) affich\xE9es."), INSTA_SECTIONS.map(sec => /*#__PURE__*/React.createElement(FootInstaSection, {
+    key: sec.key,
+    sec: sec,
+    saved: settings[sec.key],
+    data: data,
+    posts: instaPosts,
+    onSave: saveSection,
+    onPublished: reloadPosts
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       color: "#60607a",
       fontSize: 11,
-      textAlign: "center",
-      marginTop: 8
+      textAlign: "center"
     }
-  }, "Publication automatique : bient\xF4t (plan 2)"));
+  }, "Envoi automatique : un planificateur v\xE9rifie toutes les ~10 minutes ce qui doit partir."));
 }
 function FootReseauxPage({
   roster,

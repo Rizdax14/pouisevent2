@@ -1,0 +1,31 @@
+# Calls the site every ~10 minutes so automatic Instagram posts leave at their slot,
+# and renews the Instagram token every Monday. Needs the repository secret INSTA_ADMIN_KEY.
+# (Vercel's own cron is limited to once a day on the free plan, so GitHub does the scheduling.)
+name: Instagram scheduler
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+concurrency:
+  group: insta-scheduler
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish what is due
+        if: github.event.schedule != '17 5 * * 1'
+        env:
+          KEY: ${{ secrets.INSTA_ADMIN_KEY }}
+        run: |
+          test -n "$KEY" || { echo "Secret INSTA_ADMIN_KEY manquant"; exit 1; }
+          curl -fsS --max-time 120 -H "X-Insta-Admin-Key: $KEY" https://leverculsec.com/api/insta/cron
+      - name: Renew the Instagram token
+        if: github.event.schedule == '17 5 * * 1'
+        env:
+          KEY: ${{ secrets.INSTA_ADMIN_KEY }}
+        run: |
+          test -n "$KEY" || { echo "Secret INSTA_ADMIN_KEY manquant"; exit 1; }
+          curl -fsS --max-time 60 -H "X-Insta-Admin-Key: $KEY" https://leverculsec.com/api/insta/refresh-token
