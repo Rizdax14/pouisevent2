@@ -92,3 +92,16 @@ test("scan: retouched photos live in a 'retouché' subfolder", () => {
   const got = I.scan(dir).map((f) => `${f.kind}/${f.kit}/${f.name}/${f.retouched}`).sort();
   assert.deepEqual(got, ["celebration/domicile/Nils/false", "celebration/domicile/Nils/true", "dos/exterieur/Timo/false"]);
 });
+
+test("duplicateSlots flags two files targeting the same player/kit/kind/retouched slot", () => {
+  const files = [
+    { name: "Max", kind: "dos", kit: "domicile", retouched: false, file: "a/Max.png" },
+    { name: "Maxime", kind: "dos", kit: "domicile", retouched: false, file: "b/Maxime.png" },
+    { name: "Max", kind: "dos", kit: "domicile", retouched: true, file: "c/Max.png" },
+    { name: "Louis", kind: "dos", kit: "domicile", retouched: false, file: "d/Louis.png" },
+  ];
+  const idOf = (n) => (n === "Louis" ? 1 : 22);
+  const dups = I.duplicateSlots(files, idOf);
+  assert.equal(dups.length, 1);
+  assert.deepEqual(dups[0].map((f) => f.file), ["a/Max.png", "b/Maxime.png"]);
+});

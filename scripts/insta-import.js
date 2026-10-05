@@ -51,6 +51,16 @@ function parseMap(s) {
 function jerseyFor(name) { return JERSEYS[norm(name)] || null; }
 function storagePath(playerId, kit, kind, retouched, stamp) { return `${playerId}/${kit}/${kind}${retouched ? "-retouche" : ""}-${stamp}.png`; }
 
+// Groups of files that would overwrite each other (same player, kit, kind and retouched flag).
+function duplicateSlots(files, playerIdOf) {
+  const slots = new Map();
+  for (const f of files) {
+    const key = [playerIdOf(f.name), f.kit, f.kind, f.retouched].join("|");
+    slots.set(key, [...(slots.get(key) || []), f]);
+  }
+  return [...slots.values()].filter((g) => g.length > 1);
+}
+
 function scan(dir) {
   const files = [];
   for (const kindDir of fs.readdirSync(dir)) {
@@ -110,8 +120,11 @@ async function main(argv) {
     else { unmatched.push(name); console.log(`  ${name} → ${result.ambiguous ? `AMBIGU : ${result.ambiguous.map(label).join(" / ")}` : "AUCUN joueur de l'effectif"}`); }
   }
   if (unmatched.length) console.log(`\nNon résolus : ${unmatched.join(", ")} — relancer avec --map ${unmatched.map((n) => `${n}=<id>`).join(",")}`);
+  const dups = duplicateSlots(files.filter((f) => byName.get(norm(f.name)).result.id), (n) => byName.get(norm(n)).result.id);
+  for (const g of dups) console.log(`\nDOUBLON : ${g.map((f) => f.file).join("  et  ")} visent le même emplacement — le dernier écraserait le premier`);
   if (!apply) { console.log("\n(dry-run : rien n'a été écrit)"); return; }
   if (unmatched.length) throw new Error("Des prénoms ne sont pas résolus : --apply refusé.");
+  if (dups.length) throw new Error("Des fichiers en doublon : supprime-en un avant --apply.");
 
   let n = 0;
   for (const f of files) {
@@ -132,4 +145,4 @@ async function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2)).catch((e) => { console.error(e.message); process.exit(1); });
-module.exports = { norm, parseFileName, kitFromDir, kindFromDir, matchPlayer, parseMap, jerseyFor, storagePath, scan };
+module.exports = { norm, parseFileName, kitFromDir, kindFromDir, matchPlayer, parseMap, jerseyFor, storagePath, scan, duplicateSlots };
