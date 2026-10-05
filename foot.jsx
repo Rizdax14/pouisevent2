@@ -1636,8 +1636,16 @@ function FootSectionSchedule({ sec, cfg, onChange }) {
   const rule = cfg.rule;
   const set = (patch) => onChange({ ...cfg, rule: { ...rule, ...patch } });
   const field = { ...FOOT_SELECT_STYLE };
+  const typeChoice = sec.rules.length > 1 ? (
+    <select value={rule.type} onChange={(e) => onChange({ ...cfg, rule: e.target.value === "on_close" ? { type: "on_close", days: 0, time: "00:00" } : { type: "after_match", days: 0, time: "22:00" } })} style={field}>
+      <option value="on_close">Dès la clôture du match</option>
+      <option value="after_match">À une heure précise après le match</option>
+    </select>
+  ) : null;
+  if (rule.type === "on_close") return <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 15, color: FC.text }}>{typeChoice}</div>;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 15, color: FC.text }}>
+      {typeChoice}
       {rule.type === "weekly" ? (
         <>
           <span>Chaque</span>
@@ -1689,6 +1697,7 @@ function FootInstaNext({ sec, next, cfg, data, posts, featuredId, candidates, on
   if (!next.available) badge = ["warn", "En attente : " + next.waitingFor];
   else if (cfg.mode !== "auto") badge = ["accent", "Prêt — envoi manuel"];
   else if (next.due) badge = ["warn", "Part au prochain passage (≤ 10 min)"];
+  else if (!next.scheduledAt) badge = ["good", "Part dès la clôture du match"];
   else badge = ["good", `Programmé : ${instaWhen(next.scheduledAt)}`];
   return (
     <div>

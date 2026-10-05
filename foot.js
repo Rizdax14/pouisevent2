@@ -4012,6 +4012,36 @@ function FootSectionSchedule({
   const field = {
     ...FOOT_SELECT_STYLE
   };
+  const typeChoice = sec.rules.length > 1 ? /*#__PURE__*/React.createElement("select", {
+    value: rule.type,
+    onChange: e => onChange({
+      ...cfg,
+      rule: e.target.value === "on_close" ? {
+        type: "on_close",
+        days: 0,
+        time: "00:00"
+      } : {
+        type: "after_match",
+        days: 0,
+        time: "22:00"
+      }
+    }),
+    style: field
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "on_close"
+  }, "D\xE8s la cl\xF4ture du match"), /*#__PURE__*/React.createElement("option", {
+    value: "after_match"
+  }, "\xC0 une heure pr\xE9cise apr\xE8s le match")) : null;
+  if (rule.type === "on_close") return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 15,
+      color: FC.text
+    }
+  }, typeChoice);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -4021,7 +4051,7 @@ function FootSectionSchedule({
       fontSize: 15,
       color: FC.text
     }
-  }, rule.type === "weekly" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "Chaque"), /*#__PURE__*/React.createElement("select", {
+  }, typeChoice, rule.type === "weekly" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, "Chaque"), /*#__PURE__*/React.createElement("select", {
     value: rule.weekday,
     onChange: e => set({
       weekday: Number(e.target.value)
@@ -4122,7 +4152,7 @@ function FootInstaNext({
     }
   }
   let badge;
-  if (!next.available) badge = ["warn", "En attente : " + next.waitingFor];else if (cfg.mode !== "auto") badge = ["accent", "Prêt — envoi manuel"];else if (next.due) badge = ["warn", "Part au prochain passage (≤ 10 min)"];else badge = ["good", `Programmé : ${instaWhen(next.scheduledAt)}`];
+  if (!next.available) badge = ["warn", "En attente : " + next.waitingFor];else if (cfg.mode !== "auto") badge = ["accent", "Prêt — envoi manuel"];else if (next.due) badge = ["warn", "Part au prochain passage (≤ 10 min)"];else if (!next.scheduledAt) badge = ["good", "Part dès la clôture du match"];else badge = ["good", `Programmé : ${instaWhen(next.scheduledAt)}`];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.ui,

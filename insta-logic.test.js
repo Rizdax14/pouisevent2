@@ -357,10 +357,10 @@ test("captionContextFor builds each caption's inputs from raw data", () => {
   assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]); // the Groupe is in the same post
 });
 
-test("captionFor matchday carries the match line and the sheet", () => {
+test("captionFor matchday carries only the match line (no group list)", () => {
   const c = L.captionFor("matchday", { opponent: "FC Test", band: "JEUDI 19H30 | STADE | VILLE", names: ["Louis", "Nolan"] });
   assert.match(c, /^MATCH DAY ⚽ Bière Leverculsec vs FC Test\nJEUDI 19H30/);
-  assert.match(c, /\n\nLouis · Nolan$/);
+  assert.equal(c, "MATCH DAY ⚽ Bière Leverculsec vs FC Test\nJEUDI 19H30 | STADE | VILLE");
   assert.equal(L.captionFor("matchday", { opponent: "X", band: "B", names: [] }), "MATCH DAY ⚽ Bière Leverculsec vs X\nB");
 });
 
@@ -508,4 +508,18 @@ test("featuredPlayerFor: an explicit choice always wins, and rotation avoids the
   assert.equal(L.featuredPlayerFor({ sheetIds: [1, 2], roster, hasPhoto: has, kinds: ["celebration"], history: [{ playerId: 1, at: "2026-10-01T00:00:00Z" }], seed: 1 }), 2);
   // a chosen player outside the sheet / without photos is still honoured (the admin knows best)
   assert.equal(L.featuredPlayerFor({ sheetIds: [1], roster, hasPhoto: () => false, kinds: ["celebration"], history: [], seed: 1, chosen: 99 }), 99);
+});
+
+test("result 'on_close': due as soon as the match is finished, not before, ignores older matches", () => {
+  const settings = { ...L.defaultSettings(), result: { mode: "auto", since: "2026-10-08T07:00:00.000Z", rule: { type: "on_close", days: 0, time: "00:00" } } };
+  assert.equal(L.defaultSettings().result.rule.type, "on_close");
+  const ctx = (matches) => ({ matches, lineups: [], posts: [], settings, now: new Date("2026-10-08T19:00:00Z") });
+  const live = L.sectionState("result", ctx([M(5, "2026-10-08T17:30:00Z", "live")]));
+  assert.equal(live.next.due, false);
+  assert.equal(live.next.available, false);
+  const done = L.sectionState("result", ctx([M(1, "2026-10-01T15:30:00Z", "finished"), M(5, "2026-10-08T17:30:00Z", "finished")]));
+  assert.equal(done.next.matchId, 5); // match 1 predates the activation
+  assert.equal(done.next.due, true);
+  assert.equal(done.next.scheduledAt, null);
+  assert.deepEqual(L.normalizeSettings({ result: { mode: "auto", rule: { type: "on_close", days: 5, time: "x" } } }).result.rule, { type: "on_close", days: 0, time: "00:00" });
 });

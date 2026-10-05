@@ -182,7 +182,7 @@ function rankingRows(n) {
 }
 
 function captionFor(kind, c) {
-  if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}${c.names && c.names.length ? "\n\n" + c.names.join(" · ") : ""}`;
+  if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}`;
   if (kind === "result") {
     const word = c.bl > c.opp ? "Victoire" : c.bl === c.opp ? "Match nul" : "Défaite";
     return `${word} ${c.bl}-${c.opp} contre ${c.opponent} ⚽${c.goals.length ? "\n\n" + c.goals.join("\n") : ""}`;
@@ -214,13 +214,13 @@ const INSTA_TZ = "Europe/Paris";
 const INSTA_SECTIONS = [
   // Match Day + Groupe is ONE carousel post (two images, the same player on both). `featured`: the admin can pick the player.
   { key: "matchday", kind: "matchday", label: "Match Day + Groupe", rules: ["before_match"], featured: true },
-  { key: "result", kind: "result", label: "Résultat", rules: ["after_match"], featured: true },
+  { key: "result", kind: "result", label: "Résultat", rules: ["on_close", "after_match"], featured: true },
   { key: "ratings", kind: "ratings", label: "Notes", rules: ["after_match"] },
   { key: "rankings", kind: "rankings", label: "Classements", rules: ["weekly"] },
 ];
 const RULE_DEFAULTS = {
   matchday: { type: "before_match", days: 0, time: "09:00" },
-  result: { type: "after_match", days: 0, time: "22:00" },
+  result: { type: "on_close", days: 0, time: "22:00" },
   ratings: { type: "after_match", days: 2, time: "12:00" },
   rankings: { type: "weekly", weekday: 2, time: "18:00" },
 };
@@ -269,6 +269,7 @@ function normalizeRule(sec, rule) {
   const def = RULE_DEFAULTS[sec.key];
   if (!rule || !sec.rules.includes(rule.type)) return { ...def };
   const time = TIME_RE.test(rule.time) ? rule.time : def.time;
+  if (rule.type === "on_close") return { type: "on_close", days: 0, time: "00:00" }; // as soon as the match is closed
   if (rule.type === "weekly") return { type: "weekly", weekday: Number.isInteger(rule.weekday) && rule.weekday >= 0 && rule.weekday <= 6 ? rule.weekday : def.weekday, time };
   const days = Number.isInteger(rule.days) && rule.days >= 0 && rule.days <= 14 ? rule.days : def.days;
   return { type: rule.type, days, time };
@@ -358,7 +359,8 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
     const fb = pool[pool.length - 1];
     if (fb) { last.matchId = fb.id; last.available = true; }
   }
-  const slotOf = (m) => atTime(addDays(parisParts(new Date(m.match_datetime)), rule.type === "before_match" ? -rule.days : rule.days), rule.time);
+  const onClose = rule.type === "on_close";
+  const slotOf = (m) => onClose ? new Date(new Date(m.match_datetime).getTime() + 6 * 3600 * 1000) : atTime(addDays(parisParts(new Date(m.match_datetime)), rule.type === "before_match" ? -rule.days : rule.days), rule.time);
   const pool2 = sec.rules[0] === "before_match"
     ? byDate.filter((m) => m.status === "scheduled" && new Date(m.match_datetime) > now && !isPublishedFor(m))
     : byDate.filter((m) => !isPublishedFor(m) && now - new Date(m.match_datetime) < AFTER_MATCH_WINDOW_MS && (m.status !== "scheduled" || new Date(m.match_datetime) > now - AFTER_MATCH_WINDOW_MS));
@@ -368,8 +370,8 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
   const kickoff = new Date(cand.match_datetime);
   let scheduledAt = null, due = false;
   if (isAuto) {
-    scheduledAt = slotOf(cand);
-    due = av.ok && now >= scheduledAt && (rule.type === "before_match" ? now < kickoff : now - scheduledAt < AFTER_MATCH_WINDOW_MS);
+    scheduledAt = onClose ? null : slotOf(cand);
+    due = onClose ? av.ok : av.ok && now >= scheduledAt && (rule.type === "before_match" ? now < kickoff : now - scheduledAt < AFTER_MATCH_WINDOW_MS);
   }
   return { section: sec, last, next: { kind: sec.kind, section: sectionKey, matchId: cand.id, available: av.ok, previewable: av.ok || sectionKey === "matchday", waitingFor: av.ok ? null : av.why, scheduledAt, due, failures: failuresFor((x) => x.match_id === cand.id) } };
 }
