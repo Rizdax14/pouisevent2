@@ -3463,7 +3463,7 @@ const FRAMING_GUIDES = {
     h: 46
   }]
 };
-const FRAMING_LAYOUT_LABELS = [["matchday", "Match Day"], ["result", "Résultat"], ["groupe", "Groupe"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
+const FRAMING_LAYOUT_LABELS = [["result", "Résultat (référence)"], ["matchday", "Match Day (suit Résultat)"], ["groupe", "Groupe"], ["render", "Render (rond)"], ["podium_celebration", "Podium · Buts"], ["podium_dos", "Podium · Passe D / Notes"], ["podium_render", "Podium · Moyennes"]];
 
 // One layout guide. `behind` guides (a title the player stands in front of) are drawn as plain text; the others as dashed boxes over the photo.
 function FootGuideBox({
@@ -3635,7 +3635,7 @@ function FootFramingTool({
   const players = [...new Set(photos.map(p => p.player_id))].map(id => id === FOOT_UNKNOWN_PLAYER.id ? FOOT_UNKNOWN_PLAYER : PLAYERS.find(p => p.id === id)).filter(p => p && (p.id === FOOT_UNKNOWN_PLAYER.id || roster.some(r => r.player_id === p.id))).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
-  const [layout, setLayout] = React.useState("matchday");
+  const [layout, setLayout] = React.useState("result");
   const [mode, setMode] = React.useState("single");
   const [showGuides, setShowGuides] = React.useState(true);
   const pid = players.some(p => p.id === playerId) ? playerId : players[0] ? players[0].id : null;
@@ -3760,20 +3760,33 @@ function FootFramingTool({
     setSaving(true);
     setMsg(null);
     try {
-      assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert({
+      const now = new Date().toISOString();
+      const rows = [{
         photo_id: photo.id,
         layout,
         x: fr.x,
         y: fr.y,
         width: fr.width,
-        updated_at: new Date().toISOString()
-      }, {
+        updated_at: now
+      }];
+      if (layout === "result") {
+        const md = await matchdayFromResult(fr);
+        rows.push({
+          photo_id: photo.id,
+          layout: "matchday",
+          x: md.x,
+          y: md.y,
+          width: md.width,
+          updated_at: now
+        });
+      }
+      assertUpsertOk(await SUPABASE.from("foot_photo_framings").upsert(rows, {
         onConflict: "photo_id,layout"
       }));
       await reload();
       setMsg({
         t: "success",
-        m: "Cadrage enregistré ✓"
+        m: layout === "result" ? "Cadrage enregistré ✓ (Match Day mis à jour : même zoom, joueur centré)" : "Cadrage enregistré ✓"
       });
     } catch (e) {
       setMsg({
@@ -3783,26 +3796,30 @@ function FootFramingTool({
     }
     setSaving(false);
   }
+  // Position of the player himself (0..1 across the photo), read from the photo's transparent background.
+  async function personRatio() {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.crossOrigin = "anonymous";
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("Photo illisible"));
+      i.src = instaPublicUrl(photo.path);
+    });
+    const W = 240,
+      H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, W, H);
+    return personCenterRatio(ctx.getImageData(0, 0, W, H).data, W, H);
+  }
   // Slides the photo sideways so the player himself (not the picture) stands in the middle of the canvas.
   async function centerPlayer() {
     setCentering(true);
     setMsg(null);
     try {
-      const img = await new Promise((resolve, reject) => {
-        const i = new Image();
-        i.crossOrigin = "anonymous";
-        i.onload = () => resolve(i);
-        i.onerror = () => reject(new Error("Photo illisible"));
-        i.src = instaPublicUrl(photo.path);
-      });
-      const W = 240,
-        H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
-      const c = document.createElement("canvas");
-      c.width = W;
-      c.height = H;
-      const ctx = c.getContext("2d");
-      ctx.drawImage(img, 0, 0, W, H);
-      setFr(centerFramingOnPerson(fr, cw, personCenterRatio(ctx.getImageData(0, 0, W, H).data, W, H)));
+      setFr(centerFramingOnPerson(fr, cw, await personRatio()));
     } catch (e) {
       setMsg({
         t: "error",
@@ -3811,37 +3828,57 @@ function FootFramingTool({
     }
     setCentering(false);
   }
-  function previewServer() {
-    const url = (l, withFraming) => `/api/insta/render?${new URLSearchParams({
+  // Match Day follows Résultat: same size (same zoom %) and same height, the player centred on the canvas.
+  async function matchdayFromResult(f) {
+    const shift = LAYOUTS.matchday.box.x - LAYOUTS.result.box.x;
+    return centerFramingOnPerson({
+      x: f.x + shift,
+      y: f.y,
+      width: f.width
+    }, LAYOUTS.matchday.canvas[0], await personRatio());
+  }
+  async function previewServer() {
+    const url = (l, f) => `/api/insta/render?${new URLSearchParams({
       kind: "frame",
       photo: String(photo.id),
       layout: l,
-      ...(withFraming ? {
-        x: String(Math.round(fr.x * 10) / 10),
-        y: String(Math.round(fr.y * 10) / 10),
-        w: String(Math.round(fr.width * 10) / 10)
+      ...(f ? {
+        x: String(Math.round(f.x * 10) / 10),
+        y: String(Math.round(f.y * 10) / 10),
+        w: String(Math.round(f.width * 10) / 10)
       } : {}),
       t: String(Date.now())
     })}`;
-    // Match Day and Résultat are framed separately: show the one being adjusted next to the other, as saved.
-    const other = {
-      matchday: "result",
-      result: "matchday"
-    }[layout];
-    const name = {
-      matchday: "Match Day",
-      result: "Résultat"
-    };
-    setServerPreview(other ? [{
-      label: `${name[layout]} (réglage en cours)`,
-      src: url(layout, true)
-    }, {
-      label: `${name[other]} (enregistré)`,
-      src: url(other, false)
-    }] : [{
-      label: "",
-      src: url(layout, true)
-    }]);
+    setMsg(null);
+    try {
+      if (layout === "result") {
+        // Résultat is the one being placed; Match Day is derived from it (same zoom, centred).
+        const md = await matchdayFromResult(fr);
+        setServerPreview([{
+          label: "Résultat (réglage en cours)",
+          src: url("result", fr)
+        }, {
+          label: "Match Day (déduit : même zoom, centré)",
+          src: url("matchday", md)
+        }]);
+      } else if (layout === "matchday") {
+        setServerPreview([{
+          label: "Match Day (réglage en cours)",
+          src: url("matchday", fr)
+        }, {
+          label: "Résultat (enregistré)",
+          src: url("result", null)
+        }]);
+      } else setServerPreview([{
+        label: "",
+        src: url(layout, fr)
+      }]);
+    } catch (e) {
+      setMsg({
+        t: "error",
+        m: "Aperçu impossible : " + e.message
+      });
+    }
   }
   const sel = {
     ...FOOT_SELECT_STYLE,
@@ -3898,7 +3935,14 @@ function FootFramingTool({
   }, FRAMING_LAYOUT_LABELS.map(([k, l]) => /*#__PURE__*/React.createElement("option", {
     key: k,
     value: k
-  }, l)))), mode === "compare" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, l)))), mode === "single" && (layout === "result" || layout === "matchday") && photo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 10,
+      lineHeight: 1.4
+    }
+  }, layout === "result" ? "Place le joueur ici : en enregistrant, Match Day reprend le même zoom, avec le joueur centré." : "Match Day se met à jour quand tu enregistres Résultat. Tu peux le retoucher ici, mais le prochain enregistrement de Résultat le recalcule."), mode === "compare" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: "flex",
       alignItems: "center",
