@@ -6,7 +6,7 @@ function FootballNavBar({ page, setPage, onBack, isAdmin }) {
     { id: "__back__", l: "Accueil", ic: "🏠", onClick: onBack },
     { id: "calendar", l: "Calendrier", ic: "📅" },
     { id: "rankings", l: "Classement", ic: "🏆" },
-    { id: "stats", l: "Statistiques", ic: "📊" },
+    { id: "stats", l: "Statistiques", lm: "Stats", ic: "📊" },
     ...(isAdmin ? [{ id: "reseaux", l: "Réseaux", ic: "📣" }, { id: "admin", l: "Admin", ic: "🛠" }] : []),
   ];
   const wrapStyle = m
@@ -21,15 +21,15 @@ function FootballNavBar({ page, setPage, onBack, isAdmin }) {
             key={item.id}
             onClick={() => (item.onClick ? item.onClick() : setPage(item.id))}
             style={{
-              flex: m ? 1 : "none", background: "none", border: "none", cursor: "pointer",
-              padding: m ? "10px 4px 8px" : "16px 14px",
+              flex: m ? "1 1 0" : "none", minWidth: 0, background: "none", border: "none", cursor: "pointer",
+              padding: m ? "10px 1px 8px" : "16px 14px",
               display: "flex", flexDirection: m ? "column" : "row", alignItems: "center", gap: m ? 3 : 6,
-              color: active ? "#3b82f6" : "#60607a", fontFamily: "'Outfit',sans-serif", fontSize: m ? 9 : 13, fontWeight: 600,
+              color: active ? "#3b82f6" : "#60607a", fontFamily: "'Outfit',sans-serif", fontSize: m ? 8 : 13, fontWeight: 600,
               borderBottom: !m && active ? "2px solid #3b82f6" : !m ? "2px solid transparent" : "none",
             }}
           >
             <span style={{ fontSize: m ? 18 : 15 }}>{item.ic}</span>
-            <span style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>{item.l}</span>
+            <span style={{ textTransform: "uppercase", letterSpacing: m ? "0" : "0.05em", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m && item.lm ? item.lm : item.l}</span>
           </button>
         );
       })}
@@ -1169,7 +1169,7 @@ function instaPublicUrl(path) {
   return `${SUPABASE_URL}/storage/v1/object/public/player-photos/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-const INSTA_KINDS = [["render", "Render"], ["celebration", "Célébration"], ["dos", "Dos"]];
+const INSTA_KINDS = [["render", "Render"], ["celebration", "Célébr."], ["dos", "Dos"]];
 const INSTA_KITS = [["domicile", "Domicile"], ["exterieur", "Extérieur"]];
 const INSTA_MAX_SIDE = 1600;
 
@@ -1253,7 +1253,7 @@ function FootPhotosTab({ roster, photos, reload }) {
       {players.map((p) => (
         <div key={p.id} style={{ background: "#0d0d1c", border: "1px solid #1e1e30", borderRadius: 12, padding: 12, marginBottom: 10 }}>
           <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, marginBottom: 8 }}>{nameOf(p)}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "56px 1fr 1fr", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 1fr)", gap: 6, alignItems: "center" }}>
             <span />
             {INSTA_KITS.map(([kit, label]) => <div key={kit} style={{ fontSize: 10, color: "#60607a", textTransform: "uppercase", textAlign: "center" }}>{label}</div>)}
             {INSTA_KINDS.map(([kind, kindLabel]) => (
@@ -1521,7 +1521,7 @@ function FootPostCard({ post, data }) {
           </div>
         ))}
       </div>
-      <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={5} style={{ ...FOOT_INPUT_STYLE, resize: "vertical", fontFamily: "inherit" }} />
+      <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={5} style={{ ...FOOT_INPUT_STYLE, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
       <button onClick={copy} style={{ ...mini, fontWeight: 700 }}>{copied ? "Copié ✓" : "Copier la légende"}</button>
     </div>
   );

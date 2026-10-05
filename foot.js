@@ -23,6 +23,7 @@ function FootballNavBar({
   }, {
     id: "stats",
     l: "Statistiques",
+    lm: "Stats",
     ic: "📊"
   }, ...(isAdmin ? [{
     id: "reseaux",
@@ -61,18 +62,19 @@ function FootballNavBar({
       key: item.id,
       onClick: () => item.onClick ? item.onClick() : setPage(item.id),
       style: {
-        flex: m ? 1 : "none",
+        flex: m ? "1 1 0" : "none",
+        minWidth: 0,
         background: "none",
         border: "none",
         cursor: "pointer",
-        padding: m ? "10px 4px 8px" : "16px 14px",
+        padding: m ? "10px 1px 8px" : "16px 14px",
         display: "flex",
         flexDirection: m ? "column" : "row",
         alignItems: "center",
         gap: m ? 3 : 6,
         color: active ? "#3b82f6" : "#60607a",
         fontFamily: "'Outfit',sans-serif",
-        fontSize: m ? 9 : 13,
+        fontSize: m ? 8 : 13,
         fontWeight: 600,
         borderBottom: !m && active ? "2px solid #3b82f6" : !m ? "2px solid transparent" : "none"
       }
@@ -83,9 +85,13 @@ function FootballNavBar({
     }, item.ic), /*#__PURE__*/React.createElement("span", {
       style: {
         textTransform: "uppercase",
-        letterSpacing: "0.05em"
+        letterSpacing: m ? "0" : "0.05em",
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
-    }, item.l));
+    }, m && item.lm ? item.lm : item.l));
   }));
 }
 function FootPlaceholderPage({
@@ -2640,7 +2646,7 @@ async function instaAdminFetch(path, body) {
 function instaPublicUrl(path) {
   return `${SUPABASE_URL}/storage/v1/object/public/player-photos/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
-const INSTA_KINDS = [["render", "Render"], ["celebration", "Célébration"], ["dos", "Dos"]];
+const INSTA_KINDS = [["render", "Render"], ["celebration", "Célébr."], ["dos", "Dos"]];
 const INSTA_KITS = [["domicile", "Domicile"], ["exterieur", "Extérieur"]];
 const INSTA_MAX_SIDE = 1600;
 
@@ -2864,7 +2870,7 @@ function FootPhotosTab({
   }, nameOf(p)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "56px 1fr 1fr",
+      gridTemplateColumns: "52px minmax(0, 1fr) minmax(0, 1fr)",
       gap: 6,
       alignItems: "center"
     }
@@ -3560,6 +3566,7 @@ function FootPostCard({
     rows: 5,
     style: {
       ...FOOT_INPUT_STYLE,
+      boxSizing: "border-box",
       resize: "vertical",
       fontFamily: "inherit"
     }
