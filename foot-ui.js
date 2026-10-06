@@ -694,6 +694,8 @@ function footGlobalCss() {
     .ft button:not(:disabled):active { transform: translateY(2px); }
     .ft input:focus-visible, .ft select:focus-visible, .ft textarea:focus-visible, .ft button:focus-visible, .ft [role=button]:focus-visible { outline: 3px solid ${FC.accent}; outline-offset: 2px; }
     .ft select { appearance: none; -webkit-appearance: none; padding-right: 34px !important; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23${FC.deep.slice(1)}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; }
+    .ft input[type=date], .ft input[type=time], .ft input[type=datetime-local] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 52px; text-align: left; }
+    .ft input[type=date]::-webkit-date-and-time-value, .ft input[type=time]::-webkit-date-and-time-value, .ft input[type=datetime-local]::-webkit-date-and-time-value { text-align: left; min-height: 1.4em; }
     .ft input[type=checkbox] { accent-color: ${FC.accent}; width: 20px; height: 20px; }
     .ft input[type=range] { accent-color: ${FC.accent}; }
     .ft a { color: ${FC.deep}; }

@@ -1224,15 +1224,19 @@ function FootRosterManager({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
+        padding: "8px 0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        padding: "8px 0"
+        gap: 10
       }
     }, /*#__PURE__*/React.createElement(FAvatar, {
       playerId: p.id,
       name: nameOf(p),
-      size: 38
+      size: 38,
+      linkable: true
     }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -1240,20 +1244,28 @@ function FootRosterManager({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 15,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        fontSize: 16,
+        overflowWrap: "anywhere"
       }
     }, nameOf(p)), d && (d.birth_date || d.phone || d.email) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: FC.muted,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        overflowWrap: "anywhere"
       }
-    }, [d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement("input", {
+    }, [d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement(FIconBtn, {
+      icon: "user",
+      label: `Infos de ${nameOf(p)}`,
+      tone: open ? "soft" : "ghost",
+      onClick: () => setOpenId(open ? null : p.id)
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        margin: "6px 0 0 48px"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
       key: `${p.id}-${numberByPlayer[p.id] || ""}`,
       defaultValue: numberByPlayer[p.id] || "",
       placeholder: "n\xB0",
@@ -1266,7 +1278,7 @@ function FootRosterManager({
       },
       style: {
         ...FOOT_INPUT_STYLE,
-        width: 58,
+        width: 70,
         marginBottom: 0,
         textAlign: "center",
         padding: "8px 6px",
@@ -1280,7 +1292,8 @@ function FootRosterManager({
       "aria-label": `Rôle de ${nameOf(p)}`,
       style: {
         ...FOOT_SELECT_STYLE,
-        maxWidth: 124
+        flex: 1,
+        minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
@@ -1290,12 +1303,7 @@ function FootRosterManager({
       value: "occasionnel"
     }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
       value: "invite"
-    }, "Invit\xE9")), /*#__PURE__*/React.createElement(FIconBtn, {
-      icon: "user",
-      label: `Infos de ${nameOf(p)}`,
-      tone: open ? "soft" : "ghost",
-      onClick: () => setOpenId(open ? null : p.id)
-    })), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
+    }, "Invit\xE9")))), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
       key: `${p.id}-${d ? d.phone : ""}`,
       player: p,
       detail: d,

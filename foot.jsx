@@ -486,22 +486,26 @@ function FootRosterManager({ roster, reload }) {
         const open = openId === p.id;
         return (
           <div key={p.id} style={{ borderTop: `1px solid ${FC.line}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
-              <FAvatar playerId={p.id} name={nameOf(p)} size={38} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
-                {d && (d.birth_date || d.phone || d.email) && <div style={{ fontSize: 12, color: FC.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · ")}</div>}
+            <div style={{ padding: "8px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <FAvatar playerId={p.id} name={nameOf(p)} size={38} linkable />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, overflowWrap: "anywhere" }}>{nameOf(p)}</div>
+                  {d && (d.birth_date || d.phone || d.email) && <div style={{ fontSize: 12, color: FC.muted, overflowWrap: "anywhere" }}>{[d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · ")}</div>}
+                </div>
+                <FIconBtn icon="user" label={`Infos de ${nameOf(p)}`} tone={open ? "soft" : "ghost"} onClick={() => setOpenId(open ? null : p.id)} />
               </div>
-              <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3} aria-label={`Numéro de ${nameOf(p)}`}
-                onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
-                style={{ ...FOOT_INPUT_STYLE, width: 58, marginBottom: 0, textAlign: "center", padding: "8px 6px", minHeight: 40, fontFamily: FF.ui }} />
-              <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, maxWidth: 124 }}>
-                <option value="">Hors équipe</option>
-                <option value="regulier">Régulier</option>
-                <option value="occasionnel">Occasionnel</option>
-                <option value="invite">Invité</option>
-              </select>
-              <FIconBtn icon="user" label={`Infos de ${nameOf(p)}`} tone={open ? "soft" : "ghost"} onClick={() => setOpenId(open ? null : p.id)} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0 0 48px" }}>
+                <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3} aria-label={`Numéro de ${nameOf(p)}`}
+                  onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
+                  style={{ ...FOOT_INPUT_STYLE, width: 70, marginBottom: 0, textAlign: "center", padding: "8px 6px", minHeight: 40, fontFamily: FF.ui }} />
+                <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, flex: 1, minWidth: 0 }}>
+                  <option value="">Hors équipe</option>
+                  <option value="regulier">Régulier</option>
+                  <option value="occasionnel">Occasionnel</option>
+                  <option value="invite">Invité</option>
+                </select>
+              </div>
             </div>
             {open && (hasKey ? <FootPlayerDetailsEditor key={`${p.id}-${d ? d.phone : ""}`} player={p} detail={d} onSaved={(row) => setDetails({ ...details, [p.id]: row })} /> : <div style={{ fontSize: 13, color: FC.muted, padding: "0 0 12px 48px" }}>Saisis la clé admin ci-dessus pour voir et modifier les infos.</div>)}
           </div>
