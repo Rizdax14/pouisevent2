@@ -1808,7 +1808,7 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
               onClick={() => onPick(p.id)}
               style={{ position: "relative", width: W, height: ch * scale, overflow: "hidden", cursor: "pointer", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222", border: `1px solid ${FC.line}`, boxSizing: "border-box" }}
             >
-              {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: W, height: ch * scale }} />}
+              {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg?v=crt1`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: W, height: ch * scale }} />}
               {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
               {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale }} />}
               {!photo && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: FC.muted, fontSize: 11, textAlign: "center", padding: 8 }}>Pas de photo</div>}
@@ -2008,7 +2008,7 @@ function FootFramingTool({ roster, photos, framings, reload }) {
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
             style={{ position: "relative", width: boxW, height: ch * scale, overflow: "hidden", touchAction: "none", cursor: "grab", userSelect: "none", borderRadius: layout === "render" ? "50%" : isMask ? 40 * scale : 0, background: isMask ? "#ffffff" : "#222" }}
           >
-            {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: cw * scale, height: ch * scale }} />}
+            {!isMask && <img src={`/assets/insta/bg-${photo ? photo.kit : kit}.jpg?v=crt1`} alt="" draggable={false} style={{ position: "absolute", left: 0, top: 0, width: cw * scale, height: ch * scale }} />}
             {(FRAMING_GUIDES[layout] || []).filter((g) => g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
             {photo && rect && <img src={instaPublicUrl(photo.path)} alt="" draggable={false} style={{ position: "absolute", left: rect.x * scale, top: rect.y * scale, width: rect.width * scale, height: rect.height * scale, pointerEvents: "none" }} />}
             {(FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} text />)}
@@ -2460,7 +2460,7 @@ function FootballApp({ currentPlayer, onBack }) {
       const faces = photoRows.filter((x) => x.kind === "render").map((x) => instaPublicUrl(x.path));
       await withTimeout(Promise.all(faces.map(preload)), 5000);
       tick("rankings");
-      const bgs = ["/assets/foot/bg-green.jpg", "/assets/foot/bg-pink.jpg", "/logo-bl.png", "/logo-bl-rose.png"];
+      const bgs = ["/assets/foot/bg-green.jpg?v=crt1", "/assets/foot/bg-pink.jpg?v=crt1", "/logo-bl.png", "/logo-bl-rose.png"];
       await withTimeout(Promise.all([document.fonts ? document.fonts.ready : null, ...bgs.map(preload)]), 4000);
       tick("stats");
       await new Promise((res) => setTimeout(res, Math.max(350, MIN_MS - (Date.now() - started))));

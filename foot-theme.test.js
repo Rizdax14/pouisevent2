@@ -45,7 +45,7 @@ const sharp = require("sharp");
 for (const name of ["green", "pink"]) {
   test(`${name}: white text stays readable on the lightest 2% of the tinted background`, async () => {
     const t = T.FOOT_THEMES[name];
-    const { data } = await sharp(require("path").join(__dirname, t.bgImage)).resize({ width: 240 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data } = await sharp(require("path").join(__dirname, t.bgImage.split("?")[0])).resize({ width: 240 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const tint = [1, 3, 5].map((i) => parseInt(t.bgTint.slice(i, i + 2), 16));
     const hex = (c) => "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
     const px = [];

@@ -4763,7 +4763,7 @@ function FootFramingCompare({
         boxSizing: "border-box"
       }
     }, !isMask && /*#__PURE__*/React.createElement("img", {
-      src: `/assets/insta/bg-${photo ? photo.kit : kit}.jpg`,
+      src: `/assets/insta/bg-${photo ? photo.kit : kit}.jpg?v=crt1`,
       alt: "",
       draggable: false,
       style: {
@@ -5209,7 +5209,7 @@ function FootFramingTool({
       background: isMask ? "#ffffff" : "#222"
     }
   }, !isMask && /*#__PURE__*/React.createElement("img", {
-    src: `/assets/insta/bg-${photo ? photo.kit : kit}.jpg`,
+    src: `/assets/insta/bg-${photo ? photo.kit : kit}.jpg?v=crt1`,
     alt: "",
     draggable: false,
     style: {
@@ -6354,7 +6354,7 @@ function FootballApp({
       const faces = photoRows.filter(x => x.kind === "render").map(x => instaPublicUrl(x.path));
       await withTimeout(Promise.all(faces.map(preload)), 5000);
       tick("rankings");
-      const bgs = ["/assets/foot/bg-green.jpg", "/assets/foot/bg-pink.jpg", "/logo-bl.png", "/logo-bl-rose.png"];
+      const bgs = ["/assets/foot/bg-green.jpg?v=crt1", "/assets/foot/bg-pink.jpg?v=crt1", "/logo-bl.png", "/logo-bl-rose.png"];
       await withTimeout(Promise.all([document.fonts ? document.fonts.ready : null, ...bgs.map(preload)]), 4000);
       tick("stats");
       await new Promise(res => setTimeout(res, Math.max(350, MIN_MS - (Date.now() - started))));

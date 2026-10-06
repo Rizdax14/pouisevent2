@@ -5,12 +5,12 @@ var FOOT_THEMES = {
   green: {
     label: "Vert", accent: "#1f6b3d", deep: "#14502b", soft: "#e8f3ec", softer: "#f4faf6", line: "#cfe3d6",
     text: "#1c2420", muted: "#52605a", good: "#17803d", bad: "#b3261e", warn: "#8f5600",
-    bgImage: "/assets/foot/bg-green.jpg", bgColor: "#1f6b3d", bgTint: "#84ae94",
+    bgImage: "/assets/foot/bg-green.jpg?v=crt1", bgColor: "#1f6b3d", bgTint: "#ffffff",
   },
   pink: {
     label: "Rose", accent: "#8e3f96", deep: "#722d79", soft: "#f6e9f7", softer: "#fbf4fb", line: "#e6cde8",
     text: "#261d28", muted: "#5f5062", good: "#17803d", bad: "#b3261e", warn: "#8f5600",
-    bgImage: "/assets/foot/bg-pink.jpg", bgColor: "#a24fa9", bgTint: "#9f5ca6",
+    bgImage: "/assets/foot/bg-pink.jpg?v=crt1", bgColor: "#a24fa9", bgTint: "#ffffff",
   },
 };
 
