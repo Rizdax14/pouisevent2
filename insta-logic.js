@@ -20,6 +20,7 @@ const RANKING_PAGES = [
   { key: "goals", heading: "BUTS", layout: "podium_celebration" },
   { key: "assists", heading: "PASSE D", layout: "podium_dos" },
   { key: "rating", heading: "MOYENNES", layout: "podium_render" },
+  { key: "motm", heading: "HOMMES DU MATCH", layout: "podium_celebration" },
 ];
 
 function savedFraming(framings, photoId, layout) {

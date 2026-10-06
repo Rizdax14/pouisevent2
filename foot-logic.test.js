@@ -207,8 +207,8 @@ test("computePlayerStats counts W/D/L from finished matches on the sheet only", 
   const lineups = [L(1, 10), L(2, 10), L(3, 10), L(4, 10), L(1, 20)];
   const events = [G(1, 10), O(2), O(4)]; // m1 win 1-0, m2 loss 0-1, m3 draw 0-0, m4 ignored (live)
   const s = byId(computePlayerStats(matches, lineups, events));
-  assert.deepEqual(s[10], { playerId: 10, played: 3, wins: 1, draws: 1, losses: 1, goals: 1, assists: 0, decisive: 1 });
-  assert.deepEqual(s[20], { playerId: 20, played: 1, wins: 1, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 });
+  assert.deepEqual(s[10], { playerId: 10, played: 3, wins: 1, draws: 1, losses: 1, goals: 1, assists: 0, decisive: 1, motm: 0 });
+  assert.deepEqual(s[20], { playerId: 20, played: 1, wins: 1, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 });
 });
 
 test("computePlayerStats only counts goals/assists for matches where the player is on the sheet", () => {
@@ -527,4 +527,16 @@ test("computeAttendanceQueue: answers in order, the first `min` confirmed, the r
   // someone drops out: the waiting player comes in
   const after = computeAttendanceQueue(roster, rows.map((r) => (r.player_id === 1 ? { ...r, status: "absent" } : r)), 2);
   assert.deepEqual(after.confirmed, [3, 2]);
+});
+
+test("motmWinners: validated matches only, most votes wins, ties share; computePlayerStats counts them", () => {
+  const { motmWinners } = require("./foot-logic.js");
+  const matches = [{ id: 1, status: "finished", ratings_validated_at: "x" }, { id: 2, status: "finished", ratings_validated_at: null }, { id: 3, status: "finished", ratings_validated_at: "x" }];
+  const votes = [{ match_id: 1, voter_id: 1, player_id: 10 }, { match_id: 1, voter_id: 2, player_id: 10 }, { match_id: 1, voter_id: 3, player_id: 20 },
+    { match_id: 2, voter_id: 1, player_id: 10 }, { match_id: 3, voter_id: 1, player_id: 10 }, { match_id: 3, voter_id: 2, player_id: 20 }];
+  const w = motmWinners(matches, votes);
+  assert.deepEqual(w, { 1: [10], 3: [10, 20] });
+  const lineups = [1, 3].flatMap((m) => [10, 20].map((p) => ({ match_id: m, player_id: p })));
+  const s = byId(computePlayerStats(matches.map((m) => ({ ...m })), lineups, [], w));
+  assert.deepEqual([s[10].motm, s[20].motm], [2, 1]);
 });

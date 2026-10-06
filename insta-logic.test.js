@@ -142,8 +142,8 @@ test("goalRows gives minute, scorer and assist in match order", () => {
   assert.deepEqual(L.goalRows(ev, players), [{ minute: 32, scorer: "Louis", assist: "Thisma" }, { minute: 5, scorer: "Thisma", assist: null }]);
 });
 
-test("RANKING_PAGES: Buts (célébration), Passes D (dos), Notes moyennes (render)", () => {
-  assert.deepEqual(L.RANKING_PAGES.map((p) => [p.key, p.layout]), [["goals", "podium_celebration"], ["assists", "podium_dos"], ["rating", "podium_render"]]);
+test("RANKING_PAGES: Buts (célébration), Passes D (dos), Notes moyennes (render), Hommes du match (célébration)", () => {
+  assert.deepEqual(L.RANKING_PAGES.map((p) => [p.key, p.layout]), [["goals", "podium_celebration"], ["assists", "podium_dos"], ["rating", "podium_render"], ["motm", "podium_celebration"]]);
 });
 
 test("ratingRows: sorted by match rating desc, unrated last, with season averages", () => {

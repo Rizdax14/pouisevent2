@@ -122,12 +122,13 @@ async function withPodiumPhotos(rows, data, layout, kit) {
 async function buildRankings(q) {
   const page = L.RANKING_PAGES[Number(q.page || 1) - 1];
   if (!page) throw new Error("Page de classement inconnue");
-  const [common, matches, lineups, events, ratings] = await Promise.all([
+  const [common, matches, lineups, events, ratings, motmVotes] = await Promise.all([
     loadCommon(),
     sbGet("foot_matches", "?select=*"),
     sbGet("foot_lineups", "?select=match_id,player_id"),
     sbGet("foot_match_events", "?select=*"),
     sbGet("foot_ratings", "?select=*"),
+    sbGet("foot_motm_votes", "?select=match_id,voter_id,player_id").catch(() => []),
   ]);
   const season = q.season || F.seasonOf(new Date().toISOString());
   const seasonMatches = F.filterMatchesForStats(matches, { season, type: "all" });
@@ -137,7 +138,7 @@ async function buildRankings(q) {
   const theme = THEMES[themeName];
   const ids = new Set(seasonMatches.map((m) => m.id));
   const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
-  const stats = F.computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)));
+  const stats = F.computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)), F.motmWinners(seasonMatches, motmVotes));
   const rows = F.buildStatsRows(F.statsRoster(common.roster), stats, {});
   // Season average rating + number of rated matches, for the "MOYENNES" page.
   for (const r of rows) {

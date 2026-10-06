@@ -2600,10 +2600,89 @@ function FootLiveView({
 const FOOT_SCORE_OPTIONS = Array.from({
   length: 19
 }, (_, i) => 1 + i * 0.5);
+
+// Tap the face of the best player of the match.
+function FootMotmPicker({
+  ids,
+  value,
+  onPick,
+  disabled
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "Homme du match",
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))",
+      gap: 8
+    }
+  }, ids.map(id => {
+    const on = value === id;
+    return /*#__PURE__*/React.createElement("button", {
+      key: id,
+      role: "radio",
+      "aria-checked": on,
+      disabled: disabled,
+      onClick: () => onPick(id),
+      style: {
+        border: `2px solid ${on ? FC.accent : "transparent"}`,
+        background: on ? FC.accentSoft : FC.softer,
+        borderRadius: 18,
+        padding: "8px 4px 6px",
+        cursor: disabled ? "default" : "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4,
+        minWidth: 0,
+        color: FC.text
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "relative",
+        display: "inline-flex"
+      }
+    }, /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: id,
+      name: footNameOf(id),
+      size: 52,
+      ring: on ? FC.accent : undefined
+    }), on && /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        right: -4,
+        bottom: -4,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        background: FC.accent,
+        color: "#fff",
+        border: "2px solid #fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement(FIcon, {
+      name: "check",
+      size: 13,
+      stroke: 3
+    }))), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: FF.ui,
+        fontSize: 12,
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, footNameOf(id)));
+  }));
+}
 function FootRatingsTab({
   match,
   lineups,
   ratings,
+  motmVotes,
   currentPlayer,
   isAdmin,
   reload
@@ -2617,6 +2696,9 @@ function FootRatingsTab({
   const isVoter = sheetIds.includes(me);
   const hasVoted = progress.doneIds.includes(me);
   const mine = Object.fromEntries(mr.filter(r => r.rater_id === me).map(r => [r.ratee_id, String(r.score)]));
+  const myMotm = (motmVotes || []).find(v => v.match_id === match.id && v.voter_id === me);
+  const [motm, setMotm] = React.useState(myMotm ? myMotm.player_id : null);
+  const winners = validated ? motmWinners([match], motmVotes || [])[match.id] || [] : [];
   const [editing, setEditing] = React.useState(isVoter && !hasVoted && !validated);
   const [scores, setScores] = React.useState(mine);
   const [busy, setBusy] = React.useState(false);
@@ -2630,17 +2712,31 @@ function FootRatingsTab({
       setErr(e.message);
       return;
     }
+    if (!motm) {
+      setErr("Choisis ton homme du match en touchant son visage.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
       const result = await submitRatings({
         isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
-        writeRatings: async () => assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map(r => ({
-          ...r,
-          updated_at: new Date().toISOString()
-        })), {
-          onConflict: "match_id,rater_id,ratee_id"
-        }))
+        writeRatings: async () => {
+          assertUpsertOk(await SUPABASE.from("foot_motm_votes").upsert({
+            match_id: match.id,
+            voter_id: me,
+            player_id: motm,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: "match_id,voter_id"
+          }));
+          assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows.map(r => ({
+            ...r,
+            updated_at: new Date().toISOString()
+          })), {
+            onConflict: "match_id,rater_id,ratee_id"
+          }));
+        }
       });
       if (result === "closed") setErr("Les notes de ce match ont déjà été validées, tes notes n'ont pas été enregistrées.");
       setEditing(false);
@@ -2692,7 +2788,16 @@ function FootRatingsTab({
     style: {
       marginBottom: 14
     }
-  }, sheetIds.filter(id => id !== me).map(id => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FLabel, null, "Ton homme du match"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(FootMotmPicker, {
+    ids: sheetIds.filter(id => id !== me),
+    value: motm,
+    onPick: setMotm,
+    disabled: busy
+  })), /*#__PURE__*/React.createElement(FLabel, null, "Les notes"), sheetIds.filter(id => id !== me).map(id => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
@@ -2751,7 +2856,52 @@ function FootRatingsTab({
     style: {
       marginBottom: 12
     }
-  }, view.editLabel), view.showAverages && ranked.map(({
+  }, view.editLabel), winners.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      background: FC.accentSoft,
+      borderRadius: 18,
+      padding: "10px 12px",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex"
+    }
+  }, winners.map((id, i) => /*#__PURE__*/React.createElement("span", {
+    key: id,
+    style: {
+      marginLeft: i ? -10 : 0
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: footNameOf(id),
+    size: 52,
+    ring: FC.accent,
+    linkable: true
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em"
+    }
+  }, "Homme du match"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 22,
+      color: FC.deep,
+      lineHeight: 1.15,
+      overflowWrap: "anywhere"
+    }
+  }, winners.map(footNameOf).join(" · ")))), view.showAverages && ranked.map(({
     id,
     avg
   }, i) => /*#__PURE__*/React.createElement("div", {
@@ -3104,6 +3254,7 @@ function FootFinishedView({
   lineups,
   attendance,
   ratings,
+  motmVotes,
   currentPlayer,
   isAdmin,
   reload
@@ -3142,6 +3293,7 @@ function FootFinishedView({
     match: match,
     lineups: lineups,
     ratings: ratings || [],
+    motmVotes: motmVotes || [],
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload
@@ -3365,6 +3517,7 @@ function FootMatchDetailPage({
   events,
   lineups,
   ratings,
+  motmVotes,
   currentPlayer,
   navBack,
   reload
@@ -3469,6 +3622,7 @@ function FootMatchDetailPage({
     lineups: lineups,
     attendance: attendance,
     ratings: ratings,
+    motmVotes: motmVotes,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
     reload: reload
@@ -3557,6 +3711,10 @@ const FOOT_STAT_COLUMNS = [{
   key: "rating",
   label: "Note",
   title: "Note"
+}, {
+  key: "motm",
+  label: "HDM",
+  title: "Homme du match"
 }];
 function readPref(key, fallback, allowed) {
   try {
@@ -3709,6 +3867,7 @@ function FootStatsPage({
   lineups,
   events,
   ratings,
+  motmVotes,
   roster,
   currentPlayer,
   subjectId
@@ -3738,12 +3897,13 @@ function FootStatsPage({
   });
   const population = statsRoster(roster);
   const ratingBy = Object.fromEntries(population.map(id => [id, averageRating(playerRatingSeries(filtered, ratings, lineups, id))]));
-  const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events), ratingBy);
+  const motmBy = motmWinners(filtered, motmVotes || []);
+  const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events, motmBy), ratingBy);
   const pool = rows.filter(r => r.played > 0);
   const ratingPool = rows.filter(r => r.rating != null);
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
   // A player outside the regular roster (guest…) still has a page; he is just not ranked.
-  const me = rows.find(r => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events), {
+  const me = rows.find(r => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events, motmBy), {
     [subject]: averageRating(playerRatingSeries(filtered, ratings, lineups, subject))
   })[0] : null);
   const series = subject ? playerRatingSeries(filtered, ratings, lineups, subject).slice(-10) : [];
@@ -3848,8 +4008,13 @@ function FootStatsPage({
       marginBottom: 14
     }
   }, tilesFor(["played", "wins", "draws", "losses", "rating"])), /*#__PURE__*/React.createElement(FLabel, null, "Attaque"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...tiles,
+      marginBottom: 14
+    }
+  }, tilesFor(["goals", "assists", "decisive"])), /*#__PURE__*/React.createElement(FLabel, null, "Distinctions"), /*#__PURE__*/React.createElement("div", {
     style: tiles
-  }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, isOther ? "Évolution" : "Mon évolution"), /*#__PURE__*/React.createElement(FootRatingChart, {
+  }, tilesFor(["motm"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, isOther ? "Évolution" : "Mon évolution"), /*#__PURE__*/React.createElement(FootRatingChart, {
     series: series
   })), !isOther && /*#__PURE__*/React.createElement(FootRankingsPanel, {
     seasonMatches: filtered,
@@ -3857,6 +4022,7 @@ function FootStatsPage({
     lineups: lineups,
     events: events,
     ratings: ratings,
+    motmVotes: motmVotes,
     roster: roster,
     currentPlayer: currentPlayer,
     mode: mode
@@ -3879,6 +4045,11 @@ const FOOT_RANKING_TABS = [{
   label: "Moyennes",
   unit: "",
   icon: "star"
+}, {
+  key: "motm",
+  label: "HDM",
+  unit: "fois",
+  icon: "trophy"
 }];
 function FootPodiumSlot({
   entry,
@@ -3955,18 +4126,19 @@ function FootRankingsPanel({
   lineups,
   events,
   ratings,
+  motmVotes,
   roster,
   currentPlayer,
   mode = "abs"
 }) {
-  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating"]));
+  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating", "motm"]));
   const pick = v => {
     setTab(v);
     writePref("foot_rank_tab", v);
   };
   const ids = new Set(seasonMatches.map(m => m.id));
   const seasonLineups = lineups.filter(l => ids.has(l.match_id));
-  const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id))), {});
+  const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id)), motmWinners(seasonMatches, motmVotes || [])), {});
   for (const r of rows) {
     const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
     r.rating = averageRating(series);
@@ -4002,7 +4174,7 @@ function FootRankingsPanel({
   }), entries.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
     icon: "trophy",
     title: "Pas encore de classement",
-    text: `Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : "passe décisive"} sur cette période.`
+    text: `Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : "passe décisive"} sur cette période.`
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -6107,6 +6279,7 @@ function FootballApp({
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
   const [activities, setActivities] = React.useState([]);
+  const [motmVotes, setMotmVotes] = React.useState([]);
   const [activityAttendance, setActivityAttendance_] = React.useState([]);
   const isAdmin = isBureau(currentPlayer);
   const setTheme = t => {
@@ -6123,11 +6296,13 @@ function FootballApp({
     };
   }, [theme]);
   async function reloadFoot() {
-    const [r, m, a, e, l, rt, ph, fr, ac, aa] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
+    const [r, m, a, e, l, rt, ph, fr, ac, aa, mv] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
     // optional: absent until the insta migration is applied
     sbFetch("foot_photo_framings", "?select=*").catch(() => []), sbFetch("foot_activities", "?select=*&order=starts_at").catch(() => []),
     // optional: absent until the activities migration is applied
-    sbFetch("foot_activity_attendance", "?select=*").catch(() => [])]);
+    sbFetch("foot_activity_attendance", "?select=*").catch(() => []), sbFetch("foot_motm_votes", "?select=match_id,voter_id,player_id").catch(() => []) // optional: absent until the man-of-the-match migration is applied
+    ]);
+    setMotmVotes(mv || []);
     setActivities(ac || []);
     setActivityAttendance_(aa || []);
     setRoster(r || []);
@@ -6268,6 +6443,7 @@ function FootballApp({
     events: events,
     lineups: lineups,
     ratings: ratings,
+    motmVotes: motmVotes,
     currentPlayer: currentPlayer,
     navBack: () => nav("calendar"),
     reload: reloadFoot
@@ -6289,6 +6465,7 @@ function FootballApp({
     lineups: lineups,
     events: events,
     ratings: ratings,
+    motmVotes: motmVotes,
     roster: roster,
     currentPlayer: currentPlayer
   }), loaded && playerPage && /*#__PURE__*/React.createElement(FootStatsPage, {
@@ -6297,6 +6474,7 @@ function FootballApp({
     lineups: lineups,
     events: events,
     ratings: ratings,
+    motmVotes: motmVotes,
     roster: roster,
     currentPlayer: currentPlayer,
     subjectId: sub.playerId

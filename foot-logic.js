@@ -108,7 +108,20 @@ function buildEventPayload({ type, half, minute, playerId, assistId }) {
 
 const STAT_KEYS_PCT_OF_PLAYED = ["wins", "draws", "losses"];
 
-function computePlayerStats(matches, lineups, events) {
+// Man of the match: the player with the most votes of each validated match (ties share it). → { matchId: [playerId, …] }
+function motmWinners(matches, votes) {
+  const out = {};
+  for (const m of matches) {
+    if (m.status !== "finished" || !m.ratings_validated_at) continue;
+    const tally = {};
+    for (const v of votes) if (v.match_id === m.id) tally[v.player_id] = (tally[v.player_id] || 0) + 1;
+    const top = Math.max(0, ...Object.values(tally));
+    if (top > 0) out[m.id] = Object.keys(tally).filter((id) => tally[id] === top).map(Number);
+  }
+  return out;
+}
+
+function computePlayerStats(matches, lineups, events, motmByMatch) {
   const finished = new Set(matches.filter((m) => m.status === "finished").map((m) => m.id));
   const resultByMatch = {};
   for (const id of finished) {
@@ -120,7 +133,7 @@ function computePlayerStats(matches, lineups, events) {
   for (const l of lineups) {
     if (!finished.has(l.match_id)) continue;
     onSheet.add(`${l.match_id}:${l.player_id}`);
-    const st = stats[l.player_id] || (stats[l.player_id] = { playerId: l.player_id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 });
+    const st = stats[l.player_id] || (stats[l.player_id] = { playerId: l.player_id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 });
     st.played++;
     st[resultByMatch[l.match_id]]++;
   }
@@ -128,6 +141,10 @@ function computePlayerStats(matches, lineups, events) {
     if (e.type !== "goal_bl" || !finished.has(e.match_id)) continue;
     if (e.player_id && onSheet.has(`${e.match_id}:${e.player_id}`)) stats[e.player_id].goals++;
     if (e.assist_player_id && onSheet.has(`${e.match_id}:${e.assist_player_id}`)) stats[e.assist_player_id].assists++;
+  }
+  for (const [matchId, ids] of Object.entries(motmByMatch || {})) {
+    if (!finished.has(Number(matchId))) continue;
+    for (const id of ids) if (onSheet.has(`${matchId}:${id}`)) stats[id].motm++;
   }
   return Object.values(stats).map((s) => ({ ...s, decisive: s.goals + s.assists }));
 }
@@ -281,7 +298,7 @@ function statsRoster(roster) {
 
 function buildStatsRows(rosterIds, stats, ratingByPlayer) {
   return rosterIds.map((id) => {
-    const s = stats.find((x) => x.playerId === id) || { playerId: id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 };
+    const s = stats.find((x) => x.playerId === id) || { playerId: id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 };
     return { ...s, rating: ratingByPlayer[id] ?? null };
   });
 }
@@ -353,6 +370,7 @@ if (typeof module !== "undefined" && module.exports) {
     toDatetimeLocalValue,
     buildEventPayload,
     computePlayerStats,
+    motmWinners,
     statValue,
     rankPlayers,
     formatRank,
