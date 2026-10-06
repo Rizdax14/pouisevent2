@@ -39,6 +39,7 @@ const FOOT_ICONS = {
   sliders: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
   back: "M15 5l-7 7 7 7",
   plus: "M12 5v14M5 12h14",
+  user: "M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   pencil: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   check: "M5 12l5 5 9-10",

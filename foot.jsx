@@ -8,6 +8,20 @@ async function setMatchAttendance(matchId, playerId, status) {
   ));
 }
 
+// An admin can clear an answer (back to "no response").
+async function clearMatchAttendance(matchId, playerId) {
+  await sbFetch("foot_attendance", `?match_id=eq.${matchId}&player_id=eq.${playerId}`, { method: "DELETE" });
+}
+async function setActivityAttendance(activityId, playerId, status) {
+  assertUpsertOk(await SUPABASE.from("foot_activity_attendance").upsert(
+    { activity_id: activityId, player_id: playerId, status, responded_at: new Date().toISOString() },
+    { onConflict: "activity_id,player_id" }
+  ));
+}
+async function clearActivityAttendance(activityId, playerId) {
+  await sbFetch("foot_activity_attendance", `?activity_id=eq.${activityId}&player_id=eq.${playerId}`, { method: "DELETE" });
+}
+
 async function addToLineup(matchId, playerIds) {
   if (!playerIds.length) return;
   assertUpsertOk(await SUPABASE.from("foot_lineups").upsert(
@@ -176,8 +190,8 @@ function FootLineupSection({ match, roster, lineups, attendance, isAdmin, reload
 
 // ---- match form (create / edit) ----------------------------------------------------------------------------------------
 function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
-  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile" };
-  const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime) } : empty;
+  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile", min_players: "10" };
+  const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime), min_players: initial.min_players == null ? "" : String(initial.min_players) } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
@@ -189,9 +203,16 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
       setMsg({ t: "bad", m: "Adversaire et date/heure sont obligatoires." });
       return;
     }
+    const minRaw = String(f.min_players ?? "").trim();
+    const min = minRaw === "" ? null : Number(minRaw);
+    if (min !== null && !(Number.isInteger(min) && min >= 1 && min <= 50)) {
+      setMsg({ t: "bad", m: "Le minimum de joueurs doit être un nombre entre 1 et 50 (ou vide)." });
+      return;
+    }
     setSaving(true);
     try {
       await onSubmit({
+        min_players: min,
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
         venue: f.venue === "exterieur" ? "exterieur" : "domicile",
@@ -218,6 +239,8 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
       <FSegmented value={f.venue || "domicile"} onChange={(v) => setF({ ...f, venue: v })} options={[["domicile", "Domicile"], ["exterieur", "Extérieur"]]} style={{ marginBottom: 12 }} />
       <FLabel>Type</FLabel>
       <FSegmented value={f.match_type || "championnat"} onChange={(v) => setF({ ...f, match_type: v })} options={[["championnat", "Championnat"], ["amical", "Amical"]]} style={{ marginBottom: 14 }} />
+      <FField label="Joueurs minimum"><input style={FOOT_INPUT_STYLE} inputMode="numeric" placeholder="Ex. 10 (vide = pas de limite)" value={f.min_players ?? ""} onChange={set("min_players")} aria-label="Nombre minimum de joueurs" /></FField>
+      <div style={{ fontSize: 12, color: FC.muted, margin: "-6px 0 14px" }}>Au-delà, les joueurs qui répondent « présent » passent en liste d'attente, dans l'ordre de leur réponse.</div>
       <FField label="Stade"><input style={FOOT_INPUT_STYLE} placeholder="Nom du stade" value={f.stadium_name || ""} onChange={set("stadium_name")} /></FField>
       <FField label="Adresse"><input style={FOOT_INPUT_STYLE} placeholder="Adresse" value={f.address || ""} onChange={set("address")} /></FField>
       <div style={{ display: "flex", gap: 10 }}>
@@ -248,19 +271,19 @@ function FootCreateMatchForm({ reload }) {
 }
 
 // ---- calendar ---------------------------------------------------------------------------------------------------------------
-function FootPresenceStack({ ids, total }) {
+function FootPresenceStack({ ids, total, min, waiting }) {
   const shown = ids.slice(0, 6);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div style={{ display: "flex" }}>
         {shown.map((id, i) => <span key={id} style={{ marginLeft: i ? -9 : 0, borderRadius: 20, boxShadow: `0 0 0 2px ${FC.solid}` }}><FAvatar playerId={id} name={footNameOf(id)} size={30} /></span>)}
       </div>
-      <span style={{ fontSize: 14, color: FC.muted }}><b style={{ color: FC.text, fontFamily: FF.ui, fontSize: 16 }}>{ids.length}</b> / {total} présents</span>
+      <span style={{ fontSize: 14, color: FC.muted }}><b style={{ color: FC.text, fontFamily: FF.ui, fontSize: 16 }}>{ids.length}</b> / {min || total} {min ? "confirmés" : "présents"}{waiting ? ` · ${waiting} en attente` : ""}</span>
     </div>
   );
 }
 
-function FootMatchHero({ match, score, presentIds, rosterSize, onOpen, isOnRoster, myStatus, onSetStatus, saving }) {
+function FootMatchHero({ match, score, presentIds, waitingCount, rosterSize, onOpen, isOnRoster, myStatus, onSetStatus, saving }) {
   const live = match.status === "live";
   return (
     <FCard onClick={onOpen} pad={20} style={{ marginBottom: 18 }}>
@@ -277,7 +300,7 @@ function FootMatchHero({ match, score, presentIds, rosterSize, onOpen, isOnRoste
       <div style={{ margin: "12px 0" }}><FootMetaChips match={match} /></div>
       {!live && (
         <>
-          <FootPresenceStack ids={presentIds} total={rosterSize} />
+          <FootPresenceStack ids={presentIds} total={rosterSize} min={match.min_players} waiting={waitingCount} />
           {isOnRoster && <div style={{ marginTop: 14 }}><FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={onSetStatus} /></div>}
         </>
       )}
@@ -310,7 +333,7 @@ function FootMatchRow({ match, score, onOpen }) {
   );
 }
 
-function FootCalendarPage({ matches, events, roster, attendance, nav, currentPlayer, reload }) {
+function FootCalendarPage({ matches, events, roster, attendance, activities, activityAttendance, nav, currentPlayer, reload }) {
   const [savingMatchId, setSavingMatchId] = React.useState(null);
   const presenceRoster = attendanceRoster(roster);
   const isOnRoster = presenceRoster.some((r) => r.player_id === currentPlayer?.id);
@@ -322,7 +345,15 @@ function FootCalendarPage({ matches, events, roster, attendance, nav, currentPla
     setSavingMatchId(null);
   }
 
+  const upcomingActivities = (activities || []).filter((a) => new Date(a.starts_at).getTime() > Date.now() - 6 * 3600 * 1000).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const activitiesBlock = upcomingActivities.length > 0 && (
+    <div style={{ marginBottom: 8 }}>
+      <FTitle size={20} style={{ marginBottom: 10 }}>Activités</FTitle>
+      {upcomingActivities.map((a) => <FootActivityCard key={a.id} activity={a} roster={roster} rows={(activityAttendance || []).filter((r) => r.activity_id === a.id)} currentPlayer={currentPlayer} isAdmin={isBureau(currentPlayer)} reload={reload} />)}
+    </div>
+  );
   if (matches.length === 0) {
+    if (activitiesBlock) return <div className="ft-page">{activitiesBlock}</div>;
     return <FCard><FEmpty icon="calendar" title="Aucun match" text="Les matchs apparaîtront ici dès qu'ils seront créés." /></FCard>;
   }
   const scoreOf = (m) => computeFootScore(events.filter((e) => e.match_id === m.id));
@@ -342,21 +373,61 @@ function FootCalendarPage({ matches, events, roster, attendance, nav, currentPla
       {featured && (
         <FootMatchHero
           match={featured} score={scoreOf(featured)} onOpen={open(featured)}
-          presentIds={computeAttendanceBuckets(presenceRoster, heroAttendance).present} rosterSize={presenceRoster.length}
+          presentIds={computeAttendanceQueue(presenceRoster, heroAttendance, featured.min_players).confirmed} waitingCount={computeAttendanceQueue(presenceRoster, heroAttendance, featured.min_players).waiting.length} rosterSize={presenceRoster.length}
           isOnRoster={isOnRoster} myStatus={heroAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null}
           saving={savingMatchId === featured.id} onSetStatus={(status) => setStatus(featured.id, status)}
         />
       )}
       {section("À venir", upcoming)}
+      {activitiesBlock}
       {section("Résultats", past)}
     </div>
   );
 }
 
 // ---- roster & admin -------------------------------------------------------------------------------------------------------------
+// Private details of one player (birth date, phone, e-mail). Stored server-side behind the admin key.
+function FootPlayerDetailsEditor({ player, detail, onSaved }) {
+  const [f, setF] = React.useState({ birth_date: (detail && detail.birth_date) || "", phone: (detail && detail.phone) || "", email: (detail && detail.email) || "" });
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  async function save() {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await instaAdminFetch("player-details", { player_id: player.id, birth_date: f.birth_date, phone: f.phone, email: f.email });
+      onSaved(r.detail);
+      setMsg({ t: "good", m: "Enregistré ✓" });
+    } catch (e) { setMsg({ t: "bad", m: e.message }); }
+    setBusy(false);
+  }
+  return (
+    <div style={{ padding: "6px 0 12px 48px" }}>
+      <FField label="Date de naissance"><input style={FOOT_INPUT_STYLE} type="date" value={f.birth_date} onChange={set("birth_date")} max={new Date().toISOString().slice(0, 10)} aria-label="Date de naissance" /></FField>
+      <FField label="Téléphone"><input style={FOOT_INPUT_STYLE} type="tel" inputMode="tel" placeholder="06 12 34 56 78" value={f.phone} onChange={set("phone")} aria-label="Téléphone" autoComplete="off" /></FField>
+      <FField label="E-mail"><input style={FOOT_INPUT_STYLE} type="email" inputMode="email" placeholder="prenom@exemple.fr" value={f.email} onChange={set("email")} aria-label="E-mail" autoCapitalize="off" autoComplete="off" /></FField>
+      {msg && <FMessage tone={msg.t}>{msg.m}</FMessage>}
+      <FBtn size="sm" onClick={save} disabled={busy}>{busy ? "…" : "Enregistrer les infos"}</FBtn>
+    </div>
+  );
+}
+
 function FootRosterManager({ roster, reload }) {
   const [saving, setSaving] = React.useState(null); // player id currently being saved
   const [search, setSearch] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [addSearch, setAddSearch] = React.useState("");
+  const [addRole, setAddRole] = React.useState("regulier");
+  const [openId, setOpenId] = React.useState(null);
+  const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
+  const [details, setDetails] = React.useState({});
+  const [detailsErr, setDetailsErr] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!hasKey) return;
+    instaAdminFetch("player-details", null, "GET").then((r) => { setDetails(Object.fromEntries((r.details || []).map((d) => [d.player_id, d]))); setDetailsErr(null); })
+      .catch((e) => { setDetailsErr(e.message); setHasKey(!!readInstaKey()); });
+  }, [hasKey]);
 
   const roleByPlayer = {};
   const numberByPlayer = {};
@@ -390,43 +461,192 @@ function FootRosterManager({ roster, reload }) {
   }
 
   const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
-  // Team members first, then everybody else (to add them).
-  const sortedPlayers = [...PLAYERS].sort((a, b) => (roleByPlayer[b.id] ? 1 : 0) - (roleByPlayer[a.id] ? 1 : 0) || nameOf(a).localeCompare(nameOf(b)));
-  const visiblePlayers = filterPlayersByName(sortedPlayers, search, nameOf);
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
+  const team = PLAYERS.filter((p) => roleByPlayer[p.id]).sort(byName);
+  const visibleTeam = filterPlayersByName(team, search, nameOf);
+  const others = PLAYERS.filter((p) => !roleByPlayer[p.id]).sort(byName);
+  const visibleOthers = filterPlayersByName(others, addSearch, nameOf);
+  const ageOf = (iso) => { if (!iso) return null; const d = new Date(iso), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return a; };
 
   return (
     <FCard>
       <FHeading right={<FChip tone="soft">{roster.length} joueurs</FChip>}>Effectif</FHeading>
-      <input style={FOOT_INPUT_STYLE} placeholder="Rechercher un joueur…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Rechercher un joueur" />
-      {visiblePlayers.length === 0 && <FEmpty icon="users" title="Aucun résultat" text={`Aucun joueur ne correspond à « ${search} ».`} />}
-      {visiblePlayers.map((p) => {
-        const inTeam = !!roleByPlayer[p.id];
+      <input style={FOOT_INPUT_STYLE} placeholder="Rechercher dans l'effectif…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Rechercher dans l'effectif" />
+      {team.length === 0 && <FEmpty icon="users" title="Effectif vide" text="Ajoute des joueurs avec le bouton ci-dessous." />}
+      {team.length > 0 && visibleTeam.length === 0 && <FEmpty icon="users" title="Aucun résultat" text={`Aucun joueur de l'effectif ne correspond à « ${search} ».`} />}
+      {detailsErr && <FMessage tone="warn">Infos personnelles indisponibles ({detailsErr}).</FMessage>}
+      {!hasKey && <div style={{ marginTop: 10 }}><FootInstaKeyBox onSaved={() => setHasKey(true)} /></div>}
+      {visibleTeam.map((p) => {
+        const d = details[p.id];
+        const open = openId === p.id;
         return (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}`, opacity: inTeam ? 1 : 0.75 }}>
-            <FAvatar playerId={p.id} name={nameOf(p)} size={38} />
-            <div style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
-            {inTeam && (
+          <div key={p.id} style={{ borderTop: `1px solid ${FC.line}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+              <FAvatar playerId={p.id} name={nameOf(p)} size={38} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
+                {d && (d.birth_date || d.phone || d.email) && <div style={{ fontSize: 12, color: FC.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · ")}</div>}
+              </div>
               <input key={`${p.id}-${numberByPlayer[p.id] || ""}`} defaultValue={numberByPlayer[p.id] || ""} placeholder="n°" inputMode="numeric" maxLength={3} aria-label={`Numéro de ${nameOf(p)}`}
                 onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
                 style={{ ...FOOT_INPUT_STYLE, width: 58, marginBottom: 0, textAlign: "center", padding: "8px 6px", minHeight: 40, fontFamily: FF.ui }} />
-            )}
-            <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, maxWidth: 138 }}>
-              <option value="">Hors équipe</option>
+              <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, maxWidth: 124 }}>
+                <option value="">Hors équipe</option>
+                <option value="regulier">Régulier</option>
+                <option value="occasionnel">Occasionnel</option>
+                <option value="invite">Invité</option>
+              </select>
+              <FIconBtn icon="user" label={`Infos de ${nameOf(p)}`} tone={open ? "soft" : "ghost"} onClick={() => setOpenId(open ? null : p.id)} />
+            </div>
+            {open && (hasKey ? <FootPlayerDetailsEditor key={`${p.id}-${d ? d.phone : ""}`} player={p} detail={d} onSaved={(row) => setDetails({ ...details, [p.id]: row })} /> : <div style={{ fontSize: 13, color: FC.muted, padding: "0 0 12px 48px" }}>Saisis la clé admin ci-dessus pour voir et modifier les infos.</div>)}
+          </div>
+        );
+      })}
+
+      <FBtn variant="secondary" full icon="plus" onClick={() => setAdding(!adding)} style={{ marginTop: 14 }}>{adding ? "Fermer la liste" : "Ajouter un joueur"}</FBtn>
+      {adding && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <input style={{ ...FOOT_INPUT_STYLE, marginBottom: 0, flex: 1 }} placeholder="Chercher parmi tous les joueurs…" value={addSearch} onChange={(e) => setAddSearch(e.target.value)} aria-label="Chercher parmi tous les joueurs" />
+            <select value={addRole} onChange={(e) => setAddRole(e.target.value)} aria-label="Rôle à l'ajout" style={{ ...FOOT_SELECT_STYLE, maxWidth: 124 }}>
               <option value="regulier">Régulier</option>
               <option value="occasionnel">Occasionnel</option>
               <option value="invite">Invité</option>
             </select>
           </div>
-        );
-      })}
+          {visibleOthers.length === 0 && <FEmpty icon="users" title="Aucun joueur" text={addSearch ? `Aucun joueur ne correspond à « ${addSearch} ».` : "Tous les joueurs sont déjà dans l'effectif."} />}
+          <div style={{ maxHeight: 360, overflowY: "auto" }}>
+            {visibleOthers.map((p) => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
+                <FAvatar playerId={p.id} name={nameOf(p)} size={34} />
+                <div style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
+                <FBtn size="sm" icon="plus" disabled={saving === p.id} onClick={() => setRole(p.id, addRole)}>Ajouter</FBtn>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </FCard>
   );
 }
 
-function FootAdminPage({ roster, reload }) {
+// ---- activities (free events, not matches) ------------------------------------------------------------------------------------
+function FootActivityForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
+  const empty = { title: "", description: "", starts_at: "", location: "", min_players: "" };
+  const [f, setF] = React.useState(initial ? { ...empty, ...initial, starts_at: toDatetimeLocalValue(initial.starts_at), min_players: initial.min_players == null ? "" : String(initial.min_players), description: initial.description || "", location: initial.location || "" } : empty);
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  async function submit() {
+    if (!f.title.trim() || !f.starts_at) { setMsg({ t: "bad", m: "Le titre et la date/heure sont obligatoires." }); return; }
+    const minRaw = String(f.min_players ?? "").trim();
+    const min = minRaw === "" ? null : Number(minRaw);
+    if (min !== null && !(Number.isInteger(min) && min >= 1 && min <= 200)) { setMsg({ t: "bad", m: "Le minimum doit être un nombre entre 1 et 200 (ou vide)." }); return; }
+    setSaving(true);
+    try {
+      await onSubmit({ title: f.title.trim(), description: f.description.trim() || null, starts_at: new Date(f.starts_at).toISOString(), location: f.location.trim() || null, min_players: min });
+      if (resetOnSuccess) setF(empty);
+      setMsg({ t: "good", m: "Enregistré ✓" });
+    } catch (e) { setMsg({ t: "bad", m: "Erreur : " + e.message }); }
+    setSaving(false);
+  }
+  return (
+    <FCard>
+      <FHeading>{title}</FHeading>
+      <FField label="Titre"><input style={FOOT_INPUT_STYLE} placeholder="Ex. Troisième mi-temps, entraînement, resto d'équipe…" value={f.title} onChange={set("title")} aria-label="Titre de l'activité" /></FField>
+      <FField label="Date et heure"><input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.starts_at} onChange={set("starts_at")} aria-label="Date et heure" /></FField>
+      <FField label="Lieu"><input style={FOOT_INPUT_STYLE} placeholder="Où ça se passe ?" value={f.location} onChange={set("location")} aria-label="Lieu" /></FField>
+      <FField label="Détails"><textarea style={{ ...FOOT_INPUT_STYLE, minHeight: 84, resize: "vertical", fontFamily: "inherit" }} placeholder="Programme, infos pratiques, à apporter…" value={f.description} onChange={set("description")} aria-label="Détails" /></FField>
+      <FField label="Participants minimum"><input style={FOOT_INPUT_STYLE} inputMode="numeric" placeholder="Vide = pas de limite" value={f.min_players} onChange={set("min_players")} aria-label="Participants minimum" /></FField>
+      {msg && <FMessage tone={msg.t}>{msg.m}</FMessage>}
+      <div style={{ display: "flex", gap: 10 }}>
+        {onCancel && <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>}
+        <FBtn onClick={submit} disabled={saving} style={{ flex: 1 }}>{saving ? "Enregistrement…" : submitLabel}</FBtn>
+      </div>
+    </FCard>
+  );
+}
+
+function FootCreateActivityForm({ reload }) {
+  const [open, setOpen] = React.useState(false);
+  if (!open) return <FBtn full size="lg" variant="secondary" icon="plus" onClick={() => setOpen(true)} style={{ marginBottom: 14 }}>Nouvelle activité</FBtn>;
+  return <FootActivityForm title="Nouvelle activité" submitLabel="Créer l'activité" resetOnSuccess onCancel={() => setOpen(false)} onSubmit={async (data) => { await sbInsert("foot_activities", data); await reload(); setOpen(false); }} />;
+}
+
+// Admin list of the activities: edit or delete.
+function FootActivitiesAdmin({ activities, reload }) {
+  const [editingId, setEditingId] = React.useState(null);
+  const [busyId, setBusyId] = React.useState(null);
+  if (!activities.length) return null;
+  const sorted = [...activities].sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+  async function remove(a) {
+    if (!window.confirm(`Supprimer l'activité « ${a.title} » et ses réponses ?`)) return;
+    setBusyId(a.id);
+    try { await sbFetch("foot_activities", `?id=eq.${a.id}`, { method: "DELETE" }); await reload(); } catch (e) { console.warn("delete activity failed", e); }
+    setBusyId(null);
+  }
+  return (
+    <FCard>
+      <FHeading right={<FChip tone="soft">{activities.length}</FChip>}>Activités</FHeading>
+      {sorted.map((a) => editingId === a.id ? (
+        <FootActivityForm key={a.id} title="Modifier l'activité" initial={a} submitLabel="Enregistrer" onCancel={() => setEditingId(null)} onSubmit={async (data) => { await sbUpdate("foot_activities", { id: a.id }, data); await reload(); setEditingId(null); }} />
+      ) : (
+        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</div>
+            <div style={{ fontSize: 12, color: FC.muted }}>{footDate(a.starts_at)} · {footTime(a.starts_at)}{a.location ? ` · ${a.location}` : ""}</div>
+          </div>
+          <FIconBtn icon="pencil" label={`Modifier ${a.title}`} onClick={() => setEditingId(a.id)} />
+          <FIconBtn icon="trash" label={`Supprimer ${a.title}`} tone="danger" disabled={busyId === a.id} onClick={() => remove(a)} />
+        </div>
+      ))}
+    </FCard>
+  );
+}
+
+// An activity on the Matchs page: details, my answer, and everybody's answers.
+function FootActivityCard({ activity, roster, rows, currentPlayer, isAdmin, reload }) {
+  const [saving, setSaving] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
+  const presenceRoster = attendanceRoster(roster);
+  const isOnRoster = presenceRoster.some((r) => r.player_id === currentPlayer?.id);
+  const mine = rows.find((a) => a.player_id === currentPlayer?.id);
+  const q = computeAttendanceQueue(presenceRoster, rows, activity.min_players);
+  const myPlace = q.order.find((o) => o.playerId === currentPlayer?.id);
+  async function setMine(status) {
+    setSaving(true);
+    try { await setActivityAttendance(activity.id, currentPlayer.id, status); await reload(); } catch (e) { console.warn("activity attendance failed", e); }
+    setSaving(false);
+  }
+  const setPlayer = async (id, status) => { if (status === null) await clearActivityAttendance(activity.id, id); else await setActivityAttendance(activity.id, id, status); await reload(); };
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <FCard>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <FChip tone="accent" icon="calendar">Activité</FChip>
+          <span style={{ fontFamily: FF.ui, fontSize: 14, color: FC.deep }}>{footRelative(activity.starts_at)}</span>
+        </div>
+        <div style={{ fontFamily: FF.display, fontSize: 24, lineHeight: 1.15, color: FC.deep, overflowWrap: "anywhere" }}>{activity.title}</div>
+        <div style={{ fontSize: 14, color: FC.muted, margin: "6px 0" }}>{footDate(activity.starts_at)} · {footTime(activity.starts_at)}{activity.location ? ` · ${activity.location}` : ""}</div>
+        {activity.description && <div style={{ fontSize: 15, lineHeight: 1.4, margin: "8px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{activity.description}</div>}
+        <div style={{ margin: "10px 0" }}>
+          <FChip tone={q.min && q.confirmed.length >= q.min ? "good" : "soft"}>{q.confirmed.length}{q.min ? ` / ${q.min}` : ""} {q.min ? "confirmés" : "présents"}{q.waiting.length ? ` · ${q.waiting.length} en attente` : ""}</FChip>
+        </div>
+        {isOnRoster && <FootAttendanceButtons myStatus={mine ? mine.status : null} saving={saving} onSet={setMine} compact />}
+        {myPlace && <div style={{ marginTop: 10 }}><FChip tone={myPlace.waiting ? "warn" : "good"}>{myPlace.waiting ? `En liste d'attente · n°${myPlace.rank}` : `Confirmé · n°${myPlace.rank}`}</FChip></div>}
+        <FBtn variant="ghost" size="sm" onClick={() => setShowAll(!showAll)} style={{ marginTop: 10 }}>{showAll ? "Masquer les réponses" : "Voir les réponses"}</FBtn>
+      </FCard>
+      {showAll && <FootPresenceCard roster={presenceRoster} rows={rows} min={activity.min_players} isAdmin={isAdmin} onSetPlayer={setPlayer} />}
+    </div>
+  );
+}
+
+function FootAdminPage({ roster, activities, reload }) {
   return (
     <div className="ft-page">
       <FootCreateMatchForm reload={reload} />
+      <FootCreateActivityForm reload={reload} />
+      <FootActivitiesAdmin activities={activities || []} reload={reload} />
       <FootRosterManager roster={roster} reload={reload} />
     </div>
   );
@@ -954,12 +1174,75 @@ function FootFinishedView({ match, roster, events, lineups, attendance, ratings,
   );
 }
 
+// Answers to a match or an activity: who is in (in order of answer), who waits, who is absent, who has not answered.
+// `onSetPlayer(playerId, "present" | "absent" | null)` lets an admin set or clear anybody's answer.
+function FootPresenceCard({ roster, rows, min, isAdmin, onSetPlayer, emptyText }) {
+  const [editing, setEditing] = React.useState(false);
+  const [busyId, setBusyId] = React.useState(null);
+  const q = computeAttendanceQueue(roster, rows, min);
+  const sections = [["Présents", q.confirmed, "good"], ["Liste d'attente", q.waiting, "warn"], ["Pas de réponse", q.noResponse, "plain"], ["Absents", q.absent, "bad"]];
+  const rankOf = Object.fromEntries(q.order.map((o) => [o.playerId, o.rank]));
+  const statusOf = Object.fromEntries(rows.map((r) => [r.player_id, r.status]));
+  async function set(id, status) {
+    setBusyId(id);
+    try { await onSetPlayer(id, status); } catch (e) { console.warn("presence update failed", e); }
+    setBusyId(null);
+  }
+  const names = [...roster].map((r) => r.player_id).sort((a, b) => footNameOf(a).localeCompare(footNameOf(b)));
+  return (
+    <FCard>
+      <FHeading right={<FChip tone={q.min && q.confirmed.length >= q.min ? "good" : "soft"}>{q.confirmed.length} / {q.min || roster.length}</FChip>}>Présences</FHeading>
+      {roster.length === 0 ? <FEmpty icon="users" title="Effectif vide" text={emptyText || "Ajoute des joueurs à l'effectif dans l'onglet Admin."} /> : (
+        <>
+          {q.min && <div style={{ fontSize: 13, color: FC.muted, marginBottom: 10 }}>Minimum {q.min} joueurs{q.waiting.length ? ` · ${q.waiting.length} en liste d'attente` : ""}. Classés par ordre de réponse.</div>}
+          {sections.map(([label, ids, tone]) => (ids.length > 0 || label === "Présents") && (
+            <div key={label} style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 6 }}><FChip tone={tone}>{label} · {ids.length}</FChip></div>
+              {ids.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {ids.map((id) => (
+                    <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, maxWidth: "100%" }}>
+                      {rankOf[id] && <span style={{ fontFamily: FF.ui, fontSize: 12, color: FC.muted, minWidth: 18, textAlign: "right" }}>{rankOf[id]}.</span>}
+                      <FootPlayerPill id={id} tone="line" dim={tone === "plain"} />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {isAdmin && (
+            <>
+              <FBtn variant="secondary" size="sm" icon="pencil" onClick={() => setEditing(!editing)} style={{ marginTop: 4 }}>{editing ? "Fermer" : "Modifier les présences"}</FBtn>
+              {editing && (
+                <div style={{ marginTop: 10 }}>
+                  {names.map((id) => (
+                    <div key={id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
+                      <FAvatar playerId={id} name={footNameOf(id)} size={30} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{footNameOf(id)}{rankOf[id] ? <span style={{ color: FC.muted, fontSize: 12 }}> · {q.waiting.includes(id) ? "attente " : "n°"}{rankOf[id]}</span> : null}</span>
+                      {[["present", "Présent", "good"], ["absent", "Absent", "bad"], [null, "—", "plain"]].map(([st, lab, tone]) => {
+                        const on = (statusOf[id] || null) === st;
+                        return <button key={lab} disabled={busyId === id} onClick={() => !on && set(id, st)} aria-pressed={on} aria-label={`${footNameOf(id)} : ${st === null ? "pas de réponse" : lab}`}
+                          style={{ border: `1.5px solid ${on ? (tone === "good" ? FC.good : tone === "bad" ? FC.bad : FC.muted) : FC.line}`, background: on ? (tone === "good" ? FC.goodSoft : tone === "bad" ? FC.badSoft : FC.soft) : "transparent", color: on ? (tone === "good" ? FC.good : tone === "bad" ? FC.bad : FC.text) : FC.muted, borderRadius: 12, padding: "6px 9px", fontFamily: FF.ui, fontSize: 12, cursor: "pointer", minWidth: 40 }}>{lab}</button>;
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </FCard>
+  );
+}
+
 function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, canStart, reload, onStartMatch }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
-  const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
+  const queue = computeAttendanceQueue(presenceRoster, matchAttendance, match.min_players);
   const isOnRoster = presenceRoster.some((r) => r.player_id === currentPlayer?.id);
   const myStatus = matchAttendance.find((a) => a.player_id === currentPlayer?.id)?.status || null;
+  const myPlace = queue.order.find((o) => o.playerId === currentPlayer?.id);
   const [saving, setSaving] = React.useState(false);
 
   async function setMyStatus(status) {
@@ -969,7 +1252,7 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
     setSaving(false);
   }
 
-  const groups = [["Présents", buckets.present, "good"], ["Pas de réponse", buckets.noResponse, "plain"], ["Absents", buckets.absent, "bad"]];
+  const setPlayer = async (id, status) => { if (status === null) await clearMatchAttendance(match.id, id); else await setMatchAttendance(match.id, id, status); await reload(); };
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
@@ -980,18 +1263,11 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
         <FCard>
           <FHeading>Ma présence</FHeading>
           <FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={setMyStatus} />
+          {myPlace && <div style={{ marginTop: 10 }}><FChip tone={myPlace.waiting ? "warn" : "good"}>{myPlace.waiting ? `En liste d'attente · n°${myPlace.rank}` : `Confirmé · n°${myPlace.rank}`}</FChip></div>}
         </FCard>
       )}
 
-      <FCard>
-        <FHeading right={<FChip tone="soft">{buckets.present.length} / {presenceRoster.length}</FChip>}>Présences</FHeading>
-        {presenceRoster.length === 0 ? <FEmpty icon="users" title="Effectif vide" text="Ajoute des joueurs à l'effectif dans l'onglet Admin." /> : groups.map(([label, ids, tone]) => (
-          <div key={label} style={{ marginBottom: 12 }}>
-            <div style={{ marginBottom: 6 }}><FChip tone={tone}>{label} · {ids.length}</FChip></div>
-            {ids.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{ids.map((id) => <FootPlayerPill key={id} id={id} tone="line" dim={tone === "plain"} />)}</div>}
-          </div>
-        ))}
-      </FCard>
+      <FootPresenceCard roster={presenceRoster} rows={matchAttendance} min={match.min_players} isAdmin={isAdmin} onSetPlayer={setPlayer} />
 
       {canStart && <FBtn variant="success" size="lg" full icon="play" onClick={onStartMatch}>Commencer le match</FBtn>}
     </div>
@@ -2039,6 +2315,8 @@ function FootballApp({ currentPlayer, onBack }) {
   const [ratings, setRatings] = React.useState([]);
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
+  const [activities, setActivities] = React.useState([]);
+  const [activityAttendance, setActivityAttendance_] = React.useState([]);
 
   const isAdmin = isBureau(currentPlayer);
   const setTheme = (t) => { setThemeState(t); writePref("foot_theme", t); };
@@ -2052,7 +2330,7 @@ function FootballApp({ currentPlayer, onBack }) {
   }, [theme]);
 
   async function reloadFoot() {
-    const [r, m, a, e, l, rt, ph, fr] = await Promise.all([
+    const [r, m, a, e, l, rt, ph, fr, ac, aa] = await Promise.all([
       sbFetch("foot_roster", "?select=*"),
       sbFetch("foot_matches", "?select=*&order=match_datetime"),
       sbFetch("foot_attendance", "?select=*"),
@@ -2061,7 +2339,11 @@ function FootballApp({ currentPlayer, onBack }) {
       sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"),
       sbFetch("foot_player_photos", "?select=*").catch(() => []), // optional: absent until the insta migration is applied
       sbFetch("foot_photo_framings", "?select=*").catch(() => []),
+      sbFetch("foot_activities", "?select=*&order=starts_at").catch(() => []), // optional: absent until the activities migration is applied
+      sbFetch("foot_activity_attendance", "?select=*").catch(() => []),
     ]);
+    setActivities(ac || []);
+    setActivityAttendance_(aa || []);
     setRoster(r || []);
     setMatches(m || []);
     setAttendance(a || []);
@@ -2122,14 +2404,14 @@ function FootballApp({ currentPlayer, onBack }) {
       <FootShell wide={page === "stats" || page === "reseaux"}>
         <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : undefined} />
         {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
-        {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
+        {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} activities={activities} activityAttendance={activityAttendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
         {loaded && detail && (
           <FootMatchDetailPage
             matchId={sub.matchId} matches={matches} roster={roster} attendance={attendance} events={events} lineups={lineups} ratings={ratings}
             currentPlayer={currentPlayer} navBack={() => nav("calendar")} reload={reloadFoot}
           />
         )}
-        {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} reload={reloadFoot} />}
+        {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} activities={activities} reload={reloadFoot} />}
         {loaded && page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
         {loaded && page === "rankings" && <FootRankingsPage />}
         {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}

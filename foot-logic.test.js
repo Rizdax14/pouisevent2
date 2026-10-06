@@ -488,3 +488,28 @@ test("parseFinalNote accepts decimals, comma, empty = auto, rejects out of range
   assert.throws(() => parseFinalNote("0.5"));
   assert.throws(() => parseFinalNote("abc"));
 });
+
+test("computeAttendanceQueue: answers in order, the first `min` confirmed, the rest on the waiting list", () => {
+  const { computeAttendanceQueue } = require("./foot-logic.js");
+  const roster = [1, 2, 3, 4, 5].map((player_id) => ({ player_id }));
+  const rows = [
+    { player_id: 3, status: "present", responded_at: "2026-10-01T10:00:00Z" },
+    { player_id: 1, status: "present", responded_at: "2026-10-01T09:00:00Z" },
+    { player_id: 2, status: "present", responded_at: "2026-10-01T11:00:00Z" },
+    { player_id: 4, status: "absent", responded_at: "2026-10-01T08:00:00Z" },
+    { player_id: 99, status: "present", responded_at: "2026-10-01T07:00:00Z" }, // not in the roster
+  ];
+  const q = computeAttendanceQueue(roster, rows, 2);
+  assert.deepEqual(q.order.map((o) => [o.playerId, o.rank, o.waiting]), [[1, 1, false], [3, 2, false], [2, 3, true]]);
+  assert.deepEqual(q.confirmed, [1, 3]);
+  assert.deepEqual(q.waiting, [2]);
+  assert.deepEqual(q.absent, [4]);
+  assert.deepEqual(q.noResponse, [5]);
+  // no minimum: nobody waits
+  const all = computeAttendanceQueue(roster, rows, null);
+  assert.deepEqual(all.waiting, []);
+  assert.equal(all.min, null);
+  // someone drops out: the waiting player comes in
+  const after = computeAttendanceQueue(roster, rows.map((r) => (r.player_id === 1 ? { ...r, status: "absent" } : r)), 2);
+  assert.deepEqual(after.confirmed, [3, 2]);
+});

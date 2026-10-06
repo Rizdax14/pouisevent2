@@ -11,6 +11,28 @@ async function setMatchAttendance(matchId, playerId, status) {
     onConflict: "match_id,player_id"
   }));
 }
+
+// An admin can clear an answer (back to "no response").
+async function clearMatchAttendance(matchId, playerId) {
+  await sbFetch("foot_attendance", `?match_id=eq.${matchId}&player_id=eq.${playerId}`, {
+    method: "DELETE"
+  });
+}
+async function setActivityAttendance(activityId, playerId, status) {
+  assertUpsertOk(await SUPABASE.from("foot_activity_attendance").upsert({
+    activity_id: activityId,
+    player_id: playerId,
+    status,
+    responded_at: new Date().toISOString()
+  }, {
+    onConflict: "activity_id,player_id"
+  }));
+}
+async function clearActivityAttendance(activityId, playerId) {
+  await sbFetch("foot_activity_attendance", `?activity_id=eq.${activityId}&player_id=eq.${playerId}`, {
+    method: "DELETE"
+  });
+}
 async function addToLineup(matchId, playerIds) {
   if (!playerIds.length) return;
   assertUpsertOk(await SUPABASE.from("foot_lineups").upsert(playerIds.map(player_id => ({
@@ -438,12 +460,14 @@ function FootMatchForm({
     postal_code: "",
     city: "",
     match_type: "championnat",
-    venue: "domicile"
+    venue: "domicile",
+    min_players: "10"
   };
   const start = initial ? {
     ...empty,
     ...initial,
-    match_datetime: toDatetimeLocalValue(initial.match_datetime)
+    match_datetime: toDatetimeLocalValue(initial.match_datetime),
+    min_players: initial.min_players == null ? "" : String(initial.min_players)
   } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
@@ -460,9 +484,19 @@ function FootMatchForm({
       });
       return;
     }
+    const minRaw = String(f.min_players ?? "").trim();
+    const min = minRaw === "" ? null : Number(minRaw);
+    if (min !== null && !(Number.isInteger(min) && min >= 1 && min <= 50)) {
+      setMsg({
+        t: "bad",
+        m: "Le minimum de joueurs doit être un nombre entre 1 et 50 (ou vide)."
+      });
+      return;
+    }
     setSaving(true);
     try {
       await onSubmit({
+        min_players: min,
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
         venue: f.venue === "exterieur" ? "exterieur" : "domicile",
@@ -520,6 +554,21 @@ function FootMatchForm({
       marginBottom: 14
     }
   }), /*#__PURE__*/React.createElement(FField, {
+    label: "Joueurs minimum"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    inputMode: "numeric",
+    placeholder: "Ex. 10 (vide = pas de limite)",
+    value: f.min_players ?? "",
+    onChange: set("min_players"),
+    "aria-label": "Nombre minimum de joueurs"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: FC.muted,
+      margin: "-6px 0 14px"
+    }
+  }, "Au-del\xE0, les joueurs qui r\xE9pondent \xAB pr\xE9sent \xBB passent en liste d'attente, dans l'ordre de leur r\xE9ponse."), /*#__PURE__*/React.createElement(FField, {
     label: "Stade"
   }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
@@ -610,7 +659,9 @@ function FootCreateMatchForm({
 // ---- calendar ---------------------------------------------------------------------------------------------------------------
 function FootPresenceStack({
   ids,
-  total
+  total,
+  min,
+  waiting
 }) {
   const shown = ids.slice(0, 6);
   return /*#__PURE__*/React.createElement("div", {
@@ -645,12 +696,13 @@ function FootPresenceStack({
       fontFamily: FF.ui,
       fontSize: 16
     }
-  }, ids.length), " / ", total, " pr\xE9sents"));
+  }, ids.length), " / ", min || total, " ", min ? "confirmés" : "présents", waiting ? ` · ${waiting} en attente` : ""));
 }
 function FootMatchHero({
   match,
   score,
   presentIds,
+  waitingCount,
   rosterSize,
   onOpen,
   isOnRoster,
@@ -724,7 +776,9 @@ function FootMatchHero({
     match: match
   })), !live && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootPresenceStack, {
     ids: presentIds,
-    total: rosterSize
+    total: rosterSize,
+    min: match.min_players,
+    waiting: waitingCount
   }), isOnRoster && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 14
@@ -837,6 +891,8 @@ function FootCalendarPage({
   events,
   roster,
   attendance,
+  activities,
+  activityAttendance,
   nav,
   currentPlayer,
   reload
@@ -854,7 +910,29 @@ function FootCalendarPage({
     }
     setSavingMatchId(null);
   }
+  const upcomingActivities = (activities || []).filter(a => new Date(a.starts_at).getTime() > Date.now() - 6 * 3600 * 1000).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const activitiesBlock = upcomingActivities.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(FTitle, {
+    size: 20,
+    style: {
+      marginBottom: 10
+    }
+  }, "Activit\xE9s"), upcomingActivities.map(a => /*#__PURE__*/React.createElement(FootActivityCard, {
+    key: a.id,
+    activity: a,
+    roster: roster,
+    rows: (activityAttendance || []).filter(r => r.activity_id === a.id),
+    currentPlayer: currentPlayer,
+    isAdmin: isBureau(currentPlayer),
+    reload: reload
+  })));
   if (matches.length === 0) {
+    if (activitiesBlock) return /*#__PURE__*/React.createElement("div", {
+      className: "ft-page"
+    }, activitiesBlock);
     return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
       icon: "calendar",
       title: "Aucun match",
@@ -890,22 +968,124 @@ function FootCalendarPage({
     match: featured,
     score: scoreOf(featured),
     onOpen: open(featured),
-    presentIds: computeAttendanceBuckets(presenceRoster, heroAttendance).present,
+    presentIds: computeAttendanceQueue(presenceRoster, heroAttendance, featured.min_players).confirmed,
+    waitingCount: computeAttendanceQueue(presenceRoster, heroAttendance, featured.min_players).waiting.length,
     rosterSize: presenceRoster.length,
     isOnRoster: isOnRoster,
     myStatus: heroAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null,
     saving: savingMatchId === featured.id,
     onSetStatus: status => setStatus(featured.id, status)
-  }), section("À venir", upcoming), section("Résultats", past));
+  }), section("À venir", upcoming), activitiesBlock, section("Résultats", past));
 }
 
 // ---- roster & admin -------------------------------------------------------------------------------------------------------------
+// Private details of one player (birth date, phone, e-mail). Stored server-side behind the admin key.
+function FootPlayerDetailsEditor({
+  player,
+  detail,
+  onSaved
+}) {
+  const [f, setF] = React.useState({
+    birth_date: detail && detail.birth_date || "",
+    phone: detail && detail.phone || "",
+    email: detail && detail.email || ""
+  });
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const set = k => e => setF({
+    ...f,
+    [k]: e.target.value
+  });
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await instaAdminFetch("player-details", {
+        player_id: player.id,
+        birth_date: f.birth_date,
+        phone: f.phone,
+        email: f.email
+      });
+      onSaved(r.detail);
+      setMsg({
+        t: "good",
+        m: "Enregistré ✓"
+      });
+    } catch (e) {
+      setMsg({
+        t: "bad",
+        m: e.message
+      });
+    }
+    setBusy(false);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "6px 0 12px 48px"
+    }
+  }, /*#__PURE__*/React.createElement(FField, {
+    label: "Date de naissance"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    type: "date",
+    value: f.birth_date,
+    onChange: set("birth_date"),
+    max: new Date().toISOString().slice(0, 10),
+    "aria-label": "Date de naissance"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "T\xE9l\xE9phone"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    type: "tel",
+    inputMode: "tel",
+    placeholder: "06 12 34 56 78",
+    value: f.phone,
+    onChange: set("phone"),
+    "aria-label": "T\xE9l\xE9phone",
+    autoComplete: "off"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "E-mail"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    type: "email",
+    inputMode: "email",
+    placeholder: "prenom@exemple.fr",
+    value: f.email,
+    onChange: set("email"),
+    "aria-label": "E-mail",
+    autoCapitalize: "off",
+    autoComplete: "off"
+  })), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t
+  }, msg.m), /*#__PURE__*/React.createElement(FBtn, {
+    size: "sm",
+    onClick: save,
+    disabled: busy
+  }, busy ? "…" : "Enregistrer les infos"));
+}
 function FootRosterManager({
   roster,
   reload
 }) {
   const [saving, setSaving] = React.useState(null); // player id currently being saved
   const [search, setSearch] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [addSearch, setAddSearch] = React.useState("");
+  const [addRole, setAddRole] = React.useState("regulier");
+  const [openId, setOpenId] = React.useState(null);
+  const [hasKey, setHasKey] = React.useState(() => !!readInstaKey());
+  const [details, setDetails] = React.useState({});
+  const [detailsErr, setDetailsErr] = React.useState(null);
+  React.useEffect(() => {
+    if (!hasKey) return;
+    instaAdminFetch("player-details", null, "GET").then(r => {
+      setDetails(Object.fromEntries((r.details || []).map(d => [d.player_id, d])));
+      setDetailsErr(null);
+    }).catch(e => {
+      setDetailsErr(e.message);
+      setHasKey(!!readInstaKey());
+    });
+  }, [hasKey]);
   const roleByPlayer = {};
   const numberByPlayer = {};
   roster.forEach(r => {
@@ -953,34 +1133,59 @@ function FootRosterManager({
     setSaving(null);
   }
   const nameOf = p => getDisplayName(p, PLAYERS) || "";
-  // Team members first, then everybody else (to add them).
-  const sortedPlayers = [...PLAYERS].sort((a, b) => (roleByPlayer[b.id] ? 1 : 0) - (roleByPlayer[a.id] ? 1 : 0) || nameOf(a).localeCompare(nameOf(b)));
-  const visiblePlayers = filterPlayersByName(sortedPlayers, search, nameOf);
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
+  const team = PLAYERS.filter(p => roleByPlayer[p.id]).sort(byName);
+  const visibleTeam = filterPlayersByName(team, search, nameOf);
+  const others = PLAYERS.filter(p => !roleByPlayer[p.id]).sort(byName);
+  const visibleOthers = filterPlayersByName(others, addSearch, nameOf);
+  const ageOf = iso => {
+    if (!iso) return null;
+    const d = new Date(iso),
+      n = new Date();
+    let a = n.getFullYear() - d.getFullYear();
+    if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--;
+    return a;
+  };
   return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
     right: /*#__PURE__*/React.createElement(FChip, {
       tone: "soft"
     }, roster.length, " joueurs")
   }, "Effectif"), /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
-    placeholder: "Rechercher un joueur\u2026",
+    placeholder: "Rechercher dans l'effectif\u2026",
     value: search,
     onChange: e => setSearch(e.target.value),
-    "aria-label": "Rechercher un joueur"
-  }), visiblePlayers.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
+    "aria-label": "Rechercher dans l'effectif"
+  }), team.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Effectif vide",
+    text: "Ajoute des joueurs avec le bouton ci-dessous."
+  }), team.length > 0 && visibleTeam.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
     title: "Aucun r\xE9sultat",
-    text: `Aucun joueur ne correspond à « ${search} ».`
-  }), visiblePlayers.map(p => {
-    const inTeam = !!roleByPlayer[p.id];
+    text: `Aucun joueur de l'effectif ne correspond à « ${search} ».`
+  }), detailsErr && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn"
+  }, "Infos personnelles indisponibles (", detailsErr, ")."), !hasKey && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement(FootInstaKeyBox, {
+    onSaved: () => setHasKey(true)
+  })), visibleTeam.map(p => {
+    const d = details[p.id];
+    const open = openId === p.id;
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
+      style: {
+        borderTop: `1px solid ${FC.line}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "8px 0",
-        borderTop: `1px solid ${FC.line}`,
-        opacity: inTeam ? 1 : 0.75
+        padding: "8px 0"
       }
     }, /*#__PURE__*/React.createElement(FAvatar, {
       playerId: p.id,
@@ -989,13 +1194,24 @@ function FootRosterManager({
     }), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
-        minWidth: 0,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
         fontSize: 15,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, nameOf(p)), inTeam && /*#__PURE__*/React.createElement("input", {
+    }, nameOf(p)), d && (d.birth_date || d.phone || d.email) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: FC.muted,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, [d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement("input", {
       key: `${p.id}-${numberByPlayer[p.id] || ""}`,
       defaultValue: numberByPlayer[p.id] || "",
       placeholder: "n\xB0",
@@ -1022,7 +1238,7 @@ function FootRosterManager({
       "aria-label": `Rôle de ${nameOf(p)}`,
       style: {
         ...FOOT_SELECT_STYLE,
-        maxWidth: 138
+        maxWidth: 124
       }
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
@@ -1032,16 +1248,467 @@ function FootRosterManager({
       value: "occasionnel"
     }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
       value: "invite"
-    }, "Invit\xE9")));
+    }, "Invit\xE9")), /*#__PURE__*/React.createElement(FIconBtn, {
+      icon: "user",
+      label: `Infos de ${nameOf(p)}`,
+      tone: open ? "soft" : "ghost",
+      onClick: () => setOpenId(open ? null : p.id)
+    })), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
+      key: `${p.id}-${d ? d.phone : ""}`,
+      player: p,
+      detail: d,
+      onSaved: row => setDetails({
+        ...details,
+        [p.id]: row
+      })
+    }) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: FC.muted,
+        padding: "0 0 12px 48px"
+      }
+    }, "Saisis la cl\xE9 admin ci-dessus pour voir et modifier les infos.")));
+  }), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
+    full: true,
+    icon: "plus",
+    onClick: () => setAdding(!adding),
+    style: {
+      marginTop: 14
+    }
+  }, adding ? "Fermer la liste" : "Ajouter un joueur"), adding && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...FOOT_INPUT_STYLE,
+      marginBottom: 0,
+      flex: 1
+    },
+    placeholder: "Chercher parmi tous les joueurs\u2026",
+    value: addSearch,
+    onChange: e => setAddSearch(e.target.value),
+    "aria-label": "Chercher parmi tous les joueurs"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: addRole,
+    onChange: e => setAddRole(e.target.value),
+    "aria-label": "R\xF4le \xE0 l'ajout",
+    style: {
+      ...FOOT_SELECT_STYLE,
+      maxWidth: 124
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "regulier"
+  }, "R\xE9gulier"), /*#__PURE__*/React.createElement("option", {
+    value: "occasionnel"
+  }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
+    value: "invite"
+  }, "Invit\xE9"))), visibleOthers.length === 0 && /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Aucun joueur",
+    text: addSearch ? `Aucun joueur ne correspond à « ${addSearch} ».` : "Tous les joueurs sont déjà dans l'effectif."
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 360,
+      overflowY: "auto"
+    }
+  }, visibleOthers.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 0",
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: p.id,
+    name: nameOf(p),
+    size: 34
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, nameOf(p)), /*#__PURE__*/React.createElement(FBtn, {
+    size: "sm",
+    icon: "plus",
+    disabled: saving === p.id,
+    onClick: () => setRole(p.id, addRole)
+  }, "Ajouter"))))));
+}
+
+// ---- activities (free events, not matches) ------------------------------------------------------------------------------------
+function FootActivityForm({
+  title,
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  resetOnSuccess
+}) {
+  const empty = {
+    title: "",
+    description: "",
+    starts_at: "",
+    location: "",
+    min_players: ""
+  };
+  const [f, setF] = React.useState(initial ? {
+    ...empty,
+    ...initial,
+    starts_at: toDatetimeLocalValue(initial.starts_at),
+    min_players: initial.min_players == null ? "" : String(initial.min_players),
+    description: initial.description || "",
+    location: initial.location || ""
+  } : empty);
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const set = k => e => setF({
+    ...f,
+    [k]: e.target.value
+  });
+  async function submit() {
+    if (!f.title.trim() || !f.starts_at) {
+      setMsg({
+        t: "bad",
+        m: "Le titre et la date/heure sont obligatoires."
+      });
+      return;
+    }
+    const minRaw = String(f.min_players ?? "").trim();
+    const min = minRaw === "" ? null : Number(minRaw);
+    if (min !== null && !(Number.isInteger(min) && min >= 1 && min <= 200)) {
+      setMsg({
+        t: "bad",
+        m: "Le minimum doit être un nombre entre 1 et 200 (ou vide)."
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSubmit({
+        title: f.title.trim(),
+        description: f.description.trim() || null,
+        starts_at: new Date(f.starts_at).toISOString(),
+        location: f.location.trim() || null,
+        min_players: min
+      });
+      if (resetOnSuccess) setF(empty);
+      setMsg({
+        t: "good",
+        m: "Enregistré ✓"
+      });
+    } catch (e) {
+      setMsg({
+        t: "bad",
+        m: "Erreur : " + e.message
+      });
+    }
+    setSaving(false);
+  }
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, title), /*#__PURE__*/React.createElement(FField, {
+    label: "Titre"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    placeholder: "Ex. Troisi\xE8me mi-temps, entra\xEEnement, resto d'\xE9quipe\u2026",
+    value: f.title,
+    onChange: set("title"),
+    "aria-label": "Titre de l'activit\xE9"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Date et heure"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    type: "datetime-local",
+    value: f.starts_at,
+    onChange: set("starts_at"),
+    "aria-label": "Date et heure"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Lieu"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    placeholder: "O\xF9 \xE7a se passe ?",
+    value: f.location,
+    onChange: set("location"),
+    "aria-label": "Lieu"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "D\xE9tails"
+  }, /*#__PURE__*/React.createElement("textarea", {
+    style: {
+      ...FOOT_INPUT_STYLE,
+      minHeight: 84,
+      resize: "vertical",
+      fontFamily: "inherit"
+    },
+    placeholder: "Programme, infos pratiques, \xE0 apporter\u2026",
+    value: f.description,
+    onChange: set("description"),
+    "aria-label": "D\xE9tails"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Participants minimum"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    inputMode: "numeric",
+    placeholder: "Vide = pas de limite",
+    value: f.min_players,
+    onChange: set("min_players"),
+    "aria-label": "Participants minimum"
+  })), msg && /*#__PURE__*/React.createElement(FMessage, {
+    tone: msg.t
+  }, msg.m), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, onCancel && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    onClick: onCancel,
+    disabled: saving,
+    style: {
+      flex: 1
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
+    onClick: submit,
+    disabled: saving,
+    style: {
+      flex: 1
+    }
+  }, saving ? "Enregistrement…" : submitLabel)));
+}
+function FootCreateActivityForm({
+  reload
+}) {
+  const [open, setOpen] = React.useState(false);
+  if (!open) return /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    size: "lg",
+    variant: "secondary",
+    icon: "plus",
+    onClick: () => setOpen(true),
+    style: {
+      marginBottom: 14
+    }
+  }, "Nouvelle activit\xE9");
+  return /*#__PURE__*/React.createElement(FootActivityForm, {
+    title: "Nouvelle activit\xE9",
+    submitLabel: "Cr\xE9er l'activit\xE9",
+    resetOnSuccess: true,
+    onCancel: () => setOpen(false),
+    onSubmit: async data => {
+      await sbInsert("foot_activities", data);
+      await reload();
+      setOpen(false);
+    }
+  });
+}
+
+// Admin list of the activities: edit or delete.
+function FootActivitiesAdmin({
+  activities,
+  reload
+}) {
+  const [editingId, setEditingId] = React.useState(null);
+  const [busyId, setBusyId] = React.useState(null);
+  if (!activities.length) return null;
+  const sorted = [...activities].sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+  async function remove(a) {
+    if (!window.confirm(`Supprimer l'activité « ${a.title} » et ses réponses ?`)) return;
+    setBusyId(a.id);
+    try {
+      await sbFetch("foot_activities", `?id=eq.${a.id}`, {
+        method: "DELETE"
+      });
+      await reload();
+    } catch (e) {
+      console.warn("delete activity failed", e);
+    }
+    setBusyId(null);
+  }
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, activities.length)
+  }, "Activit\xE9s"), sorted.map(a => editingId === a.id ? /*#__PURE__*/React.createElement(FootActivityForm, {
+    key: a.id,
+    title: "Modifier l'activit\xE9",
+    initial: a,
+    submitLabel: "Enregistrer",
+    onCancel: () => setEditingId(null),
+    onSubmit: async data => {
+      await sbUpdate("foot_activities", {
+        id: a.id
+      }, data);
+      await reload();
+      setEditingId(null);
+    }
+  }) : /*#__PURE__*/React.createElement("div", {
+    key: a.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 0",
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, a.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: FC.muted
+    }
+  }, footDate(a.starts_at), " \xB7 ", footTime(a.starts_at), a.location ? ` · ${a.location}` : "")), /*#__PURE__*/React.createElement(FIconBtn, {
+    icon: "pencil",
+    label: `Modifier ${a.title}`,
+    onClick: () => setEditingId(a.id)
+  }), /*#__PURE__*/React.createElement(FIconBtn, {
+    icon: "trash",
+    label: `Supprimer ${a.title}`,
+    tone: "danger",
+    disabled: busyId === a.id,
+    onClick: () => remove(a)
+  }))));
+}
+
+// An activity on the Matchs page: details, my answer, and everybody's answers.
+function FootActivityCard({
+  activity,
+  roster,
+  rows,
+  currentPlayer,
+  isAdmin,
+  reload
+}) {
+  const [saving, setSaving] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
+  const presenceRoster = attendanceRoster(roster);
+  const isOnRoster = presenceRoster.some(r => r.player_id === currentPlayer?.id);
+  const mine = rows.find(a => a.player_id === currentPlayer?.id);
+  const q = computeAttendanceQueue(presenceRoster, rows, activity.min_players);
+  const myPlace = q.order.find(o => o.playerId === currentPlayer?.id);
+  async function setMine(status) {
+    setSaving(true);
+    try {
+      await setActivityAttendance(activity.id, currentPlayer.id, status);
+      await reload();
+    } catch (e) {
+      console.warn("activity attendance failed", e);
+    }
+    setSaving(false);
+  }
+  const setPlayer = async (id, status) => {
+    if (status === null) await clearActivityAttendance(activity.id, id);else await setActivityAttendance(activity.id, id, status);
+    await reload();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: "accent",
+    icon: "calendar"
+  }, "Activit\xE9"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      color: FC.deep
+    }
+  }, footRelative(activity.starts_at))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 24,
+      lineHeight: 1.15,
+      color: FC.deep,
+      overflowWrap: "anywhere"
+    }
+  }, activity.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: FC.muted,
+      margin: "6px 0"
+    }
+  }, footDate(activity.starts_at), " \xB7 ", footTime(activity.starts_at), activity.location ? ` · ${activity.location}` : ""), activity.description && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      lineHeight: 1.4,
+      margin: "8px 0",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere"
+    }
+  }, activity.description), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "10px 0"
+    }
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: q.min && q.confirmed.length >= q.min ? "good" : "soft"
+  }, q.confirmed.length, q.min ? ` / ${q.min}` : "", " ", q.min ? "confirmés" : "présents", q.waiting.length ? ` · ${q.waiting.length} en attente` : "")), isOnRoster && /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    myStatus: mine ? mine.status : null,
+    saving: saving,
+    onSet: setMine,
+    compact: true
+  }), myPlace && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: myPlace.waiting ? "warn" : "good"
+  }, myPlace.waiting ? `En liste d'attente · n°${myPlace.rank}` : `Confirmé · n°${myPlace.rank}`)), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    size: "sm",
+    onClick: () => setShowAll(!showAll),
+    style: {
+      marginTop: 10
+    }
+  }, showAll ? "Masquer les réponses" : "Voir les réponses")), showAll && /*#__PURE__*/React.createElement(FootPresenceCard, {
+    roster: presenceRoster,
+    rows: rows,
+    min: activity.min_players,
+    isAdmin: isAdmin,
+    onSetPlayer: setPlayer
   }));
 }
 function FootAdminPage({
   roster,
+  activities,
   reload
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "ft-page"
   }, /*#__PURE__*/React.createElement(FootCreateMatchForm, {
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FootCreateActivityForm, {
+    reload: reload
+  }), /*#__PURE__*/React.createElement(FootActivitiesAdmin, {
+    activities: activities || [],
     reload: reload
   }), /*#__PURE__*/React.createElement(FootRosterManager, {
     roster: roster,
@@ -2365,6 +3032,145 @@ function FootFinishedView({
     reload: reload
   }));
 }
+
+// Answers to a match or an activity: who is in (in order of answer), who waits, who is absent, who has not answered.
+// `onSetPlayer(playerId, "present" | "absent" | null)` lets an admin set or clear anybody's answer.
+function FootPresenceCard({
+  roster,
+  rows,
+  min,
+  isAdmin,
+  onSetPlayer,
+  emptyText
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [busyId, setBusyId] = React.useState(null);
+  const q = computeAttendanceQueue(roster, rows, min);
+  const sections = [["Présents", q.confirmed, "good"], ["Liste d'attente", q.waiting, "warn"], ["Pas de réponse", q.noResponse, "plain"], ["Absents", q.absent, "bad"]];
+  const rankOf = Object.fromEntries(q.order.map(o => [o.playerId, o.rank]));
+  const statusOf = Object.fromEntries(rows.map(r => [r.player_id, r.status]));
+  async function set(id, status) {
+    setBusyId(id);
+    try {
+      await onSetPlayer(id, status);
+    } catch (e) {
+      console.warn("presence update failed", e);
+    }
+    setBusyId(null);
+  }
+  const names = [...roster].map(r => r.player_id).sort((a, b) => footNameOf(a).localeCompare(footNameOf(b)));
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: q.min && q.confirmed.length >= q.min ? "good" : "soft"
+    }, q.confirmed.length, " / ", q.min || roster.length)
+  }, "Pr\xE9sences"), roster.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "users",
+    title: "Effectif vide",
+    text: emptyText || "Ajoute des joueurs à l'effectif dans l'onglet Admin."
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, q.min && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 10
+    }
+  }, "Minimum ", q.min, " joueurs", q.waiting.length ? ` · ${q.waiting.length} en liste d'attente` : "", ". Class\xE9s par ordre de r\xE9ponse."), sections.map(([label, ids, tone]) => (ids.length > 0 || label === "Présents") && /*#__PURE__*/React.createElement("div", {
+    key: label,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement(FChip, {
+    tone: tone
+  }, label, " \xB7 ", ids.length)), ids.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, ids.map(id => /*#__PURE__*/React.createElement("span", {
+    key: id,
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      maxWidth: "100%"
+    }
+  }, rankOf[id] && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 12,
+      color: FC.muted,
+      minWidth: 18,
+      textAlign: "right"
+    }
+  }, rankOf[id], "."), /*#__PURE__*/React.createElement(FootPlayerPill, {
+    id: id,
+    tone: "line",
+    dim: tone === "plain"
+  })))))), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "secondary",
+    size: "sm",
+    icon: "pencil",
+    onClick: () => setEditing(!editing),
+    style: {
+      marginTop: 4
+    }
+  }, editing ? "Fermer" : "Modifier les présences"), editing && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, names.map(id => /*#__PURE__*/React.createElement("div", {
+    key: id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "6px 0",
+      borderTop: `1px solid ${FC.line}`
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: footNameOf(id),
+    size: 30
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 15,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, footNameOf(id), rankOf[id] ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.muted,
+      fontSize: 12
+    }
+  }, " \xB7 ", q.waiting.includes(id) ? "attente " : "n°", rankOf[id]) : null), [["present", "Présent", "good"], ["absent", "Absent", "bad"], [null, "—", "plain"]].map(([st, lab, tone]) => {
+    const on = (statusOf[id] || null) === st;
+    return /*#__PURE__*/React.createElement("button", {
+      key: lab,
+      disabled: busyId === id,
+      onClick: () => !on && set(id, st),
+      "aria-pressed": on,
+      "aria-label": `${footNameOf(id)} : ${st === null ? "pas de réponse" : lab}`,
+      style: {
+        border: `1.5px solid ${on ? tone === "good" ? FC.good : tone === "bad" ? FC.bad : FC.muted : FC.line}`,
+        background: on ? tone === "good" ? FC.goodSoft : tone === "bad" ? FC.badSoft : FC.soft : "transparent",
+        color: on ? tone === "good" ? FC.good : tone === "bad" ? FC.bad : FC.text : FC.muted,
+        borderRadius: 12,
+        padding: "6px 9px",
+        fontFamily: FF.ui,
+        fontSize: 12,
+        cursor: "pointer",
+        minWidth: 40
+      }
+    }, lab);
+  })))))));
+}
 function FootScheduledView({
   match,
   roster,
@@ -2378,9 +3184,10 @@ function FootScheduledView({
 }) {
   const matchAttendance = attendance.filter(a => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
-  const buckets = computeAttendanceBuckets(presenceRoster, matchAttendance);
+  const queue = computeAttendanceQueue(presenceRoster, matchAttendance, match.min_players);
   const isOnRoster = presenceRoster.some(r => r.player_id === currentPlayer?.id);
   const myStatus = matchAttendance.find(a => a.player_id === currentPlayer?.id)?.status || null;
+  const myPlace = queue.order.find(o => o.playerId === currentPlayer?.id);
   const [saving, setSaving] = React.useState(false);
   async function setMyStatus(status) {
     setSaving(true);
@@ -2392,7 +3199,10 @@ function FootScheduledView({
     }
     setSaving(false);
   }
-  const groups = [["Présents", buckets.present, "good"], ["Pas de réponse", buckets.noResponse, "plain"], ["Absents", buckets.absent, "bad"]];
+  const setPlayer = async (id, status) => {
+    if (status === null) await clearMatchAttendance(match.id, id);else await setMatchAttendance(match.id, id, status);
+    await reload();
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "ft-page"
   }, /*#__PURE__*/React.createElement(FootScoreboard, {
@@ -2412,37 +3222,19 @@ function FootScheduledView({
     myStatus: myStatus,
     saving: saving,
     onSet: setMyStatus
-  })), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
-    right: /*#__PURE__*/React.createElement(FChip, {
-      tone: "soft"
-    }, buckets.present.length, " / ", presenceRoster.length)
-  }, "Pr\xE9sences"), presenceRoster.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
-    icon: "users",
-    title: "Effectif vide",
-    text: "Ajoute des joueurs \xE0 l'effectif dans l'onglet Admin."
-  }) : groups.map(([label, ids, tone]) => /*#__PURE__*/React.createElement("div", {
-    key: label,
+  }), myPlace && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 6
+      marginTop: 10
     }
   }, /*#__PURE__*/React.createElement(FChip, {
-    tone: tone
-  }, label, " \xB7 ", ids.length)), ids.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 6
-    }
-  }, ids.map(id => /*#__PURE__*/React.createElement(FootPlayerPill, {
-    key: id,
-    id: id,
-    tone: "line",
-    dim: tone === "plain"
-  })))))), canStart && /*#__PURE__*/React.createElement(FBtn, {
+    tone: myPlace.waiting ? "warn" : "good"
+  }, myPlace.waiting ? `En liste d'attente · n°${myPlace.rank}` : `Confirmé · n°${myPlace.rank}`))), /*#__PURE__*/React.createElement(FootPresenceCard, {
+    roster: presenceRoster,
+    rows: matchAttendance,
+    min: match.min_players,
+    isAdmin: isAdmin,
+    onSetPlayer: setPlayer
+  }), canStart && /*#__PURE__*/React.createElement(FBtn, {
     variant: "success",
     size: "lg",
     full: true,
@@ -5140,6 +5932,8 @@ function FootballApp({
   const [ratings, setRatings] = React.useState([]);
   const [photos, setPhotos] = React.useState([]);
   const [framings, setFramings] = React.useState([]);
+  const [activities, setActivities] = React.useState([]);
+  const [activityAttendance, setActivityAttendance_] = React.useState([]);
   const isAdmin = isBureau(currentPlayer);
   const setTheme = t => {
     setThemeState(t);
@@ -5155,9 +5949,13 @@ function FootballApp({
     };
   }, [theme]);
   async function reloadFoot() {
-    const [r, m, a, e, l, rt, ph, fr] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
+    const [r, m, a, e, l, rt, ph, fr, ac, aa] = await Promise.all([sbFetch("foot_roster", "?select=*"), sbFetch("foot_matches", "?select=*&order=match_datetime"), sbFetch("foot_attendance", "?select=*"), sbFetch("foot_match_events", "?select=*"), sbFetch("foot_lineups", "?select=match_id,player_id"), sbFetch("foot_ratings", "?select=match_id,rater_id,ratee_id,score"), sbFetch("foot_player_photos", "?select=*").catch(() => []),
     // optional: absent until the insta migration is applied
-    sbFetch("foot_photo_framings", "?select=*").catch(() => [])]);
+    sbFetch("foot_photo_framings", "?select=*").catch(() => []), sbFetch("foot_activities", "?select=*&order=starts_at").catch(() => []),
+    // optional: absent until the activities migration is applied
+    sbFetch("foot_activity_attendance", "?select=*").catch(() => [])]);
+    setActivities(ac || []);
+    setActivityAttendance_(aa || []);
     setRoster(r || []);
     setMatches(m || []);
     setAttendance(a || []);
@@ -5273,6 +6071,8 @@ function FootballApp({
     events: events,
     roster: roster,
     attendance: attendance,
+    activities: activities,
+    activityAttendance: activityAttendance,
     nav: nav,
     currentPlayer: currentPlayer,
     reload: reloadFoot
@@ -5289,6 +6089,7 @@ function FootballApp({
     reload: reloadFoot
   }), loaded && page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
     roster: roster,
+    activities: activities,
     reload: reloadFoot
   }), loaded && page === "reseaux" && isAdmin && /*#__PURE__*/React.createElement(FootReseauxPage, {
     roster: roster,

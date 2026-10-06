@@ -8,6 +8,26 @@ function computeFootScore(events) {
   return { bl, opponent };
 }
 
+// Presences in order of answer. With a minimum number of players, the first `min` "present" answers are confirmed and the
+// following ones go on a waiting list (they come in automatically if someone drops out). `order` lists every present player.
+function computeAttendanceQueue(roster, attendanceRows, minPlayers) {
+  const ids = new Set(roster.map((r) => r.player_id));
+  const rows = attendanceRows.filter((a) => ids.has(a.player_id));
+  const present = rows.filter((a) => a.status === "present")
+    .sort((a, b) => String(a.responded_at).localeCompare(String(b.responded_at)) || a.player_id - b.player_id);
+  const min = Number.isInteger(minPlayers) && minPlayers > 0 ? minPlayers : null;
+  const order = present.map((a, i) => ({ playerId: a.player_id, rank: i + 1, waiting: min != null && i >= min, respondedAt: a.responded_at }));
+  const answered = new Set(rows.map((a) => a.player_id));
+  return {
+    order,
+    confirmed: order.filter((o) => !o.waiting).map((o) => o.playerId),
+    waiting: order.filter((o) => o.waiting).map((o) => o.playerId),
+    absent: rows.filter((a) => a.status === "absent").map((a) => a.player_id),
+    noResponse: roster.map((r) => r.player_id).filter((id) => !answered.has(id)),
+    min,
+  };
+}
+
 function computeAttendanceBuckets(roster, attendanceRows) {
   const statusByPlayer = {};
   for (const row of attendanceRows) statusByPlayer[row.player_id] = row.status;
@@ -311,6 +331,7 @@ if (typeof module !== "undefined" && module.exports) {
     canStartMatch,
     computeFootScore,
     computeAttendanceBuckets,
+    computeAttendanceQueue,
     computeHalfElapsedSeconds,
     buildEventTimeline,
     nextHalfState,
