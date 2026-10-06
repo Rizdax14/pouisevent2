@@ -57,6 +57,8 @@ function formatMatchPlace(match) {
 const footNameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
 const footDayMs = 86400000;
 function footDate(iso) { return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Paris" }); }
+// "19h" or "18h30" (Paris time)
+function footHour(iso) { const [h, m] = footTime(iso).split(":"); return `${Number(h)}h${m === "00" ? "" : m}`; }
 function footTime(iso) { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }); }
 const FOOT_OUTCOME_TONE = { V: "good", N: "warn", D: "bad" };
 const FOOT_OUTCOME_LABEL = { V: "Victoire", N: "Nul", D: "Défaite" };
@@ -75,8 +77,9 @@ function FootWhenWhere({ match, size = 14 }) {
   const place = formatMatchPlace(match);
   return (
     <div style={{ display: "grid", gap: 5, fontSize: size, color: FC.muted }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)} · {match.meeting_at ? "coup d'envoi " : ""}{footTime(match.match_datetime)}</div>
-      {match.meeting_at && <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="clock" size={16} /><span>Rendez-vous à <b>{footTime(match.meeting_at)}</b></span></div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="clock" size={16} /><span>Heure du match : <b>{footHour(match.match_datetime)}</b></span></div>
+      {match.meeting_at && <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="users" size={16} /><span>Heure de RDV : <b>{footHour(match.meeting_at)}</b></span></div>}
       {place && <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span></div>}
     </div>
   );
@@ -1550,7 +1553,8 @@ function FootStatsPage({ matches, lineups, events, ratings, motmVotes, roster, c
 const FOOT_RANKING_TABS = [
   { key: "goals", label: "Buts", unit: "buts", icon: "ball" },
   { key: "assists", label: "Passe D", unit: "passes", icon: "send" },
-  { key: "rating", label: "Moyennes", unit: "", icon: "star" },
+  { key: "decisive", label: "Décisifs", unit: "", icon: "chart" },
+  { key: "rating", label: "Notes", unit: "", icon: "star" },
   { key: "motm", label: "HDM", unit: "fois", icon: "trophy" },
 ];
 
@@ -1571,7 +1575,7 @@ function FootPodiumSlot({ entry, place, size }) {
 
 // Podium of goals / assists / average rating for the matches given (the Stats page passes its filtered ones).
 function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, motmVotes, roster, currentPlayer, mode = "abs" }) {
-  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating", "motm"]));
+  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "decisive", "rating", "motm"]));
   const pick = (v) => { setTab(v); writePref("foot_rank_tab", v); };
   const ids = new Set(seasonMatches.map((m) => m.id));
   const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
@@ -1596,7 +1600,7 @@ function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, mo
       <FHeading right={<FChip tone="soft">{season === "all" ? "Toutes saisons" : `Saison ${season}`}</FChip>}>{mode === "pct" && tab !== "rating" ? "Classements (par match)" : "Classements"}</FHeading>
       <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 16 }} />
       {entries.length === 0 ? (
-        <FEmpty icon="trophy" title="Pas encore de classement" text={`Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : "passe décisive"} sur cette période.`} />
+        <FEmpty icon="trophy" title="Pas encore de classement" text={`Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : t.key === "decisive" ? "but ni passe décisive" : "passe décisive"} sur cette période.`} />
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: rest.length ? 14 : 0 }}>
@@ -2338,7 +2342,7 @@ function FootReseauxPage({ roster, photos, framings, matches, lineups, events, r
 
 // ---- app shell --------------------------------------------------------------------------------------------------------------------------
 const FOOT_PAGE_TITLES = {
-  calendar: ["Matchs", "Bière Leverculsec"], rankings: ["Classement", null], stats: ["Stats", null], reseaux: ["Réseaux", "Instagram"], admin: ["Admin", "Matchs et effectif"],
+  calendar: ["Calendrier", "Bière Leverculsec"], rankings: ["Classement", null], stats: ["Stats", null], reseaux: ["Réseaux", "Instagram"], admin: ["Admin", "Matchs et effectif"],
 };
 
 // ---- opening screen -------------------------------------------------------------------------------------------------------------------
@@ -2475,7 +2479,7 @@ function FootballApp({ currentPlayer, onBack }) {
   function nav(p, s = {}) { setPage(p); setSub(s); window.scrollTo && window.scrollTo(0, 0); }
 
   const navItems = [
-    { id: "calendar", label: "Matchs", icon: "calendar" },
+    { id: "calendar", label: "Calendrier", icon: "calendar" },
     { id: "rankings", label: "Classement", icon: "trophy" },
     { id: "stats", label: "Stats", icon: "chart" },
     ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone" }, { id: "admin", label: "Admin", icon: "sliders" }] : []),

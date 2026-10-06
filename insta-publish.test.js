@@ -108,7 +108,7 @@ function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail 
       if (method === "DELETE") { db.splice(db.findIndex((r) => r.id === idm), 1); return null; }
       Object.assign(db.find((r) => r.id === idm), body); return [{ ...db.find((r) => r.id === idm) }];
     },
-    async renderImages(t) { log.push("render"); return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3"), Buffer.from("4")] : t.kind === "matchday" ? [Buffer.from("1"), Buffer.from("2")] : [Buffer.from("1")]; },
+    async renderImages(t) { log.push("render"); return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3"), Buffer.from("4"), Buffer.from("5")] : t.kind === "matchday" ? [Buffer.from("1"), Buffer.from("2")] : [Buffer.from("1")]; },
     featuredId: async (t) => { if (featuredFail) throw new Error("db down"); log.push(`featured ${t.player || "auto"}`); return t.player || 21; },
     async uploadImage(p) { log.push("upload " + p); if (uploadFail) throw new Error("storage down"); },
     publicUrl: (p) => `https://pub/${p}`,
@@ -179,14 +179,14 @@ test("a storage failure is a failed post and Instagram is never called", async (
   assert.ok(!w.log.some((l) => l.startsWith("ig ")));
 });
 
-test("rankings publish a 4-image carousel keyed by ISO week", async () => {
+test("rankings publish a 5-image carousel keyed by ISO week", async () => {
   const w = fakeWorld();
   const r = await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W41", season: "2026-2027" }, { data: DATA });
   assert.equal(r.status, "published");
   assert.equal(w.db[0].week_key, "2026-W41");
   assert.equal(w.db[0].match_id, null);
-  assert.equal(w.db[0].image_paths.length, 4);
-  assert.ok(w.log.includes("ig 4 Les classements mis à jour après cette nouvelle semaine de compétition !"));
+  assert.equal(w.db[0].image_paths.length, 5);
+  assert.ok(w.log.includes("ig 5 Les classements mis à jour après cette nouvelle semaine de compétition !"));
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W41", season: "2026-2027" }, { data: DATA })).status, "already_published");
   assert.equal((await w.pub.publishTarget({ kind: "rankings", weekKey: "2026-W42", season: "2026-2027" }, { data: DATA })).status, "published");
 });

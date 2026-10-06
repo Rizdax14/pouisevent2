@@ -81,6 +81,11 @@ function footDate(iso) {
     timeZone: "Europe/Paris"
   });
 }
+// "19h" or "18h30" (Paris time)
+function footHour(iso) {
+  const [h, m] = footTime(iso).split(":");
+  return `${Number(h)}h${m === "00" ? "" : m}`;
+}
 function footTime(iso) {
   return new Date(iso).toLocaleTimeString("fr-FR", {
     hour: "2-digit",
@@ -136,7 +141,7 @@ function FootWhenWhere({
   }, /*#__PURE__*/React.createElement(FIcon, {
     name: "calendar",
     size: 16
-  }), footDate(match.match_datetime), " \xB7 ", match.meeting_at ? "coup d'envoi " : "", footTime(match.match_datetime)), match.meeting_at && /*#__PURE__*/React.createElement("div", {
+  }), footDate(match.match_datetime)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -146,7 +151,17 @@ function FootWhenWhere({
   }, /*#__PURE__*/React.createElement(FIcon, {
     name: "clock",
     size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Rendez-vous \xE0 ", /*#__PURE__*/React.createElement("b", null, footTime(match.meeting_at)))), place && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, "Heure du match : ", /*#__PURE__*/React.createElement("b", null, footHour(match.match_datetime)))), match.meeting_at && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      color: FC.text
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "users",
+    size: 16
+  }), /*#__PURE__*/React.createElement("span", null, "Heure de RDV : ", /*#__PURE__*/React.createElement("b", null, footHour(match.meeting_at)))), place && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "flex-start",
@@ -4041,8 +4056,13 @@ const FOOT_RANKING_TABS = [{
   unit: "passes",
   icon: "send"
 }, {
+  key: "decisive",
+  label: "Décisifs",
+  unit: "",
+  icon: "chart"
+}, {
   key: "rating",
-  label: "Moyennes",
+  label: "Notes",
   unit: "",
   icon: "star"
 }, {
@@ -4131,7 +4151,7 @@ function FootRankingsPanel({
   currentPlayer,
   mode = "abs"
 }) {
-  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "rating", "motm"]));
+  const [tab, setTab] = React.useState(() => readPref("foot_rank_tab", "goals", ["goals", "assists", "decisive", "rating", "motm"]));
   const pick = v => {
     setTab(v);
     writePref("foot_rank_tab", v);
@@ -4174,7 +4194,7 @@ function FootRankingsPanel({
   }), entries.length === 0 ? /*#__PURE__*/React.createElement(FEmpty, {
     icon: "trophy",
     title: "Pas encore de classement",
-    text: `Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : "passe décisive"} sur cette période.`
+    text: `Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : t.key === "decisive" ? "but ni passe décisive" : "passe décisive"} sur cette période.`
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -6108,7 +6128,7 @@ function FootReseauxPage({
 
 // ---- app shell --------------------------------------------------------------------------------------------------------------------------
 const FOOT_PAGE_TITLES = {
-  calendar: ["Matchs", "Bière Leverculsec"],
+  calendar: ["Calendrier", "Bière Leverculsec"],
   rankings: ["Classement", null],
   stats: ["Stats", null],
   reseaux: ["Réseaux", "Instagram"],
@@ -6374,7 +6394,7 @@ function FootballApp({
   }
   const navItems = [{
     id: "calendar",
-    label: "Matchs",
+    label: "Calendrier",
     icon: "calendar"
   }, {
     id: "rankings",

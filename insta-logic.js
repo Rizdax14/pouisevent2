@@ -19,6 +19,7 @@ const PHOTO_KIND_FOR_LAYOUT = { matchday: "celebration", result: "celebration", 
 const RANKING_PAGES = [
   { key: "goals", heading: "BUTS", layout: "podium_celebration" },
   { key: "assists", heading: "PASSE D", layout: "podium_dos" },
+  { key: "decisive", heading: "DÉCISIFS", layout: "podium_dos" }, // buts + passes décisives
   { key: "rating", heading: "MOYENNES", layout: "podium_render" },
   { key: "motm", heading: "HOMMES DU MATCH", layout: "podium_celebration" },
 ];
