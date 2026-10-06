@@ -888,8 +888,8 @@ function FNav({
     }), /*#__PURE__*/React.createElement("span", {
       style: {
         fontFamily: FF.ui,
-        fontSize: 11,
-        letterSpacing: "0.03em",
+        fontSize: "clamp(9px, 2.6vw, 11px)",
+        letterSpacing: 0,
         textTransform: "uppercase",
         maxWidth: "100%",
         overflow: "hidden",
@@ -902,7 +902,7 @@ function FNav({
     "aria-label": "Actualiser la page",
     style: {
       flex: "0 0 auto",
-      width: 52,
+      width: 44,
       border: "none",
       borderRadius: 24,
       padding: "8px 2px 7px",

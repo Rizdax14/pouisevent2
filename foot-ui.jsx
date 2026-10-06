@@ -284,12 +284,12 @@ function FNav({ page, items, onGo }) {
             <button key={it.id} onClick={() => onGo(it.id)} aria-current={on ? "page" : undefined}
               style={{ flex: 1, minWidth: 0, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: on ? FC.accent : "transparent", color: on ? "#fff" : FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer", boxShadow: on ? `0 3px 0 ${FC.deep}` : "none" }}>
               <FIcon name={it.icon} size={21} stroke={on ? 2.4 : 2} />
-              <span style={{ fontFamily: FF.ui, fontSize: 11, letterSpacing: "0.03em", textTransform: "uppercase", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+              <span style={{ fontFamily: FF.ui, fontSize: "clamp(9px, 2.6vw, 11px)", letterSpacing: 0, textTransform: "uppercase", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
             </button>
           );
         })}
         <button onClick={() => window.location.reload()} aria-label="Actualiser la page"
-          style={{ flex: "0 0 auto", width: 52, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: "transparent", color: FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}>
+          style={{ flex: "0 0 auto", width: 44, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: "transparent", color: FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}>
           <FIcon name="refresh" size={21} />
           <span style={{ fontFamily: FF.ui, fontSize: 11, letterSpacing: "0.03em", textTransform: "uppercase" }}>Actu.</span>
         </button>
