@@ -1598,7 +1598,7 @@ function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, mo
   return (
     <FCard>
       <FHeading right={<FChip tone="soft">{season === "all" ? "Toutes saisons" : `Saison ${season}`}</FChip>}>{mode === "pct" && tab !== "rating" ? "Classements (par match)" : "Classements"}</FHeading>
-      <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label, x.icon])} style={{ marginBottom: 16 }} />
+      <FSegmented value={tab} onChange={pick} options={FOOT_RANKING_TABS.map((x) => [x.key, x.label])} style={{ marginBottom: 16 }} />
       {entries.length === 0 ? (
         <FEmpty icon="trophy" title="Pas encore de classement" text={`Aucun joueur n'a encore de ${t.key === "rating" ? "note" : t.key === "goals" ? "but" : t.key === "motm" ? "titre d'homme du match" : t.key === "decisive" ? "but ni passe décisive" : "passe décisive"} sur cette période.`} />
       ) : (

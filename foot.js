@@ -4187,7 +4187,7 @@ function FootRankingsPanel({
   }, mode === "pct" && tab !== "rating" ? "Classements (par match)" : "Classements"), /*#__PURE__*/React.createElement(FSegmented, {
     value: tab,
     onChange: pick,
-    options: FOOT_RANKING_TABS.map(x => [x.key, x.label, x.icon]),
+    options: FOOT_RANKING_TABS.map(x => [x.key, x.label]),
     style: {
       marginBottom: 16
     }
