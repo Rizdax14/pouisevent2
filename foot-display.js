@@ -27,4 +27,23 @@ function playerInitials(name) {
   return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials };
+function _parisToDate(y, m, d, hh, mm) { return (typeof module !== "undefined" && module.exports ? require("./insta-logic.js").parisToDate : parisToDate)(y, m, d, hh, mm); }
+
+// Meeting time ("HH:MM", Paris) on the day of the match → ISO instant. A time later than kick-off means the evening before.
+function meetingIsoFor(matchIso, hhmm) {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm || "").trim());
+  if (!m) return null;
+  const kick = new Date(matchIso);
+  const d = _parisParts(kick);
+  let at = _parisToDate(d.y, d.m, d.d, Number(m[1]), Number(m[2]));
+  if (at > kick) { const prev = new Date(Date.UTC(d.y, d.m - 1, d.d - 1)); at = _parisToDate(prev.getUTCFullYear(), prev.getUTCMonth() + 1, prev.getUTCDate(), Number(m[1]), Number(m[2])); }
+  return at.toISOString();
+}
+// ISO instant → "HH:MM" in Paris ("" when none).
+function meetingTimeValue(iso) {
+  if (!iso) return "";
+  const p = _parisParts(new Date(iso));
+  return `${String(p.hh).padStart(2, "0")}:${String(p.mm).padStart(2, "0")}`;
+}
+
+if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue };

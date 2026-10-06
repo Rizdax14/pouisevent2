@@ -26,7 +26,7 @@ function liveStyle(make) {
   return o;
 }
 
-const FootCtx = React.createContext({ photos: [], framings: [], themeName: "green" });
+const FootCtx = React.createContext({ photos: [], framings: [], themeName: "green", openPlayer: null });
 
 // ---- icons ----------------------------------------------------------------------------------------------
 const FOOT_ICONS = {
@@ -39,6 +39,7 @@ const FOOT_ICONS = {
   sliders: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
   back: "M15 5l-7 7 7 7",
   plus: "M12 5v14M5 12h14",
+  clock: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   user: "M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   pencil: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
@@ -187,8 +188,22 @@ function FSkeleton({ h = 90 }) {
 
 // ---- players ---------------------------------------------------------------------------------------------
 // Round portrait: the "render" photo cropped exactly like the Instagram circle (its saved framing), initials otherwise.
-function FAvatar({ playerId, name, size = 36, ring }) {
+// Tap a name or a portrait to open that player's stats page (when the app provides openPlayer).
+function FPlayerLink({ id, children, style }) {
+  const { openPlayer } = React.useContext(FootCtx);
+  if (!id || !openPlayer) return <span style={style}>{children}</span>;
+  return (
+    <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); openPlayer(id); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openPlayer(id); } }}
+      aria-label={`Voir les stats de ${footNameOf(id)}`} style={{ cursor: "pointer", ...style }}>{children}</span>
+  );
+}
+
+function FAvatar({ playerId, name, size = 36, ring, linkable }) {
   const { photos, framings, themeName } = React.useContext(FootCtx);
+  const inner = FAvatarInner({ playerId, name, size, ring, photos, framings, themeName });
+  return linkable && playerId ? <FPlayerLink id={playerId} style={{ display: "inline-flex", verticalAlign: "middle", flexShrink: 0 }}>{inner}</FPlayerLink> : inner;
+}
+function FAvatarInner({ playerId, name, size, ring, photos, framings, themeName }) {
   const kit = themeName === "pink" ? "exterieur" : "domicile";
   const ph = playerId ? photoOrDefault(photos, playerId, "render", kit) : null;
   const common = { display: "inline-block", verticalAlign: "middle", width: size, height: size, borderRadius: size / 2, flexShrink: 0, overflow: "hidden", position: "relative", background: FC.soft, boxShadow: ring ? `0 0 0 3px ${ring}` : "none" };

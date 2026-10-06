@@ -75,7 +75,8 @@ function FootWhenWhere({ match, size = 14 }) {
   const place = formatMatchPlace(match);
   return (
     <div style={{ display: "grid", gap: 5, fontSize: size, color: FC.muted }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)} · {footTime(match.match_datetime)}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)} · {match.meeting_at ? "coup d'envoi " : ""}{footTime(match.match_datetime)}</div>
+      {match.meeting_at && <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="clock" size={16} /><span>Rendez-vous à <b>{footTime(match.meeting_at)}</b></span></div>}
       {place && <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span></div>}
     </div>
   );
@@ -104,8 +105,10 @@ function presenceMap(attendance, matchId) {
 // A player as a pill: round portrait, name, optional jersey number.
 function FootPlayerPill({ id, number, tone = "soft", dim, status }) {
   const name = footNameOf(id);
+  const { openPlayer } = React.useContext(FootCtx);
+  const open = openPlayer ? { role: "button", tabIndex: 0, onClick: (e) => { e.stopPropagation(); openPlayer(id); }, onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openPlayer(id); } }, "aria-label": `Voir les stats de ${name}` } : {};
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, background: tone === "soft" ? FC.soft : "transparent", border: tone === "soft" ? "none" : `1px solid ${FC.line}`, borderRadius: 999, padding: "4px 12px 4px 4px", fontSize: 14, color: dim ? FC.muted : FC.text, maxWidth: "100%" }}>
+    <span {...open} style={{ cursor: openPlayer ? "pointer" : "inherit", display: "inline-flex", alignItems: "center", gap: 7, background: tone === "soft" ? FC.soft : "transparent", border: tone === "soft" ? "none" : `1px solid ${FC.line}`, borderRadius: 999, padding: "4px 12px 4px 4px", fontSize: 14, color: dim ? FC.muted : FC.text, maxWidth: "100%" }}>
       <FootPresenceAvatar id={id} name={name} size={28} status={status} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
       {number && <span style={{ fontFamily: FF.ui, fontSize: 12, color: FC.deep, background: FC.solid, borderRadius: 999, padding: "1px 7px" }}>{number}</span>}
@@ -190,8 +193,8 @@ function FootLineupSection({ match, roster, lineups, attendance, isAdmin, reload
 
 // ---- match form (create / edit) ----------------------------------------------------------------------------------------
 function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetOnSuccess }) {
-  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile", min_players: "10" };
-  const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime), min_players: initial.min_players == null ? "" : String(initial.min_players) } : empty;
+  const empty = { opponent_name: "", match_datetime: "", stadium_name: "", address: "", postal_code: "", city: "", match_type: "championnat", venue: "domicile", min_players: "10", meeting_time: "" };
+  const start = initial ? { ...empty, ...initial, match_datetime: toDatetimeLocalValue(initial.match_datetime), min_players: initial.min_players == null ? "" : String(initial.min_players), meeting_time: meetingTimeValue(initial.meeting_at) } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
@@ -200,7 +203,7 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
 
   async function submit() {
     if (!f.opponent_name.trim() || !f.match_datetime) {
-      setMsg({ t: "bad", m: "Adversaire et date/heure sont obligatoires." });
+      setMsg({ t: "bad", m: "Adversaire et date/heure du coup d'envoi sont obligatoires." });
       return;
     }
     const minRaw = String(f.min_players ?? "").trim();
@@ -213,6 +216,7 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
     try {
       await onSubmit({
         min_players: min,
+        meeting_at: meetingIsoFor(new Date(f.match_datetime).toISOString(), f.meeting_time),
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
         venue: f.venue === "exterieur" ? "exterieur" : "domicile",
@@ -234,7 +238,8 @@ function FootMatchForm({ title, initial, submitLabel, onSubmit, onCancel, resetO
     <FCard>
       <FHeading>{title}</FHeading>
       <FField label="Équipe adverse"><input style={FOOT_INPUT_STYLE} placeholder="Ex. En Avant Guinguette" value={f.opponent_name} onChange={set("opponent_name")} /></FField>
-      <FField label="Date et heure"><input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.match_datetime} onChange={set("match_datetime")} /></FField>
+      <FField label="Date et heure du coup d'envoi"><input style={FOOT_INPUT_STYLE} type="datetime-local" value={f.match_datetime} onChange={set("match_datetime")} /></FField>
+      <FField label="Heure du rendez-vous (optionnel)"><input style={FOOT_INPUT_STYLE} type="time" value={f.meeting_time || ""} onChange={set("meeting_time")} aria-label="Heure du rendez-vous" /></FField>
       <FLabel>Lieu</FLabel>
       <FSegmented value={f.venue || "domicile"} onChange={(v) => setF({ ...f, venue: v })} options={[["domicile", "Domicile"], ["exterieur", "Extérieur"]]} style={{ marginBottom: 12 }} />
       <FLabel>Type</FLabel>
@@ -760,7 +765,7 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
   const [type, setType] = React.useState(event?.type || "goal_bl");
   const [half, setHalf] = React.useState(String(event?.half ?? defaultHalf ?? 1));
   const [minute, setMinute] = React.useState(String(event?.minute ?? 0));
-  const [playerId, setPlayerId] = React.useState(event?.player_id ? String(event.player_id) : "");
+  const [playerId, setPlayerId] = React.useState(event?.own_goal ? "csc" : event?.player_id ? String(event.player_id) : "");
   const [assistId, setAssistId] = React.useState(event?.assist_player_id ? String(event.assist_player_id) : "");
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState(null);
@@ -790,14 +795,17 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
             <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
               <option value="">— Choisir —</option>
               {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+              <option value="csc">CSC (but contre son camp)</option>
             </select>
           </FField>
-          <FField label="Passe décisive (optionnel)">
-            <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
-              <option value="">— Aucune —</option>
-              {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
-            </select>
-          </FField>
+          {playerId !== "csc" && (
+            <FField label="Passe décisive (optionnel)">
+              <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
+                <option value="">— Aucune —</option>
+                {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+              </select>
+            </FField>
+          )}
         </>
       )}
       {err && <FMessage>{err}</FMessage>}
@@ -845,10 +853,10 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
               <span style={{ display: "block", fontFamily: FF.display, fontSize: 18, color: FC.deep, lineHeight: 1.1 }}>{e.minute}'</span>
               <span style={{ display: "block", fontSize: 11, color: FC.muted }}>{e.half}{e.half === 1 ? "re" : "e"} MT</span>
             </span>
-            {ours ? <FAvatar playerId={e.player_id} name={footNameOf(e.player_id)} size={36} /> : <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.badSoft, color: FC.bad, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FIcon name="ball" size={18} /></span>}
+            {ours && e.own_goal ? <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.accentSoft, color: FC.deep, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.ui, fontSize: 12 }}>CSC</span> : ours ? <FAvatar playerId={e.player_id} name={footNameOf(e.player_id)} size={36} linkable /> : <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.badSoft, color: FC.bad, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FIcon name="ball" size={18} /></span>}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: ours ? FC.text : FC.muted }}>{ours ? footNameOf(e.player_id) : "But adverse"}</div>
-              {ours && e.assist_player_id && <div style={{ fontSize: 13, color: FC.muted }}>Passe de {footNameOf(e.assist_player_id)}</div>}
+              <div style={{ fontSize: 15, fontWeight: 600, color: ours ? FC.text : FC.muted }}>{ours ? (e.own_goal ? "CSC (but contre son camp)" : <FPlayerLink id={e.player_id}>{footNameOf(e.player_id)}</FPlayerLink>) : "But adverse"}</div>
+              {ours && e.assist_player_id && <div style={{ fontSize: 13, color: FC.muted }}>Passe de <FPlayerLink id={e.assist_player_id}>{footNameOf(e.assist_player_id)}</FPlayerLink></div>}
             </div>
             {editable && (
               <span style={{ display: "inline-flex" }}>
@@ -880,9 +888,10 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
         <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
           <option value="">— Choisir —</option>
           {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+          <option value="csc">CSC (but contre son camp)</option>
         </select>
       </FField>
-      {withAssist && (
+      {withAssist && playerId !== "csc" && (
         <FField label="Passe décisive (optionnel)">
           <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
             <option value="">— Aucune —</option>
@@ -892,7 +901,7 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
       )}
       <div style={{ display: "flex", gap: 10 }}>
         <FBtn variant="ghost" onClick={onCancel} style={{ flex: 1 }}>Annuler</FBtn>
-        <FBtn icon="check" onClick={() => can && onConfirm(Number(playerId), assistId ? Number(assistId) : null)} disabled={!can} style={{ flex: 1 }}>Valider</FBtn>
+        <FBtn icon="check" onClick={() => can && onConfirm(playerId === "csc" ? "csc" : Number(playerId), playerId !== "csc" && assistId ? Number(assistId) : null)} disabled={!can} style={{ flex: 1 }}>Valider</FBtn>
       </div>
     </div>
   );
@@ -915,9 +924,11 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
     try {
-      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), { type, player_id: playerId, assist_player_id: assistId }, {
+      const own = playerId === "csc";
+      const scorer = own ? null : playerId;
+      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), { type, player_id: scorer, assist_player_id: assistId }, {
         addToSheet: (ids) => addToLineup(match.id, ids),
-        writeGoal: () => sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute: minutesElapsed, type, player_id: playerId, assist_player_id: assistId }),
+        writeGoal: () => sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute: minutesElapsed, type, player_id: scorer, assist_player_id: assistId, own_goal: own }),
       });
       setPicking(null);
       await reload();
@@ -1071,79 +1082,82 @@ function FootRatingsTab({ match, lineups, ratings, currentPlayer, isAdmin, reloa
       {view.showAverages && ranked.map(({ id, avg }, i) => (
         <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${FC.line}` }}>
           <span style={{ width: 22, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: i < 3 ? FC.deep : FC.muted }}>{i + 1}</span>
-          <FAvatar playerId={id} name={nameOf(id)} size={34} />
+          <FAvatar playerId={id} name={nameOf(id)} size={34} linkable />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(id)}</div>
+            <div style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><FPlayerLink id={id}>{nameOf(id)}</FPlayerLink></div>
             <div style={{ height: 6, borderRadius: 3, background: FC.soft, marginTop: 4 }}><div style={{ width: `${avg == null ? 0 : Math.max(4, (avg / 10) * 100)}%`, height: "100%", borderRadius: 3, background: FC.accent }} /></div>
           </div>
           <span style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, minWidth: 42, textAlign: "right" }}>{avg == null ? "—" : avg.toFixed(1)}</span>
         </div>
       ))}
-      {view.showHiddenMessage && <FMessage tone="warn">Note tes coéquipiers pour voir les moyennes, ou attends la validation par le bureau.</FMessage>}
+      {view.showHiddenMessage && <FMessage tone="warn">{isVoter ? "Note tes coéquipiers pour voir les moyennes, ou attends la validation par le bureau." : "Les notes restent cachées jusqu'à leur validation par le bureau."}</FMessage>}
 
       {!validated && progress.pendingIds.length > 0 && (
         <div style={{ marginTop: 12, fontSize: 13, color: FC.muted }}>Pas encore voté : {progress.pendingIds.map(nameOf).join(" · ")}</div>
       )}
 
       {isAdmin && !validated && <FBtn variant="success" full size="sm" onClick={forceValidate} disabled={busy} style={{ marginTop: 12 }}>Valider les notes</FBtn>}
-      {isAdmin && <FootRatingsAdminPanel match={match} sheetIds={sheetIds} mr={mr} averages={averages} reload={reload} />}
+      {isAdmin && <FootRatingsAdminPanel match={match} sheetIds={sheetIds} reload={reload} />}
     </FCard>
   );
 }
 
-// Bureau only: edit any player's votes and the final note of each player. Nobody else ever sees this table.
-function FootRatingsAdminPanel({ match, sheetIds, mr, averages, reload }) {
+// Bureau only, write-only: an admin can set any player's votes and final notes but never reads what is already there.
+function FootRatingsAdminPanel({ match, sheetIds, reload }) {
   const [open, setOpen] = React.useState(false);
   const [rater, setRater] = React.useState(sheetIds[0]);
   const [scores, setScores] = React.useState({});
   const [finals, setFinals] = React.useState({});
+  const [resets, setResets] = React.useState([]);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
-  const over = match.rating_overrides || {};
-  React.useEffect(() => { setScores(Object.fromEntries(mr.filter((r) => r.rater_id === rater).map((r) => [r.ratee_id, String(r.score)]))); }, [rater, mr.length, open]);
-  React.useEffect(() => { setFinals(Object.fromEntries(sheetIds.map((id) => [id, over[id] != null ? String(over[id]) : ""]))); }, [match.rating_overrides, open]);
-  if (!open) return <FBtn variant="secondary" full size="sm" icon="sliders" onClick={() => setOpen(true)} style={{ marginTop: 10 }}>Tableau des notes (bureau)</FBtn>;
+  const clear = () => { setScores({}); setFinals({}); setResets([]); };
+  React.useEffect(() => { setScores({}); }, [rater, open]);
+  React.useEffect(() => { setFinals({}); setResets([]); }, [open]);
+  if (!open) return <FBtn variant="secondary" full size="sm" icon="sliders" onClick={() => setOpen(true)} style={{ marginTop: 10 }}>Corriger des notes (bureau)</FBtn>;
 
   async function saveVotes() {
     const rows = sheetIds.filter((id) => id !== rater && scores[id] !== undefined && scores[id] !== "").map((id) => ({ match_id: match.id, rater_id: rater, ratee_id: id, score: Number(scores[id]), updated_at: new Date().toISOString() }));
+    if (!rows.length) { setMsg({ t: "error", m: "Choisis au moins une note à enregistrer." }); return; }
     setBusy(true); setMsg(null);
     try {
-      if (rows.length) assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows, { onConflict: "match_id,rater_id,ratee_id" }));
-      await reload(); setMsg({ t: "success", m: "Notes enregistrées ✓" });
+      assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows, { onConflict: "match_id,rater_id,ratee_id" }));
+      await reload(); setScores({}); setMsg({ t: "success", m: `${rows.length} note${rows.length > 1 ? "s" : ""} enregistrée${rows.length > 1 ? "s" : ""} ✓` });
     } catch (e) { setMsg({ t: "error", m: "Erreur : " + e.message }); }
     setBusy(false);
   }
   async function saveFinals() {
-    const next = {};
-    try { for (const id of sheetIds) { const n = parseFinalNote(finals[id]); if (n != null) next[id] = n; } }
+    let next;
+    try { next = mergeFinalNotes(match.rating_overrides, finals, resets); }
     catch (e) { setMsg({ t: "error", m: e.message }); return; }
+    if (!Object.values(finals).some((v) => String(v || "").trim() !== "") && !resets.length) { setMsg({ t: "error", m: "Écris au moins une note finale (ou remets un joueur en auto)." }); return; }
     setBusy(true); setMsg(null);
-    try { await sbUpdate("foot_matches", { id: match.id }, { rating_overrides: next, ratings_validated_at: match.ratings_validated_at || new Date().toISOString() }); await reload(); setMsg({ t: "success", m: "Notes finales enregistrées et validées ✓" }); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { rating_overrides: next, ratings_validated_at: match.ratings_validated_at || new Date().toISOString() }); await reload(); setFinals({}); setResets([]); setMsg({ t: "success", m: "Notes finales enregistrées et validées ✓" }); }
     catch (e) { setMsg({ t: "error", m: "Erreur : " + e.message }); }
     setBusy(false);
   }
   const opts = FOOT_SCORE_OPTIONS.map((x) => <option key={x} value={String(x)}>{x.toFixed(1)}</option>);
   return (
     <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${FC.line}` }}>
-      <FHeading right={<FBtn size="sm" variant="ghost" onClick={() => setOpen(false)}>Fermer</FBtn>}>Tableau des notes</FHeading>
-      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 10 }}>Visible et modifiable uniquement par le bureau.</div>
+      <FHeading right={<FBtn size="sm" variant="ghost" onClick={() => { clear(); setOpen(false); }}>Fermer</FBtn>}>Corriger des notes</FHeading>
+      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 10, lineHeight: 1.4 }}>Tu peux modifier des notes sans jamais voir celles déjà enregistrées. Seules les cases remplies sont écrasées.</div>
       <FField label="Notes données par">
         <select value={rater} onChange={(e) => setRater(Number(e.target.value))} style={FOOT_SELECT_STYLE}>{sheetIds.map((id) => <option key={id} value={id}>{footNameOf(id)}</option>)}</select>
       </FField>
       {sheetIds.filter((id) => id !== rater).map((id) => (
         <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
           <span style={{ flex: 1, fontSize: 15 }}>{footNameOf(id)}</span>
-          <select value={scores[id] ?? ""} disabled={busy} onChange={(e) => setScores({ ...scores, [id]: e.target.value })} style={{ ...FOOT_SELECT_STYLE, minWidth: 82 }}><option value="">—</option>{opts}</select>
+          <select value={scores[id] ?? ""} disabled={busy} onChange={(e) => setScores({ ...scores, [id]: e.target.value })} aria-label={`Nouvelle note de ${footNameOf(rater)} pour ${footNameOf(id)}`} style={{ ...FOOT_SELECT_STYLE, minWidth: 96 }}><option value="">Inchangée</option>{opts}</select>
         </div>
       ))}
       <FBtn full size="sm" onClick={saveVotes} disabled={busy} style={{ margin: "10px 0 16px" }}>Enregistrer les notes de {footNameOf(rater)}</FBtn>
       <div style={{ fontFamily: FF.ui, fontSize: 16, marginBottom: 4 }}>Note finale par joueur</div>
-      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>Écris la note (ex : 6.1). Vide = moyenne des votes. Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit.</div>
+      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6, lineHeight: 1.4 }}>Écris la note (ex : 6.1) ou remets « auto » (moyenne des votes). Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit.</div>
       {sheetIds.map((id) => (
-        <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
+        <div key={id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${FC.line}` }}>
           <span style={{ flex: 1, fontSize: 15 }}>{footNameOf(id)}</span>
-          <span style={{ fontSize: 12, color: FC.muted }}>{averages[id] == null ? "—" : averages[id].toFixed(1)}</span>
-          <input type="text" inputMode="decimal" placeholder="Auto" value={finals[id] ?? ""} disabled={busy} onChange={(e) => setFinals({ ...finals, [id]: e.target.value })} aria-label={`Note finale de ${footNameOf(id)}`} style={{ ...FOOT_INPUT_STYLE, width: 82, textAlign: "center" }} />
+          <button disabled={busy} onClick={() => { setResets(resets.includes(id) ? resets.filter((x) => x !== id) : [...resets, id]); setFinals({ ...finals, [id]: "" }); }} aria-pressed={resets.includes(id)} style={{ border: `1.5px solid ${resets.includes(id) ? FC.accent : FC.line}`, background: resets.includes(id) ? FC.accentSoft : "transparent", color: resets.includes(id) ? FC.deep : FC.muted, borderRadius: 12, padding: "6px 9px", fontFamily: FF.ui, fontSize: 12, cursor: "pointer" }}>Auto</button>
+          <input type="text" inputMode="decimal" placeholder="Inchangée" value={finals[id] ?? ""} disabled={busy || resets.includes(id)} onChange={(e) => setFinals({ ...finals, [id]: e.target.value })} aria-label={`Note finale de ${footNameOf(id)}`} style={{ ...FOOT_INPUT_STYLE, width: 96, textAlign: "center" }} />
         </div>
       ))}
       <FBtn full size="sm" onClick={saveFinals} disabled={busy} style={{ marginTop: 10 }}>Enregistrer et valider les notes finales</FBtn>
@@ -1281,8 +1295,23 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   const [startingConfig, setStartingConfig] = React.useState(false);
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [resetting, setResetting] = React.useState(false);
 
   if (!match) return <FCard><FEmpty icon="calendar" title="Match introuvable" action={<FBtn onClick={navBack}>Retour aux matchs</FBtn>} /></FCard>;
+
+  const canReset = isBureau(currentPlayer) && match.status !== "scheduled";
+  async function resetMatch() {
+    if (!window.confirm(`Remettre le match contre ${match.opponent_name} à « pas joué » ?\n\nLes buts, le chrono et les notes seront supprimés. La convocation et les présences sont conservées.`)) return;
+    setResetting(true);
+    try {
+      await sbFetch("foot_match_events", `?match_id=eq.${match.id}`, { method: "DELETE" });
+      await sbFetch("foot_ratings", `?match_id=eq.${match.id}`, { method: "DELETE" });
+      await sbUpdate("foot_matches", { id: match.id }, { status: "scheduled", nb_halves: null, half_duration_min: null, current_half: null, half_started_at: null, half_elapsed_seconds: 0, started_by: null, ratings_validated_at: null, rating_overrides: {} });
+      setStartingConfig(false);
+      await reload();
+    } catch (e) { console.warn("reset match failed", e); window.alert("Impossible de remettre le match à zéro : " + e.message); }
+    setResetting(false);
+  }
 
   async function deleteMatch() {
     if (!window.confirm(`Supprimer définitivement le match contre ${match.opponent_name} ? Les buts et présences associés seront aussi supprimés.`)) return;
@@ -1318,6 +1347,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
           )}
         </>
       )}
+      {canReset && <FBtn variant="ghost" full icon="refresh" onClick={resetMatch} disabled={resetting} style={{ marginTop: 10, color: FC.bad, borderColor: withAlpha(FC.bad, 0.4), background: "rgba(255,255,255,0.9)" }}>{resetting ? "Remise à zéro…" : "Remettre le match à « pas joué »"}</FBtn>}
     </div>
   );
 }
@@ -1387,7 +1417,9 @@ function FootRatingChart({ series }) {
   );
 }
 
-function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlayer }) {
+function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlayer, subjectId }) {
+  const isOther = !!subjectId && subjectId !== currentPlayer?.id;
+  const subject = subjectId || currentPlayer?.id;
   const currentSeason = seasonOf(new Date().toISOString());
   const [mode, setModeState] = React.useState(() => readPref("foot_stats_mode", "abs", ["abs", "pct"]));
   const [season, setSeasonState] = React.useState(() => readPref("foot_stats_season", currentSeason));
@@ -1404,8 +1436,9 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
   const pool = rows.filter((r) => r.played > 0);
   const ratingPool = rows.filter((r) => r.rating != null);
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map((c) => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
-  const me = rows.find((r) => r.playerId === currentPlayer?.id);
-  const series = currentPlayer ? playerRatingSeries(filtered, ratings, lineups, currentPlayer.id).slice(-10) : [];
+  // A player outside the regular roster (guest…) still has a page; he is just not ranked.
+  const me = rows.find((r) => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events), { [subject]: averageRating(playerRatingSeries(filtered, ratings, lineups, subject)) })[0] : null);
+  const series = subject ? playerRatingSeries(filtered, ratings, lineups, subject).slice(-10) : [];
   const nameOf = footNameOf;
 
   function tilesFor(keys) {
@@ -1437,13 +1470,14 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
       </FCard>
 
       {!me && <FMessage tone="warn">Les statistiques concernent l'effectif régulier et occasionnel.</FMessage>}
+      {me && !population.includes(subject) && <FMessage tone="warn">Joueur hors effectif régulier : pas de classement.</FMessage>}
       {me && me.played === 0 && <FMessage tone="warn">Pas encore de match terminé avec une convocation.</FMessage>}
 
       <FCard>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <FAvatar playerId={currentPlayer?.id} name={currentPlayer?.name || footNameOf(currentPlayer?.id)} size={56} />
+          <FAvatar playerId={subject} name={footNameOf(subject)} size={56} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, lineHeight: 1.15 }}>Mes stats</div>
+            <div style={{ fontFamily: FF.display, fontSize: 22, color: FC.deep, lineHeight: 1.15 }}>{isOther ? `Stats de ${footNameOf(subject)}` : "Mes stats"}</div>
             <div style={{ fontSize: 14, color: FC.muted }}>{season === "all" ? "Toutes saisons" : `Saison ${season}`}</div>
           </div>
         </div>
@@ -1454,11 +1488,11 @@ function FootStatsPage({ matches, lineups, events, ratings, roster, currentPlaye
       </FCard>
 
       <FCard>
-        <FHeading>Mon évolution</FHeading>
+        <FHeading>{isOther ? "Évolution" : "Mon évolution"}</FHeading>
         <FootRatingChart series={series} />
       </FCard>
 
-      <FootRankingsPanel seasonMatches={filtered} season={season} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} mode={mode} />
+      {!isOther && <FootRankingsPanel seasonMatches={filtered} season={season} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} mode={mode} />}
     </div>
   );
 }
@@ -1475,10 +1509,10 @@ function FootPodiumSlot({ entry, place, size }) {
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: "center", marginTop: first ? 0 : 26 }}>
       <div style={{ position: "relative", display: "inline-block", marginBottom: 8 }}>
-        <FAvatar playerId={entry.playerId} name={entry.name} size={size} ring={first ? FC.accent : FC.line} />
+        <FAvatar playerId={entry.playerId} name={entry.name} size={size} ring={first ? FC.accent : FC.line} linkable />
         <span style={{ position: "absolute", left: -6, top: -6, width: 28, height: 28, borderRadius: 14, background: FC.accent, color: "#fff", border: "3px solid #fff", fontFamily: FF.display, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{place}</span>
       </div>
-      <div style={{ fontFamily: FF.ui, fontSize: first ? 18 : 16, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
+      <div style={{ fontFamily: FF.ui, fontSize: first ? 18 : 16, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><FPlayerLink id={entry.playerId}>{entry.name}</FPlayerLink></div>
       <div style={{ fontFamily: FF.display, fontSize: first ? 30 : 24, color: FC.deep, lineHeight: 1.2 }}>{entry.shown}</div>
       <div style={{ fontSize: 12, color: FC.muted }}>{entry.matches} match{entry.matches > 1 ? "s" : ""}</div>
     </div>
@@ -1521,8 +1555,8 @@ function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, ro
           {rest.map((e, i) => (
             <div key={e.playerId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px", marginInline: -8, borderTop: `1px solid ${FC.line}`, borderRadius: 12, background: e.playerId === currentPlayer?.id ? FC.accentSoft : "transparent" }}>
               <span style={{ width: 24, textAlign: "center", fontFamily: FF.display, fontSize: 16, color: FC.muted }}>{i + 4}</span>
-              <FAvatar playerId={e.playerId} name={e.name} size={34} />
-              <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
+              <FAvatar playerId={e.playerId} name={e.name} size={34} linkable />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><FPlayerLink id={e.playerId}>{e.name}</FPlayerLink></span>
               <span style={{ fontSize: 12, color: FC.muted }}>{e.matches} m.</span>
               <span style={{ fontFamily: FF.display, fontSize: 20, color: FC.deep, minWidth: 36, textAlign: "right" }}>{e.shown}</span>
             </div>
@@ -2394,15 +2428,18 @@ function FootballApp({ currentPlayer, onBack }) {
     ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone" }, { id: "admin", label: "Admin", icon: "sliders" }] : []),
   ];
   const detail = page === "matchDetail";
+  const playerPage = page === "player";
+  const openPlayer = (id) => nav("player", { playerId: id, from: { page: playerPage ? sub.from.page : page, sub: playerPage ? sub.from.sub : sub } });
+  const backFromPlayer = () => nav(sub.from ? sub.from.page : "stats", sub.from ? sub.from.sub : {});
   const openMatch = detail ? matches.find((m) => m.id === sub.matchId) : null;
-  const [title, subtitle] = detail
+  const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : detail
     ? [openMatch ? { scheduled: "Match", live: "En direct", finished: "Résultat" }[openMatch.status] : "Match", openMatch ? `vs ${openMatch.opponent_name}` : null]
     : FOOT_PAGE_TITLES[page] || ["Foot", null];
 
   return (
-    <FootCtx.Provider value={{ photos, framings, themeName: theme }}>
-      <FootShell wide={page === "stats" || page === "reseaux"}>
-        <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : undefined} />
+    <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
+      <FootShell wide={page === "stats" || page === "reseaux" || playerPage}>
+        <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined} />
         {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
         {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} activities={activities} activityAttendance={activityAttendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
         {loaded && detail && (
@@ -2415,8 +2452,9 @@ function FootballApp({ currentPlayer, onBack }) {
         {loaded && page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
         {loaded && page === "rankings" && <FootRankingsPage />}
         {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} />}
+        {loaded && playerPage && <FootStatsPage key={sub.playerId} matches={matches} lineups={lineups} events={events} ratings={ratings} roster={roster} currentPlayer={currentPlayer} subjectId={sub.playerId} />}
       </FootShell>
-      <FNav page={detail ? "calendar" : page} items={navItems} onGo={nav} />
+      <FNav page={detail ? "calendar" : playerPage ? "stats" : page} items={navItems} onGo={nav} />
       {splashOn && <FootSplash steps={steps} leaving={leaving} theme={theme} />}
     </FootCtx.Provider>
   );

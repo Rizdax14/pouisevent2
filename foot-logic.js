@@ -97,11 +97,13 @@ function buildEventPayload({ type, half, minute, playerId, assistId }) {
   if (!Number.isInteger(h) || h < 1) throw new Error("Mi-temps invalide");
   if (!Number.isInteger(m) || m < 0) throw new Error("Minute invalide");
   if (type === "goal_opponent") {
-    return { type, half: h, minute: m, player_id: null, assist_player_id: null };
+    return { type, half: h, minute: m, player_id: null, assist_player_id: null, own_goal: false };
   }
   if (!playerId) throw new Error("Choisis un buteur");
+  // Own goal (CSC): a goal for us with no scorer of ours.
+  if (playerId === "csc") return { type: "goal_bl", half: h, minute: m, player_id: null, assist_player_id: null, own_goal: true };
   if (assistId && String(assistId) === String(playerId)) throw new Error("Le buteur ne peut pas faire la passe décisive");
-  return { type: "goal_bl", half: h, minute: m, player_id: Number(playerId), assist_player_id: assistId ? Number(assistId) : null };
+  return { type: "goal_bl", half: h, minute: m, player_id: Number(playerId), assist_player_id: assistId ? Number(assistId) : null, own_goal: false };
 }
 
 const STAT_KEYS_PCT_OF_PLAYED = ["wins", "draws", "losses"];
@@ -236,6 +238,15 @@ function parseFinalNote(raw) {
   return Math.round(n * 10) / 10;
 }
 
+// Final notes are write-only for admins: what they type is merged over the notes already set (which they never see);
+// an id in `resetIds` goes back to the automatic average.
+function mergeFinalNotes(existing, typed, resetIds) {
+  const out = { ...(existing || {}) };
+  for (const [id, raw] of Object.entries(typed || {})) { const n = parseFinalNote(raw); if (n != null) out[id] = n; }
+  for (const id of resetIds || []) delete out[id];
+  return out;
+}
+
 function playerRatingSeries(matches, ratings, lineups, playerId) {
   const series = [];
   for (const m of matches) {
@@ -294,7 +305,7 @@ async function submitRatings({ isValidated, writeRatings }) {
 
 function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   const showForm = editing && isVoter && !validated;
-  const showAverages = !showForm && (validated || isAdmin || (isVoter && hasVoted));
+  const showAverages = !showForm && (validated || (isVoter && hasVoted));
   return {
     showForm,
     showAverages,
@@ -357,6 +368,7 @@ if (typeof module !== "undefined" && module.exports) {
     matchAverages,
     finalAverages,
     parseFinalNote,
+    mergeFinalNotes,
     playerRatingSeries,
     averageRating,
     buildRatingPayload,

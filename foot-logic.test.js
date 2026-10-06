@@ -164,14 +164,21 @@ test("toDatetimeLocalValue returns an empty string for a missing value", () => {
 test("buildEventPayload keeps scorer and assist for a BL goal", () => {
   assert.deepEqual(
     buildEventPayload({ type: "goal_bl", half: "2", minute: "17", playerId: "4", assistId: "9" }),
-    { type: "goal_bl", half: 2, minute: 17, player_id: 4, assist_player_id: 9 }
+    { type: "goal_bl", half: 2, minute: 17, player_id: 4, assist_player_id: 9, own_goal: false }
+  );
+});
+
+test("buildEventPayload: CSC is a goal for us with no scorer and no assist", () => {
+  assert.deepEqual(
+    buildEventPayload({ type: "goal_bl", half: "1", minute: "9", playerId: "csc", assistId: "4" }),
+    { type: "goal_bl", half: 1, minute: 9, player_id: null, assist_player_id: null, own_goal: true }
   );
 });
 
 test("buildEventPayload clears scorer and assist for an opponent goal", () => {
   assert.deepEqual(
     buildEventPayload({ type: "goal_opponent", half: "1", minute: "3", playerId: "4", assistId: "9" }),
-    { type: "goal_opponent", half: 1, minute: 3, player_id: null, assist_player_id: null }
+    { type: "goal_opponent", half: 1, minute: 3, player_id: null, assist_player_id: null, own_goal: false }
   );
 });
 
@@ -470,12 +477,20 @@ test("permissions : bureau, démarrage et édition d'un match", () => {
   assert.equal(L.canEditMatch({ status: "scheduled" }, membre), false);
 });
 
-test("ratingsTabView: before validation only voters (and admins) see the tables; once validated, everyone", () => {
+test("ratingsTabView: tables only for voters who voted, or everyone once validated (admins get no special view)", () => {
   assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
   assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: false, editing: false, isAdmin: false }).showAverages, false);
   assert.equal(ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: false }).showAverages, true);
-  assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: true }).showAverages, true);
+  assert.equal(ratingsTabView({ validated: false, isVoter: false, hasVoted: false, editing: false, isAdmin: true }).showAverages, false);
   assert.equal(ratingsTabView({ validated: true, isVoter: false, hasVoted: false, editing: false, isAdmin: false }).showAverages, true);
+});
+
+test("mergeFinalNotes: typed notes overwrite, the rest is kept, resets go back to auto", () => {
+  const { mergeFinalNotes } = require("./foot-logic.js");
+  assert.deepEqual(mergeFinalNotes({ 1: 7, 2: 5 }, { 1: "8,5", 3: "" }, []), { 1: 8.5, 2: 5 });
+  assert.deepEqual(mergeFinalNotes({ 1: 7, 2: 5 }, {}, [2]), { 1: 7 });
+  assert.deepEqual(mergeFinalNotes(null, { 4: "6.1" }, []), { 4: 6.1 });
+  assert.throws(() => mergeFinalNotes({}, { 1: "12" }, []));
 });
 
 test("parseFinalNote accepts decimals, comma, empty = auto, rejects out of range", () => {

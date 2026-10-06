@@ -52,7 +52,8 @@ function liveStyle(make) {
 const FootCtx = React.createContext({
   photos: [],
   framings: [],
-  themeName: "green"
+  themeName: "green",
+  openPlayer: null
 });
 
 // ---- icons ----------------------------------------------------------------------------------------------
@@ -66,6 +67,7 @@ const FOOT_ICONS = {
   sliders: "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4",
   back: "M15 5l-7 7 7 7",
   plus: "M12 5v14M5 12h14",
+  clock: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   user: "M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   pencil: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
@@ -563,17 +565,78 @@ function FSkeleton({
 
 // ---- players ---------------------------------------------------------------------------------------------
 // Round portrait: the "render" photo cropped exactly like the Instagram circle (its saved framing), initials otherwise.
+// Tap a name or a portrait to open that player's stats page (when the app provides openPlayer).
+function FPlayerLink({
+  id,
+  children,
+  style
+}) {
+  const {
+    openPlayer
+  } = React.useContext(FootCtx);
+  if (!id || !openPlayer) return /*#__PURE__*/React.createElement("span", {
+    style: style
+  }, children);
+  return /*#__PURE__*/React.createElement("span", {
+    role: "button",
+    tabIndex: 0,
+    onClick: e => {
+      e.stopPropagation();
+      openPlayer(id);
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        openPlayer(id);
+      }
+    },
+    "aria-label": `Voir les stats de ${footNameOf(id)}`,
+    style: {
+      cursor: "pointer",
+      ...style
+    }
+  }, children);
+}
 function FAvatar({
   playerId,
   name,
   size = 36,
-  ring
+  ring,
+  linkable
 }) {
   const {
     photos,
     framings,
     themeName
   } = React.useContext(FootCtx);
+  const inner = FAvatarInner({
+    playerId,
+    name,
+    size,
+    ring,
+    photos,
+    framings,
+    themeName
+  });
+  return linkable && playerId ? /*#__PURE__*/React.createElement(FPlayerLink, {
+    id: playerId,
+    style: {
+      display: "inline-flex",
+      verticalAlign: "middle",
+      flexShrink: 0
+    }
+  }, inner) : inner;
+}
+function FAvatarInner({
+  playerId,
+  name,
+  size,
+  ring,
+  photos,
+  framings,
+  themeName
+}) {
   const kit = themeName === "pink" ? "exterieur" : "domicile";
   const ph = playerId ? photoOrDefault(photos, playerId, "render", kit) : null;
   const common = {

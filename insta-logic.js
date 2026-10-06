@@ -164,7 +164,7 @@ function goalRows(events, players) {
   const nameOf = (id) => postName(players.find((p) => p.id === id), players);
   return events.filter((e) => e.type === "goal_bl")
     .sort((a, b) => a.half - b.half || a.minute - b.minute)
-    .map((e) => ({ minute: e.minute, scorer: nameOf(e.player_id), assist: e.assist_player_id ? nameOf(e.assist_player_id) : null }));
+    .map((e) => ({ minute: e.minute, scorer: e.own_goal ? "CSC" : nameOf(e.player_id), assist: e.assist_player_id ? nameOf(e.assist_player_id) : null }));
 }
 
 function goalLines(events, players) {

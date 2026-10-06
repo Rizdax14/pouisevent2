@@ -1,3 +1,4 @@
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 // foot.jsx — screens of the football app (design system: foot-ui.jsx, tokens: foot-theme.js)
 
 // ---- data helpers ------------------------------------------------------------------------------------------
@@ -135,7 +136,17 @@ function FootWhenWhere({
   }, /*#__PURE__*/React.createElement(FIcon, {
     name: "calendar",
     size: 16
-  }), footDate(match.match_datetime), " \xB7 ", footTime(match.match_datetime)), place && /*#__PURE__*/React.createElement("div", {
+  }), footDate(match.match_datetime), " \xB7 ", match.meeting_at ? "coup d'envoi " : "", footTime(match.match_datetime)), match.meeting_at && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      color: FC.text
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "clock",
+    size: 16
+  }), /*#__PURE__*/React.createElement("span", null, "Rendez-vous \xE0 ", /*#__PURE__*/React.createElement("b", null, footTime(match.meeting_at)))), place && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "flex-start",
@@ -212,8 +223,28 @@ function FootPlayerPill({
   status
 }) {
   const name = footNameOf(id);
-  return /*#__PURE__*/React.createElement("span", {
+  const {
+    openPlayer
+  } = React.useContext(FootCtx);
+  const open = openPlayer ? {
+    role: "button",
+    tabIndex: 0,
+    onClick: e => {
+      e.stopPropagation();
+      openPlayer(id);
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        openPlayer(id);
+      }
+    },
+    "aria-label": `Voir les stats de ${name}`
+  } : {};
+  return /*#__PURE__*/React.createElement("span", _extends({}, open, {
     style: {
+      cursor: openPlayer ? "pointer" : "inherit",
       display: "inline-flex",
       alignItems: "center",
       gap: 7,
@@ -225,7 +256,7 @@ function FootPlayerPill({
       color: dim ? FC.muted : FC.text,
       maxWidth: "100%"
     }
-  }, /*#__PURE__*/React.createElement(FootPresenceAvatar, {
+  }), /*#__PURE__*/React.createElement(FootPresenceAvatar, {
     id: id,
     name: name,
     size: 28,
@@ -461,13 +492,15 @@ function FootMatchForm({
     city: "",
     match_type: "championnat",
     venue: "domicile",
-    min_players: "10"
+    min_players: "10",
+    meeting_time: ""
   };
   const start = initial ? {
     ...empty,
     ...initial,
     match_datetime: toDatetimeLocalValue(initial.match_datetime),
-    min_players: initial.min_players == null ? "" : String(initial.min_players)
+    min_players: initial.min_players == null ? "" : String(initial.min_players),
+    meeting_time: meetingTimeValue(initial.meeting_at)
   } : empty;
   const [f, setF] = React.useState(start);
   const [saving, setSaving] = React.useState(false);
@@ -480,7 +513,7 @@ function FootMatchForm({
     if (!f.opponent_name.trim() || !f.match_datetime) {
       setMsg({
         t: "bad",
-        m: "Adversaire et date/heure sont obligatoires."
+        m: "Adversaire et date/heure du coup d'envoi sont obligatoires."
       });
       return;
     }
@@ -497,6 +530,7 @@ function FootMatchForm({
     try {
       await onSubmit({
         min_players: min,
+        meeting_at: meetingIsoFor(new Date(f.match_datetime).toISOString(), f.meeting_time),
         opponent_name: f.opponent_name.trim(),
         match_type: f.match_type || "championnat",
         venue: f.venue === "exterieur" ? "exterieur" : "domicile",
@@ -527,12 +561,20 @@ function FootMatchForm({
     value: f.opponent_name,
     onChange: set("opponent_name")
   })), /*#__PURE__*/React.createElement(FField, {
-    label: "Date et heure"
+    label: "Date et heure du coup d'envoi"
   }, /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     type: "datetime-local",
     value: f.match_datetime,
     onChange: set("match_datetime")
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Heure du rendez-vous (optionnel)"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    type: "time",
+    value: f.meeting_time || "",
+    onChange: set("meeting_time"),
+    "aria-label": "Heure du rendez-vous"
   })), /*#__PURE__*/React.createElement(FLabel, null, "Lieu"), /*#__PURE__*/React.createElement(FSegmented, {
     value: f.venue || "domicile",
     onChange: v => setF({
@@ -1978,7 +2020,7 @@ function FootEventEditor({
   const [type, setType] = React.useState(event?.type || "goal_bl");
   const [half, setHalf] = React.useState(String(event?.half ?? defaultHalf ?? 1));
   const [minute, setMinute] = React.useState(String(event?.minute ?? 0));
-  const [playerId, setPlayerId] = React.useState(event?.player_id ? String(event.player_id) : "");
+  const [playerId, setPlayerId] = React.useState(event?.own_goal ? "csc" : event?.player_id ? String(event.player_id) : "");
   const [assistId, setAssistId] = React.useState(event?.assist_player_id ? String(event.assist_player_id) : "");
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState(null);
@@ -2068,7 +2110,9 @@ function FootEventEditor({
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))))), /*#__PURE__*/React.createElement(FField, {
+  }, getDisplayName(p, PLAYERS))), /*#__PURE__*/React.createElement("option", {
+    value: "csc"
+  }, "CSC (but contre son camp)"))), playerId !== "csc" && /*#__PURE__*/React.createElement(FField, {
     label: "Passe d\xE9cisive (optionnel)"
   }, /*#__PURE__*/React.createElement("select", {
     value: assistId,
@@ -2177,10 +2221,24 @@ function FootEventTimeline({
         fontSize: 11,
         color: FC.muted
       }
-    }, e.half, e.half === 1 ? "re" : "e", " MT")), ours ? /*#__PURE__*/React.createElement(FAvatar, {
+    }, e.half, e.half === 1 ? "re" : "e", " MT")), ours && e.own_goal ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        background: FC.accentSoft,
+        color: FC.deep,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: FF.ui,
+        fontSize: 12
+      }
+    }, "CSC") : ours ? /*#__PURE__*/React.createElement(FAvatar, {
       playerId: e.player_id,
       name: footNameOf(e.player_id),
-      size: 36
+      size: 36,
+      linkable: true
     }) : /*#__PURE__*/React.createElement("span", {
       style: {
         width: 36,
@@ -2206,12 +2264,16 @@ function FootEventTimeline({
         fontWeight: 600,
         color: ours ? FC.text : FC.muted
       }
-    }, ours ? footNameOf(e.player_id) : "But adverse"), ours && e.assist_player_id && /*#__PURE__*/React.createElement("div", {
+    }, ours ? e.own_goal ? "CSC (but contre son camp)" : /*#__PURE__*/React.createElement(FPlayerLink, {
+      id: e.player_id
+    }, footNameOf(e.player_id)) : "But adverse"), ours && e.assist_player_id && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
         color: FC.muted
       }
-    }, "Passe de ", footNameOf(e.assist_player_id))), editable && /*#__PURE__*/React.createElement("span", {
+    }, "Passe de ", /*#__PURE__*/React.createElement(FPlayerLink, {
+      id: e.assist_player_id
+    }, footNameOf(e.assist_player_id)))), editable && /*#__PURE__*/React.createElement("span", {
       style: {
         display: "inline-flex"
       }
@@ -2274,7 +2336,9 @@ function FootGoalPicker({
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))))), withAssist && /*#__PURE__*/React.createElement(FField, {
+  }, getDisplayName(p, PLAYERS))), /*#__PURE__*/React.createElement("option", {
+    value: "csc"
+  }, "CSC (but contre son camp)"))), withAssist && playerId !== "csc" && /*#__PURE__*/React.createElement(FField, {
     label: "Passe d\xE9cisive (optionnel)"
   }, /*#__PURE__*/React.createElement("select", {
     value: assistId,
@@ -2298,7 +2362,7 @@ function FootGoalPicker({
     }
   }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
     icon: "check",
-    onClick: () => can && onConfirm(Number(playerId), assistId ? Number(assistId) : null),
+    onClick: () => can && onConfirm(playerId === "csc" ? "csc" : Number(playerId), playerId !== "csc" && assistId ? Number(assistId) : null),
     disabled: !can,
     style: {
       flex: 1
@@ -2325,9 +2389,11 @@ function FootLiveAdminConsole({
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
     try {
+      const own = playerId === "csc";
+      const scorer = own ? null : playerId;
       await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), {
         type,
-        player_id: playerId,
+        player_id: scorer,
         assist_player_id: assistId
       }, {
         addToSheet: ids => addToLineup(match.id, ids),
@@ -2336,8 +2402,9 @@ function FootLiveAdminConsole({
           half: match.current_half,
           minute: minutesElapsed,
           type,
-          player_id: playerId,
-          assist_player_id: assistId
+          player_id: scorer,
+          assist_player_id: assistId,
+          own_goal: own
         })
       });
       setPicking(null);
@@ -2699,7 +2766,8 @@ function FootRatingsTab({
   }, i + 1), /*#__PURE__*/React.createElement(FAvatar, {
     playerId: id,
     name: nameOf(id),
-    size: 34
+    size: 34,
+    linkable: true
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -2712,7 +2780,9 @@ function FootRatingsTab({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, nameOf(id)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FPlayerLink, {
+    id: id
+  }, nameOf(id))), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 6,
       borderRadius: 3,
@@ -2736,7 +2806,7 @@ function FootRatingsTab({
     }
   }, avg == null ? "—" : avg.toFixed(1)))), view.showHiddenMessage && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
-  }, "Note tes co\xE9quipiers pour voir les moyennes, ou attends la validation par le bureau."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, isVoter ? "Note tes coéquipiers pour voir les moyennes, ou attends la validation par le bureau." : "Les notes restent cachées jusqu'à leur validation par le bureau."), !validated && progress.pendingIds.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       fontSize: 13,
@@ -2754,33 +2824,35 @@ function FootRatingsTab({
   }, "Valider les notes"), isAdmin && /*#__PURE__*/React.createElement(FootRatingsAdminPanel, {
     match: match,
     sheetIds: sheetIds,
-    mr: mr,
-    averages: averages,
     reload: reload
   }));
 }
 
-// Bureau only: edit any player's votes and the final note of each player. Nobody else ever sees this table.
+// Bureau only, write-only: an admin can set any player's votes and final notes but never reads what is already there.
 function FootRatingsAdminPanel({
   match,
   sheetIds,
-  mr,
-  averages,
   reload
 }) {
   const [open, setOpen] = React.useState(false);
   const [rater, setRater] = React.useState(sheetIds[0]);
   const [scores, setScores] = React.useState({});
   const [finals, setFinals] = React.useState({});
+  const [resets, setResets] = React.useState([]);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
-  const over = match.rating_overrides || {};
+  const clear = () => {
+    setScores({});
+    setFinals({});
+    setResets([]);
+  };
   React.useEffect(() => {
-    setScores(Object.fromEntries(mr.filter(r => r.rater_id === rater).map(r => [r.ratee_id, String(r.score)])));
-  }, [rater, mr.length, open]);
+    setScores({});
+  }, [rater, open]);
   React.useEffect(() => {
-    setFinals(Object.fromEntries(sheetIds.map(id => [id, over[id] != null ? String(over[id]) : ""])));
-  }, [match.rating_overrides, open]);
+    setFinals({});
+    setResets([]);
+  }, [open]);
   if (!open) return /*#__PURE__*/React.createElement(FBtn, {
     variant: "secondary",
     full: true,
@@ -2790,7 +2862,7 @@ function FootRatingsAdminPanel({
     style: {
       marginTop: 10
     }
-  }, "Tableau des notes (bureau)");
+  }, "Corriger des notes (bureau)");
   async function saveVotes() {
     const rows = sheetIds.filter(id => id !== rater && scores[id] !== undefined && scores[id] !== "").map(id => ({
       match_id: match.id,
@@ -2799,16 +2871,24 @@ function FootRatingsAdminPanel({
       score: Number(scores[id]),
       updated_at: new Date().toISOString()
     }));
+    if (!rows.length) {
+      setMsg({
+        t: "error",
+        m: "Choisis au moins une note à enregistrer."
+      });
+      return;
+    }
     setBusy(true);
     setMsg(null);
     try {
-      if (rows.length) assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows, {
+      assertUpsertOk(await SUPABASE.from("foot_ratings").upsert(rows, {
         onConflict: "match_id,rater_id,ratee_id"
       }));
       await reload();
+      setScores({});
       setMsg({
         t: "success",
-        m: "Notes enregistrées ✓"
+        m: `${rows.length} note${rows.length > 1 ? "s" : ""} enregistrée${rows.length > 1 ? "s" : ""} ✓`
       });
     } catch (e) {
       setMsg({
@@ -2819,16 +2899,20 @@ function FootRatingsAdminPanel({
     setBusy(false);
   }
   async function saveFinals() {
-    const next = {};
+    let next;
     try {
-      for (const id of sheetIds) {
-        const n = parseFinalNote(finals[id]);
-        if (n != null) next[id] = n;
-      }
+      next = mergeFinalNotes(match.rating_overrides, finals, resets);
     } catch (e) {
       setMsg({
         t: "error",
         m: e.message
+      });
+      return;
+    }
+    if (!Object.values(finals).some(v => String(v || "").trim() !== "") && !resets.length) {
+      setMsg({
+        t: "error",
+        m: "Écris au moins une note finale (ou remets un joueur en auto)."
       });
       return;
     }
@@ -2842,6 +2926,8 @@ function FootRatingsAdminPanel({
         ratings_validated_at: match.ratings_validated_at || new Date().toISOString()
       });
       await reload();
+      setFinals({});
+      setResets([]);
       setMsg({
         t: "success",
         m: "Notes finales enregistrées et validées ✓"
@@ -2868,15 +2954,19 @@ function FootRatingsAdminPanel({
     right: /*#__PURE__*/React.createElement(FBtn, {
       size: "sm",
       variant: "ghost",
-      onClick: () => setOpen(false)
+      onClick: () => {
+        clear();
+        setOpen(false);
+      }
     }, "Fermer")
-  }, "Tableau des notes"), /*#__PURE__*/React.createElement("div", {
+  }, "Corriger des notes"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: FC.muted,
-      marginBottom: 10
+      marginBottom: 10,
+      lineHeight: 1.4
     }
-  }, "Visible et modifiable uniquement par le bureau."), /*#__PURE__*/React.createElement(FField, {
+  }, "Tu peux modifier des notes sans jamais voir celles d\xE9j\xE0 enregistr\xE9es. Seules les cases remplies sont \xE9cras\xE9es."), /*#__PURE__*/React.createElement(FField, {
     label: "Notes donn\xE9es par"
   }, /*#__PURE__*/React.createElement("select", {
     value: rater,
@@ -2906,13 +2996,14 @@ function FootRatingsAdminPanel({
       ...scores,
       [id]: e.target.value
     }),
+    "aria-label": `Nouvelle note de ${footNameOf(rater)} pour ${footNameOf(id)}`,
     style: {
       ...FOOT_SELECT_STYLE,
-      minWidth: 82
+      minWidth: 96
     }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "\u2014"), opts))), /*#__PURE__*/React.createElement(FBtn, {
+  }, "Inchang\xE9e"), opts))), /*#__PURE__*/React.createElement(FBtn, {
     full: true,
     size: "sm",
     onClick: saveVotes,
@@ -2930,14 +3021,15 @@ function FootRatingsAdminPanel({
     style: {
       fontSize: 13,
       color: FC.muted,
-      marginBottom: 6
+      marginBottom: 6,
+      lineHeight: 1.4
     }
-  }, "\xC9cris la note (ex : 6.1). Vide = moyenne des votes. Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
+  }, "\xC9cris la note (ex : 6.1) ou remets \xAB auto \xBB (moyenne des votes). Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 10,
+      gap: 8,
       padding: "6px 0",
       borderTop: `1px solid ${FC.line}`
     }
@@ -2946,17 +3038,32 @@ function FootRatingsAdminPanel({
       flex: 1,
       fontSize: 15
     }
-  }, footNameOf(id)), /*#__PURE__*/React.createElement("span", {
+  }, footNameOf(id)), /*#__PURE__*/React.createElement("button", {
+    disabled: busy,
+    onClick: () => {
+      setResets(resets.includes(id) ? resets.filter(x => x !== id) : [...resets, id]);
+      setFinals({
+        ...finals,
+        [id]: ""
+      });
+    },
+    "aria-pressed": resets.includes(id),
     style: {
+      border: `1.5px solid ${resets.includes(id) ? FC.accent : FC.line}`,
+      background: resets.includes(id) ? FC.accentSoft : "transparent",
+      color: resets.includes(id) ? FC.deep : FC.muted,
+      borderRadius: 12,
+      padding: "6px 9px",
+      fontFamily: FF.ui,
       fontSize: 12,
-      color: FC.muted
+      cursor: "pointer"
     }
-  }, averages[id] == null ? "—" : averages[id].toFixed(1)), /*#__PURE__*/React.createElement("input", {
+  }, "Auto"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     inputMode: "decimal",
-    placeholder: "Auto",
+    placeholder: "Inchang\xE9e",
     value: finals[id] ?? "",
-    disabled: busy,
+    disabled: busy || resets.includes(id),
     onChange: e => setFinals({
       ...finals,
       [id]: e.target.value
@@ -2964,7 +3071,7 @@ function FootRatingsAdminPanel({
     "aria-label": `Note finale de ${footNameOf(id)}`,
     style: {
       ...FOOT_INPUT_STYLE,
-      width: 82,
+      width: 96,
       textAlign: "center"
     }
   }))), /*#__PURE__*/React.createElement(FBtn, {
@@ -3260,6 +3367,7 @@ function FootMatchDetailPage({
   const [startingConfig, setStartingConfig] = React.useState(false);
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [resetting, setResetting] = React.useState(false);
   if (!match) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
     icon: "calendar",
     title: "Match introuvable",
@@ -3267,6 +3375,38 @@ function FootMatchDetailPage({
       onClick: navBack
     }, "Retour aux matchs")
   }));
+  const canReset = isBureau(currentPlayer) && match.status !== "scheduled";
+  async function resetMatch() {
+    if (!window.confirm(`Remettre le match contre ${match.opponent_name} à « pas joué » ?\n\nLes buts, le chrono et les notes seront supprimés. La convocation et les présences sont conservées.`)) return;
+    setResetting(true);
+    try {
+      await sbFetch("foot_match_events", `?match_id=eq.${match.id}`, {
+        method: "DELETE"
+      });
+      await sbFetch("foot_ratings", `?match_id=eq.${match.id}`, {
+        method: "DELETE"
+      });
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        status: "scheduled",
+        nb_halves: null,
+        half_duration_min: null,
+        current_half: null,
+        half_started_at: null,
+        half_elapsed_seconds: 0,
+        started_by: null,
+        ratings_validated_at: null,
+        rating_overrides: {}
+      });
+      setStartingConfig(false);
+      await reload();
+    } catch (e) {
+      console.warn("reset match failed", e);
+      window.alert("Impossible de remettre le match à zéro : " + e.message);
+    }
+    setResetting(false);
+  }
   async function deleteMatch() {
     if (!window.confirm(`Supprimer définitivement le match contre ${match.opponent_name} ? Les buts et présences associés seront aussi supprimés.`)) return;
     setDeleting(true);
@@ -3361,7 +3501,19 @@ function FootMatchDetailPage({
       borderColor: withAlpha(FC.bad, 0.4),
       background: "rgba(255,255,255,0.9)"
     }
-  }, deleting ? "…" : "Supprimer"))));
+  }, deleting ? "…" : "Supprimer"))), canReset && /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    full: true,
+    icon: "refresh",
+    onClick: resetMatch,
+    disabled: resetting,
+    style: {
+      marginTop: 10,
+      color: FC.bad,
+      borderColor: withAlpha(FC.bad, 0.4),
+      background: "rgba(255,255,255,0.9)"
+    }
+  }, resetting ? "Remise à zéro…" : "Remettre le match à « pas joué »"));
 }
 
 // ---- stats ---------------------------------------------------------------------------------------------------------------------------
@@ -3550,8 +3702,11 @@ function FootStatsPage({
   events,
   ratings,
   roster,
-  currentPlayer
+  currentPlayer,
+  subjectId
 }) {
+  const isOther = !!subjectId && subjectId !== currentPlayer?.id;
+  const subject = subjectId || currentPlayer?.id;
   const currentSeason = seasonOf(new Date().toISOString());
   const [mode, setModeState] = React.useState(() => readPref("foot_stats_mode", "abs", ["abs", "pct"]));
   const [season, setSeasonState] = React.useState(() => readPref("foot_stats_season", currentSeason));
@@ -3579,8 +3734,11 @@ function FootStatsPage({
   const pool = rows.filter(r => r.played > 0);
   const ratingPool = rows.filter(r => r.rating != null);
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
-  const me = rows.find(r => r.playerId === currentPlayer?.id);
-  const series = currentPlayer ? playerRatingSeries(filtered, ratings, lineups, currentPlayer.id).slice(-10) : [];
+  // A player outside the regular roster (guest…) still has a page; he is just not ranked.
+  const me = rows.find(r => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events), {
+    [subject]: averageRating(playerRatingSeries(filtered, ratings, lineups, subject))
+  })[0] : null);
+  const series = subject ? playerRatingSeries(filtered, ratings, lineups, subject).slice(-10) : [];
   const nameOf = footNameOf;
   function tilesFor(keys) {
     return keys.map(k => {
@@ -3645,7 +3803,9 @@ function FootStatsPage({
     options: [["abs", "Valeurs"], ["pct", "En %"]]
   })), !me && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
-  }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && me.played === 0 && /*#__PURE__*/React.createElement(FMessage, {
+  }, "Les statistiques concernent l'effectif r\xE9gulier et occasionnel."), me && !population.includes(subject) && /*#__PURE__*/React.createElement(FMessage, {
+    tone: "warn"
+  }, "Joueur hors effectif r\xE9gulier : pas de classement."), me && me.played === 0 && /*#__PURE__*/React.createElement(FMessage, {
     tone: "warn"
   }, "Pas encore de match termin\xE9 avec une convocation."), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3655,8 +3815,8 @@ function FootStatsPage({
       marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement(FAvatar, {
-    playerId: currentPlayer?.id,
-    name: currentPlayer?.name || footNameOf(currentPlayer?.id),
+    playerId: subject,
+    name: footNameOf(subject),
     size: 56
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3669,7 +3829,7 @@ function FootStatsPage({
       color: FC.deep,
       lineHeight: 1.15
     }
-  }, "Mes stats"), /*#__PURE__*/React.createElement("div", {
+  }, isOther ? `Stats de ${footNameOf(subject)}` : "Mes stats"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 14,
       color: FC.muted
@@ -3681,9 +3841,9 @@ function FootStatsPage({
     }
   }, tilesFor(["played", "wins", "draws", "losses", "rating"])), /*#__PURE__*/React.createElement(FLabel, null, "Attaque"), /*#__PURE__*/React.createElement("div", {
     style: tiles
-  }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Mon \xE9volution"), /*#__PURE__*/React.createElement(FootRatingChart, {
+  }, tilesFor(["goals", "assists", "decisive"]))), /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, isOther ? "Évolution" : "Mon évolution"), /*#__PURE__*/React.createElement(FootRatingChart, {
     series: series
-  })), /*#__PURE__*/React.createElement(FootRankingsPanel, {
+  })), !isOther && /*#__PURE__*/React.createElement(FootRankingsPanel, {
     seasonMatches: filtered,
     season: season,
     lineups: lineups,
@@ -3735,7 +3895,8 @@ function FootPodiumSlot({
     playerId: entry.playerId,
     name: entry.name,
     size: size,
-    ring: first ? FC.accent : FC.line
+    ring: first ? FC.accent : FC.line,
+    linkable: true
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       position: "absolute",
@@ -3762,7 +3923,9 @@ function FootPodiumSlot({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, entry.name), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(FPlayerLink, {
+    id: entry.playerId
+  }, entry.name)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.display,
       fontSize: first ? 30 : 24,
@@ -3867,7 +4030,8 @@ function FootRankingsPanel({
   }, i + 4), /*#__PURE__*/React.createElement(FAvatar, {
     playerId: e.playerId,
     name: e.name,
-    size: 34
+    size: 34,
+    linkable: true
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1,
@@ -3877,7 +4041,9 @@ function FootRankingsPanel({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, e.name), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(FPlayerLink, {
+    id: e.playerId
+  }, e.name)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: FC.muted
@@ -6045,8 +6211,17 @@ function FootballApp({
     icon: "sliders"
   }] : [])];
   const detail = page === "matchDetail";
+  const playerPage = page === "player";
+  const openPlayer = id => nav("player", {
+    playerId: id,
+    from: {
+      page: playerPage ? sub.from.page : page,
+      sub: playerPage ? sub.from.sub : sub
+    }
+  });
+  const backFromPlayer = () => nav(sub.from ? sub.from.page : "stats", sub.from ? sub.from.sub : {});
   const openMatch = detail ? matches.find(m => m.id === sub.matchId) : null;
-  const [title, subtitle] = detail ? [openMatch ? {
+  const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : detail ? [openMatch ? {
     scheduled: "Match",
     live: "En direct",
     finished: "Résultat"
@@ -6055,17 +6230,18 @@ function FootballApp({
     value: {
       photos,
       framings,
-      themeName: theme
+      themeName: theme,
+      openPlayer
     }
   }, /*#__PURE__*/React.createElement(FootShell, {
-    wide: page === "stats" || page === "reseaux"
+    wide: page === "stats" || page === "reseaux" || playerPage
   }, /*#__PURE__*/React.createElement(FTopBar, {
     title: title,
     subtitle: subtitle,
     theme: theme,
     onTheme: setTheme,
     onHome: onBack,
-    onBack: detail ? () => nav("calendar") : undefined
+    onBack: detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined
   }), loaded && loadError && /*#__PURE__*/React.createElement(FMessage, null, "Chargement incomplet : ", loadError), loaded && page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
     matches: matches,
     events: events,
@@ -6107,8 +6283,17 @@ function FootballApp({
     ratings: ratings,
     roster: roster,
     currentPlayer: currentPlayer
+  }), loaded && playerPage && /*#__PURE__*/React.createElement(FootStatsPage, {
+    key: sub.playerId,
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    ratings: ratings,
+    roster: roster,
+    currentPlayer: currentPlayer,
+    subjectId: sub.playerId
   })), /*#__PURE__*/React.createElement(FNav, {
-    page: detail ? "calendar" : page,
+    page: detail ? "calendar" : playerPage ? "stats" : page,
     items: navItems,
     onGo: nav
   }), splashOn && /*#__PURE__*/React.createElement(FootSplash, {

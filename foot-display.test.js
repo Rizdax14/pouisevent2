@@ -35,3 +35,13 @@ test("playerInitials", () => {
   assert.equal(D.playerInitials(""), "?");
   assert.equal(D.playerInitials(undefined), "?");
 });
+
+test("meetingIsoFor puts the meeting time on the match's Paris day (evening before if after kick-off)", () => {
+  const kick = "2026-10-08T17:30:00Z"; // Thu 19:30 Paris
+  assert.equal(D.meetingIsoFor(kick, "18:30"), "2026-10-08T16:30:00.000Z");
+  assert.equal(D.meetingIsoFor(kick, ""), null);
+  assert.equal(D.meetingIsoFor(kick, "25:00"), null);
+  assert.equal(D.meetingIsoFor("2026-10-08T22:30:00Z", "23:30"), "2026-10-08T21:30:00.000Z"); // kick-off Fri 00:30 Paris → RDV Thu 23:30
+  assert.equal(D.meetingTimeValue("2026-10-08T16:30:00.000Z"), "18:30");
+  assert.equal(D.meetingTimeValue(null), "");
+});
