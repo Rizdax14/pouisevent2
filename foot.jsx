@@ -2579,6 +2579,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
   const [boardMode, setBoardModeState] = React.useState(() => readPref("foot_room_board", "indiv", ["indiv", "team"]));
   const [boardTab, setBoardTabState] = React.useState(() => readPref("foot_rank_tab", "goals", FOOT_RANKING_TABS.map((t) => t.key)));
   const [month, setMonth] = React.useState(() => { const s = calendarStartMonth(matches); return s.year * 12 + s.month - 1; });
+  const months = React.useMemo(() => matchMonths(matches), [matches]);
   const [paper, setPaper] = React.useState(null);
   const [savingPresence, setSavingPresence] = React.useState(false);
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
@@ -2636,7 +2637,10 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
     else if (kind === "match") { const m = matches.find((x) => String(x.id) === rest); if (m) nav("matchDetail", { matchId: m.id }); }
     else if (kind === "presence") answer(rest);
     else if (kind === "pres") { const [mid, st] = rest.split(":"); answer(st, mid); }
-    else if (kind === "cal") setMonth((v) => Math.max(bounds.min, Math.min(bounds.max, v + (rest === "next" ? 1 : -1))));
+    else if (kind === "cal") setMonth((v) => { // jump to the previous / next month that has a match
+      const k = rest === "next" ? months.find((x) => x > v) : [...months].reverse().find((x) => x < v);
+      return k == null ? v : k;
+    });
   };
 
   // ---- the room itself: created once, kept while the football app is open ----
@@ -2694,9 +2698,9 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
         id: m.id, date: longDate(m.match_datetime), opponent: m.opponent_name, sub: `${footHour(m.match_datetime)} · ${venue(m)}`,
         canAnswer: !!meId && m.status === "scheduled", presence: presenceOf(m),
       })),
-      calendar: calendarMonth(matches, (m) => scoreById[m.id] || { bl: 0, opponent: 0 }, y, mo, undefined, (m) => myRatings[m.id]),
+      calendar: { ...monthMatches(matches, (m) => scoreById[m.id] || { bl: 0, opponent: 0 }, month, (m) => myRatings[m.id]), hasPrev: months.some((x) => x < month), hasNext: months.some((x) => x > month) },
     });
-  }, [upcoming, matches, scoreById, month, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
+  }, [upcoming, matches, scoreById, month, months, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
 
   // ---- overlays ----
   const vestRows = React.useMemo(() => {
@@ -2745,16 +2749,16 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
         </div>
       )}
       {/* vestiaire: the shirt in front */}
-      {state === "ready" && zone === "rack" && shirt && meId && shirt.id !== meId && (
-        <div style={{ position: "absolute", left: 0, right: 0, top: "calc(64px + env(safe-area-inset-top))", textAlign: "center", opacity: arrived === "rack" ? 1 : 0, transition: "opacity 0.45s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
-          <button onClick={() => room.current && room.current.selectId(meId)}
-            style={{ ...glass, borderRadius: 999, padding: "9px 16px", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.04em", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <FIcon name="shirt" size={16} /> Revenir à mon maillot
-          </button>
-        </div>
-      )}
       {state === "ready" && zone === "rack" && shirt && (
         <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background, padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px", opacity: arrived === "rack" ? 1 : 0, transform: arrived === "rack" ? "none" : "translateY(14px)", transition: "opacity 0.5s ease, transform 0.5s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
+          {meId && shirt.id !== meId && (
+            <div style={{ position: "absolute", left: 0, right: 0, top: -54, textAlign: "center" }}>
+              <button onClick={() => room.current && room.current.selectId(meId)}
+                style={{ ...glass, borderRadius: 999, padding: "9px 16px", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.04em", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <FIcon name="shirt" size={16} /> Revenir à mon maillot
+              </button>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => room.current && room.current.step(-1)} aria-label="Maillot précédent" style={roundBtn}>‹</button>
             <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, color: "#fff", textAlign: "left" }}>

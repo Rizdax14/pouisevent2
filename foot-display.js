@@ -129,6 +129,30 @@ function calendarMonth(matches, scoreOf, year, month, nowMs, ratingOf) {
   const t = _parisParts(new Date(nowMs === undefined ? Date.now() : nowMs));
   return { title: `${FOOT_MONTHS[month - 1]} ${year}`, year, month, offset, length, days, today: t.y === year && t.m === month ? t.d : null };
 }
+// Months (year*12 + month-1) that hold at least one match, oldest first.
+function matchMonths(matches) {
+  const set = new Set(matches.map((m) => { const p = _parisParts(new Date(m.match_datetime)); return p.y * 12 + p.m - 1; }));
+  return [...set].sort((a, b) => a - b);
+}
+// The matches of one month for the desk sheet: date, opponent, score + result (played), hour (to come), my final rating.
+function monthMatches(matches, scoreOf, key, ratingOf) {
+  const year = Math.floor(key / 12), month = (key % 12) + 1;
+  const rows = matches.filter((m) => { const p = _parisParts(new Date(m.match_datetime)); return p.y === year && p.m === month; })
+    .sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))
+    .map((m) => {
+      const p = _parisParts(new Date(m.match_datetime));
+      const played = m.status === "finished";
+      const sc = played ? scoreOf(m) : null;
+      return {
+        id: m.id, day: p.d, wd: ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."][p.wd], opponent: m.opponent_name,
+        score: played ? `${sc.bl} - ${sc.opponent}` : null, result: played ? footOutcome(sc) : null,
+        hour: played ? null : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
+        rating: played && ratingOf ? (ratingOf(m) ?? null) : null,
+      };
+    });
+  return { key, title: `${FOOT_MONTHS[month - 1]} ${year}`, rows };
+}
+
 // The month the desk calendar opens on: the next match's month, else the current one.
 function calendarStartMonth(matches, nowMs) {
   const next = upcomingMatches(matches, 1)[0];
@@ -143,4 +167,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

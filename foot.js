@@ -6851,6 +6851,7 @@ function FootRoomScreen({
     const s = calendarStartMonth(matches);
     return s.year * 12 + s.month - 1;
   });
+  const months = React.useMemo(() => matchMonths(matches), [matches]);
   const [paper, setPaper] = React.useState(null);
   const [savingPresence, setSavingPresence] = React.useState(false);
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
@@ -6947,7 +6948,11 @@ function FootRoomScreen({
     } else if (kind === "presence") answer(rest);else if (kind === "pres") {
       const [mid, st] = rest.split(":");
       answer(st, mid);
-    } else if (kind === "cal") setMonth(v => Math.max(bounds.min, Math.min(bounds.max, v + (rest === "next" ? 1 : -1))));
+    } else if (kind === "cal") setMonth(v => {
+      // jump to the previous / next month that has a match
+      const k = rest === "next" ? months.find(x => x > v) : [...months].reverse().find(x => x < v);
+      return k == null ? v : k;
+    });
   };
 
   // ---- the room itself: created once, kept while the football app is open ----
@@ -7057,12 +7062,16 @@ function FootRoomScreen({
         canAnswer: !!meId && m.status === "scheduled",
         presence: presenceOf(m)
       })),
-      calendar: calendarMonth(matches, m => scoreById[m.id] || {
-        bl: 0,
-        opponent: 0
-      }, y, mo, undefined, m => myRatings[m.id])
+      calendar: {
+        ...monthMatches(matches, m => scoreById[m.id] || {
+          bl: 0,
+          opponent: 0
+        }, month, m => myRatings[m.id]),
+        hasPrev: months.some(x => x < month),
+        hasNext: months.some(x => x > month)
+      }
     });
-  }, [upcoming, matches, scoreById, month, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
+  }, [upcoming, matches, scoreById, month, months, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
 
   // ---- overlays ----
   const vestRows = React.useMemo(() => {
@@ -7213,16 +7222,29 @@ function FootRoomScreen({
       padding: "0 14px",
       marginTop: 10
     }
-  }, "Pages classiques")), state === "ready" && zone === "rack" && shirt && meId && shirt.id !== meId && /*#__PURE__*/React.createElement("div", {
+  }, "Pages classiques")), state === "ready" && zone === "rack" && shirt && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 12,
+      right: 12,
+      bottom: "calc(96px + env(safe-area-inset-bottom))",
+      maxWidth: 560,
+      margin: "0 auto",
+      ...glass,
+      background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background,
+      padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px",
+      opacity: arrived === "rack" ? 1 : 0,
+      transform: arrived === "rack" ? "none" : "translateY(14px)",
+      transition: "opacity 0.5s ease, transform 0.5s ease",
+      pointerEvents: arrived === "rack" ? "auto" : "none"
+    }
+  }, meId && shirt.id !== meId && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       left: 0,
       right: 0,
-      top: "calc(64px + env(safe-area-inset-top))",
-      textAlign: "center",
-      opacity: arrived === "rack" ? 1 : 0,
-      transition: "opacity 0.45s ease",
-      pointerEvents: arrived === "rack" ? "auto" : "none"
+      top: -54,
+      textAlign: "center"
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => room.current && room.current.selectId(meId),
@@ -7241,23 +7263,7 @@ function FootRoomScreen({
   }, /*#__PURE__*/React.createElement(FIcon, {
     name: "shirt",
     size: 16
-  }), " Revenir \xE0 mon maillot")), state === "ready" && zone === "rack" && shirt && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      left: 12,
-      right: 12,
-      bottom: "calc(96px + env(safe-area-inset-bottom))",
-      maxWidth: 560,
-      margin: "0 auto",
-      ...glass,
-      background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background,
-      padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px",
-      opacity: arrived === "rack" ? 1 : 0,
-      transform: arrived === "rack" ? "none" : "translateY(14px)",
-      transition: "opacity 0.5s ease, transform 0.5s ease",
-      pointerEvents: arrived === "rack" ? "auto" : "none"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
+  }), " Revenir \xE0 mon maillot")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",

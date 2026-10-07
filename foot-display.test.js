@@ -118,3 +118,18 @@ test("shirtStats: win rate, per-match numbers, last ratings newest first, recent
   assert.deepEqual(st.lastRatings.map((x) => x.opponent), ["D", "C", "B"]);
   assert.deepEqual(st.form, ["N", "D", "V"]);
 });
+
+test("monthMatches: the month's matches with score, result, hour or my rating", () => {
+  const ms = [
+    { id: 1, status: "finished", match_datetime: "2026-09-03T17:30:00Z", opponent_name: "En Avant Guinguette" },
+    { id: 2, status: "scheduled", match_datetime: "2026-09-24T17:00:00Z", opponent_name: "Bagnolet" },
+    { id: 3, status: "finished", match_datetime: "2026-10-01T17:00:00Z", opponent_name: "Autre" },
+  ];
+  assert.deepEqual(D.matchMonths(ms), [2026 * 12 + 8, 2026 * 12 + 9]);
+  const sept = D.monthMatches(ms, () => ({ bl: 7, opponent: 3 }), 2026 * 12 + 8, (m) => (m.id === 1 ? 6.5 : null));
+  assert.equal(sept.title, "Septembre 2026");
+  assert.deepEqual(sept.rows.map((r) => [r.id, r.wd, r.day, r.score, r.result, r.hour, r.rating]), [
+    [1, "jeu.", 3, "7 - 3", "V", null, 6.5],
+    [2, "jeu.", 24, null, null, "19h", null],
+  ]);
+});
