@@ -154,6 +154,38 @@ Meilleur joueur de la saison (vote) : Maxime (24 voix), Nils (8), Thisma (6).
 | Simon | 0 | 1 |
 | Nils | 0 | 0 |
 
+### 2025-2026 — notes moyennes (phase 2 + amicaux Yoni et Copains, fichier « moyenne 25-26 »)
+
+| Joueur | Matchs notés | Note moy. | Buts | Passes D |
+|---|---|---|---|---|
+| Mahé Chanut | 1 | 8.9 | 1 | 0 |
+| Quentin Laurent | 1 | 8.8 | 3 | 0 |
+| Jean Jean Brunon | 2 | 8.45 | 0 | 2 |
+| Clément Desjoyaux | 1 | 8.3 | 0 | 0 |
+| Maxime Marechal | 4 | 8.3 | 0 | 0 |
+| Vianel Chanut | 1 | 8.3 | 3 | 1 |
+| Titouan Brunon | 11 | 7.44 | 10 | 12 |
+| Léandre Cagna | 2 | 7.05 | 0 | 1 |
+| Mathis France | 2 | 7.05 | 2 | 0 |
+| Esteban Brunon | 5 | 7.02 | 8 | 3 |
+| Baptiste Lurel | 1 | 7.0 | 0 | 0 |
+| Nils Brenquet | 1 | 7.0 | 0 | 0 |
+| Solal Gruyers | 8 | 6.9 | 1 | 1 |
+| Samuel Olagnier | 10 | 6.64 | 5 | 6 |
+| Simon Grangy | 5 | 6.48 | 0 | 2 |
+| Etienne Ollagnier | 6 | 6.22 | 1 | 0 |
+| Nolan Martin | 10 | 6.03 | 4 | 0 |
+| Louis Marcoux | 10 | 6.01 | 7 | 5 |
+| Thomas Peyreton | 9 | 5.99 | 0 | 0 |
+| Romain Curtil | 4 | 5.72 | 1 | 1 |
+| Timothée Deville | 11 | 5.48 | 1 | 0 |
+| Ilan Tifra | 6 | 5.27 | 2 | 1 |
+| Nathan Devitte | 4 | 5.15 | 1 | 0 |
+| Julien Courat | 9 | 5.05 | 0 | 0 |
+| TOTAL ÉQUIPE | 124 | 6.86 | 50 | 35 |
+
+Pas de notes pour la phase 1 2025-26 : seulement les votes « tops du match ».
+
 ## 2026-2027 (déjà dans l'appli)
 Amicaux : 27/08 Les potes à Nathan 4-8, 03/09 En Avant Guinguette 7-3, 10/09 AS Sampicot 7-3.
 
