@@ -80,29 +80,23 @@ function seasonRack(ids, roster, nameOf) {
     .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
 }
 
-// The cool numbers behind a shirt. seasonMatches: the season's matches; allMatches for the career line.
-// row / careerRow: buildStatsRows rows; series: playerRatingSeries of the season (oldest first).
-function shirtStats({ row, careerRow, series, seasonFinished, scoreOf, lineups, playerId, allMatches }) {
+// The numbers behind a shirt. row / careerRow: buildStatsRows rows (season, career);
+// series / careerSeries: playerRatingSeries of the season and of the whole career (oldest first).
+function shirtStats({ row, careerRow, series, careerSeries }) {
   const r = row || { played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 };
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
   const per = (a, b) => (b ? Math.round((a / b) * 100) / 100 : null);
-  const ratings = (series || []).map((s) => s.rating);
-  // last matches played (on the sheet of a finished match), newest first, with the result
-  const mine = new Set((lineups || []).filter((l) => l.player_id === playerId).map((l) => l.match_id));
-  const lastPlayed = (allMatches || []).filter((m) => m.status === "finished" && !m.score_unknown && mine.has(m.id))
-    .sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime)).slice(0, 5)
-    .map((m) => { const sc = scoreOf(m); return sc.bl > sc.opponent ? "V" : sc.bl < sc.opponent ? "D" : "N"; });
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const avg = (ss) => (ss && ss.length ? r1(ss.reduce((a, s) => a + s.rating, 0) / ss.length) : null);
+  const pick = (better) => ((series || []).length ? series.reduce((a, s) => (better(s.rating, a.rating) ? s : a)) : null);
+  const match = (s) => s && { rating: r1(s.rating), opponent: s.opponent, matchId: s.matchId, date: s.date };
+  const c = careerRow;
   return {
-    played: r.played, wins: r.wins, draws: r.draws, losses: r.losses,
-    winPct: pct(r.wins, r.played),
+    played: r.played, wins: r.wins, draws: r.draws, losses: r.losses, winPct: pct(r.wins, r.played),
     goals: r.goals, assists: r.assists, decisive: r.decisive, motm: r.motm,
-    goalsPerMatch: per(r.goals, r.played), decisivePerMatch: per(r.decisive, r.played),
-    playedPct: pct(r.played, seasonFinished),
-    rating: ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null,
-    best: ratings.length ? Math.max(...ratings) : null,
-    lastRatings: (series || []).slice(-3).reverse().map((s) => ({ opponent: s.opponent, rating: Math.round(s.rating * 10) / 10, date: s.date })),
-    form: lastPlayed,
-    career: careerRow ? { played: careerRow.played, goals: careerRow.goals, assists: careerRow.assists, motm: careerRow.motm } : null,
+    goalsPerMatch: per(r.goals, r.played), assistsPerMatch: per(r.assists, r.played), decisivePerMatch: per(r.decisive, r.played),
+    rating: avg(series), best: match(pick((a, b) => a > b)), worst: match(pick((a, b) => a < b)),
+    career: c ? { played: c.played, goals: c.goals, assists: c.assists, decisive: c.decisive ?? c.goals + c.assists, motm: c.motm, rating: avg(careerSeries) } : null,
   };
 }
 

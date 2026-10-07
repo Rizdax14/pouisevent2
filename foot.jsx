@@ -54,7 +54,10 @@ function formatMatchPlace(match) {
   return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
 }
 
-const footNameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? getDisplayName(p, PLAYERS) : "?"; };
+// "Prénom N" everywhere in the club; two club players with the same first name and initial keep their display name
+let FOOT_POOL = null; // the club's players (roster + everyone on a sheet), set when the data loads
+const footShortName = (p) => shortName(p, FOOT_POOL ? PLAYERS.filter((x) => FOOT_POOL.has(x.id)) : PLAYERS);
+const footNameOf = (id) => { const p = PLAYERS.find((x) => x.id === id); return p ? footShortName(p) : "?"; };
 const footDayMs = 86400000;
 function footDate(iso) { return new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Paris" }); }
 // "19h" or "18h30" (Paris time)
@@ -150,7 +153,7 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, pr
   const ids = [...new Set([...roster.map((r) => r.player_id), ...(extraIds || [])])];
   const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
   const players = ids.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean)
-    .sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
+    .sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   if (players.length === 0) return <FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif dans l'onglet Admin." />;
   return (
     <div style={{ display: "grid", gap: 6 }}>
@@ -158,8 +161,8 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, pr
         const on = checked.includes(p.id);
         return (
           <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 6px 6px", borderRadius: 16, background: on ? FC.accentSoft : FC.softer, border: `1.5px solid ${on ? FC.accent : "transparent"}`, cursor: disabled ? "default" : "pointer", fontSize: 15 }}>
-            <FootPresenceAvatar id={p.id} name={getDisplayName(p, PLAYERS)} size={34} status={presence ? presence[p.id] || "none" : null} />
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDisplayName(p, PLAYERS)}</span>
+            <FootPresenceAvatar id={p.id} name={footShortName(p)} size={34} status={presence ? presence[p.id] || "none" : null} />
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{footShortName(p)}</span>
             {numberOf(p.id) && <span style={{ fontFamily: FF.ui, fontSize: 13, color: FC.deep }}>n°{numberOf(p.id)}</span>}
             <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(p.id)} />
           </label>
@@ -487,7 +490,7 @@ function FootRosterManager({ roster, reload }) {
     setSaving(null);
   }
 
-  const nameOf = (p) => getDisplayName(p, PLAYERS) || "";
+  const nameOf = (p) => footShortName(p) || "";
   const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
   const team = PLAYERS.filter((p) => roleByPlayer[p.id]).sort(byName);
   const visibleTeam = filterPlayersByName(team, search, nameOf);
@@ -821,7 +824,7 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
           <FField label="Buteur">
             <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
               <option value="">— Choisir —</option>
-              {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+              {options.map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
               <option value="csc">CSC (but contre son camp)</option>
             </select>
           </FField>
@@ -829,7 +832,7 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
             <FField label="Passe décisive (optionnel)">
               <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
                 <option value="">— Aucune —</option>
-                {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+                {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
               </select>
             </FField>
           )}
@@ -914,7 +917,7 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
       <FField label="Buteur">
         <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
           <option value="">— Choisir —</option>
-          {options.map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+          {options.map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
           <option value="csc">CSC (but contre son camp)</option>
         </select>
       </FField>
@@ -922,7 +925,7 @@ function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
         <FField label="Passe décisive (optionnel)">
           <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
             <option value="">— Aucune —</option>
-            {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{getDisplayName(p, PLAYERS)}</option>)}
+            {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
           </select>
         </FField>
       )}
@@ -1838,7 +1841,7 @@ function FootPhotoCell({ playerId, kit, kind, photos, reload }) {
 const FOOT_UNKNOWN_PLAYER = { id: DEFAULT_PHOTO_PLAYER_ID, name: "Joueur inconnu (photo par défaut)" };
 
 function FootPhotosTab({ roster, photos, reload }) {
-  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : getDisplayName(p, PLAYERS) || "";
+  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : footShortName(p) || "";
   const real = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   if (!real.length) return <FCard><FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif (onglet Admin)." /></FCard>;
   const players = [FOOT_UNKNOWN_PLAYER, ...real];
@@ -1931,7 +1934,7 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
               {showGuides && (FRAMING_GUIDES[layout] || []).filter((g) => !g.behind).map((g) => <FootGuideBox key={g.label} g={g} scale={scale} />)}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 4 }}>
-              <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : getDisplayName(p, PLAYERS)}</span>
+              <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : footShortName(p)}</span>
               {photo && <span style={{ fontSize: 9, color: saved ? FC.good : FC.muted, textTransform: "uppercase", flexShrink: 0 }}>{saved ? "réglé" : "défaut"}</span>}
             </div>
           </div>
@@ -1942,7 +1945,7 @@ function FootFramingCompare({ players, photos, framings, kit, layout, showGuides
 }
 
 function FootFramingTool({ roster, photos, framings, reload }) {
-  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : getDisplayName(p, PLAYERS) || "";
+  const nameOf = (p) => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : footShortName(p) || "";
   const players = [...new Set(photos.map((p) => p.player_id))].map((id) => id === FOOT_UNKNOWN_PLAYER.id ? FOOT_UNKNOWN_PLAYER : PLAYERS.find((p) => p.id === id)).filter((p) => p && (p.id === FOOT_UNKNOWN_PLAYER.id || roster.some((r) => r.player_id === p.id))).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
@@ -2396,7 +2399,7 @@ function FootPostsTab({ matches, lineups, events, ratings, roster, photos }) {
   // Players that can be put on a photo: roster players with a celebration photo.
   const candidates = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean)
     .filter((p) => photos.some((ph) => ph.player_id === p.id && ph.kind === "celebration"))
-    .map((p) => ({ id: p.id, name: getDisplayName(p, PLAYERS) || "", hasDos: photos.some((ph) => ph.player_id === p.id && ph.kind === "dos") }))
+    .map((p) => ({ id: p.id, name: footShortName(p) || "", hasDos: photos.some((ph) => ph.player_id === p.id && ph.kind === "dos") }))
     .sort((a, b) => a.name.localeCompare(b.name));
   async function pickPlayer(key, id) {
     const before = featured;
@@ -2515,17 +2518,27 @@ function FootRoomStat({ label, value }) {
 }
 
 // The extra numbers under a shirt (Vestiaire, "Plus de stats"): compact, so everything fits on a phone screen at once.
-function FootShirtMore({ st }) {
+function FootShirtMore({ st, onOpenMatch }) {
   const label = { fontFamily: FF.ui, fontSize: 10, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", margin: "9px 0 4px" };
+  const box = { background: "rgba(255,255,255,0.07)", borderRadius: 11, padding: "5px 4px 4px", textAlign: "center", minWidth: 0 };
+  const small = { fontFamily: FF.ui, fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const tile = (title, value) => (
-    <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 11, padding: "5px 4px 4px", textAlign: "center", minWidth: 0 }}>
+    <div style={box}>
       <div style={{ fontFamily: FF.display, fontSize: 17, lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontFamily: FF.ui, fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+      <div style={small}>{title}</div>
     </div>
   );
   const dash = (v, f = (x) => x) => (v == null ? "–" : f(v));
+  const two = (v) => v.toFixed(2), one = (v) => v.toFixed(1);
+  // a rated match: the mark, who it was against; a tap opens the match
+  const matchTile = (title, m, tone) => (
+    <button disabled={!m} onClick={() => m && onOpenMatch(m.matchId)} style={{ ...box, border: "none", color: "#fff", cursor: m ? "pointer" : "default", background: m ? tone : box.background, font: "inherit" }}>
+      <div style={{ fontFamily: FF.display, fontSize: 17, lineHeight: 1.1 }}>{m ? one(m.rating) : "–"}</div>
+      <div style={small}>{title}</div>
+      <div style={{ fontSize: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "rgba(255,255,255,0.85)" }}>{m ? `vs ${m.opponent} ›` : "pas de note"}</div>
+    </button>
+  );
   const res = [["V", st.wins, "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, "#c0262d"]];
-  const formColor = { V: "#2f9a55", N: "#b9a03a", D: "#c0262d" };
   const grid = (n) => ({ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: 5 });
   return (
     <div>
@@ -2536,36 +2549,24 @@ function FootShirtMore({ st }) {
         </div>
         <div style={{ fontFamily: FF.display, fontSize: 16, whiteSpace: "nowrap" }}>{dash(st.winPct, (v) => `${v}%`)} <span style={{ fontFamily: FF.ui, fontSize: 10, color: "rgba(255,255,255,0.6)" }}>VICTOIRES</span></div>
       </div>
-      {st.form.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginRight: 3 }}>Forme</span>
-          {st.form.map((r, k) => <span key={k} style={{ width: 20, height: 20, borderRadius: 6, background: formColor[r], display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.ui, fontSize: 11 }}>{r}</span>)}
-        </div>
-      )}
       <div style={label}>Cette saison</div>
       <div style={grid(3)}>
-        {tile("Buts / match", dash(st.goalsPerMatch, (v) => v.toFixed(2)))}
-        {tile("Décisifs", st.decisive)}
-        {tile("Décisifs / m.", dash(st.decisivePerMatch, (v) => v.toFixed(2)))}
-        {tile("Matchs joués", dash(st.playedPct, (v) => `${v}%`))}
-        {tile("Meilleure note", dash(st.best, (v) => (Math.round(v * 10) / 10).toFixed(1)))}
-        {tile("Note moy.", dash(st.rating, (v) => v.toFixed(1)))}
+        {tile("Buts / match", dash(st.goalsPerMatch, two))}
+        {tile("Passes D / match", dash(st.assistsPerMatch, two))}
+        {tile("Décisifs / match", dash(st.decisivePerMatch, two))}
       </div>
-      <div style={label}>3 derniers matchs notés</div>
-      {st.lastRatings.length === 0 ? <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Pas encore de note cette saison</div> : (
-        <div style={grid(3)}>
-          {st.lastRatings.map((r, k) => (
-            <div key={k} style={{ borderRadius: 11, padding: "5px 4px 4px", textAlign: "center", minWidth: 0, background: r.rating >= 7 ? "rgba(47,154,85,0.85)" : r.rating >= 5.5 ? "rgba(255,255,255,0.1)" : "rgba(192,38,45,0.85)" }}>
-              <div style={{ fontFamily: FF.display, fontSize: 17, lineHeight: 1.1 }}>{r.rating.toFixed(1)}</div>
-              <div style={{ fontSize: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>vs {r.opponent}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ ...grid(3), marginTop: 5 }}>
+        {matchTile("Meilleure note", st.best, "rgba(47,154,85,0.75)")}
+        {matchTile("Pire note", st.worst, "rgba(192,38,45,0.7)")}
+        {tile("Note moyenne", dash(st.rating, one))}
+      </div>
       {st.career && (
         <>
           <div style={label}>Carrière au club</div>
-          <div style={grid(4)}>{tile("Matchs", st.career.played)}{tile("Buts", st.career.goals)}{tile("Passes D", st.career.assists)}{tile("HDM", st.career.motm)}</div>
+          <div style={grid(6)}>
+            {tile("Matchs", st.career.played)}{tile("Buts", st.career.goals)}{tile("Passes D", st.career.assists)}
+            {tile("Décisifs", st.career.decisive)}{tile("Note", dash(st.career.rating, one))}{tile("HDM", st.career.motm)}
+          </div>
         </>
       )}
     </div>
@@ -2707,7 +2708,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
 
   React.useEffect(() => {
     if (!room.current) return;
-    const entries = rankingEntries(rows, boardTab, footNameOf, 10).map((e) => ({
+    const entries = rankingEntries(rows, boardTab, footNameOf, 99).map((e) => ({
       playerId: e.playerId, name: footNameOf(e.playerId), value: boardTab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, boardTab, "abs"),
       face: faceFor(e.playerId),
     }));
@@ -2760,8 +2761,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
     const career = buildStatsRows([shirt.id], computePlayerStats(careerMs, lineups, events, motmWinners(careerMs, motmVotes || [])), {})[0];
     return shirtStats({
       row, careerRow: career, series: playerRatingSeries(seasonMs, ratings, lineups.filter((l) => ids.has(l.match_id)), shirt.id),
-      seasonFinished: seasonMs.filter((m) => m.status === "finished").length, scoreOf: (m) => scoreById[m.id] || { bl: 0, opponent: 0 },
-      lineups, playerId: shirt.id, allMatches: careerMs,
+      careerSeries: playerRatingSeries(careerMs, ratings, lineups, shirt.id),
     });
   }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, rackSeason, statsType]);
   const glass = { background: "rgba(16,12,14,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 22, color: "#fff" };
@@ -2830,10 +2830,11 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
             <FootRoomStat label="Matchs" value={row ? row.played : 0} />
             <FootRoomStat label="Buts" value={row ? row.goals : 0} />
             <FootRoomStat label="Passes D" value={row ? row.assists : 0} />
+            <FootRoomStat label="Décisifs" value={row ? row.decisive : 0} />
             <FootRoomStat label="Note" value={row && row.rating != null ? row.rating.toFixed(1) : "–"} />
             <FootRoomStat label="HDM" value={row ? row.motm : 0} />
           </div>
-          {statsOpen && more && <FootShirtMore st={more} />}
+          {statsOpen && more && <FootShirtMore st={more} onOpenMatch={(id) => nav("matchDetail", { matchId: id })} />}
           <button onClick={() => setStatsOpen(!statsOpen)} aria-expanded={statsOpen}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: statsOpen ? 8 : 10, border: "none", borderRadius: 14, padding: statsOpen ? "7px 0" : "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
             {statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"}
@@ -2922,6 +2923,7 @@ function FootballApp({ currentPlayer, onBack }) {
       sbFetch("foot_activity_attendance", "?select=*").catch(() => []),
       sbFetch("foot_motm_votes", "?select=match_id,voter_id,player_id").catch(() => []), // optional: absent until the man-of-the-match migration is applied
     ]);
+    FOOT_POOL = new Set([...(r || []).map((x) => x.player_id), ...(l || []).map((x) => x.player_id), ...Object.values(FOOT_SEASON_SQUADS).flat()]);
     setMotmVotes(mv || []);
     setActivities(ac || []);
     setActivityAttendance_(aa || []);

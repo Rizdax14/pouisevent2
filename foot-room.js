@@ -195,14 +195,14 @@
     async function loadKit(kit) {
       if (kitCache[kit]) return kitCache[kit];
       const base = KIT_BASE + kit + "/";
-      const [meta, front, back, collar] = await Promise.all([fetch(base + "kit.json?v=2").then((r) => r.json()), loadImg(base + "front.png?v=2"), loadImg(base + "back.png?v=2"), loadImg(base + "collar.png?v=2")]);
+      const [meta, front, back, collar] = await Promise.all([fetch(base + "kit.json?v=3").then((r) => r.json()), loadImg(base + "front.png?v=3"), loadImg(base + "back.png?v=3"), loadImg(base + "collar.png?v=3")]);
       kitCache[kit] = { kit, base, meta, front, back, collar, flocs: {} };
       return kitCache[kit];
     }
     async function flocageFor(K, p) {
       if (K.flocs[p.id] !== undefined) return K.flocs[p.id];
       const f = K.meta.flocages[p.id];
-      K.flocs[p.id] = f ? { img: await loadImg(`${K.base}flocages/${p.id}.png?v=2`), x: f.x, y: f.y } : null;
+      K.flocs[p.id] = f ? { img: await loadImg(`${K.base}flocages/${p.id}.png?v=3`), x: f.x, y: f.y } : null;
       return K.flocs[p.id];
     }
     // A player the kit file doesn't have yet: name and number typeset on the fly where the others sit.
@@ -407,8 +407,11 @@
       else { ctx.fillStyle = opts.accent || "#2f8f5b"; ctx.fillRect(x, y, F, F); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `${Math.round(F * 0.42)}px ${FONT_DISPLAY}`; ctx.fillText(initials(name), x + F / 2, y + F * 0.66); }
       ctx.restore();
     }
+    const boardList = { scroll: 0, max: 0, key: null, top: 0, bottom: 0 }; // the rows under the podium scroll
     function drawBoard(m) {
       lastBoard = m;
+      const key = [m.mode, m.tab, m.season].join("|");
+      if (key !== boardList.key) { boardList.key = key; boardList.scroll = 0; }
       for (const en of (m.entries || []).slice(0, 3)) {
         const u = en.face && en.face.url;
         if (u) needFace(en.face, () => lastBoard && drawBoard(lastBoard), "board");
@@ -490,16 +493,27 @@
             regions.push({ id: "player:" + en.playerId, x: cx - colW / 2, y: top - 20, w: colW, h: base - top + 20 });
           });
           ctx.strokeStyle = ink; ctx.lineWidth = 6; wobbleLine(ctx, W / 2 - colW * 1.5 + 8, base + 2, W / 2 + colW * 1.5 - 8, base, 8);
-          // 4th and after
-          let y = base + 92;
-          e.slice(3, 9).forEach((en, k) => {
+          // 4th and after: as many as there are, scrolled by a vertical swipe on the board
+          const listTop = base + 30, listBottom = H - 18, rowH = 72;
+          boardList.top = listTop; boardList.bottom = listBottom;
+          boardList.max = Math.max(0, (e.length - 3) * rowH + 30 - (listBottom - listTop));
+          boardList.scroll = Math.min(boardList.max, Math.max(0, boardList.scroll));
+          ctx.save(); ctx.beginPath(); ctx.rect(0, listTop, W, listBottom - listTop); ctx.clip();
+          let y = base + 92 - boardList.scroll;
+          e.slice(3).forEach((en, k) => {
+            if (y < listTop - rowH || y > listBottom + rowH) { y += rowH; return; }
             ctx.textAlign = "left"; ctx.fillStyle = "#6a707a"; ctx.font = `46px ${FONT_MARKER}`; ctx.fillText(`${k + 4}.`, 90, y);
             ctx.fillStyle = ink; fitFont(ctx, en.name, FONT_MARKER, 50, 560); ctx.fillText(en.name, 175, y);
             ctx.textAlign = "right"; ctx.fillStyle = blue; ctx.font = `50px ${FONT_MARKER}`; ctx.fillText(en.value, W - 90, y);
             ctx.strokeStyle = "#d4d7dc"; ctx.lineWidth = 2; ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.moveTo(175, y + 16); ctx.lineTo(W - 90, y + 16); ctx.stroke(); ctx.setLineDash([]);
-            regions.push({ id: "player:" + en.playerId, x: 60, y: y - 56, w: W - 120, h: 72 });
-            y += 72;
+            if (y - 56 >= listTop - 20 && y + 16 <= listBottom + 20) regions.push({ id: "player:" + en.playerId, x: 60, y: y - 56, w: W - 120, h: 72 });
+            y += rowH;
           });
+          ctx.restore();
+          // the list goes on: a soft fade and an arrow at the edge that hides rows
+          const fade = (y0, up) => { const gr = ctx.createLinearGradient(0, y0, 0, y0 + (up ? 60 : -60)); gr.addColorStop(0, "rgba(242,243,240,1)"); gr.addColorStop(1, "rgba(242,243,240,0)"); ctx.fillStyle = gr; ctx.fillRect(40, up ? y0 : y0 - 60, W - 80, 60); };
+          if (boardList.scroll > 2) fade(listTop, true);
+          if (boardList.scroll < boardList.max - 2) { fade(listBottom, false); ctx.fillStyle = "#8a909a"; ctx.beginPath(); ctx.moveTo(W - 70, listBottom - 30); ctx.lineTo(W - 46, listBottom - 30); ctx.lineTo(W - 58, listBottom - 14); ctx.closePath(); ctx.fill(); }
           ctx.textAlign = "center";
         }
       }
@@ -703,13 +717,27 @@
       return regs.find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) || null;
     }
     const el = renderer.domElement;
+    let boardRedraw = 0;
+    function boardPxPerScreenPx() { // logical board height / its height on screen
+      const box = new THREE.Box3().setFromObject(board), a = box.min.clone().project(camera), b = box.max.clone().project(camera);
+      const screenH = Math.abs(a.y - b.y) / 2 * container.clientHeight;
+      return screenH > 10 ? (boardCanvas.height / (board.userData.scale || 1)) / screenH : 1;
+    }
     el.addEventListener("pointerdown", (e) => {
       drag = { x: e.clientX, y: e.clientY, last: e.clientX, t: performance.now(), scroll: rack.scroll, moved: 0, vel: 0 };
       if (cam.zone === "rack") el.setPointerCapture(e.pointerId);
+      if (cam.zone === "board" && boardList.max > 0) { drag.boardScroll = boardList.scroll; el.setPointerCapture(e.pointerId); } // a vertical swipe scrolls the board's list
     });
     el.addEventListener("pointermove", (e) => {
       if (!drag) return;
       drag.moved = Math.max(drag.moved, Math.abs(e.clientX - drag.x), Math.abs(e.clientY - drag.y));
+      if (cam.zone === "board" && drag.boardScroll != null && lastBoard) {
+        // board units per screen pixel, from the board's height on screen (no hit test needed while the finger leaves it)
+        const k = boardPxPerScreenPx();
+        boardList.scroll = Math.min(boardList.max, Math.max(0, drag.boardScroll - (e.clientY - drag.y) * k));
+        if (!boardRedraw) boardRedraw = requestAnimationFrame(() => { boardRedraw = 0; if (lastBoard) drawBoard(lastBoard); });
+        return;
+      }
       if (cam.zone !== "rack" || !rack.shirts.length) return;
       const now = performance.now();
       rack.scroll = Math.min(rack.squad.length - 0.7, Math.max(-0.3, drag.scroll - (e.clientX - drag.x) / pxPerShirt()));

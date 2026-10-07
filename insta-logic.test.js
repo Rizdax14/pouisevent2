@@ -46,11 +46,13 @@ test("pickFeatured is stable for the same seed", () => {
   assert.equal(L.pickFeatured([4, 5, 6], [], 42), L.pickFeatured([4, 5, 6], [], 42));
 });
 
-test("postName uses first names unless two players share one", () => {
-  const ps = [{ id: 1, name: "Louis", display_name: "Louis Mar" }, { id: 2, name: "Thomas", display_name: "Thomas" }, { id: 3, name: "Louis", display_name: "Louis B" }];
-  assert.equal(L.postName(ps[1], ps), "Thomas");
-  assert.equal(L.postName(ps[0], ps), "Louis Mar");
-  assert.equal(L.postName(ps[0], [ps[0], ps[1]]), "Louis");
+test("postName writes first name + initial of the last name", () => {
+  const ps = [{ id: 1, name: "Louis", last_name: "Marcoux", display_name: "Louis Mar" }, { id: 2, name: "Thomas", last_name: "peycelon", display_name: "Thomas" },
+    { id: 3, name: "Louis", last_name: "Martin", display_name: "Louis Mart" }, { id: 4, name: "Juju", display_name: "Juju" }];
+  assert.equal(L.postName(ps[1], ps), "Thomas P");
+  assert.equal(L.postName(ps[0], ps), "Louis Mar"); // same first name and initial: the display name tells them apart
+  assert.equal(L.postName(ps[0], [ps[0], ps[1]]), "Louis M");
+  assert.equal(L.postName(ps[3], ps), "Juju"); // no last name
 });
 
 test("opponentLabel abbreviates long names", () => {

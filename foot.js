@@ -68,9 +68,13 @@ function formatMatchPlace(match) {
   const cityLine = [match.postal_code, match.city].filter(Boolean).join(" ");
   return [match.stadium_name, match.address, cityLine].filter(Boolean).join(" · ");
 }
+
+// "Prénom N" everywhere in the club; two club players with the same first name and initial keep their display name
+let FOOT_POOL = null; // the club's players (roster + everyone on a sheet), set when the data loads
+const footShortName = p => shortName(p, FOOT_POOL ? PLAYERS.filter(x => FOOT_POOL.has(x.id)) : PLAYERS);
 const footNameOf = id => {
   const p = PLAYERS.find(x => x.id === id);
-  return p ? getDisplayName(p, PLAYERS) : "?";
+  return p ? footShortName(p) : "?";
 };
 const footDayMs = 86400000;
 function footDate(iso) {
@@ -395,7 +399,7 @@ function FootLineupChecklist({
 }) {
   const ids = [...new Set([...roster.map(r => r.player_id), ...(extraIds || [])])];
   const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
-  const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (getDisplayName(a, PLAYERS) || "").localeCompare(getDisplayName(b, PLAYERS) || ""));
+  const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   if (players.length === 0) return /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
     title: "Aucun joueur",
@@ -423,7 +427,7 @@ function FootLineupChecklist({
       }
     }, /*#__PURE__*/React.createElement(FootPresenceAvatar, {
       id: p.id,
-      name: getDisplayName(p, PLAYERS),
+      name: footShortName(p),
       size: 34,
       status: presence ? presence[p.id] || "none" : null
     }), /*#__PURE__*/React.createElement("span", {
@@ -434,7 +438,7 @@ function FootLineupChecklist({
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, getDisplayName(p, PLAYERS)), numberOf(p.id) && /*#__PURE__*/React.createElement("span", {
+    }, footShortName(p)), numberOf(p.id) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontFamily: FF.ui,
         fontSize: 13,
@@ -1271,7 +1275,7 @@ function FootRosterManager({
     }
     setSaving(null);
   }
-  const nameOf = p => getDisplayName(p, PLAYERS) || "";
+  const nameOf = p => footShortName(p) || "";
   const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
   const team = PLAYERS.filter(p => roleByPlayer[p.id]).sort(byName);
   const visibleTeam = filterPlayersByName(team, search, nameOf);
@@ -2217,7 +2221,7 @@ function FootEventEditor({
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))), /*#__PURE__*/React.createElement("option", {
+  }, footShortName(p))), /*#__PURE__*/React.createElement("option", {
     value: "csc"
   }, "CSC (but contre son camp)"))), playerId !== "csc" && /*#__PURE__*/React.createElement(FField, {
     label: "Passe d\xE9cisive (optionnel)"
@@ -2230,7 +2234,7 @@ function FootEventEditor({
   }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS)))))), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
+  }, footShortName(p)))))), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -2443,7 +2447,7 @@ function FootGoalPicker({
   }, "\u2014 Choisir \u2014"), options.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))), /*#__PURE__*/React.createElement("option", {
+  }, footShortName(p))), /*#__PURE__*/React.createElement("option", {
     value: "csc"
   }, "CSC (but contre son camp)"))), withAssist && playerId !== "csc" && /*#__PURE__*/React.createElement(FField, {
     label: "Passe d\xE9cisive (optionnel)"
@@ -2456,7 +2460,7 @@ function FootGoalPicker({
   }, "\u2014 Aucune \u2014"), options.filter(p => String(p.id) !== playerId).map(p => /*#__PURE__*/React.createElement("option", {
     key: p.id,
     value: p.id
-  }, getDisplayName(p, PLAYERS))))), /*#__PURE__*/React.createElement("div", {
+  }, footShortName(p))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -4868,7 +4872,7 @@ function FootPhotosTab({
   photos,
   reload
 }) {
-  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : getDisplayName(p, PLAYERS) || "";
+  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? p.name : footShortName(p) || "";
   const real = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   if (!real.length) return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
@@ -5190,7 +5194,7 @@ function FootFramingCompare({
         overflow: "hidden",
         textOverflow: "ellipsis"
       }
-    }, p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : getDisplayName(p, PLAYERS)), photo && /*#__PURE__*/React.createElement("span", {
+    }, p.id === FOOT_UNKNOWN_PLAYER.id ? "Inconnu" : footShortName(p)), photo && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         color: saved ? FC.good : FC.muted,
@@ -5206,7 +5210,7 @@ function FootFramingTool({
   framings,
   reload
 }) {
-  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : getDisplayName(p, PLAYERS) || "";
+  const nameOf = p => p.id === FOOT_UNKNOWN_PLAYER.id ? "Joueur inconnu" : footShortName(p) || "";
   const players = [...new Set(photos.map(p => p.player_id))].map(id => id === FOOT_UNKNOWN_PLAYER.id ? FOOT_UNKNOWN_PLAYER : PLAYERS.find(p => p.id === id)).filter(p => p && (p.id === FOOT_UNKNOWN_PLAYER.id || roster.some(r => r.player_id === p.id))).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const [playerId, setPlayerId] = React.useState(null);
   const [kit, setKit] = React.useState("domicile");
@@ -6327,7 +6331,7 @@ function FootPostsTab({
   // Players that can be put on a photo: roster players with a celebration photo.
   const candidates = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).filter(p => photos.some(ph => ph.player_id === p.id && ph.kind === "celebration")).map(p => ({
     id: p.id,
-    name: getDisplayName(p, PLAYERS) || "",
+    name: footShortName(p) || "",
     hasDos: photos.some(ph => ph.player_id === p.id && ph.kind === "dos")
   })).sort((a, b) => a.name.localeCompare(b.name));
   async function pickPlayer(key, id) {
@@ -6673,7 +6677,8 @@ function FootRoomStat({
 
 // The extra numbers under a shirt (Vestiaire, "Plus de stats"): compact, so everything fits on a phone screen at once.
 function FootShirtMore({
-  st
+  st,
+  onOpenMatch
 }) {
   const label = {
     fontFamily: FF.ui,
@@ -6683,14 +6688,25 @@ function FootShirtMore({
     color: "rgba(255,255,255,0.6)",
     margin: "9px 0 4px"
   };
+  const box = {
+    background: "rgba(255,255,255,0.07)",
+    borderRadius: 11,
+    padding: "5px 4px 4px",
+    textAlign: "center",
+    minWidth: 0
+  };
+  const small = {
+    fontFamily: FF.ui,
+    fontSize: 9,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.7)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  };
   const tile = (title, value) => /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "rgba(255,255,255,0.07)",
-      borderRadius: 11,
-      padding: "5px 4px 4px",
-      textAlign: "center",
-      minWidth: 0
-    }
+    style: box
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.display,
@@ -6698,24 +6714,41 @@ function FootShirtMore({
       lineHeight: 1.1
     }
   }, value), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: FF.ui,
-      fontSize: 9,
-      letterSpacing: "0.04em",
-      textTransform: "uppercase",
-      color: "rgba(255,255,255,0.7)",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis"
-    }
+    style: small
   }, title));
   const dash = (v, f = x => x) => v == null ? "–" : f(v);
+  const two = v => v.toFixed(2),
+    one = v => v.toFixed(1);
+  // a rated match: the mark, who it was against; a tap opens the match
+  const matchTile = (title, m, tone) => /*#__PURE__*/React.createElement("button", {
+    disabled: !m,
+    onClick: () => m && onOpenMatch(m.matchId),
+    style: {
+      ...box,
+      border: "none",
+      color: "#fff",
+      cursor: m ? "pointer" : "default",
+      background: m ? tone : box.background,
+      font: "inherit"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 17,
+      lineHeight: 1.1
+    }
+  }, m ? one(m.rating) : "–"), /*#__PURE__*/React.createElement("div", {
+    style: small
+  }, title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      color: "rgba(255,255,255,0.85)"
+    }
+  }, m ? `vs ${m.opponent} ›` : "pas de note"));
   const res = [["V", st.wins, "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, "#c0262d"]];
-  const formColor = {
-    V: "#2f9a55",
-    N: "#b9a03a",
-    D: "#c0262d"
-  };
   const grid = n => ({
     display: "grid",
     gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`,
@@ -6756,72 +6789,20 @@ function FootShirtMore({
       fontSize: 10,
       color: "rgba(255,255,255,0.6)"
     }
-  }, "VICTOIRES"))), st.form.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 5,
-      marginTop: 6
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "rgba(255,255,255,0.7)",
-      marginRight: 3
-    }
-  }, "Forme"), st.form.map((r, k) => /*#__PURE__*/React.createElement("span", {
-    key: k,
-    style: {
-      width: 20,
-      height: 20,
-      borderRadius: 6,
-      background: formColor[r],
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: FF.ui,
-      fontSize: 11
-    }
-  }, r))), /*#__PURE__*/React.createElement("div", {
+  }, "VICTOIRES"))), /*#__PURE__*/React.createElement("div", {
     style: label
   }, "Cette saison"), /*#__PURE__*/React.createElement("div", {
     style: grid(3)
-  }, tile("Buts / match", dash(st.goalsPerMatch, v => v.toFixed(2))), tile("Décisifs", st.decisive), tile("Décisifs / m.", dash(st.decisivePerMatch, v => v.toFixed(2))), tile("Matchs joués", dash(st.playedPct, v => `${v}%`)), tile("Meilleure note", dash(st.best, v => (Math.round(v * 10) / 10).toFixed(1))), tile("Note moy.", dash(st.rating, v => v.toFixed(1)))), /*#__PURE__*/React.createElement("div", {
-    style: label
-  }, "3 derniers matchs not\xE9s"), st.lastRatings.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, tile("Buts / match", dash(st.goalsPerMatch, two)), tile("Passes D / match", dash(st.assistsPerMatch, two)), tile("Décisifs / match", dash(st.decisivePerMatch, two))), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "rgba(255,255,255,0.6)"
+      ...grid(3),
+      marginTop: 5
     }
-  }, "Pas encore de note cette saison") : /*#__PURE__*/React.createElement("div", {
-    style: grid(3)
-  }, st.lastRatings.map((r, k) => /*#__PURE__*/React.createElement("div", {
-    key: k,
-    style: {
-      borderRadius: 11,
-      padding: "5px 4px 4px",
-      textAlign: "center",
-      minWidth: 0,
-      background: r.rating >= 7 ? "rgba(47,154,85,0.85)" : r.rating >= 5.5 ? "rgba(255,255,255,0.1)" : "rgba(192,38,45,0.85)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: FF.display,
-      fontSize: 17,
-      lineHeight: 1.1
-    }
-  }, r.rating.toFixed(1)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis"
-    }
-  }, "vs ", r.opponent)))), st.career && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, matchTile("Meilleure note", st.best, "rgba(47,154,85,0.75)"), matchTile("Pire note", st.worst, "rgba(192,38,45,0.7)"), tile("Note moyenne", dash(st.rating, one))), st.career && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: label
   }, "Carri\xE8re au club"), /*#__PURE__*/React.createElement("div", {
-    style: grid(4)
-  }, tile("Matchs", st.career.played), tile("Buts", st.career.goals), tile("Passes D", st.career.assists), tile("HDM", st.career.motm))));
+    style: grid(6)
+  }, tile("Matchs", st.career.played), tile("Buts", st.career.goals), tile("Passes D", st.career.assists), tile("Décisifs", st.career.decisive), tile("Note", dash(st.career.rating, one)), tile("HDM", st.career.motm))));
 }
 
 // A compact season / matches picker floating over the 3D room (native select: easy on a phone).
@@ -7085,7 +7066,7 @@ function FootRoomScreen({
   }, [squad, kit, state]);
   React.useEffect(() => {
     if (!room.current) return;
-    const entries = rankingEntries(rows, boardTab, footNameOf, 10).map(e => ({
+    const entries = rankingEntries(rows, boardTab, footNameOf, 99).map(e => ({
       playerId: e.playerId,
       name: footNameOf(e.playerId),
       value: boardTab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, boardTab, "abs"),
@@ -7193,14 +7174,7 @@ function FootRoomScreen({
       row,
       careerRow: career,
       series: playerRatingSeries(seasonMs, ratings, lineups.filter(l => ids.has(l.match_id)), shirt.id),
-      seasonFinished: seasonMs.filter(m => m.status === "finished").length,
-      scoreOf: m => scoreById[m.id] || {
-        bl: 0,
-        opponent: 0
-      },
-      lineups,
-      playerId: shirt.id,
-      allMatches: careerMs
+      careerSeries: playerRatingSeries(careerMs, ratings, lineups, shirt.id)
     });
   }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, rackSeason, statsType]);
   const glass = {
@@ -7486,13 +7460,19 @@ function FootRoomScreen({
     label: "Passes D",
     value: row ? row.assists : 0
   }), /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "D\xE9cisifs",
+    value: row ? row.decisive : 0
+  }), /*#__PURE__*/React.createElement(FootRoomStat, {
     label: "Note",
     value: row && row.rating != null ? row.rating.toFixed(1) : "–"
   }), /*#__PURE__*/React.createElement(FootRoomStat, {
     label: "HDM",
     value: row ? row.motm : 0
   })), statsOpen && more && /*#__PURE__*/React.createElement(FootShirtMore, {
-    st: more
+    st: more,
+    onOpenMatch: id => nav("matchDetail", {
+      matchId: id
+    })
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => setStatsOpen(!statsOpen),
     "aria-expanded": statsOpen,
@@ -7666,6 +7646,7 @@ function FootballApp({
     // optional: absent until the activities migration is applied
     sbFetch("foot_activity_attendance", "?select=*").catch(() => []), sbFetch("foot_motm_votes", "?select=match_id,voter_id,player_id").catch(() => []) // optional: absent until the man-of-the-match migration is applied
     ]);
+    FOOT_POOL = new Set([...(r || []).map(x => x.player_id), ...(l || []).map(x => x.player_id), ...Object.values(FOOT_SEASON_SQUADS).flat()]);
     setMotmVotes(mv || []);
     setActivities(ac || []);
     setActivityAttendance_(aa || []);

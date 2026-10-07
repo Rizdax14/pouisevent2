@@ -109,24 +109,21 @@ test("calendarBounds spans the first match to the last one, today included", () 
   assert.equal(b.max, 2026 * 12 + 11);
 });
 
-test("shirtStats: win rate, per-match numbers, last ratings newest first, recent form", () => {
-  const ms = [
-    { id: 1, status: "finished", match_datetime: "2026-09-01T17:00:00Z" }, { id: 2, status: "finished", match_datetime: "2026-09-08T17:00:00Z" },
-    { id: 3, status: "finished", match_datetime: "2026-09-15T17:00:00Z" }, { id: 4, status: "scheduled", match_datetime: "2026-10-15T17:00:00Z" },
-  ];
-  const scores = { 1: { bl: 2, opponent: 1 }, 2: { bl: 0, opponent: 3 }, 3: { bl: 1, opponent: 1 } };
+test("shirtStats: win rate, per-match numbers, best and worst rated match, career", () => {
+  const series = [{ matchId: 1, opponent: "A", rating: 6 }, { matchId: 2, opponent: "B", rating: 7.25 }, { matchId: 3, opponent: "C", rating: 5 }, { matchId: 4, opponent: "D", rating: 8 }];
   const st = D.shirtStats({
-    row: { played: 3, wins: 1, draws: 1, losses: 1, goals: 4, assists: 2, decisive: 6, motm: 1 }, careerRow: { played: 10, goals: 9, assists: 4, motm: 2 },
-    series: [{ opponent: "A", rating: 6 }, { opponent: "B", rating: 7.25 }, { opponent: "C", rating: 5 }, { opponent: "D", rating: 8 }],
-    seasonFinished: 4, scoreOf: (m) => scores[m.id], lineups: [1, 2, 3].map((id) => ({ match_id: id, player_id: 9 })), playerId: 9, allMatches: ms,
+    row: { played: 3, wins: 1, draws: 1, losses: 1, goals: 4, assists: 2, decisive: 6, motm: 1 },
+    careerRow: { played: 10, goals: 9, assists: 4, decisive: 13, motm: 2 }, series, careerSeries: [...series, { matchId: 9, opponent: "E", rating: 4 }],
   });
   assert.equal(st.winPct, 33);
   assert.equal(st.goalsPerMatch, 1.33);
-  assert.equal(st.playedPct, 75);
-  assert.equal(st.best, 8);
+  assert.equal(st.assistsPerMatch, 0.67);
+  assert.equal(st.decisivePerMatch, 2);
+  assert.deepEqual(st.best, { rating: 8, opponent: "D", matchId: 4, date: undefined });
+  assert.equal(st.worst.opponent, "C");
   assert.equal(st.rating, 6.6);
-  assert.deepEqual(st.lastRatings.map((x) => x.opponent), ["D", "C", "B"]);
-  assert.deepEqual(st.form, ["N", "D", "V"]);
+  assert.deepEqual(st.career, { played: 10, goals: 9, assists: 4, decisive: 13, motm: 2, rating: 6.1 });
+  assert.equal(D.shirtStats({ row: null, careerRow: null, series: [] }).best, null);
 });
 
 test("monthMatches: the month's matches with score, result, hour or my rating", () => {

@@ -122,11 +122,17 @@ function pickFeatured(candidateIds, history, seed) {
   })[0];
 }
 
-function postName(player, players) {
+// "Prénom N" (first name + first letter of the last name), the club's one way to write a player.
+// Two players with the same first name and initial keep their full display name.
+function shortName(player, players) {
   if (!player) return "?";
-  const same = players.filter((p) => p.name === player.name);
-  return same.length > 1 ? (player.display_name || player.name) : player.name;
+  const first = String(player.name || "").trim(), last = String(player.last_name || "").trim();
+  if (!last) return player.display_name || first || "?";
+  const short = `${first} ${last[0].toUpperCase()}`;
+  const clash = (players || []).some((p) => p.id !== player.id && String(p.name || "").trim() === first && String(p.last_name || "").trim()[0]?.toUpperCase() === last[0].toUpperCase());
+  return clash ? player.display_name || short : short;
 }
+function postName(player, players) { return shortName(player, players); }
 
 function opponentLabel(name) {
   const up = String(name || "").trim().toUpperCase();
@@ -402,5 +408,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }
