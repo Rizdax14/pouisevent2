@@ -919,7 +919,8 @@ function FootMatchRow({
   onOpen
 }) {
   const finished = match.status !== "scheduled";
-  const out = finished ? footOutcome(score) : null;
+  const unknown = finished && match.score_unknown;
+  const out = finished && !unknown ? footOutcome(score) : null;
   const dt = new Date(match.match_datetime);
   return /*#__PURE__*/React.createElement(FCard, {
     onClick: onOpen,
@@ -931,7 +932,7 @@ function FootMatchRow({
       gap: 12
     }
   }, finished ? /*#__PURE__*/React.createElement("span", {
-    title: FOOT_OUTCOME_LABEL[out],
+    title: unknown ? "Score inconnu" : FOOT_OUTCOME_LABEL[out],
     style: {
       width: 44,
       height: 44,
@@ -942,10 +943,10 @@ function FootMatchRow({
       justifyContent: "center",
       fontFamily: FF.display,
       fontSize: 20,
-      background: FC[FOOT_OUTCOME_TONE[out]],
+      background: unknown ? FC.muted : FC[FOOT_OUTCOME_TONE[out]],
       color: "#fff"
     }
-  }, out) : /*#__PURE__*/React.createElement("span", {
+  }, unknown ? "?" : out) : /*#__PURE__*/React.createElement("span", {
     style: {
       width: 44,
       flexShrink: 0,
@@ -1002,7 +1003,7 @@ function FootMatchRow({
       color: FC.deep,
       whiteSpace: "nowrap"
     }
-  }, score.bl, "\u2013", score.opponent) : /*#__PURE__*/React.createElement(FIcon, {
+  }, unknown ? "?–?" : `${score.bl}–${score.opponent}`) : /*#__PURE__*/React.createElement(FIcon, {
     name: "chevron",
     size: 20,
     style: {
@@ -1951,8 +1952,9 @@ function FootScoreboard({
   score
 }) {
   const live = match.status === "live",
-    finished = match.status === "finished";
-  const out = finished ? footOutcome(score) : null;
+    finished = match.status === "finished",
+    unknown = finished && match.score_unknown;
+  const out = finished && !unknown ? footOutcome(score) : null;
   return /*#__PURE__*/React.createElement(FCard, {
     pad: 20
   }, /*#__PURE__*/React.createElement("div", {
@@ -1965,7 +1967,7 @@ function FootScoreboard({
     }
   }, live ? /*#__PURE__*/React.createElement(FChip, {
     tone: "live"
-  }, "En direct") : finished ? /*#__PURE__*/React.createElement(FChip, {
+  }, "En direct") : unknown ? /*#__PURE__*/React.createElement(FChip, null, "Score inconnu") : finished ? /*#__PURE__*/React.createElement(FChip, {
     tone: FOOT_OUTCOME_TONE[out]
   }, FOOT_OUTCOME_LABEL[out]) : /*#__PURE__*/React.createElement(FChip, {
     tone: "accent"
@@ -1993,7 +1995,7 @@ function FootScoreboard({
       whiteSpace: "nowrap",
       lineHeight: 1
     }
-  }, live || finished ? `${score.bl} – ${score.opponent}` : "VS"), /*#__PURE__*/React.createElement(FootTeamMark, {
+  }, unknown ? "? – ?" : live || finished ? `${score.bl} – ${score.opponent}` : "VS"), /*#__PURE__*/React.createElement(FootTeamMark, {
     name: match.opponent_name
   })), live && /*#__PURE__*/React.createElement(FootLiveClock, {
     match: match
@@ -4257,7 +4259,8 @@ function FootStatsPage({
     season,
     type
   });
-  const population = statsRoster(roster);
+  const filteredIds = new Set(filtered.map(m => m.id));
+  const population = statsRoster(roster, lineups.filter(l => filteredIds.has(l.match_id)));
   const ratingBy = Object.fromEntries(population.map(id => [id, averageRating(playerRatingSeries(filtered, ratings, lineups, id))]));
   const motmBy = motmWinners(filtered, motmVotes || []);
   const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events, motmBy), ratingBy);
@@ -4505,7 +4508,7 @@ function FootRankingsPanel({
   };
   const ids = new Set(seasonMatches.map(m => m.id));
   const seasonLineups = lineups.filter(l => ids.has(l.match_id));
-  const rows = buildStatsRows(statsRoster(roster), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id)), motmWinners(seasonMatches, motmVotes || [])), {});
+  const rows = buildStatsRows(statsRoster(roster, seasonLineups), computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id)), motmWinners(seasonMatches, motmVotes || [])), {});
   for (const r of rows) {
     const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
     r.rating = averageRating(series);
@@ -6886,7 +6889,7 @@ function FootRoomScreen({
     });
     const ids = new Set(filtered.map(m => m.id));
     const ls = lineups.filter(l => ids.has(l.match_id));
-    const out = buildStatsRows(statsRoster(roster), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
+    const out = buildStatsRows(statsRoster(roster, ls), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
     for (const r of out) {
       const s = playerRatingSeries(filtered, ratings, ls, r.playerId);
       r.rating = averageRating(s);
@@ -7082,7 +7085,7 @@ function FootRoomScreen({
     });
     const ids = new Set(filtered.map(m => m.id));
     const ls = lineups.filter(l => ids.has(l.match_id));
-    const out = buildStatsRows(statsRoster(roster), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
+    const out = buildStatsRows(statsRoster(roster, ls), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
     for (const r of out) {
       const s = playerRatingSeries(filtered, ratings, ls, r.playerId);
       r.rating = averageRating(s);

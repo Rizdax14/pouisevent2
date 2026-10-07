@@ -75,7 +75,7 @@ function shirtStats({ row, careerRow, series, seasonFinished, scoreOf, lineups, 
   const ratings = (series || []).map((s) => s.rating);
   // last matches played (on the sheet of a finished match), newest first, with the result
   const mine = new Set((lineups || []).filter((l) => l.player_id === playerId).map((l) => l.match_id));
-  const lastPlayed = (allMatches || []).filter((m) => m.status === "finished" && mine.has(m.id))
+  const lastPlayed = (allMatches || []).filter((m) => m.status === "finished" && !m.score_unknown && mine.has(m.id))
     .sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime)).slice(0, 5)
     .map((m) => { const sc = scoreOf(m); return sc.bl > sc.opponent ? "V" : sc.bl < sc.opponent ? "D" : "N"; });
   return {
@@ -117,13 +117,13 @@ function calendarMonth(matches, scoreOf, year, month, nowMs, ratingOf) {
   for (const m of [...matches].sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))) {
     const p = _parisParts(new Date(m.match_datetime));
     if (p.y !== year || p.m !== month || days[p.d]) continue;
-    const played = m.status === "finished";
+    const played = m.status === "finished" && !m.score_unknown;
     const sc = played ? scoreOf(m) : null;
     days[p.d] = {
       id: m.id, top: shortOpponent(m.opponent_name),
-      bottom: played ? `${sc.bl}-${sc.opponent}` : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
+      bottom: played ? `${sc.bl}-${sc.opponent}` : m.score_unknown ? "?-?" : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
       tone: played ? { V: "win", D: "loss", N: "draw" }[footOutcome(sc)] : null,
-      rating: played && ratingOf ? (ratingOf(m) ?? null) : null,
+      rating: m.status === "finished" && ratingOf ? (ratingOf(m) ?? null) : null,
     };
   }
   const t = _parisParts(new Date(nowMs === undefined ? Date.now() : nowMs));
@@ -141,13 +141,13 @@ function monthMatches(matches, scoreOf, key, ratingOf) {
     .sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))
     .map((m) => {
       const p = _parisParts(new Date(m.match_datetime));
-      const played = m.status === "finished";
+      const played = m.status === "finished" && !m.score_unknown;
       const sc = played ? scoreOf(m) : null;
       return {
         id: m.id, day: p.d, wd: ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."][p.wd], opponent: m.opponent_name,
-        score: played ? `${sc.bl} - ${sc.opponent}` : null, result: played ? footOutcome(sc) : null,
-        hour: played ? null : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
-        rating: played && ratingOf ? (ratingOf(m) ?? null) : null,
+        score: played ? `${sc.bl} - ${sc.opponent}` : m.score_unknown ? "? - ?" : null, result: played ? footOutcome(sc) : null,
+        hour: played || m.score_unknown ? null : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
+        rating: m.status === "finished" && ratingOf ? (ratingOf(m) ?? null) : null,
       };
     });
   return { key, title: `${FOOT_MONTHS[month - 1]} ${year}`, rows };

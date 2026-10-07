@@ -148,8 +148,10 @@ function motmWinners(matches, votes) {
 
 function computePlayerStats(matches, lineups, events, motmByMatch) {
   const finished = new Set(matches.filter((m) => m.status === "finished").map((m) => m.id));
+  const unknown = new Set(matches.filter((m) => m.score_unknown).map((m) => m.id)); // played, but no result to count
   const resultByMatch = {};
   for (const id of finished) {
+    if (unknown.has(id)) continue;
     const s = computeFootScore(events.filter((e) => e.match_id === id));
     resultByMatch[id] = s.bl > s.opponent ? "wins" : s.bl === s.opponent ? "draws" : "losses";
   }
@@ -160,7 +162,7 @@ function computePlayerStats(matches, lineups, events, motmByMatch) {
     onSheet.add(`${l.match_id}:${l.player_id}`);
     const st = stats[l.player_id] || (stats[l.player_id] = { playerId: l.player_id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 });
     st.played++;
-    st[resultByMatch[l.match_id]]++;
+    if (resultByMatch[l.match_id]) st[resultByMatch[l.match_id]]++;
   }
   for (const e of events) {
     if (e.type !== "goal_bl" || !finished.has(e.match_id)) continue;
@@ -317,8 +319,11 @@ function buildRatingPayload(matchId, raterId, sheetIds, scoresByRatee) {
   });
 }
 
-function statsRoster(roster) {
-  return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel").map((r) => r.player_id);
+// Regular and occasional players. With the lineups of the matches looked at, former players (role "ancien")
+// who played one of them are counted too, so past seasons keep their whole squad.
+function statsRoster(roster, lineups) {
+  const played = new Set((lineups || []).map((l) => l.player_id));
+  return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel" || (r.role === "ancien" && played.has(r.player_id))).map((r) => r.player_id);
 }
 
 function buildStatsRows(rosterIds, stats, ratingByPlayer) {

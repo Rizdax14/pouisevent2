@@ -384,6 +384,18 @@ test("statsRoster keeps regular and occasional players only", () => {
   assert.deepEqual(statsRoster([{ player_id: 1, role: "regulier" }, { player_id: 2, role: "invite" }, { player_id: 3, role: "occasionnel" }]), [1, 3]);
 });
 
+test("statsRoster counts former players only when they played the matches looked at", () => {
+  const roster = [{ player_id: 1, role: "regulier" }, { player_id: 5, role: "ancien" }, { player_id: 6, role: "ancien" }];
+  assert.deepEqual(statsRoster(roster), [1]);
+  assert.deepEqual(statsRoster(roster, [{ match_id: 3, player_id: 6 }]), [1, 6]);
+});
+
+test("computePlayerStats counts a match with an unknown score as played, without a result", () => {
+  const ms = [{ id: 1, status: "finished", score_unknown: true }, { id: 2, status: "finished" }];
+  const st = computePlayerStats(ms, [{ match_id: 1, player_id: 7 }, { match_id: 2, player_id: 7 }], [{ match_id: 2, type: "goal_bl", player_id: 7 }], {});
+  assert.deepEqual([st[0].played, st[0].wins, st[0].draws, st[0].losses, st[0].goals], [2, 1, 0, 0, 1]);
+});
+
 test("buildStatsRows adds zero rows and ratings for the roster only", () => {
   const rows = buildStatsRows([1, 2], [{ playerId: 1, played: 2, wins: 1, draws: 0, losses: 1, goals: 1, assists: 0, decisive: 1 }, { playerId: 9, played: 1, wins: 1, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0 }], { 1: 7.25 });
   assert.deepEqual(rows.map((r) => [r.playerId, r.played, r.rating]), [[1, 2, 7.25], [2, 0, null]]);

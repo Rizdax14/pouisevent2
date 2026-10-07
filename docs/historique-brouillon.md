@@ -197,7 +197,7 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 1. 16/01/2025 vs Genilac : FSGT dit 1-3, Insta dit 3-1 (victoire, « première victoire »). → je pense que le PDF est inversé, je prends **3-1**.
 2. 12/02/2026 Dunières 8-7 vs 9-8 et 19/02/2026 PSV 8-11 vs 8-10 : je prends le **PDF officiel FSGT**.
 3. 31/10/2024 : Celda ou JBV ?
-4. Scores manquants : amical d'octobre 2024, Patronage Saint Joseph (10/07/2025).
+4. Scores manquants : amical d'octobre 2024, Patronage Saint Joseph (10/07/2025) → affiché « ? - ? » (colonne `score_unknown`), compte comme match joué sans V/N/D.
 
 ## Import en base (07/10/2026)
 - 54 matchs importés : `foot_matches` id 67 à 120 (scores, buteurs, passeurs, feuilles de match).
@@ -207,3 +207,7 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Les buts sans buteur connu sont enregistrés avec un joueur vide (forfait 6-0, Tottenaam 7-1, amicaux sans détail).
 - Pour annuler l'import : `delete from foot_matches where id between 67 and 120;` (les buts, feuilles de match et votes partent avec).
 - Notes et feuilles de match de la phase 2 25-26 (10 matchs), tirées du fichier « moyenne 25-26 ». Correspondances : Titouan Brunon = Thisma, Vianel/Mahé Chanut = Mahé. Les invités (Baptiste Lurel, Clément Desjoyaux, Quentin Laurent, Jean Jean) ne sont pas importés.
+- Amicaux de fin de saison (score SportEasy, feuilles et notes du fichier « moyenne 25-26 ») : 18/06/2026 Copains Chopines 1-3 (Nolan, passe Thisma) et 25/06/2026 Equipe Yoni 3-7 (Ilian, Thisma, 1 buteur inconnu ; passes Samuel, Louis). Le fichier date le match Yoni du 07/05 : j'ai pris la date SportEasy.
+- Esté (17) ajouté à l'effectif : régulier, n°77.
+- Recoupement des buts/passes de la phase 2 avec « moyenne 25-26 » : un seul ajout sûr, le but sans buteur de Dunières 12/02 est à Romain. Les autres écarts (passes de Thisma, but de Mathis F contre PSV le 23/04, passes d'Esté le 12/02) contredisent les totaux de Thisma : laissés tels quels.
+- Les anciens apparaissent dans les stats et les classements des saisons où ils ont joué (pas sur le portant du vestiaire).

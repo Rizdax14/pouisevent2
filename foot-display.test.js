@@ -92,6 +92,16 @@ test("calendarMonth: Monday-first grid by Paris day, score and tone for played m
   assert.equal(cal.days[31], undefined); // belongs to November in Paris
 });
 
+test("a match whose score was never found shows ?-? and no result", () => {
+  const ms = [{ id: 4, status: "finished", score_unknown: true, match_datetime: "2025-07-10T17:30:00Z", opponent_name: "Patronage Saint Joseph" }];
+  const cal = D.calendarMonth(ms, () => ({ bl: 0, opponent: 0 }), 2025, 7, 0, () => 7);
+  assert.deepEqual(cal.days[10], { id: 4, top: "Patrona.", bottom: "?-?", tone: null, rating: 7 });
+  const row = D.monthMatches(ms, () => ({ bl: 0, opponent: 0 }), 2025 * 12 + 6).rows[0];
+  assert.equal(row.score, "? - ?");
+  assert.equal(row.result, null);
+  assert.equal(row.hour, null);
+});
+
 test("calendarBounds spans the first match to the last one, today included", () => {
   const ms = [{ match_datetime: "2025-09-10T17:00:00Z" }, { match_datetime: "2026-12-10T17:00:00Z" }];
   const b = D.calendarBounds(ms, new Date("2026-10-07T10:00:00Z").getTime());
