@@ -24,11 +24,19 @@ async function featuredPhoto(ctx, layout, slot, sheetIds, kinds, chosen) {
   const ph = L.photoOrDefault(ctx.photos, pid, kind, ctx.theme);
   if (!ph) return { pid, rect: null, uri: null };
   const fr = L.savedFraming(ctx.framings, ph.id, layout);
-  const placed = await placePhoto(publicUrl("player-photos", ph.path), ph, L.framedRect(layout, ph, fr), L.LAYOUTS[layout].canvas);
-  return { pid, rect: placed.rect, uri: placed.uri };
+  const full = L.framedRect(layout, ph, fr); // the whole photo, even where it leaves the canvas
+  const placed = await placePhoto(publicUrl("player-photos", ph.path), ph, full, L.LAYOUTS[layout].canvas);
+  return { pid, rect: placed.rect, uri: placed.uri, full };
 }
 
-async function build(kind, q) {
+// Where each player is tagged on the post (canvas px), collected in `out.points` when asked.
+// Podiums: bottom-left of each of the 3 photo cards (above the name pill).
+function podiumPoints(rows) {
+  return rows.slice(0, 3).map((r, i) => ({ playerId: r.playerId, x: T.PODIUM[i].left + 44, y: T.PODIUM[i].top + T.PODIUM[i].h - 74 }));
+}
+
+async function build(kind, q, out) {
+  const tag = (pts) => { if (out) out.points = (pts || []).filter((p) => p && p.playerId); };
   if (kind === "matchday") {
     const ctx = await loadMatchContext(q.match);
     const theme = THEMES[ctx.theme];
@@ -36,9 +44,12 @@ async function build(kind, q) {
     const sheetIds = ctx.lineups.map((l) => l.player_id);
     if (String(q.page || "1") === "2") {
       const f = await featuredPhoto(ctx, "groupe", "matchday", sheetIds, ["celebration", "dos"], CHOSEN(q));
+      // On his back photo: the name printed on the shirt, about halfway down the photo (as shot), centred.
+      tag(f.full ? [{ playerId: f.pid, x: Math.min(1050, Math.max(30, f.full.x + f.full.width * 0.5)), y: Math.min(1320, Math.max(30, f.full.y + f.full.height * 0.48)) }] : []);
       return T.groupeEl({ bg, theme, lines: L.groupeLines(sheetIds, ctx.roster, ctx.players), rect: f.rect, photoUri: f.uri });
     }
     const f = await featuredPhoto(ctx, "matchday", "matchday", sheetIds, ["celebration", "dos"], CHOSEN(q));
+    tag([]);
     return T.matchDayEl({ bg, theme, opponent: L.opponentLabel(ctx.match.opponent_name), bandText: L.matchBand(ctx.match), rect: f.rect, photoUri: f.uri });
   }
   if (kind === "result") {
@@ -48,11 +59,12 @@ async function build(kind, q) {
     // Own rotation slot so Match Day and Résultat don't always feature the same player.
     const f = await featuredPhoto(ctx, "result", "result", sheetIds, ["celebration"], CHOSEN(q));
     const s = F.computeFootScore(ctx.events);
+    tag([{ playerId: f.pid, x: 86, y: 1242 }]); // bottom-left of the post
     return T.resultEl({ bg: await imageDataUri(theme.bg), theme, opponent: ctx.match.opponent_name.toUpperCase(), bl: s.bl, opp: s.opponent, goals: L.goalRows(ctx.events, ctx.players), rect: f.rect, photoUri: f.uri });
   }
   if (kind === "frame") return buildFrame(q);
-  if (kind === "ratings") return buildRatings(q);
-  if (kind === "rankings") return buildRankings(q);
+  if (kind === "ratings") return buildRatings(q, tag);
+  if (kind === "rankings") return buildRankings(q, tag);
   throw new Error(`Type inconnu : ${kind}`);
 }
 
@@ -83,7 +95,7 @@ async function buildFrame(q) {
   return T.groupeEl({ bg, theme, lines, rect, photoUri });
 }
 
-async function buildRatings(q) {
+async function buildRatings(q, tag = () => {}) {
   const ctx = await loadMatchContext(q.match);
   const theme = THEMES[ctx.theme];
   const sheetIds = ctx.lineups.map((l) => l.player_id);
@@ -101,6 +113,7 @@ async function buildRatings(q) {
   const rows = L.ratingRows(sheetIds, F.finalAverages(ctx.match, sheetIds, ctx.ratings), seasonAvg, nameOf);
   // Top 3 get their "dos" photo on the podium; missing photos fall back to initials in the template.
   await withPodiumPhotos(rows, ctx, "podium_dos", ctx.theme);
+  tag(podiumPoints(rows));
   const s = F.computeFootScore(ctx.events);
   return T.ratingsEl({ bg: await imageDataUri(theme.bg), theme, opponent: L.opponentLabel(ctx.match.opponent_name), bl: s.bl, opp: s.opponent, rows });
 }
@@ -119,7 +132,7 @@ async function withPodiumPhotos(rows, data, layout, kit) {
   return rows;
 }
 
-async function buildRankings(q) {
+async function buildRankings(q, tag = () => {}) {
   const page = L.RANKING_PAGES[Number(q.page || 1) - 1];
   if (!page) throw new Error("Page de classement inconnue");
   const [common, matches, lineups, events, ratings, motmVotes] = await Promise.all([
@@ -152,6 +165,7 @@ async function buildRankings(q) {
     ...e, name: nameOf(e.playerId), matches: page.key === "rating" ? byId[e.playerId].rated : byId[e.playerId].played,
   }));
   await withPodiumPhotos(entries, common, page.layout, themeName);
+  tag(podiumPoints(entries));
   return T.rankingEl({ bg: await imageDataUri(theme.bg), theme, heading: page.heading, season, entries, decimals: page.key === "rating" });
 }
 

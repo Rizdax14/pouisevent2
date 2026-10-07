@@ -537,3 +537,11 @@ test("photoOrDefault: a player without render gets the default (player 0) render
   assert.equal(L.photoOrDefault(photos, 9, "celebration", "domicile"), null);
   assert.equal(L.photoOrDefault(photos, 9, "dos", "domicile"), null);
 });
+
+test("userTagsFor: usernames only, normalised 0–1 and clamped, one per account, 20 max", () => {
+  const pts = [{ playerId: 1, x: 540, y: 675 }, { playerId: 2, x: -50, y: 2000 }, { playerId: 3, x: 1, y: 1 }, { playerId: 1, x: 10, y: 10 }];
+  assert.deepEqual(L.userTagsFor(pts, { 1: "a", 2: "b" }), [{ username: "a", x: 0.5, y: 0.5 }, { username: "b", x: 0.02, y: 0.98 }]);
+  assert.deepEqual(L.userTagsFor(null, { 1: "a" }), []);
+  const many = Array.from({ length: 30 }, (_, i) => ({ playerId: i, x: 100, y: 100 }));
+  assert.equal(L.userTagsFor(many, Object.fromEntries(many.map((p) => [p.playerId, "u" + p.playerId]))).length, 20);
+});

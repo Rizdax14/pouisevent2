@@ -108,11 +108,11 @@ function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail 
       if (method === "DELETE") { db.splice(db.findIndex((r) => r.id === idm), 1); return null; }
       Object.assign(db.find((r) => r.id === idm), body); return [{ ...db.find((r) => r.id === idm) }];
     },
-    async renderImages(t) { log.push("render"); return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3"), Buffer.from("4"), Buffer.from("5")] : t.kind === "matchday" ? [Buffer.from("1"), Buffer.from("2")] : [Buffer.from("1")]; },
+    async renderImages(t) { log.push("render"); if (t.kind === "result") { const b = [Buffer.from("1")]; b.points = [[{ playerId: 1, x: 86, y: 1242 }, { playerId: 9, x: 10, y: 10 }]]; return b; } return t.kind === "rankings" ? [Buffer.from("1"), Buffer.from("2"), Buffer.from("3"), Buffer.from("4"), Buffer.from("5")] : t.kind === "matchday" ? [Buffer.from("1"), Buffer.from("2")] : [Buffer.from("1")]; },
     featuredId: async (t) => { if (featuredFail) throw new Error("db down"); log.push(`featured ${t.player || "auto"}`); return t.player || 21; },
     async uploadImage(p) { log.push("upload " + p); if (uploadFail) throw new Error("storage down"); },
     publicUrl: (p) => `https://pub/${p}`,
-    igClient: () => ({ async publishImages({ urls, caption }) { log.push(`ig ${urls.length} ${caption}`); if (igFail) throw igFail; return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
+    igClient: () => ({ async publishImages({ urls, caption, userTags }) { log.push(`ig ${urls.length} ${caption}`); if (userTags && userTags.some((t) => t.length)) log.push("tags " + JSON.stringify(userTags)); if (igFail) throw igFail; return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
   };
   return { db, log, pub: createPublisher(deps) };
 }
@@ -204,4 +204,29 @@ test("a failure while recording the featured player never fails a published post
   const r = await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
   assert.equal(r.status, "published");
   assert.deepEqual(w.db[0].featured, {});
+});
+
+test("players with an Instagram username are tagged where the image shows them", async () => {
+  const w = fakeWorld();
+  const data = { ...DATA, matches: [{ ...DATA.matches[0], status: "finished" }], instagram: { 1: "louis.bl" } };
+  await w.pub.publishTarget({ kind: "result", matchId: 2 }, { data });
+  assert.ok(w.log.includes('tags [[{"username":"louis.bl","x":0.08,"y":0.92}]]'), w.log.join("\n"));
+});
+
+test("Instagram client sends user_tags on the images that have some", async () => {
+  const { createClient } = require("./lib/insta/instagram");
+  const calls = [];
+  const fetchFn = async (url, opts) => {
+    const body = opts && opts.body ? Object.fromEntries(new URLSearchParams(String(opts.body))) : {};
+    calls.push({ url: String(url), body });
+    const ok = (d) => ({ ok: true, json: async () => d });
+    if (String(url).includes("fields=status_code")) return ok({ status_code: "FINISHED" });
+    if (String(url).includes("fields=permalink")) return ok({ permalink: "p" });
+    return ok({ id: "c" + calls.length });
+  };
+  const c = createClient({ token: "t", userId: "u", fetchFn, sleep: async () => {} });
+  await c.publishImages({ urls: ["a", "b"], caption: "x", userTags: [[], [{ username: "louis.bl", x: 0.1, y: 0.9 }]] });
+  const kids = calls.filter((k) => k.body.is_carousel_item);
+  assert.equal(kids[0].body.user_tags, undefined);
+  assert.deepEqual(JSON.parse(kids[1].body.user_tags), [{ username: "louis.bl", x: 0.1, y: 0.9 }]);
 });

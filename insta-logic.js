@@ -196,6 +196,21 @@ function rankingRows(n) {
   return rows;
 }
 
+// Points to tag ({ playerId, x, y } in canvas px) → Instagram user_tags ({ username, x, y } from 0 to 1, top-left origin).
+// Players without an Instagram username are skipped; one tag per account; Instagram takes 20 at most per image.
+function userTagsFor(points, usernames, [w, h] = [1080, 1350]) {
+  const out = [], seen = new Set();
+  const clamp = (v) => Math.min(0.98, Math.max(0.02, Math.round(v * 1000) / 1000));
+  for (const p of points || []) {
+    const u = usernames && usernames[p.playerId];
+    if (!u || seen.has(u)) continue;
+    seen.add(u);
+    out.push({ username: u, x: clamp(p.x / w), y: clamp(p.y / h) });
+    if (out.length === 20) break;
+  }
+  return out;
+}
+
 function captionFor(kind, c) {
   if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}`;
   if (kind === "result") return `RESULTAT ${c.matchType === "amical" ? "Amical" : "FSGT"} ⚽ Bière Leverculsec ${c.bl} vs ${c.opponent} ${c.opp}\n${c.dateLine}`;
@@ -387,5 +402,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }
