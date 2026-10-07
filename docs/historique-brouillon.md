@@ -7,15 +7,29 @@ Légende : ✅ sûr (deux sources concordent) · ⚠️ à vérifier · ❓ manq
 
 ## 2024-2025
 
-### Phase 1 (brassage)
+### Amicaux
+| Date | Adversaire | Score | Source |
+|---|---|---|---|
+| oct. 2024 (avant le 24/10) | ? | ? | ❓ cité dans la conf' de presse du 23/10, pas de résultat |
+| 09/01/2025 | En Avant Guinguette | 8 - 4 (V) | Insta ✅ — Nils x2, Quentin x3, Maxime, Timo, CSC |
 
-8 matchs (fiches de notes) : 24/10, 31/10, 14/11, 21/11, 28/11, 5/12, 12/12, 19/12/2024. Buteurs, passeurs et notes connus pour chaque match. ❓ Adversaires et scores manquants.
+### Phase 1 (brassage) — Insta + feuille de stats concordent ✅
+| Date | Adversaire | Score | Buteurs |
+|---|---|---|---|
+| 24/10 | Celda (Unieux) | 3 - 1 V | CSC, Maxime, Simon |
+| 31/10 | Celda ⚠️ (visuel « Celda », mais la légende parle de JBV) | 5 - 2 V | Samuel x2, Flo, Simon, Thisma |
+| 14/11 | Clos Pascal (Méons) | 5 - 2 V | Simon, CSC, Samuel, Thisma x2 |
+| 21/11 | FC Dunières (Montfaucon) | 1 - 11 D | Samuel |
+| 28/11 | City Stade Team (Méons) | 2 - 0 V | Samuel, Léandre |
+| 05/12 | AL Ricamarie | 1 - 3 D | Thisma |
+| 12/12 | Inter Mitemps | 3 - 4 D | Simon, Florent x2 |
+| 19/12 | Crédit Agricole | 4 - 1 V | Samuel, Florent, Quentin x2 |
 
 ### Phase 2 (championnat FSGT, SENIORS D)
 
 | Date | Adversaire | Score | Résultat |
 |---|---|---|---|
-| 16/1 | Fc Genilac 1 | 1 - 3 | D |
+| 16/1 | Fc Genilac 1 | 1 - 3 ⚠️ Insta : **3-1 victoire** (Louis, Samuel x2) | V ? |
 | 23/1 | Les Pantheres | 1 - 5 | D |
 | 30/1 | Fc Coiffeurs | 4 - 4 | N |
 | 6/2 | Tottenaam Hotwings | 7 - 1 | V |
@@ -39,9 +53,28 @@ Bilan phase 2 : 4 V · 2 N · 9 D, 59 buts marqués, 75 encaissés.
 
 ## 2025-2026
 
-### Phase 1 (brassage)
+### Amicaux
+| Date | Adversaire | Score |
+|---|---|---|
+| 10/07/2025 | Patronage Saint Joseph (Méons) | ❓ score pas trouvé |
+| 18/09/2025 | En Avant Guinguette | 4 - 3 V |
+| 02/10/2025 | En Avant Guinguette (Méons) | 7 - 3 V |
+| 09/10/2025 | Stelle D'Italia (Trèves) | 5 - 7 D |
 
-9 adversaires connus avec buteurs/passeurs : Basset Athletic 1, FC Fifou, ABH 1, FC Détente, Bellegarde Sport, Verallia, Athletic Club Sainte, FC Loire Ascenseurs, FC Pastèque 2. Votes « tops du match » sur 11 semaines (2/10 → 11/12/2025). ❓ Scores et dates exactes de chaque adversaire manquants.
+### Phase 1 (brassage) — Insta ✅ (5e sur 10 : 3V 1N 5D, 54-50)
+| Date | Adversaire | Score |
+|---|---|---|
+| 16/10 | Basset Athletic 1 | 3 - 5 D |
+| 23/10 | FC Fifou | 10 - 2 V |
+| 30/10 | ABH 1 | 4 - 14 D |
+| 06/11 | La Détente | 4 - 6 D |
+| 13/11 | Bellegarde Sport | 4 - 4 N |
+| 20/11 | Verallia | 6 - 8 D |
+| 27/11 | Athletic Club Sainte | 6 - 1 V |
+| 04/12 | FC Loire Ascenseurs | 11 - 3 V |
+| 11/12 | FC Pastèque 2 | 6 - 7 D |
+
+Buteurs/passeurs par adversaire : feuille « Stats phase 1 - 25/26 » ✅
 
 ### Phase 2 (championnat FSGT, SENIORS D)
 
@@ -51,8 +84,8 @@ Bilan phase 2 : 4 V · 2 N · 9 D, 59 buts marqués, 75 encaissés.
 | 22/1 | As Trv | 3 - 0 | V |
 | 29/1 | Copains Chopines | 6 - 6 | N |
 | 5/2 | Fc Caribou | 1 - 5 | D |
-| 12/2 | Fc Dunieres | 8 - 7 | V |
-| 19/2 | Psv Heineken | 8 - 11 | D |
+| 12/2 | Fc Dunieres | 8 - 7 (Insta : 9-8) ⚠️ | V |
+| 19/2 | Psv Heineken | 8 - 11 (Insta : 8-10) ⚠️ | D |
 | 26/2 | Fc Arsenul | 4 - 8 | D |
 | 5/3 | — exempt / pas de match — | | |
 | 12/3 | Shouf Team | 0 - 3 | D |
@@ -64,7 +97,7 @@ Bilan phase 2 : 4 V · 2 N · 9 D, 59 buts marqués, 75 encaissés.
 | 23/4 | Psv Heineken | 6 - 4 | V |
 | 30/4 | Fc Arsenul | 9 - 3 | V |
 | 7/5 | — exempt / pas de match — | | |
-| 21/5 | Shouf Team | 6 - 0 ⚠️ (6-0 = probable forfait) | V |
+| 21/5 | Shouf Team | 6 - 0 forfait | V |
 
 Bilan phase 2 : 7 V · 1 N · 8 D, 83 buts marqués, 81 encaissés.
 
@@ -121,11 +154,15 @@ Meilleur joueur de la saison (vote) : Maxime (24 voix), Nils (8), Thisma (6).
 | Simon | 0 | 1 |
 | Nils | 0 | 0 |
 
-## Ce qui manque ou ne colle pas
+## 2026-2027 (déjà dans l'appli)
+Amicaux : 27/08 Les potes à Nathan 4-8, 03/09 En Avant Guinguette 7-3, 10/09 AS Sampicot 7-3.
 
-1. ❓ Scores et adversaires de la phase 1 (brassage) 24-25, et scores + dates de la phase 1 25-26 → SportEasy / Instagram.
-2. ⚠️ 24-25 phase 2 : la feuille de stats compte 16 colonnes de match pour 15 matchs FSGT, et les buts ne collent pas partout (ex. 16/1 : 3 buts notés, score officiel 1-3 ; 6/2 : 5 notés pour 7-1). Il y a sûrement des matchs amicaux mélangés, ou des colonnes décalées.
-3. ⚠️ 25-26 : 21/5 (6-0) et le match aller contre Shouf Team (0-3) n'ont aucun buteur dans la feuille. 6-0 ressemble à un forfait.
-4. ⚠️ 25-26 : 11 semaines de votes en phase 1 pour 9 adversaires : 2 matchs en trop (amicaux ?).
-5. ❓ Noms à confirmer : « Este/Esté » = Esteban ? « Sam/Samuel » ? « France » = Mathis F ? « Quentin H », « Quentin L », « Mahé », « Romain », « Jean jean » (= Père Thisma ?), « Etienne », « Marlon », « Florent/Flo », « Simon » : qui est qui dans l'appli ?
-6. ❓ Matchs amicaux : aucune source pour l'instant hors des 3 déjà dans l'appli (août-septembre 2026).
+## Noms → joueurs
+Este = Esteban · Sam = Samuel · France = Mathis F · Mathis (24-25) = Thisma · Etienne = effectif actuel.
+Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon, Florent (Flo), Simon. Autres : Quentin L, Mahé, Jean jean, Enzo, Adrien, Jules.
+
+## Reste à trancher
+1. 16/01/2025 vs Genilac : FSGT dit 1-3, Insta dit 3-1 (victoire, « première victoire »). → je pense que le PDF est inversé, je prends **3-1**.
+2. 12/02/2026 Dunières 8-7 vs 9-8 et 19/02/2026 PSV 8-11 vs 8-10 : je prends le **PDF officiel FSGT**.
+3. 31/10/2024 : Celda ou JBV ?
+4. Scores manquants : amical d'octobre 2024, Patronage Saint Joseph (10/07/2025).
