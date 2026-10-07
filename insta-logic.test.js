@@ -91,6 +91,11 @@ test("goalLines lists BL goals with assists in match order", () => {
   assert.deepEqual(L.goalLines(ev, players), ["32' Louis (Thisma)", "5' Thisma"]);
 });
 
+test("rankingEntries: the rating ranking needs two rated matches", () => {
+  const rows = [{ playerId: 1, rating: 9, rated: 1 }, { playerId: 2, rating: 7, rated: 2 }, { playerId: 3, rating: 8, rated: 5 }];
+  assert.deepEqual(L.rankingEntries(rows, "rating", String).map((e) => e.playerId), [3, 2]);
+});
+
 test("rankingEntries keeps positive values, sorted, limited", () => {
   const rows = [{ playerId: 1, goals: 2 }, { playerId: 2, goals: 0 }, { playerId: 3, goals: 5 }, { playerId: 4, goals: 2 }];
   const name = (id) => ({ 1: "B", 3: "C", 4: "A" })[id];

@@ -179,8 +179,10 @@ function goalLines(events, players) {
   return goalRows(events, players).map((g) => `${g.minute}' ${g.scorer}${g.assist ? ` (${g.assist})` : ""}`);
 }
 
+// The average-rating ranking only counts players rated in at least RATING_MIN_MATCHES matches (rows carry `rated`).
+const RATING_MIN_MATCHES = 2;
 function rankingEntries(rows, key, nameOf, limit = 15) {
-  return rows.filter((r) => (r[key] || 0) > 0)
+  return rows.filter((r) => (r[key] || 0) > 0 && (key !== "rating" || r.rated == null || r.rated >= RATING_MIN_MATCHES))
     .sort((a, b) => b[key] - a[key] || nameOf(a.playerId).localeCompare(nameOf(b.playerId)))
     .slice(0, limit).map((r) => ({ playerId: r.playerId, value: r[key] }));
 }
@@ -408,5 +410,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

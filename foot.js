@@ -4265,11 +4265,12 @@ function FootStatsPage({
   });
   const filteredIds = new Set(filtered.map(m => m.id));
   const population = statsPopulation(roster, season, lineups.filter(l => filteredIds.has(l.match_id)));
-  const ratingBy = Object.fromEntries(population.map(id => [id, averageRating(playerRatingSeries(filtered, ratings, lineups, id))]));
+  const seriesBy = Object.fromEntries(population.map(id => [id, playerRatingSeries(filtered, ratings, lineups, id)]));
+  const ratingBy = Object.fromEntries(population.map(id => [id, averageRating(seriesBy[id])]));
   const motmBy = motmWinners(filtered, motmVotes || []);
   const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events, motmBy), ratingBy);
   const pool = rows.filter(r => r.played > 0);
-  const ratingPool = rows.filter(r => r.rating != null);
+  const ratingPool = rows.filter(r => r.rating != null && seriesBy[r.playerId].length >= RATING_MIN_MATCHES);
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
   // A player outside the regular roster (guest…) still has a page; he is just not ranked.
   const me = rows.find(r => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events, motmBy), {
@@ -6748,15 +6749,12 @@ function FootShirtMore({
       color: "rgba(255,255,255,0.85)"
     }
   }, m ? `vs ${m.opponent} ›` : "pas de note"));
-  const res = [["V", st.wins, "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, "#c0262d"]];
   const grid = n => ({
     display: "grid",
     gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`,
     gap: 5
   });
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: label
-  }, "R\xE9sultats \xB7 ", st.wins, " V \xB7 ", st.draws, " N \xB7 ", st.losses, " D"), /*#__PURE__*/React.createElement("div", {
+  const resultsBar = x => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -6771,10 +6769,10 @@ function FootShirtMore({
       overflow: "hidden",
       background: "rgba(255,255,255,0.1)"
     }
-  }, st.played > 0 && res.map(([k, n, c]) => n > 0 && /*#__PURE__*/React.createElement("div", {
+  }, x.played > 0 && [["V", x.wins, "#2f9a55"], ["N", x.draws, "#b9a03a"], ["D", x.losses, "#c0262d"]].map(([k, n, c]) => n > 0 && /*#__PURE__*/React.createElement("div", {
     key: k,
     style: {
-      width: `${n / st.played * 100}%`,
+      width: `${n / x.played * 100}%`,
       background: c
     }
   }))), /*#__PURE__*/React.createElement("div", {
@@ -6783,13 +6781,16 @@ function FootShirtMore({
       fontSize: 16,
       whiteSpace: "nowrap"
     }
-  }, dash(st.winPct, v => `${v}%`), " ", /*#__PURE__*/React.createElement("span", {
+  }, dash(x.winPct, v => `${v}%`), " ", /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: FF.ui,
       fontSize: 10,
       color: "rgba(255,255,255,0.6)"
     }
-  }, "VICTOIRES"))), /*#__PURE__*/React.createElement("div", {
+  }, "VICTOIRES")));
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "R\xE9sultats \xB7 ", st.wins, " V \xB7 ", st.draws, " N \xB7 ", st.losses, " D"), resultsBar(st), /*#__PURE__*/React.createElement("div", {
     style: label
   }, "Cette saison"), /*#__PURE__*/React.createElement("div", {
     style: grid(3)
@@ -6800,9 +6801,278 @@ function FootShirtMore({
     }
   }, matchTile("Meilleure note", st.best, "rgba(47,154,85,0.75)"), matchTile("Pire note", st.worst, "rgba(192,38,45,0.7)"), tile("Note moyenne", dash(st.rating, one))), st.career && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: label
-  }, "Carri\xE8re au club"), /*#__PURE__*/React.createElement("div", {
+  }, "Carri\xE8re au club \xB7 ", st.career.wins, " V \xB7 ", st.career.draws, " N \xB7 ", st.career.losses, " D"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 5
+    }
+  }, resultsBar(st.career)), /*#__PURE__*/React.createElement("div", {
     style: grid(6)
   }, tile("Matchs", st.career.played), tile("Buts", st.career.goals), tile("Passes D", st.career.assists), tile("Décisifs", st.career.decisive), tile("Note", dash(st.career.rating, one)), tile("HDM", st.career.motm))));
+}
+
+// Season-by-season bars of a player's numbers (Vestiaire › Évolution).
+function FootEvolution({
+  data
+}) {
+  const charts = [["Buts", "goals"], ["Passes D", "assists"], ["Décisifs", "decisive"], ["Note moyenne", "rating", v => v.toFixed(1), 10], ["Matchs joués", "played"], ["% victoires", "winPct", v => `${v}%`, 100]];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+      gap: 6,
+      marginTop: 10
+    }
+  }, charts.map(([title, key, fmt = v => v, cap]) => {
+    const max = cap || Math.max(1, ...data.map(d => d[key] || 0));
+    const best = Math.max(...data.map(d => d[key] ?? -1));
+    return /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        background: "rgba(255,255,255,0.07)",
+        borderRadius: 11,
+        padding: "6px 8px 4px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: FF.ui,
+        fontSize: 10,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.7)",
+        marginBottom: 2
+      }
+    }, title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 6,
+        height: 62
+      }
+    }, data.map(d => {
+      const v = d[key];
+      return /*#__PURE__*/React.createElement("div", {
+        key: d.season,
+        style: {
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          height: "100%"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: FF.display,
+          fontSize: 13,
+          lineHeight: 1.1
+        }
+      }, v == null ? "–" : fmt(v)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: "100%",
+          maxWidth: 34,
+          height: `${v == null ? 0 : Math.max(3, v / max * 40)}px`,
+          borderRadius: "5px 5px 2px 2px",
+          background: v != null && v === best && data.length > 1 ? FC.accent : "rgba(255,255,255,0.35)"
+        }
+      }), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          color: "rgba(255,255,255,0.65)",
+          marginTop: 2,
+          whiteSpace: "nowrap"
+        }
+      }, shortSeason(d.season)));
+    })));
+  }));
+}
+
+// "Tous ses matchs": a player's matches with his numbers and marks (season and match-type filters live in the page state).
+function FootPlayerMatchesPage({
+  playerId,
+  season,
+  type,
+  onFilter,
+  matches,
+  lineups,
+  events,
+  ratings,
+  motmVotes,
+  nav
+}) {
+  const played = new Set(lineups.filter(l => l.player_id === playerId).map(l => l.match_id));
+  const seasons = seasonsFromMatches(matches.filter(m => played.has(m.id) && m.status === "finished"));
+  const filtered = filterMatchesForStats(matches, {
+    season,
+    type
+  });
+  const motmBy = motmWinners(filtered, motmVotes || []);
+  const ratingByMatch = Object.fromEntries(playerRatingSeries(filtered, ratings, lineups, playerId).map(r => [r.matchId, r.rating]));
+  const byMatch = {};
+  for (const e of events) (byMatch[e.match_id] = byMatch[e.match_id] || []).push(e);
+  const rows = playerMatchRows({
+    matches: filtered,
+    lineups,
+    events,
+    ratingByMatch,
+    motmByMatch: motmBy,
+    scoreOf: m => computeFootScore(byMatch[m.id] || []),
+    playerId
+  });
+  const rated = rows.filter(r => r.rating != null);
+  const sum = k => rows.reduce((a, r) => a + r[k], 0);
+  const avg = rated.length ? rated.reduce((a, r) => a + r.rating, 0) / rated.length : null;
+  const sel = {
+    border: `1px solid ${FC.line}`,
+    borderRadius: 999,
+    padding: "9px 14px",
+    fontFamily: FF.ui,
+    fontSize: 15,
+    background: FC.card || "#fff",
+    color: FC.deep
+  };
+  const tones = {
+    V: FC.good,
+    N: FC.warn,
+    D: FC.bad
+  };
+  const date = iso => new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+    timeZone: "Europe/Paris"
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    className: "ft-page"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    "aria-label": "Saison",
+    value: season,
+    onChange: e => onFilter({
+      season: e.target.value
+    }),
+    style: sel
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Toutes les saisons"), seasons.map(x => /*#__PURE__*/React.createElement("option", {
+    key: x,
+    value: x
+  }, "Saison ", shortSeason(x)))), /*#__PURE__*/React.createElement(FSegmented, {
+    value: type,
+    onChange: v => onFilter({
+      type: v
+    }),
+    style: {
+      flex: 1,
+      minWidth: 260
+    },
+    options: [["all", "Tous"], ["championnat", "Championnat"], ["amical", "Amicaux"]]
+  })), /*#__PURE__*/React.createElement(FCard, {
+    pad: 12,
+    style: {
+      display: "flex",
+      marginBottom: 12
+    }
+  }, [["Matchs", rows.length], ["Buts", sum("goals")], ["Passes D", sum("assists")], ["Décisifs", sum("goals") + sum("assists")], ["Note moy.", avg == null ? "–" : avg.toFixed(1)], ["HDM", rows.filter(r => r.motm).length]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      flex: 1,
+      textAlign: "center",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 24,
+      color: FC.deep,
+      lineHeight: 1.1
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 11,
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      color: FC.muted,
+      whiteSpace: "nowrap"
+    }
+  }, l)))), rows.length === 0 && /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "calendar",
+    title: "Aucun match",
+    text: "Pas de match jou\xE9 avec ces filtres."
+  })), rows.map(r => /*#__PURE__*/React.createElement(FCard, {
+    key: r.id,
+    pad: 12,
+    onClick: () => nav("matchDetail", {
+      matchId: r.id
+    }),
+    style: {
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      minWidth: 64,
+      padding: "6px 0",
+      borderRadius: 10,
+      textAlign: "center",
+      fontFamily: FF.display,
+      fontSize: 18,
+      color: "#fff",
+      background: r.result ? tones[r.result] : FC.muted
+    }
+  }, r.score), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 17,
+      lineHeight: 1.2,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, "vs ", r.opponent), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted
+    }
+  }, date(r.date), r.type === "amical" ? " · Amical" : "", r.goals > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.deep
+    }
+  }, " \xB7 ", r.goals, " but", r.goals > 1 ? "s" : ""), r.assists > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.deep
+    }
+  }, " \xB7 ", r.assists, " passe", r.assists > 1 ? "s" : "", " D"))), r.motm && /*#__PURE__*/React.createElement(FChip, {
+    tone: "warn"
+  }, "HDM"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      flexShrink: 0,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: FF.display,
+      fontSize: 17,
+      background: r.rating == null ? FC.soft : r.rating >= 7 ? FC.good : r.rating >= 5.5 ? "#e7c64a" : FC.bad,
+      color: r.rating == null ? FC.muted : r.rating >= 5.5 && r.rating < 7 ? "#1b1b1b" : "#fff"
+    }
+  }, r.rating == null ? "–" : r.rating.toFixed(1)))));
 }
 
 // A compact season / matches picker floating over the 3D room (native select: easy on a phone).
@@ -6913,12 +7183,16 @@ function FootRoomScreen({
   };
   const [rackSeason, setRackSeason] = React.useState(season);
   const [rackAway, setRackAway] = React.useState(false); // home or away kit of the season (when it had two)
+  const [rackView, setRackView] = React.useState("stats"); // "stats" | "evo" (season-by-season charts)
   const {
     photos,
     framings
   } = React.useContext(FootCtx);
   const meId = currentPlayer ? currentPlayer.id : null;
-  const zone = FOOT_ROOM_ZONES[page] || "rack";
+  // off the room (a match, a player's matches…) the camera stays in the corner it was in, so going back finds it as it was
+  const lastZone = React.useRef(FOOT_ROOM_ZONES[page] || "rack");
+  const zone = FOOT_ROOM_ZONES[page] || lastZone.current;
+  lastZone.current = zone;
   const kits = seasonKits(rackSeason, season);
   const kit = rackAway && kits[1] ? kits[1] : kits[0];
 
@@ -7134,27 +7408,6 @@ function FootRoomScreen({
     });
   }, [upcoming, matches, scoreById, month, months, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
 
-  // the desk calendar's season (August → July) and the jump to another one
-  const deskSeason = (() => {
-    const y = Math.floor(month / 12),
-      m0 = month % 12;
-    const st = m0 >= 7 ? y : y - 1;
-    return `${st}-${st + 1}`;
-  })();
-  const jumpToSeason = s => {
-    if (s === season) {
-      const st = calendarStartMonth(matches);
-      setMonth(st.year * 12 + st.month - 1);
-      return;
-    }
-    const first = months.find(k => {
-      const y = Math.floor(k / 12),
-        m0 = k % 12;
-      return `${m0 >= 7 ? y : y - 1}-${(m0 >= 7 ? y : y - 1) + 1}` === s;
-    });
-    if (first != null) setMonth(first);
-  };
-
   // ---- overlays ----
   const vestRows = React.useMemo(() => rowsFor(rackSeason, statsType, () => squad.map(p => p.id)), [statsType, squad, matches, lineups, events, ratings, motmVotes, rackSeason]);
   const row = shirt && vestRows.find(r => r.playerId === shirt.id);
@@ -7177,6 +7430,34 @@ function FootRoomScreen({
       careerSeries: playerRatingSeries(careerMs, ratings, lineups, shirt.id)
     });
   }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, rackSeason, statsType]);
+  // season by season, for the Évolution charts (every season the player played in)
+  const evo = React.useMemo(() => {
+    if (!shirt) return [];
+    const id = shirt.id,
+      mine = new Set(lineups.filter(l => l.player_id === id).map(l => l.match_id));
+    return seasonsFromMatches(matches.filter(m => m.status === "finished" && mine.has(m.id))).sort().map(s => {
+      const ms = filterMatchesForStats(matches, {
+          season: s,
+          type: statsType
+        }),
+        ids = new Set(ms.map(m => m.id)),
+        ls = lineups.filter(l => ids.has(l.match_id));
+      const r = buildStatsRows([id], computePlayerStats(ms, ls, events.filter(e => ids.has(e.match_id)), motmWinners(ms, motmVotes || [])), {})[0];
+      const sr = playerRatingSeries(ms, ratings, ls, id);
+      return {
+        season: s,
+        played: r.played,
+        goals: r.goals,
+        assists: r.assists,
+        decisive: r.decisive,
+        motm: r.motm,
+        rating: averageRating(sr),
+        winPct: r.played ? Math.round(r.wins / r.played * 100) : null
+      };
+    });
+  }, [shirt, matches, lineups, events, ratings, motmVotes, statsType]);
+  const multiSeason = evo.length >= 2;
+  const view = multiSeason ? rackView : "stats";
   const glass = {
     background: "rgba(16,12,14,0.72)",
     backdropFilter: "blur(10px)",
@@ -7196,7 +7477,6 @@ function FootRoomScreen({
     cursor: "pointer",
     flex: "0 0 auto"
   };
-  const hint = zone === "desk" ? "Touchez une feuille ou un match du calendrier" : null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -7286,11 +7566,6 @@ function FootRoomScreen({
     value: rackAway ? "away" : "home",
     onChange: v => setRackAway(v === "away"),
     options: [["home", "Domicile"], ["away", "Extérieur"]]
-  }), zone === "desk" && /*#__PURE__*/React.createElement(FootRoomPicker, {
-    label: "Saison",
-    value: deskSeason,
-    onChange: jumpToSeason,
-    options: seasonsFromMatches(matches).map(s => [s, `Saison ${shortSeason(s)}`])
   })), state === "loading" && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
@@ -7413,7 +7688,36 @@ function FootRoomScreen({
     onClick: () => room.current && room.current.step(1),
     "aria-label": "Maillot suivant",
     style: roundBtn
-  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+  }, "\u203A")), multiSeason && /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "Vue",
+    style: {
+      display: "flex",
+      gap: 4,
+      marginTop: 10,
+      padding: 3,
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.08)"
+    }
+  }, [["stats", "Stats"], ["evo", "Évolution"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    role: "radio",
+    "aria-checked": view === k,
+    onClick: () => setRackView(k),
+    style: {
+      flex: 1,
+      border: "none",
+      borderRadius: 999,
+      padding: "6px 0",
+      cursor: "pointer",
+      fontFamily: FF.ui,
+      fontSize: 13,
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      background: view === k ? "rgba(255,255,255,0.24)" : "transparent",
+      color: view === k ? "#fff" : "rgba(255,255,255,0.7)"
+    }
+  }, l))), /*#__PURE__*/React.createElement("div", {
     role: "radiogroup",
     "aria-label": "Matchs pris en compte",
     style: {
@@ -7442,7 +7746,7 @@ function FootRoomScreen({
       background: statsType === k ? FC.accent : "transparent",
       color: statsType === k ? "#fff" : "rgba(255,255,255,0.7)"
     }
-  }, l))), /*#__PURE__*/React.createElement("div", {
+  }, l))), view === "stats" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -7473,7 +7777,15 @@ function FootRoomScreen({
     onOpenMatch: id => nav("matchDetail", {
       matchId: id
     })
-  }), /*#__PURE__*/React.createElement("button", {
+  })) : /*#__PURE__*/React.createElement(FootEvolution, {
+    data: evo
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: statsOpen && view === "stats" ? 8 : 10
+    }
+  }, view === "stats" && /*#__PURE__*/React.createElement("button", {
     onClick: () => setStatsOpen(!statsOpen),
     "aria-expanded": statsOpen,
     style: {
@@ -7481,8 +7793,7 @@ function FootRoomScreen({
       alignItems: "center",
       justifyContent: "center",
       gap: 6,
-      width: "100%",
-      marginTop: statsOpen ? 8 : 10,
+      flex: 1,
       border: "none",
       borderRadius: 14,
       padding: statsOpen ? "7px 0" : "9px 0",
@@ -7494,7 +7805,26 @@ function FootRoomScreen({
       textTransform: "uppercase",
       cursor: "pointer"
     }
-  }, statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"), !statsOpen && /*#__PURE__*/React.createElement("div", {
+  }, statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => nav("playerMatches", {
+      playerId: shirt.id,
+      season: rackSeason,
+      type: statsType
+    }),
+    style: {
+      flex: 1,
+      border: "none",
+      borderRadius: 14,
+      padding: statsOpen && view === "stats" ? "7px 0" : "9px 0",
+      background: "rgba(255,255,255,0.1)",
+      color: "#fff",
+      fontFamily: FF.ui,
+      fontSize: 14,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+      cursor: "pointer"
+    }
+  }, "Tous ses matchs \u203A")), !statsOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       fontSize: 10,
@@ -7502,24 +7832,7 @@ function FootRoomScreen({
       marginTop: 6,
       letterSpacing: "0.04em"
     }
-  }, "Saison ", shortSeason(rackSeason), statsType === "championnat" ? " · championnat" : statsType === "amical" ? " · amicaux" : "", " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), state === "ready" && hint && !paper && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: "calc(98px + env(safe-area-inset-bottom))",
-      textAlign: "center",
-      pointerEvents: "none"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      ...glass,
-      display: "inline-block",
-      padding: "7px 14px",
-      fontSize: 12,
-      borderRadius: 999
-    }
-  }, hint)), paper && /*#__PURE__*/React.createElement("div", {
+  }, "Saison ", shortSeason(rackSeason), statsType === "championnat" ? " · championnat" : statsType === "amical" ? " · amicaux" : "", " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), paper && /*#__PURE__*/React.createElement("div", {
     onClick: () => setPaper(null),
     style: {
       position: "absolute",
@@ -7622,13 +7935,13 @@ function FootballApp({
   const [motmVotes, setMotmVotes] = React.useState([]);
   const [activityAttendance, setActivityAttendance_] = React.useState([]);
   const isAdmin = isBureau(currentPlayer);
-  // 3D club room (beta, bureau only for now): Calendrier / Classement / Vestiaire become corners of one locker room
-  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "on", ["on", "off"]));
-  const roomOn = roomPref === "on";
+  // the 3D club room: Calendrier / Classement / Vestiaire are corners of one locker room.
+  // The flat pages only come back if the room can't open on this device.
+  const [roomBroken, setRoomBroken] = React.useState(false);
+  const roomOn = !roomBroken;
   const setRoom = on => {
-    setRoomPref(on ? "on" : "off");
-    writePref("foot_room", on ? "on" : "off");
-    setPage(p => on && p === "stats" ? "vestiaire" : !on && p === "vestiaire" ? "stats" : p);
+    setRoomBroken(!on);
+    setPage(p => !on && p === "vestiaire" ? "stats" : p);
   };
   React.useEffect(() => {
     // the browser bar follows the theme
@@ -7712,11 +8025,48 @@ function FootballApp({
       alive = false;
     };
   }, []);
+
+  // Going back returns to the exact page left (its filters and scroll included): every move is stacked.
+  const history = React.useRef([]);
+  const here = React.useRef({
+    page,
+    sub
+  });
+  here.current = {
+    page,
+    sub
+  };
   function nav(p, s = {}) {
+    history.current.push({
+      ...here.current,
+      y: window.scrollY || 0
+    });
+    if (history.current.length > 40) history.current.shift();
     setPage(p);
     setSub(s);
     window.scrollTo && window.scrollTo(0, 0);
   }
+  function goTab(p) {
+    history.current = [];
+    setPage(p);
+    setSub({});
+    window.scrollTo && window.scrollTo(0, 0);
+  }
+  function goBack() {
+    const prev = history.current.pop() || {
+      page: "calendar",
+      sub: {},
+      y: 0
+    };
+    setPage(prev.page);
+    setSub(prev.sub || {});
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo && window.scrollTo(0, prev.y || 0)));
+  }
+  const setSubHere = patch => setSub(o => ({
+    ...o,
+    ...patch
+  })); // a filter changed on the current page
+
   const navItems = [{
     id: "calendar",
     label: "Calendrier",
@@ -7747,11 +8097,6 @@ function FootballApp({
     on: page === "admin",
     onClick: () => nav("admin")
   }] : []), {
-    id: "room",
-    label: roomOn ? "Pages classiques" : "Vestiaire 3D",
-    icon: "cube",
-    onClick: () => setRoom(!roomOn)
-  }, {
     id: "refresh",
     label: "Actualiser",
     icon: "refresh",
@@ -7759,17 +8104,13 @@ function FootballApp({
   }];
   const detail = page === "matchDetail";
   const playerPage = page === "player";
+  const playerMatchesPage = page === "playerMatches";
   const openPlayer = id => nav("player", {
-    playerId: id,
-    from: {
-      page: playerPage ? sub.from.page : page,
-      sub: playerPage ? sub.from.sub : sub
-    }
+    playerId: id
   });
-  const backFromPlayer = () => nav(sub.from ? sub.from.page : roomOn ? "vestiaire" : "stats", sub.from ? sub.from.sub : {});
   const roomVisible = roomOn && loaded && !!FOOT_ROOM_ZONES[page];
   const openMatch = detail ? matches.find(m => m.id === sub.matchId) : null;
-  const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : detail ? [openMatch ? {
+  const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : playerMatchesPage ? [footNameOf(sub.playerId), "Tous ses matchs"] : detail ? [openMatch ? {
     scheduled: "Match",
     live: "En direct",
     finished: "Résultat"
@@ -7800,13 +8141,13 @@ function FootballApp({
     nav: nav,
     openPlayer: openPlayer
   }), !roomVisible && /*#__PURE__*/React.createElement(FootShell, {
-    wide: page === "stats" || page === "reseaux" || playerPage
+    wide: page === "stats" || page === "reseaux" || playerPage || playerMatchesPage
   }, /*#__PURE__*/React.createElement(FTopBar, {
     title: title,
     subtitle: subtitle,
     theme: theme,
     onHome: onBack,
-    onBack: detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined,
+    onBack: detail || playerPage || playerMatchesPage ? goBack : undefined,
     right: /*#__PURE__*/React.createElement(FSettingsMenu, {
       items: settingsItems
     })
@@ -7830,7 +8171,7 @@ function FootballApp({
     ratings: ratings,
     motmVotes: motmVotes,
     currentPlayer: currentPlayer,
-    navBack: () => nav("calendar"),
+    navBack: goBack,
     reload: reloadFoot
   }), loaded && page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
     roster: roster,
@@ -7853,6 +8194,17 @@ function FootballApp({
     motmVotes: motmVotes,
     roster: roster,
     currentPlayer: currentPlayer
+  }), loaded && playerMatchesPage && /*#__PURE__*/React.createElement(FootPlayerMatchesPage, {
+    playerId: sub.playerId,
+    season: sub.season || "all",
+    type: sub.type || "all",
+    onFilter: setSubHere,
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    ratings: ratings,
+    motmVotes: motmVotes,
+    nav: nav
   }), loaded && playerPage && /*#__PURE__*/React.createElement(FootStatsPage, {
     key: sub.playerId,
     matches: matches,
@@ -7864,9 +8216,9 @@ function FootballApp({
     currentPlayer: currentPlayer,
     subjectId: sub.playerId
   })), /*#__PURE__*/React.createElement(FNav, {
-    page: detail ? "calendar" : playerPage ? roomOn ? "vestiaire" : "stats" : page,
+    page: detail ? "calendar" : playerPage || playerMatchesPage ? roomOn ? "vestiaire" : "stats" : page,
     items: navItems,
-    onGo: nav
+    onGo: goTab
   }), splashOn && /*#__PURE__*/React.createElement(FootSplash, {
     steps: steps,
     leaving: leaving,

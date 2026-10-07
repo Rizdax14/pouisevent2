@@ -96,8 +96,27 @@ function shirtStats({ row, careerRow, series, careerSeries }) {
     goals: r.goals, assists: r.assists, decisive: r.decisive, motm: r.motm,
     goalsPerMatch: per(r.goals, r.played), assistsPerMatch: per(r.assists, r.played), decisivePerMatch: per(r.decisive, r.played),
     rating: avg(series), best: match(pick((a, b) => a > b)), worst: match(pick((a, b) => a < b)),
-    career: c ? { played: c.played, goals: c.goals, assists: c.assists, decisive: c.decisive ?? c.goals + c.assists, motm: c.motm, rating: avg(careerSeries) } : null,
+    career: c ? { played: c.played, goals: c.goals, assists: c.assists, decisive: c.decisive ?? c.goals + c.assists, motm: c.motm, rating: avg(careerSeries),
+      wins: c.wins || 0, draws: c.draws || 0, losses: c.losses || 0, winPct: pct(c.wins || 0, c.played) } : null,
   };
+}
+
+// Every finished match a player was on the sheet of, newest first: score + result, his goals / assists, his final rating, man of the match.
+// ratingByMatch: { matchId: rating }; motmByMatch: motmWinners(); scoreOf(match) → { bl, opponent }.
+function playerMatchRows({ matches, lineups, events, ratingByMatch, motmByMatch, scoreOf, playerId }) {
+  const mine = new Set(lineups.filter((l) => l.player_id === playerId).map((l) => l.match_id));
+  return matches.filter((m) => m.status === "finished" && mine.has(m.id))
+    .sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime))
+    .map((m) => {
+      const sc = m.score_unknown ? null : scoreOf(m);
+      const ev = events.filter((e) => e.match_id === m.id && e.type === "goal_bl");
+      return {
+        id: m.id, date: m.match_datetime, opponent: m.opponent_name, type: m.match_type,
+        score: sc ? `${sc.bl} - ${sc.opponent}` : "? - ?", result: sc ? footOutcome(sc) : null,
+        goals: ev.filter((e) => e.player_id === playerId).length, assists: ev.filter((e) => e.assist_player_id === playerId).length,
+        rating: ratingByMatch[m.id] ?? null, motm: ((motmByMatch || {})[m.id] || []).includes(playerId),
+      };
+    });
 }
 
 // The match being played (if any) then the scheduled ones, soonest first.
@@ -175,4 +194,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { playerMatchRows, FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

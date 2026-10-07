@@ -356,7 +356,7 @@
     }
     const nextSheet = sheet(0.68, 1.22, 760); nextSheet.mesh.position.set(DX - 0.36, DY + 0.008, DZ - 0.3); nextSheet.mesh.rotation.z = 0.025; nextSheet.mesh.userData.surface = "next";
     const listSheet = sheet(0.66, 1.22, 720); listSheet.mesh.position.set(DX + 0.36, DY + 0.009, DZ - 0.29); listSheet.mesh.rotation.z = -0.03; listSheet.mesh.userData.surface = "list";
-    const calSheet = sheet(1.1, 0.5, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.62); calSheet.mesh.userData.surface = "calendar";
+    const calSheet = sheet(1.38, 0.63, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.7); calSheet.mesh.userData.surface = "calendar";
     gDesk.add(nextSheet.mesh, listSheet.mesh, calSheet.mesh);
     // calendar pad thickness + binding rings
     const pad = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.016, 0.52), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY + 0.002, DZ + 0.62); gDesk.add(pad);
@@ -675,7 +675,7 @@
       const a = camera.aspect, fitW = (w) => w / (2 * HALF * a), fitH = (h) => h / (2 * HALF);
       // positions in the corner's own frame (x around 0, wall at z = -0.75, facing +z)
       if (zone === "board") { const d = Math.max(fitW(1.55), fitH(2.75)); return { theta: corners.board.theta, pos: V(0, 0.6, -0.7 + d), look: V(0, 0.55, -0.7) }; }
-      if (zone === "desk") { const h = Math.max(fitW(1.46), fitH(2.0)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ - 0.02 + h * 0.18), look: V(0, DY, DZ - 0.02) }; }
+      if (zone === "desk") { const h = Math.max(fitW(1.46), fitH(2.14)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ + 0.03 + h * 0.18), look: V(0, DY, DZ + 0.03) }; }
       const d = Math.max(3.0, fitW(a < 0.8 ? 1.3 : 1.8));
       return { theta: corners.rack.theta, pos: V(0, a < 0.8 ? 0.42 : 0.6, d), look: V(0, a < 0.8 ? 0.2 : 0.42, 0) };
     }

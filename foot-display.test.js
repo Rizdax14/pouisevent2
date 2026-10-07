@@ -122,7 +122,7 @@ test("shirtStats: win rate, per-match numbers, best and worst rated match, caree
   assert.deepEqual(st.best, { rating: 8, opponent: "D", matchId: 4, date: undefined });
   assert.equal(st.worst.opponent, "C");
   assert.equal(st.rating, 6.6);
-  assert.deepEqual(st.career, { played: 10, goals: 9, assists: 4, decisive: 13, motm: 2, rating: 6.1 });
+  assert.deepEqual(st.career, { played: 10, goals: 9, assists: 4, decisive: 13, motm: 2, rating: 6.1, wins: 0, draws: 0, losses: 0, winPct: 0 });
   assert.equal(D.shirtStats({ row: null, careerRow: null, series: [] }).best, null);
 });
 
@@ -146,4 +146,20 @@ test("seasonKits: the kits of each season, the current ones for today", () => {
   assert.deepEqual(D.seasonKits("2025-2026", "2026-2027"), ["h2526", "a2526"]);
   assert.deepEqual(D.seasonKits("2026-2027", "2026-2027"), ["home", "away"]);
   assert.equal(D.shortSeason("2025-2026"), "25-26");
+});
+
+test("playerMatchRows: his finished matches, newest first, with his goals, assists, rating and man of the match", () => {
+  const ms = [
+    { id: 1, status: "finished", match_datetime: "2026-09-01T17:00:00Z", opponent_name: "A", match_type: "amical" },
+    { id: 2, status: "finished", match_datetime: "2026-09-08T17:00:00Z", opponent_name: "B", match_type: "championnat", score_unknown: true },
+    { id: 3, status: "finished", match_datetime: "2026-09-15T17:00:00Z", opponent_name: "C", match_type: "championnat" },
+    { id: 4, status: "scheduled", match_datetime: "2026-10-15T17:00:00Z", opponent_name: "D" },
+  ];
+  const lineups = [1, 2, 4].map((id) => ({ match_id: id, player_id: 9 }));
+  const events = [{ match_id: 1, type: "goal_bl", player_id: 9, assist_player_id: 3 }, { match_id: 1, type: "goal_bl", player_id: 3, assist_player_id: 9 }, { match_id: 1, type: "goal_opponent" }];
+  const rows = D.playerMatchRows({ matches: ms, lineups, events, ratingByMatch: { 1: 7.5 }, motmByMatch: { 1: [9] }, scoreOf: () => ({ bl: 2, opponent: 1 }), playerId: 9 });
+  assert.deepEqual(rows.map((r) => r.id), [2, 1]);
+  assert.deepEqual(rows[1], { id: 1, date: ms[0].match_datetime, opponent: "A", type: "amical", score: "2 - 1", result: "V", goals: 1, assists: 1, rating: 7.5, motm: true });
+  assert.equal(rows[0].score, "? - ?");
+  assert.equal(rows[0].result, null);
 });
