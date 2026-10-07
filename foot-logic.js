@@ -28,6 +28,13 @@ function computeAttendanceQueue(roster, attendanceRows, minPlayers) {
   };
 }
 
+// How many times each player has been in charge of the balls, over the given matches. → { playerId: n }
+function ballKeeperCounts(matches) {
+  const out = {};
+  for (const m of matches) for (const id of m.ball_keepers || []) out[id] = (out[id] || 0) + 1;
+  return out;
+}
+
 function computeAttendanceBuckets(roster, attendanceRows) {
   const statusByPlayer = {};
   for (const row of attendanceRows) statusByPlayer[row.player_id] = row.status;
@@ -360,6 +367,7 @@ if (typeof module !== "undefined" && module.exports) {
     computeFootScore,
     computeAttendanceBuckets,
     computeAttendanceQueue,
+    ballKeeperCounts,
     computeHalfElapsedSeconds,
     buildEventTimeline,
     nextHalfState,

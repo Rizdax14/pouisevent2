@@ -540,3 +540,8 @@ test("motmWinners: validated matches only, most votes wins, ties share; computeP
   const s = byId(computePlayerStats(matches.map((m) => ({ ...m })), lineups, [], w));
   assert.deepEqual([s[10].motm, s[20].motm], [2, 1]);
 });
+
+test("ballKeeperCounts counts each player's ball duties", () => {
+  const { ballKeeperCounts } = require("./foot-logic.js");
+  assert.deepEqual(ballKeeperCounts([{ ball_keepers: [1, 2] }, { ball_keepers: [2, 3] }, { ball_keepers: null }, {}]), { 1: 1, 2: 2, 3: 1 });
+});

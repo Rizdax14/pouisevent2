@@ -825,7 +825,19 @@ function FootMatchHero({
     }
   }, score.bl, "\u2013", score.opponent)), /*#__PURE__*/React.createElement(FootWhenWhere, {
     match: match
-  }), /*#__PURE__*/React.createElement("div", {
+  }), (match.ball_keepers || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+      color: FC.text,
+      marginTop: 5
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "ball",
+    size: 16
+  }), /*#__PURE__*/React.createElement("span", null, "Ballons : ", /*#__PURE__*/React.createElement("b", null, match.ball_keepers.map(footNameOf).join(" et ")))), /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "12px 0"
     }
@@ -2595,7 +2607,8 @@ function FootLiveView({
   attendance,
   currentPlayer,
   isAdmin,
-  reload
+  reload,
+  extra
 }) {
   const matchEvents = events.filter(e => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
@@ -2604,7 +2617,7 @@ function FootLiveView({
   }, /*#__PURE__*/React.createElement(FootScoreboard, {
     match: match,
     score: score
-  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+  }), extra, /*#__PURE__*/React.createElement(FootLineupSection, {
     match: match,
     roster: roster,
     lineups: lineups,
@@ -3286,7 +3299,8 @@ function FootFinishedView({
   motmVotes,
   currentPlayer,
   isAdmin,
-  reload
+  reload,
+  extra
 }) {
   const [tab, setTab] = React.useState("resume");
   const matchEvents = events.filter(e => e.match_id === match.id);
@@ -3296,7 +3310,7 @@ function FootFinishedView({
   }, /*#__PURE__*/React.createElement(FootScoreboard, {
     match: match,
     score: score
-  }), /*#__PURE__*/React.createElement(FSegmented, {
+  }), extra, /*#__PURE__*/React.createElement(FSegmented, {
     value: tab,
     onChange: setTab,
     options: [["resume", "Résumé", "ball"], ["notes", "Notes", "star"]],
@@ -3467,6 +3481,189 @@ function FootPresenceCard({
     }, lab);
   })))))));
 }
+
+// ---- ball keepers (2 players bring and bring back the balls) ------------------------------------------------------------------
+function FootBallKeepersCard({
+  match,
+  matches,
+  roster,
+  canEdit,
+  reload
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [picked, setPicked] = React.useState(match.ball_keepers || []);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const season = seasonOf(match.match_datetime);
+  const counts = ballKeeperCounts(matches.filter(m => seasonOf(m.match_datetime) === season));
+  const keepers = match.ball_keepers || [];
+  const pool = attendanceRoster(roster).map(r => r.player_id).sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || footNameOf(a).localeCompare(footNameOf(b)));
+  const times = id => {
+    const n = counts[id] || 0;
+    return `${n} fois cette saison`;
+  };
+  const toggle = id => setPicked(picked.includes(id) ? picked.filter(x => x !== id) : picked.length < 2 ? [...picked, id] : picked);
+  async function save() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        ball_keepers: picked
+      });
+      await reload();
+      setEditing(false);
+    } catch (e) {
+      setErr("Enregistrement impossible : " + e.message);
+    }
+    setBusy(false);
+  }
+  return /*#__PURE__*/React.createElement(FCard, {
+    style: {
+      border: `2px solid ${FC.accent}`
+    }
+  }, /*#__PURE__*/React.createElement(FHeading, {
+    right: canEdit && !editing && /*#__PURE__*/React.createElement(FBtn, {
+      size: "sm",
+      variant: "secondary",
+      icon: "pencil",
+      onClick: () => {
+        setPicked(keepers);
+        setErr(null);
+        setEditing(true);
+      }
+    }, keepers.length ? "Changer" : "Choisir")
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "ball",
+    size: 22
+  }), "Responsables ballons")), !editing && (keepers.length ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+      gap: 10
+    }
+  }, keepers.map(id => /*#__PURE__*/React.createElement("div", {
+    key: id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      background: FC.accentSoft,
+      borderRadius: 18,
+      padding: "10px 12px",
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement(FAvatar, {
+    playerId: id,
+    name: footNameOf(id),
+    size: 44,
+    linkable: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 17,
+      overflowWrap: "anywhere"
+    }
+  }, /*#__PURE__*/React.createElement(FPlayerLink, {
+    id: id
+  }, footNameOf(id))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: FC.muted
+    }
+  }, times(id)))))) : /*#__PURE__*/React.createElement(FEmpty, {
+    icon: "ball",
+    title: "Pas encore d\xE9sign\xE9s",
+    text: canEdit ? "Choisis les 2 joueurs qui s'occupent des ballons pour ce match." : "Le bureau choisira 2 joueurs pour les ballons."
+  })), editing && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 8
+    }
+  }, "Choisis 2 joueurs (", picked.length, " / 2). Ceux qui l'ont fait le moins souvent sont en haut."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gap: 6
+    }
+  }, pool.map(id => {
+    const on = picked.includes(id);
+    const full = !on && picked.length >= 2;
+    return /*#__PURE__*/React.createElement("label", {
+      key: id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "6px 10px 6px 6px",
+        borderRadius: 16,
+        background: on ? FC.accentSoft : FC.softer,
+        border: `1.5px solid ${on ? FC.accent : "transparent"}`,
+        opacity: full ? 0.55 : 1,
+        cursor: full || busy ? "default" : "pointer",
+        fontSize: 15
+      }
+    }, /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: id,
+      name: footNameOf(id),
+      size: 34
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, footNameOf(id)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: FF.ui,
+        fontSize: 13,
+        color: FC.deep
+      }
+    }, counts[id] || 0, "\xD7"), /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: on,
+      disabled: full || busy,
+      onChange: () => toggle(id),
+      "aria-label": `${footNameOf(id)} responsable ballons`
+    }));
+  })), err && /*#__PURE__*/React.createElement(FMessage, {
+    style: {
+      marginTop: 10
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    onClick: () => setEditing(false),
+    disabled: busy,
+    style: {
+      flex: 1
+    }
+  }, "Annuler"), /*#__PURE__*/React.createElement(FBtn, {
+    onClick: save,
+    disabled: busy,
+    style: {
+      flex: 1
+    }
+  }, busy ? "…" : `Enregistrer (${picked.length})`))));
+}
 function FootScheduledView({
   match,
   roster,
@@ -3476,7 +3673,8 @@ function FootScheduledView({
   isAdmin,
   canStart,
   reload,
-  onStartMatch
+  onStartMatch,
+  extra
 }) {
   const matchAttendance = attendance.filter(a => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
@@ -3507,7 +3705,7 @@ function FootScheduledView({
       bl: 0,
       opponent: 0
     }
-  }), /*#__PURE__*/React.createElement(FootLineupSection, {
+  }), extra, /*#__PURE__*/React.createElement(FootLineupSection, {
     match: match,
     roster: roster,
     lineups: lineups || [],
@@ -3566,6 +3764,13 @@ function FootMatchDetailPage({
     }, "Retour aux matchs")
   }));
   const canReset = isBureau(currentPlayer) && match.status !== "scheduled";
+  const balls = /*#__PURE__*/React.createElement(FootBallKeepersCard, {
+    match: match,
+    matches: matches,
+    roster: roster,
+    canEdit: isBureau(currentPlayer),
+    reload: reload
+  });
   async function resetMatch() {
     if (!window.confirm(`Remettre le match contre ${match.opponent_name} à « pas joué » ?\n\nLes buts, le chrono et les notes seront supprimés. La convocation et les présences sont conservées.`)) return;
     setResetting(true);
@@ -3620,7 +3825,8 @@ function FootMatchDetailPage({
     isAdmin: isAdmin,
     canStart: canStart,
     reload: reload,
-    onStartMatch: () => setStartingConfig(true)
+    onStartMatch: () => setStartingConfig(true),
+    extra: balls
   }), match.status === "scheduled" && startingConfig && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FootScoreboard, {
     match: match,
     score: {
@@ -3643,7 +3849,8 @@ function FootMatchDetailPage({
     attendance: attendance,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
-    reload: reload
+    reload: reload,
+    extra: balls
   }), match.status === "finished" && /*#__PURE__*/React.createElement(FootFinishedView, {
     match: match,
     roster: roster,
@@ -3654,7 +3861,8 @@ function FootMatchDetailPage({
     motmVotes: motmVotes,
     currentPlayer: currentPlayer,
     isAdmin: isAdmin,
-    reload: reload
+    reload: reload,
+    extra: balls
   }), isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, editingInfo ? /*#__PURE__*/React.createElement(FootMatchForm, {
     title: "Modifier le match",
     submitLabel: "Enregistrer",

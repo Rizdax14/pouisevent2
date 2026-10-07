@@ -305,6 +305,7 @@ function FootMatchHero({ match, score, presentIds, waitingCount, rosterSize, onO
         {live && <div style={{ fontFamily: FF.display, fontSize: 34, color: FC.deep, whiteSpace: "nowrap" }}>{score.bl}–{score.opponent}</div>}
       </div>
       <FootWhenWhere match={match} />
+      {(match.ball_keepers || []).length > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: FC.text, marginTop: 5 }}><FIcon name="ball" size={16} /><span>Ballons : <b>{match.ball_keepers.map(footNameOf).join(" et ")}</b></span></div>}
       <div style={{ margin: "12px 0" }}><FootMetaChips match={match} /></div>
       {!live && (
         <>
@@ -1000,12 +1001,13 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   );
 }
 
-function FootLiveView({ match, roster, events, lineups, attendance, currentPlayer, isAdmin, reload }) {
+function FootLiveView({ match, roster, events, lineups, attendance, currentPlayer, isAdmin, reload, extra }) {
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={score} />
+      {extra}
       <FootLineupSection match={match} roster={roster} lineups={lineups} attendance={attendance} isAdmin={false} reload={reload} />
       {isAdmin && <FootLiveAdminConsole match={match} roster={roster} events={matchEvents} lineups={lineups} reload={reload} />}
       <FCard>
@@ -1215,13 +1217,14 @@ function FootRatingsAdminPanel({ match, sheetIds, reload }) {
   );
 }
 
-function FootFinishedView({ match, roster, events, lineups, attendance, ratings, motmVotes, currentPlayer, isAdmin, reload }) {
+function FootFinishedView({ match, roster, events, lineups, attendance, ratings, motmVotes, currentPlayer, isAdmin, reload, extra }) {
   const [tab, setTab] = React.useState("resume");
   const matchEvents = events.filter((e) => e.match_id === match.id);
   const score = computeFootScore(matchEvents);
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={score} />
+      {extra}
       <FSegmented value={tab} onChange={setTab} options={[["resume", "Résumé", "ball"], ["notes", "Notes", "star"]]} style={{ marginBottom: 14, background: "rgba(255,255,255,0.92)" }} />
       {tab === "resume" && (
         <>
@@ -1299,7 +1302,72 @@ function FootPresenceCard({ roster, rows, min, isAdmin, onSetPlayer, emptyText }
   );
 }
 
-function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, canStart, reload, onStartMatch }) {
+// ---- ball keepers (2 players bring and bring back the balls) ------------------------------------------------------------------
+function FootBallKeepersCard({ match, matches, roster, canEdit, reload }) {
+  const [editing, setEditing] = React.useState(false);
+  const [picked, setPicked] = React.useState(match.ball_keepers || []);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const season = seasonOf(match.match_datetime);
+  const counts = ballKeeperCounts(matches.filter((m) => seasonOf(m.match_datetime) === season));
+  const keepers = match.ball_keepers || [];
+  const pool = attendanceRoster(roster).map((r) => r.player_id)
+    .sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || footNameOf(a).localeCompare(footNameOf(b)));
+  const times = (id) => { const n = counts[id] || 0; return `${n} fois cette saison`; };
+  const toggle = (id) => setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : picked.length < 2 ? [...picked, id] : picked);
+  async function save() {
+    setBusy(true); setErr(null);
+    try { await sbUpdate("foot_matches", { id: match.id }, { ball_keepers: picked }); await reload(); setEditing(false); }
+    catch (e) { setErr("Enregistrement impossible : " + e.message); }
+    setBusy(false);
+  }
+  return (
+    <FCard style={{ border: `2px solid ${FC.accent}` }}>
+      <FHeading right={canEdit && !editing && <FBtn size="sm" variant="secondary" icon="pencil" onClick={() => { setPicked(keepers); setErr(null); setEditing(true); }}>{keepers.length ? "Changer" : "Choisir"}</FBtn>}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><FIcon name="ball" size={22} />Responsables ballons</span>
+      </FHeading>
+      {!editing && (keepers.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+          {keepers.map((id) => (
+            <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, background: FC.accentSoft, borderRadius: 18, padding: "10px 12px", minWidth: 0 }}>
+              <FAvatar playerId={id} name={footNameOf(id)} size={44} linkable />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: FF.ui, fontSize: 17, overflowWrap: "anywhere" }}><FPlayerLink id={id}>{footNameOf(id)}</FPlayerLink></div>
+                <div style={{ fontSize: 12, color: FC.muted }}>{times(id)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : <FEmpty icon="ball" title="Pas encore désignés" text={canEdit ? "Choisis les 2 joueurs qui s'occupent des ballons pour ce match." : "Le bureau choisira 2 joueurs pour les ballons."} />)}
+      {editing && (
+        <>
+          <div style={{ fontSize: 13, color: FC.muted, marginBottom: 8 }}>Choisis 2 joueurs ({picked.length} / 2). Ceux qui l'ont fait le moins souvent sont en haut.</div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {pool.map((id) => {
+              const on = picked.includes(id);
+              const full = !on && picked.length >= 2;
+              return (
+                <label key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 6px 6px", borderRadius: 16, background: on ? FC.accentSoft : FC.softer, border: `1.5px solid ${on ? FC.accent : "transparent"}`, opacity: full ? 0.55 : 1, cursor: full || busy ? "default" : "pointer", fontSize: 15 }}>
+                  <FAvatar playerId={id} name={footNameOf(id)} size={34} />
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{footNameOf(id)}</span>
+                  <span style={{ fontFamily: FF.ui, fontSize: 13, color: FC.deep }}>{counts[id] || 0}×</span>
+                  <input type="checkbox" checked={on} disabled={full || busy} onChange={() => toggle(id)} aria-label={`${footNameOf(id)} responsable ballons`} />
+                </label>
+              );
+            })}
+          </div>
+          {err && <FMessage style={{ marginTop: 10 }}>{err}</FMessage>}
+          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+            <FBtn variant="ghost" onClick={() => setEditing(false)} disabled={busy} style={{ flex: 1 }}>Annuler</FBtn>
+            <FBtn onClick={save} disabled={busy} style={{ flex: 1 }}>{busy ? "…" : `Enregistrer (${picked.length})`}</FBtn>
+          </div>
+        </>
+      )}
+    </FCard>
+  );
+}
+
+function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, isAdmin, canStart, reload, onStartMatch, extra }) {
   const matchAttendance = attendance.filter((a) => a.match_id === match.id);
   const presenceRoster = attendanceRoster(roster);
   const queue = computeAttendanceQueue(presenceRoster, matchAttendance, match.min_players);
@@ -1319,6 +1387,7 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
+      {extra}
 
       <FootLineupSection match={match} roster={roster} lineups={lineups || []} attendance={attendance} isAdmin={isAdmin} reload={reload} />
 
@@ -1349,6 +1418,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   if (!match) return <FCard><FEmpty icon="calendar" title="Match introuvable" action={<FBtn onClick={navBack}>Retour aux matchs</FBtn>} /></FCard>;
 
   const canReset = isBureau(currentPlayer) && match.status !== "scheduled";
+  const balls = <FootBallKeepersCard match={match} matches={matches} roster={roster} canEdit={isBureau(currentPlayer)} reload={reload} />;
   async function resetMatch() {
     if (!window.confirm(`Remettre le match contre ${match.opponent_name} à « pas joué » ?\n\nLes buts, le chrono et les notes seront supprimés. La convocation et les présences sont conservées.`)) return;
     setResetting(true);
@@ -1372,7 +1442,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
   return (
     <div>
       {match.status === "scheduled" && !startingConfig && (
-        <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} canStart={canStart} reload={reload} onStartMatch={() => setStartingConfig(true)} />
+        <FootScheduledView match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} isAdmin={isAdmin} canStart={canStart} reload={reload} onStartMatch={() => setStartingConfig(true)} extra={balls} />
       )}
       {match.status === "scheduled" && startingConfig && (
         <>
@@ -1380,8 +1450,8 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
           <FootStartMatchConfig match={match} roster={roster} attendance={attendance} lineups={lineups} currentPlayer={currentPlayer} reload={reload} onCancel={() => setStartingConfig(false)} />
         </>
       )}
-      {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
-      {match.status === "finished" && <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
+      {match.status === "live" && <FootLiveView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} extra={balls} />}
+      {match.status === "finished" && <FootFinishedView match={match} roster={roster} events={events} lineups={lineups} attendance={attendance} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} extra={balls} />}
 
       {isAdmin && (
         <>
