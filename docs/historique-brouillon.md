@@ -209,6 +209,6 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Notes et feuilles de match de la phase 2 25-26 (10 matchs), tirées du fichier « moyenne 25-26 ». Correspondances : Titouan Brunon = Thisma, Vianel/Mahé Chanut = Mahé. Les invités (Baptiste Lurel, Clément Desjoyaux, Quentin Laurent, Jean Jean) ne sont pas importés.
 - Amicaux de fin de saison (score SportEasy, feuilles et notes du fichier « moyenne 25-26 ») : 18/06/2026 Copains Chopines 1-3 (Nolan, passe Thisma) et 25/06/2026 Equipe Yoni 3-7 (Ilian, Thisma, 1 buteur inconnu ; passes Samuel, Louis). Le fichier date le match Yoni du 07/05 : j'ai pris la date SportEasy.
 - Esté (17) : ancien joueur, pas encore dans l'effectif (à ajouter plus tard).
-- Recoupement des buts/passes de la phase 2 avec « moyenne 25-26 » : un seul ajout sûr, le but sans buteur de Dunières 12/02 est à Romain. Les autres écarts (passes de Thisma, but de Mathis F contre PSV le 23/04, passes d'Esté le 12/02) contredisent les totaux de Thisma : laissés tels quels.
+- Recoupement des buts/passes de la phase 2 avec « moyenne 25-26 » : les écarts (Romain ou Sam contre Dunières le 12/02, passes de Thisma, but de Mathis F contre PSV le 23/04) contredisent « Stats phase 2 » (dossier Drive 25-26 > 25/26 Stats), qui reste la référence : rien de modifié.
 - Les anciens apparaissent dans les stats et les classements des saisons où ils ont joué (pas sur le portant du vestiaire).
 - Amicaux de juin 2026 : foot_matches 121 et 122.
