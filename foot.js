@@ -6627,6 +6627,507 @@ function FootSplash({
     }
   }, label))))));
 }
+
+// ---- the club room: Calendrier / Classement / Vestiaire as three corners of one 3D locker room ------------------------------
+// foot-room.js draws the room and reports taps; this screen feeds it the data and lays the readable bits over it.
+const FOOT_ROOM_ZONES = {
+  calendar: "desk",
+  rankings: "board",
+  vestiaire: "rack"
+};
+const FOOT_ROOM_TITLES = {
+  calendar: "Calendrier",
+  rankings: "Classement",
+  vestiaire: "Vestiaire"
+};
+function FootRoomStat({
+  label,
+  value
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 22,
+      lineHeight: 1.1,
+      color: "#fff"
+    }
+  }, value), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 10,
+      letterSpacing: "0.06em",
+      textTransform: "uppercase",
+      color: "rgba(255,255,255,0.7)"
+    }
+  }, label));
+}
+function FootRoomScreen({
+  visible,
+  page,
+  theme,
+  setTheme,
+  onHome,
+  roster,
+  matches,
+  events,
+  lineups,
+  ratings,
+  motmVotes,
+  currentPlayer,
+  nav,
+  openPlayer,
+  onLeaveRoom
+}) {
+  const host = React.useRef(null);
+  const room = React.useRef(null);
+  const [state, setState] = React.useState("loading");
+  const [error, setError] = React.useState(null);
+  const [shirt, setShirt] = React.useState(null);
+  const [boardMode, setBoardModeState] = React.useState(() => readPref("foot_room_board", "indiv", ["indiv", "team"]));
+  const [boardTab, setBoardTabState] = React.useState(() => readPref("foot_rank_tab", "goals", FOOT_RANKING_TABS.map(t => t.key)));
+  const [month, setMonth] = React.useState(() => {
+    const s = calendarStartMonth(matches);
+    return s.year * 12 + s.month - 1;
+  });
+  const [paper, setPaper] = React.useState(null);
+  const zone = FOOT_ROOM_ZONES[page] || "rack";
+  const kit = theme === "pink" ? "away" : "home";
+
+  // ---- data ----
+  const squad = React.useMemo(() => rackSquad(roster, footNameOf), [roster]);
+  const scoreById = React.useMemo(() => {
+    const by = {};
+    for (const e of events) (by[e.match_id] = by[e.match_id] || []).push(e);
+    return Object.fromEntries(matches.map(m => [m.id, computeFootScore(by[m.id] || [])]));
+  }, [matches, events]);
+  const season = seasonOf(new Date().toISOString());
+  const rows = React.useMemo(() => {
+    const filtered = filterMatchesForStats(matches, {
+      season,
+      type: "all"
+    });
+    const ids = new Set(filtered.map(m => m.id));
+    const ls = lineups.filter(l => ids.has(l.match_id));
+    const out = buildStatsRows(statsRoster(roster), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
+    for (const r of out) {
+      const s = playerRatingSeries(filtered, ratings, ls, r.playerId);
+      r.rating = averageRating(s);
+      r.rated = s.length;
+    }
+    return out;
+  }, [matches, lineups, events, ratings, motmVotes, roster, season]);
+  const bounds = React.useMemo(() => calendarBounds(matches), [matches]);
+  const upcoming = React.useMemo(() => upcomingMatches(matches, 4), [matches]);
+  const tap = React.useRef();
+  tap.current = (surface, id) => {
+    if (!id) {
+      if (surface === "next" && upcoming[0]) setPaper(upcoming[0]);
+      return;
+    }
+    const [kind, rest] = [id.split(":")[0], id.slice(id.indexOf(":") + 1)];
+    if (kind === "mode") {
+      setBoardModeState(rest);
+      writePref("foot_room_board", rest);
+    } else if (kind === "tab") {
+      setBoardTabState(rest);
+      writePref("foot_rank_tab", rest);
+    } else if (kind === "player") openPlayer(Number(rest));else if (kind === "next") {
+      if (upcoming[0]) setPaper(upcoming[0]);
+    } else if (kind === "match") {
+      const m = matches.find(x => String(x.id) === rest);
+      if (m) nav("matchDetail", {
+        matchId: m.id
+      });
+    } else if (kind === "cal") setMonth(v => Math.max(bounds.min, Math.min(bounds.max, v + (rest === "next" ? 1 : -1))));
+  };
+
+  // ---- the room itself: created once, kept while the football app is open ----
+  React.useEffect(() => {
+    let alive = true;
+    window.FootRoom.ensureLoaded().then(() => {
+      if (!alive || !host.current) return;
+      room.current = window.FootRoom.create(host.current, {
+        zone,
+        accent: FC.accent,
+        accentDeep: FC.deep,
+        onShirt: (i, p) => alive && setShirt(p || null),
+        onTap: (surface, id) => tap.current(surface, id)
+      });
+      setState("ready");
+    }).catch(e => {
+      if (alive) {
+        setError(e.message);
+        setState("error");
+      }
+    });
+    return () => {
+      alive = false;
+      if (room.current) room.current.destroy();
+      room.current = null;
+    };
+  }, []);
+  React.useEffect(() => {
+    if (room.current) room.current.pause(!visible);
+  }, [visible, state]);
+  React.useEffect(() => {
+    if (room.current) room.current.setZone(zone);
+    setPaper(null);
+  }, [zone, state]);
+  React.useEffect(() => {
+    if (room.current) {
+      room.current.setAccent(FC.accent, FC.deep);
+      room.current.setSquad(squad, kit, currentPlayer?.id);
+    }
+  }, [squad, kit, state]);
+  React.useEffect(() => {
+    if (!room.current) return;
+    const entries = rankingEntries(rows, boardTab, footNameOf, 10).map(e => ({
+      playerId: e.playerId,
+      name: footNameOf(e.playerId),
+      value: boardTab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, boardTab, "abs")
+    }));
+    room.current.setBoard({
+      mode: boardMode,
+      tab: boardTab,
+      tabs: FOOT_RANKING_TABS.map(({
+        key,
+        label
+      }) => ({
+        key,
+        label
+      })),
+      season: `Saison ${season}`,
+      entries
+    });
+  }, [rows, boardMode, boardTab, state]);
+  React.useEffect(() => {
+    if (!room.current) return;
+    const venue = m => m.venue === "exterieur" ? "Extérieur" : "Domicile";
+    const next = upcoming[0];
+    const longDate = iso => new Date(iso).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: "Europe/Paris"
+    });
+    const y = Math.floor(month / 12),
+      mo = month % 12 + 1;
+    room.current.setDesk({
+      next: next && {
+        kicker: [next.status === "live" ? "En direct" : footRelative(next.match_datetime), venue(next), next.match_type === "amical" ? "Amical" : null].filter(Boolean).join(" · "),
+        opponent: next.opponent_name,
+        date: longDate(next.match_datetime),
+        hours: `Match ${footHour(next.match_datetime)}${next.meeting_at ? ` · RDV ${footHour(next.meeting_at)}` : ""}`,
+        place: formatMatchPlace(next)
+      },
+      upcoming: upcoming.slice(1, 4).map(m => ({
+        id: m.id,
+        date: longDate(m.match_datetime),
+        opponent: m.opponent_name,
+        sub: `${footHour(m.match_datetime)} · ${venue(m)}`
+      })),
+      calendar: calendarMonth(matches, m => scoreById[m.id] || {
+        bl: 0,
+        opponent: 0
+      }, y, mo)
+    });
+  }, [upcoming, matches, scoreById, month, theme, state]);
+
+  // ---- overlays ----
+  const row = shirt && rows.find(r => r.playerId === shirt.id);
+  const glass = {
+    background: "rgba(16,12,14,0.72)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 22,
+    color: "#fff"
+  };
+  const roundBtn = {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    border: "1px solid rgba(255,255,255,0.22)",
+    background: "rgba(255,255,255,0.08)",
+    color: "#fff",
+    fontSize: 20,
+    cursor: "pointer",
+    flex: "0 0 auto"
+  };
+  const hint = zone === "board" ? "Touchez le tableau pour changer de classement" : zone === "desk" ? "Touchez une feuille ou un match du calendrier" : null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 5,
+      background: "#100c0e",
+      display: visible ? "block" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("style", null, footGlobalCss()), /*#__PURE__*/React.createElement("div", {
+    ref: host,
+    style: {
+      position: "absolute",
+      inset: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      padding: "calc(12px + env(safe-area-inset-top)) 16px 26px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      background: "linear-gradient(rgba(16,12,14,0.85) 40%, transparent)",
+      pointerEvents: "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      pointerEvents: "auto"
+    }
+  }, /*#__PURE__*/React.createElement(FIconBtn, {
+    icon: "home",
+    label: "Retour \xE0 l'accueil",
+    tone: "glass",
+    onClick: onHome
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 26,
+      color: "#fff",
+      textShadow: "0 2px 0 rgba(0,0,0,0.4)"
+    }
+  }, FOOT_ROOM_TITLES[page]), /*#__PURE__*/React.createElement("div", {
+    style: {
+      pointerEvents: "auto",
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement(FIconBtn, {
+    icon: "cube",
+    label: "Revenir aux pages classiques",
+    tone: "glass",
+    onClick: onLeaveRoom
+  }), /*#__PURE__*/React.createElement(FThemeSwitch, {
+    value: theme,
+    onChange: setTheme
+  }))), state === "loading" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      inset: 0,
+      display: "grid",
+      placeItems: "center",
+      color: "rgba(255,255,255,0.7)",
+      fontFamily: FF.ui,
+      fontSize: 18
+    }
+  }, "On ouvre le vestiaire\u2026"), state === "error" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 16,
+      right: 16,
+      top: "40%",
+      ...glass,
+      padding: 18,
+      textAlign: "center",
+      fontFamily: FF.ui
+    }
+  }, "Le vestiaire 3D n'a pas pu s'ouvrir (", error, "). ", /*#__PURE__*/React.createElement("button", {
+    onClick: onLeaveRoom,
+    style: {
+      ...roundBtn,
+      width: "auto",
+      padding: "0 14px",
+      marginTop: 10
+    }
+  }, "Pages classiques")), state === "ready" && zone === "rack" && shirt && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 12,
+      right: 12,
+      bottom: "calc(96px + env(safe-area-inset-bottom))",
+      maxWidth: 560,
+      margin: "0 auto",
+      ...glass,
+      padding: "12px 12px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => room.current && room.current.step(-1),
+    "aria-label": "Maillot pr\xE9c\xE9dent",
+    style: roundBtn
+  }, "\u2039"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => openPlayer(shirt.id),
+    style: {
+      flex: 1,
+      minWidth: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      background: "none",
+      border: "none",
+      color: "#fff",
+      cursor: "pointer",
+      padding: 0,
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 40,
+      lineHeight: 0.9,
+      color: "#fff",
+      textShadow: `0 3px 0 ${FC.accent}`
+    }
+  }, shirt.num || "–"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontFamily: FF.ui,
+      fontSize: 20,
+      lineHeight: 1.05,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, shirt.label || shirt.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "block",
+      fontSize: 12,
+      color: "rgba(255,255,255,0.7)"
+    }
+  }, shirt.name, " \xB7 ", shirt.role === "occasionnel" ? "Occasionnel" : "Régulier", " \xB7 voir sa fiche"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => room.current && room.current.step(1),
+    "aria-label": "Maillot suivant",
+    style: roundBtn
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: "1px solid rgba(255,255,255,0.12)"
+    }
+  }, /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "Matchs",
+    value: row ? row.played : 0
+  }), /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "Buts",
+    value: row ? row.goals : 0
+  }), /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "Passes D",
+    value: row ? row.assists : 0
+  }), /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "Note",
+    value: row && row.rating != null ? row.rating.toFixed(1) : "–"
+  }), /*#__PURE__*/React.createElement(FootRoomStat, {
+    label: "HDM",
+    value: row ? row.motm : 0
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      fontSize: 10,
+      color: "rgba(255,255,255,0.5)",
+      marginTop: 6,
+      letterSpacing: "0.04em"
+    }
+  }, "Saison ", season, " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), state === "ready" && hint && !paper && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: "calc(98px + env(safe-area-inset-bottom))",
+      textAlign: "center",
+      pointerEvents: "none"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...glass,
+      display: "inline-block",
+      padding: "7px 14px",
+      fontSize: 12,
+      borderRadius: 999
+    }
+  }, hint)), paper && /*#__PURE__*/React.createElement("div", {
+    onClick: () => setPaper(null),
+    style: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: "100%",
+      maxWidth: 420,
+      background: "#fbf9f3",
+      borderRadius: 6,
+      boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+      overflow: "hidden",
+      transform: "rotate(-1deg)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: FC.accent,
+      color: "#fff",
+      fontFamily: FF.ui,
+      fontSize: 18,
+      letterSpacing: "0.06em",
+      textAlign: "center",
+      padding: "12px 0"
+    }
+  }, "PROCHAIN MATCH"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 18px 18px",
+      color: "#1b1b1b"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 28,
+      lineHeight: 1.1,
+      marginBottom: 10
+    }
+  }, "vs ", paper.opponent_name), /*#__PURE__*/React.createElement(FootWhenWhere, {
+    match: paper,
+    size: 15
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement(FBtn, {
+    full: true,
+    onClick: () => nav("matchDetail", {
+      matchId: paper.id
+    })
+  }, "Ouvrir le match"), /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    onClick: () => setPaper(null)
+  }, "Fermer"))))));
+}
 function FootballApp({
   currentPlayer,
   onBack
@@ -6652,6 +7153,14 @@ function FootballApp({
   const setTheme = t => {
     setThemeState(t);
     writePref("foot_theme", t);
+  };
+  // 3D club room (beta, bureau only for now): Calendrier / Classement / Vestiaire become corners of one locker room
+  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "off", ["on", "off"]));
+  const roomOn = isAdmin && roomPref === "on";
+  const setRoom = on => {
+    setRoomPref(on ? "on" : "off");
+    writePref("foot_room", on ? "on" : "off");
+    setPage(p => on && p === "stats" ? "vestiaire" : !on && p === "vestiaire" ? "stats" : p);
   };
   React.useEffect(() => {
     // the browser bar follows the theme
@@ -6747,7 +7256,11 @@ function FootballApp({
     id: "rankings",
     label: "Classement",
     icon: "trophy"
-  }, {
+  }, roomOn ? {
+    id: "vestiaire",
+    label: "Vestiaire",
+    icon: "shirt"
+  } : {
     id: "stats",
     label: "Stats",
     icon: "chart"
@@ -6769,7 +7282,8 @@ function FootballApp({
       sub: playerPage ? sub.from.sub : sub
     }
   });
-  const backFromPlayer = () => nav(sub.from ? sub.from.page : "stats", sub.from ? sub.from.sub : {});
+  const backFromPlayer = () => nav(sub.from ? sub.from.page : roomOn ? "vestiaire" : "stats", sub.from ? sub.from.sub : {});
+  const roomVisible = roomOn && loaded && !!FOOT_ROOM_ZONES[page];
   const openMatch = detail ? matches.find(m => m.id === sub.matchId) : null;
   const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : detail ? [openMatch ? {
     scheduled: "Match",
@@ -6783,7 +7297,23 @@ function FootballApp({
       themeName: theme,
       openPlayer
     }
-  }, /*#__PURE__*/React.createElement(FootShell, {
+  }, roomOn && loaded && /*#__PURE__*/React.createElement(FootRoomScreen, {
+    visible: roomVisible,
+    page: page,
+    theme: theme,
+    setTheme: setTheme,
+    onHome: onBack,
+    onLeaveRoom: () => setRoom(false),
+    roster: roster,
+    matches: matches,
+    events: events,
+    lineups: lineups,
+    ratings: ratings,
+    motmVotes: motmVotes,
+    currentPlayer: currentPlayer,
+    nav: nav,
+    openPlayer: openPlayer
+  }), !roomVisible && /*#__PURE__*/React.createElement(FootShell, {
     wide: page === "stats" || page === "reseaux" || playerPage
   }, /*#__PURE__*/React.createElement(FTopBar, {
     title: title,
@@ -6791,7 +7321,13 @@ function FootballApp({
     theme: theme,
     onTheme: setTheme,
     onHome: onBack,
-    onBack: detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined
+    onBack: detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined,
+    right: isAdmin && !roomOn ? /*#__PURE__*/React.createElement(FIconBtn, {
+      icon: "cube",
+      label: "Essayer le vestiaire 3D",
+      tone: "glass",
+      onClick: () => setRoom(true)
+    }) : null
   }), loaded && loadError && /*#__PURE__*/React.createElement(FMessage, null, "Chargement incomplet : ", loadError), loaded && page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
     matches: matches,
     events: events,
@@ -6846,7 +7382,7 @@ function FootballApp({
     currentPlayer: currentPlayer,
     subjectId: sub.playerId
   })), /*#__PURE__*/React.createElement(FNav, {
-    page: detail ? "calendar" : playerPage ? "stats" : page,
+    page: detail ? "calendar" : playerPage ? roomOn ? "vestiaire" : "stats" : page,
     items: navItems,
     onGo: nav
   }), splashOn && /*#__PURE__*/React.createElement(FootSplash, {

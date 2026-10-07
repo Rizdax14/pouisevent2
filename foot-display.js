@@ -58,4 +58,62 @@ function mapLinks(match) {
   };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks };
+// ---- the club room (Vestiaire / Classement / Calendrier in 3D) ----
+// Shirts on the rack: regular and occasional players, by shirt number (no number last), then name.
+function rackSquad(roster, nameOf) {
+  const n = (v) => (v === "" || v == null || isNaN(Number(v)) ? 1e9 : Number(v));
+  return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel")
+    .map((r) => ({ id: r.player_id, num: r.jersey_number || "", name: nameOf(r.player_id), role: r.role }))
+    .sort((a, b) => n(a.num) - n(b.num) || a.name.localeCompare(b.name));
+}
+
+// The match being played (if any) then the scheduled ones, soonest first.
+function upcomingMatches(matches, limit = 4) {
+  const live = matches.filter((m) => m.status === "live");
+  const next = matches.filter((m) => m.status === "scheduled").sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime));
+  return [...live, ...next].slice(0, limit);
+}
+
+const FOOT_MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+// "19h" / "18h30" (Paris time)
+function parisHour(iso) { const p = _parisParts(new Date(iso)); return `${p.hh}h${p.mm ? String(p.mm).padStart(2, "0") : ""}`; }
+// "St-Max" from "Saint-Maximin FC": first word, at most 8 letters, for a calendar cell.
+function shortOpponent(name) {
+  const w = String(name || "?").replace(/^(FC|AS|US|SC|RC|AC|CS|ES|SO|OS)\s+/i, "").split(/[\s/]+/)[0] || "?";
+  return w.length > 8 ? w.slice(0, 7) + "." : w;
+}
+// One month of the desk calendar, by Paris day. month is 1-12. scoreOf(match) → { bl, opponent } for a played match.
+// A cell shows the opponent and either the score (played: tone win / loss / draw) or the kick-off hour.
+function calendarMonth(matches, scoreOf, year, month, nowMs) {
+  const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const offset = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7; // Monday first
+  const days = {};
+  for (const m of [...matches].sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))) {
+    const p = _parisParts(new Date(m.match_datetime));
+    if (p.y !== year || p.m !== month || days[p.d]) continue;
+    const played = m.status === "finished";
+    const sc = played ? scoreOf(m) : null;
+    days[p.d] = {
+      id: m.id, top: shortOpponent(m.opponent_name),
+      bottom: played ? `${sc.bl}-${sc.opponent}` : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
+      tone: played ? { V: "win", D: "loss", N: "draw" }[footOutcome(sc)] : null,
+    };
+  }
+  const t = _parisParts(new Date(nowMs === undefined ? Date.now() : nowMs));
+  return { title: `${FOOT_MONTHS[month - 1]} ${year}`, year, month, offset, length, days, today: t.y === year && t.m === month ? t.d : null };
+}
+// The month the desk calendar opens on: the next match's month, else the current one.
+function calendarStartMonth(matches, nowMs) {
+  const next = upcomingMatches(matches, 1)[0];
+  const p = _parisParts(next ? new Date(next.match_datetime) : new Date(nowMs === undefined ? Date.now() : nowMs));
+  return { year: p.y, month: p.m };
+}
+// Months that hold a match: the calendar can't be paged past the first or the last one (nor before today's month).
+function calendarBounds(matches, nowMs) {
+  const t = _parisParts(new Date(nowMs === undefined ? Date.now() : nowMs));
+  let lo = t.y * 12 + t.m - 1, hi = lo;
+  for (const m of matches) { const p = _parisParts(new Date(m.match_datetime)); const k = p.y * 12 + p.m - 1; lo = Math.min(lo, k); hi = Math.max(hi, k); }
+  return { min: lo, max: hi };
+}
+
+if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

@@ -54,3 +54,44 @@ test("mapLinks builds Waze, Plans and Google Maps links from the match address",
   assert.equal(l.google, `https://www.google.com/maps/search/?api=1&query=${q}`);
   assert.equal(D.mapLinks({ city: "" }), null);
 });
+
+// ---- club room ----
+test("rackSquad: regular and occasional players by shirt number, numberless last", () => {
+  const roster = [
+    { player_id: 1, jersey_number: "14", role: "regulier" }, { player_id: 2, jersey_number: "02", role: "occasionnel" },
+    { player_id: 3, jersey_number: null, role: "regulier" }, { player_id: 4, jersey_number: "7", role: "ancien" }, { player_id: 5, jersey_number: "100", role: "regulier" },
+  ];
+  const names = { 1: "Louis", 2: "Nolan", 3: "Zed", 5: "Timo" };
+  assert.deepEqual(D.rackSquad(roster, (id) => names[id]).map((p) => [p.id, p.num]), [[2, "02"], [1, "14"], [5, "100"], [3, ""]]);
+});
+
+test("upcomingMatches: the live match first, then scheduled ones soonest first", () => {
+  const ms = [
+    { id: 1, status: "scheduled", match_datetime: "2026-11-05T18:00:00Z" }, { id: 2, status: "finished", match_datetime: "2026-10-01T18:00:00Z" },
+    { id: 3, status: "scheduled", match_datetime: "2026-10-20T18:00:00Z" }, { id: 4, status: "live", match_datetime: "2026-10-07T18:00:00Z" },
+  ];
+  assert.deepEqual(D.upcomingMatches(ms, 3).map((m) => m.id), [4, 3, 1]);
+});
+
+test("calendarMonth: Monday-first grid by Paris day, score and tone for played matches, hour for the others", () => {
+  const ms = [
+    { id: 1, status: "finished", match_datetime: "2026-10-01T17:00:00Z", opponent_name: "FC Montreuil Rouge" },
+    { id: 2, status: "scheduled", match_datetime: "2026-10-31T23:30:00Z", opponent_name: "Les Lilas" }, // Nov 1st 00:30 in Paris
+    { id: 3, status: "scheduled", match_datetime: "2026-10-15T17:30:00Z", opponent_name: "Bagnolet" },
+  ];
+  const cal = D.calendarMonth(ms, () => ({ bl: 3, opponent: 1 }), 2026, 10, new Date("2026-10-07T10:00:00Z").getTime());
+  assert.equal(cal.title, "Octobre 2026");
+  assert.equal(cal.offset, 3); // Oct 1st 2026 is a Thursday
+  assert.equal(cal.length, 31);
+  assert.equal(cal.today, 7);
+  assert.deepEqual(cal.days[1], { id: 1, top: "Montreu.", bottom: "3-1", tone: "win" });
+  assert.deepEqual(cal.days[15], { id: 3, top: "Bagnolet", bottom: "19h30", tone: null });
+  assert.equal(cal.days[31], undefined); // belongs to November in Paris
+});
+
+test("calendarBounds spans the first match to the last one, today included", () => {
+  const ms = [{ match_datetime: "2025-09-10T17:00:00Z" }, { match_datetime: "2026-12-10T17:00:00Z" }];
+  const b = D.calendarBounds(ms, new Date("2026-10-07T10:00:00Z").getTime());
+  assert.equal(b.min, 2025 * 12 + 8);
+  assert.equal(b.max, 2026 * 12 + 11);
+});
