@@ -6668,67 +6668,70 @@ function FootRoomStat({
   }, label));
 }
 
-// The extra numbers under a shirt (Vestiaire, "Plus de stats").
+// The extra numbers under a shirt (Vestiaire, "Plus de stats"): compact, so everything fits on a phone screen at once.
 function FootShirtMore({
   st
 }) {
   const label = {
     fontFamily: FF.ui,
-    fontSize: 11,
+    fontSize: 10,
     letterSpacing: "0.07em",
     textTransform: "uppercase",
     color: "rgba(255,255,255,0.6)",
-    margin: "14px 0 6px"
+    margin: "9px 0 4px"
   };
-  const tile = (title, value, sub) => /*#__PURE__*/React.createElement("div", {
+  const tile = (title, value) => /*#__PURE__*/React.createElement("div", {
     style: {
       background: "rgba(255,255,255,0.07)",
-      borderRadius: 14,
-      padding: "9px 6px 7px",
+      borderRadius: 11,
+      padding: "5px 4px 4px",
       textAlign: "center",
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.display,
-      fontSize: 21,
+      fontSize: 17,
       lineHeight: 1.1
     }
   }, value), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.ui,
-      fontSize: 10,
-      letterSpacing: "0.05em",
+      fontSize: 9,
+      letterSpacing: "0.04em",
       textTransform: "uppercase",
-      color: "rgba(255,255,255,0.7)"
+      color: "rgba(255,255,255,0.7)",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
     }
-  }, title), sub && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "rgba(255,255,255,0.5)"
-    }
-  }, sub));
+  }, title));
   const dash = (v, f = x => x) => v == null ? "–" : f(v);
-  const res = [["V", st.wins, FC.good || "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, FC.bad || "#c0262d"]];
+  const res = [["V", st.wins, "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, "#c0262d"]];
   const formColor = {
     V: "#2f9a55",
     N: "#b9a03a",
     D: "#c0262d"
   };
+  const grid = n => ({
+    display: "grid",
+    gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`,
+    gap: 5
+  });
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: label
-  }, "R\xE9sultats"), /*#__PURE__*/React.createElement("div", {
+  }, "R\xE9sultats \xB7 ", st.wins, " V \xB7 ", st.draws, " N \xB7 ", st.losses, " D"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 10
+      gap: 8
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
-      height: 12,
-      borderRadius: 6,
+      height: 10,
+      borderRadius: 5,
       overflow: "hidden",
       background: "rgba(255,255,255,0.1)"
     }
@@ -6741,102 +6744,80 @@ function FootShirtMore({
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.display,
-      fontSize: 20
+      fontSize: 16,
+      whiteSpace: "nowrap"
     }
-  }, dash(st.winPct, v => `${v}%`))), /*#__PURE__*/React.createElement("div", {
+  }, dash(st.winPct, v => `${v}%`), " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      display: "flex",
-      justifyContent: "space-between",
-      fontSize: 12,
-      color: "rgba(255,255,255,0.75)",
-      marginTop: 4
+      fontFamily: FF.ui,
+      fontSize: 10,
+      color: "rgba(255,255,255,0.6)"
     }
-  }, /*#__PURE__*/React.createElement("span", null, st.wins, " V \xB7 ", st.draws, " N \xB7 ", st.losses, " D"), /*#__PURE__*/React.createElement("span", null, "de victoires")), st.form.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "VICTOIRES"))), st.form.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 6,
-      marginTop: 8
+      gap: 5,
+      marginTop: 6
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 12,
+      fontSize: 11,
       color: "rgba(255,255,255,0.7)",
-      marginRight: 4
+      marginRight: 3
     }
   }, "Forme"), st.form.map((r, k) => /*#__PURE__*/React.createElement("span", {
     key: k,
     style: {
-      width: 24,
-      height: 24,
-      borderRadius: 7,
+      width: 20,
+      height: 20,
+      borderRadius: 6,
       background: formColor[r],
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
       fontFamily: FF.ui,
-      fontSize: 13
+      fontSize: 11
     }
   }, r))), /*#__PURE__*/React.createElement("div", {
     style: label
   }, "Cette saison"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-      gap: 6
-    }
-  }, tile("Buts / match", dash(st.goalsPerMatch, v => v.toFixed(2))), tile("Décisifs", st.decisive, "buts + passes"), tile("Décisifs / match", dash(st.decisivePerMatch, v => v.toFixed(2))), tile("Matchs joués", dash(st.playedPct, v => `${v}%`), "des matchs"), tile("Meilleure note", dash(st.best, v => (Math.round(v * 10) / 10).toFixed(1))), tile("Note moyenne", dash(st.rating, v => v.toFixed(1)))), /*#__PURE__*/React.createElement("div", {
+    style: grid(3)
+  }, tile("Buts / match", dash(st.goalsPerMatch, v => v.toFixed(2))), tile("Décisifs", st.decisive), tile("Décisifs / m.", dash(st.decisivePerMatch, v => v.toFixed(2))), tile("Matchs joués", dash(st.playedPct, v => `${v}%`)), tile("Meilleure note", dash(st.best, v => (Math.round(v * 10) / 10).toFixed(1))), tile("Note moy.", dash(st.rating, v => v.toFixed(1)))), /*#__PURE__*/React.createElement("div", {
     style: label
   }, "3 derniers matchs not\xE9s"), st.lastRatings.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
+      fontSize: 12,
       color: "rgba(255,255,255,0.6)"
     }
-  }, "Pas encore de note cette saison") : st.lastRatings.map((r, k) => /*#__PURE__*/React.createElement("div", {
+  }, "Pas encore de note cette saison") : /*#__PURE__*/React.createElement("div", {
+    style: grid(3)
+  }, st.lastRatings.map((r, k) => /*#__PURE__*/React.createElement("div", {
     key: k,
     style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "6px 0",
-      borderTop: k ? "1px solid rgba(255,255,255,0.08)" : "none"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
+      borderRadius: 11,
+      padding: "5px 4px 4px",
+      textAlign: "center",
       minWidth: 0,
-      fontSize: 14,
+      background: r.rating >= 7 ? "rgba(47,154,85,0.85)" : r.rating >= 5.5 ? "rgba(255,255,255,0.1)" : "rgba(192,38,45,0.85)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.display,
+      fontSize: 17,
+      lineHeight: 1.1
+    }
+  }, r.rating.toFixed(1)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis"
     }
-  }, "vs ", r.opponent), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "rgba(255,255,255,0.55)"
-    }
-  }, r.date ? new Date(r.date).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Europe/Paris"
-  }) : ""), /*#__PURE__*/React.createElement("span", {
-    style: {
-      minWidth: 44,
-      textAlign: "center",
-      fontFamily: FF.display,
-      fontSize: 18,
-      borderRadius: 10,
-      padding: "2px 6px",
-      background: r.rating >= 7 ? "#2f9a55" : r.rating >= 5.5 ? "rgba(255,255,255,0.15)" : "#c0262d"
-    }
-  }, r.rating.toFixed(1)))), st.career && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "vs ", r.opponent)))), st.career && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: label
   }, "Carri\xE8re au club"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-      gap: 6
-    }
+    style: grid(4)
   }, tile("Matchs", st.career.played), tile("Buts", st.career.goals), tile("Passes D", st.career.assists), tile("HDM", st.career.motm))));
 }
 function FootRoomScreen({
@@ -6874,6 +6855,7 @@ function FootRoomScreen({
   const [savingPresence, setSavingPresence] = React.useState(false);
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
   const [statsOpen, setStatsOpen] = React.useState(false);
+  const [arrived, setArrived] = React.useState(null); // the corner the camera has finished travelling to
   const {
     photos,
     framings
@@ -6963,6 +6945,7 @@ function FootRoomScreen({
         accent: FC.accent,
         accentDeep: FC.deep,
         onShirt: (i, p) => alive && setShirt(p || null),
+        onArrive: z => alive && setArrived(z),
         onTap: (surface, id) => tap.current(surface, id)
       });
       setState("ready");
@@ -6983,7 +6966,10 @@ function FootRoomScreen({
   }, [visible, state]);
   React.useEffect(() => {
     if (!room.current) return;
-    room.current.setZone(zone);
+    if (room.current.zone() !== zone) {
+      setArrived(null);
+      room.current.setZone(zone);
+    } else setArrived(zone);
     setPaper(null);
     setStatsOpen(false);
     if (zone === "rack" && meId) room.current.selectId(meId);
@@ -7186,8 +7172,11 @@ function FootRoomScreen({
       position: "absolute",
       left: 0,
       right: 0,
-      top: "calc(78px + env(safe-area-inset-top))",
-      textAlign: "center"
+      top: "calc(64px + env(safe-area-inset-top))",
+      textAlign: "center",
+      opacity: arrived === "rack" ? 1 : 0,
+      transition: "opacity 0.45s ease",
+      pointerEvents: arrived === "rack" ? "auto" : "none"
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => room.current && room.current.selectId(meId),
@@ -7215,10 +7204,12 @@ function FootRoomScreen({
       maxWidth: 560,
       margin: "0 auto",
       ...glass,
-      padding: "12px 12px 10px",
-      maxHeight: "calc(100% - 200px - env(safe-area-inset-top) - env(safe-area-inset-bottom))",
-      overflowY: "auto",
-      WebkitOverflowScrolling: "touch"
+      background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background,
+      padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px",
+      opacity: arrived === "rack" ? 1 : 0,
+      transform: arrived === "rack" ? "none" : "translateY(14px)",
+      transition: "opacity 0.5s ease, transform 0.5s ease",
+      pointerEvents: arrived === "rack" ? "auto" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -7311,10 +7302,10 @@ function FootRoomScreen({
       justifyContent: "center",
       gap: 6,
       width: "100%",
-      marginTop: 10,
+      marginTop: statsOpen ? 8 : 10,
       border: "none",
       borderRadius: 14,
-      padding: "9px 0",
+      padding: statsOpen ? "7px 0" : "9px 0",
       background: "rgba(255,255,255,0.1)",
       color: "#fff",
       fontFamily: FF.ui,
@@ -7323,7 +7314,7 @@ function FootRoomScreen({
       textTransform: "uppercase",
       cursor: "pointer"
     }
-  }, statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"), /*#__PURE__*/React.createElement("div", {
+  }, statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"), !statsOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       fontSize: 10,
@@ -7456,8 +7447,8 @@ function FootballApp({
     writePref("foot_theme", t);
   };
   // 3D club room (beta, bureau only for now): Calendrier / Classement / Vestiaire become corners of one locker room
-  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "off", ["on", "off"]));
-  const roomOn = isAdmin && roomPref === "on";
+  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "on", ["on", "off"]));
+  const roomOn = roomPref === "on";
   const setRoom = on => {
     setRoomPref(on ? "on" : "off");
     writePref("foot_room", on ? "on" : "off");
@@ -7578,13 +7569,12 @@ function FootballApp({
     icon: "sliders",
     on: page === "admin",
     onClick: () => nav("admin")
-  }] : []), ...(isAdmin ? [{
+  }] : []), {
     id: "room",
     label: roomOn ? "Pages classiques" : "Vestiaire 3D",
     icon: "cube",
-    hint: roomOn ? null : "bêta",
     onClick: () => setRoom(!roomOn)
-  }] : []), {
+  }, {
     id: "refresh",
     label: "Actualiser",
     icon: "refresh",

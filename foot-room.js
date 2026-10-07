@@ -28,7 +28,7 @@
     const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     const low = (navigator.deviceMemory || 8) <= 3; // (iPhones report few cores but are fast: only memory counts)
     const HD = low ? 1 : 2; // text surfaces are drawn at twice their layout size, so they stay sharp on retina screens
-    const cb = { onShirt: opts.onShirt || (() => {}), onTap: opts.onTap || (() => {}), onReady: opts.onReady || (() => {}) };
+    const cb = { onShirt: opts.onShirt || (() => {}), onTap: opts.onTap || (() => {}), onReady: opts.onReady || (() => {}), onArrive: opts.onArrive || (() => {}) };
 
     // ---------- renderer ----------
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -615,7 +615,7 @@
       let d = target.theta - cam.from.theta; d = ((d + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
       cam.to = { ...target, theta: cam.from.theta + d };
       cam.zone = zone; cam.t = instant || reduced ? 1 : 0; cam.start = performance.now();
-      if (cam.t >= 1) { cam.cur = { theta: target.theta, pos: target.pos.clone(), look: target.look.clone() }; place(cam.cur); }
+      if (cam.t >= 1) { cam.cur = { theta: target.theta, pos: target.pos.clone(), look: target.look.clone() }; place(cam.cur); cb.onArrive(zone); }
     }
     function resize() {
       const w = container.clientWidth || 1, h = container.clientHeight || 1;
@@ -691,7 +691,7 @@
         const e = easeInOut(cam.t), arc = Math.sin(Math.PI * e);
         const pos = new THREE.Vector3().lerpVectors(cam.from.pos, cam.to.pos, e), look = new THREE.Vector3().lerpVectors(cam.from.look, cam.to.look, e);
         cam.cur = { theta: cam.from.theta + (cam.to.theta - cam.from.theta) * e, pos, look };
-        if (cam.t >= 1) cam.cur.theta = ((cam.to.theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        if (cam.t >= 1) { cam.cur.theta = ((cam.to.theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); cb.onArrive(cam.zone); }
         // swing around the centre, stepping back a little and up mid-way
         place({ theta: cam.cur.theta, pos: pos.clone().add(V(0, 0.3 * arc, 0.9 * arc)), look });
       }

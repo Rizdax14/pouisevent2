@@ -2512,60 +2512,58 @@ function FootRoomStat({ label, value }) {
   );
 }
 
-// The extra numbers under a shirt (Vestiaire, "Plus de stats").
+// The extra numbers under a shirt (Vestiaire, "Plus de stats"): compact, so everything fits on a phone screen at once.
 function FootShirtMore({ st }) {
-  const label = { fontFamily: FF.ui, fontSize: 11, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", margin: "14px 0 6px" };
-  const tile = (title, value, sub) => (
-    <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 14, padding: "9px 6px 7px", textAlign: "center", minWidth: 0 }}>
-      <div style={{ fontFamily: FF.display, fontSize: 21, lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontFamily: FF.ui, fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{title}</div>
-      {sub && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{sub}</div>}
+  const label = { fontFamily: FF.ui, fontSize: 10, letterSpacing: "0.07em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)", margin: "9px 0 4px" };
+  const tile = (title, value) => (
+    <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 11, padding: "5px 4px 4px", textAlign: "center", minWidth: 0 }}>
+      <div style={{ fontFamily: FF.display, fontSize: 17, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: FF.ui, fontSize: 9, letterSpacing: "0.04em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
     </div>
   );
   const dash = (v, f = (x) => x) => (v == null ? "–" : f(v));
-  const res = [["V", st.wins, FC.good || "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, FC.bad || "#c0262d"]];
+  const res = [["V", st.wins, "#2f9a55"], ["N", st.draws, "#b9a03a"], ["D", st.losses, "#c0262d"]];
   const formColor = { V: "#2f9a55", N: "#b9a03a", D: "#c0262d" };
+  const grid = (n) => ({ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: 5 });
   return (
     <div>
-      <div style={label}>Résultats</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ flex: 1, display: "flex", height: 12, borderRadius: 6, overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
+      <div style={label}>Résultats · {st.wins} V · {st.draws} N · {st.losses} D</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: 1, display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "rgba(255,255,255,0.1)" }}>
           {st.played > 0 && res.map(([k, n, c]) => n > 0 && <div key={k} style={{ width: `${(n / st.played) * 100}%`, background: c }} />)}
         </div>
-        <div style={{ fontFamily: FF.display, fontSize: 20 }}>{dash(st.winPct, (v) => `${v}%`)}</div>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 4 }}>
-        <span>{st.wins} V · {st.draws} N · {st.losses} D</span><span>de victoires</span>
+        <div style={{ fontFamily: FF.display, fontSize: 16, whiteSpace: "nowrap" }}>{dash(st.winPct, (v) => `${v}%`)} <span style={{ fontFamily: FF.ui, fontSize: 10, color: "rgba(255,255,255,0.6)" }}>VICTOIRES</span></div>
       </div>
       {st.form.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginRight: 4 }}>Forme</span>
-          {st.form.map((r, k) => <span key={k} style={{ width: 24, height: 24, borderRadius: 7, background: formColor[r], display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.ui, fontSize: 13 }}>{r}</span>)}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginRight: 3 }}>Forme</span>
+          {st.form.map((r, k) => <span key={k} style={{ width: 20, height: 20, borderRadius: 6, background: formColor[r], display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.ui, fontSize: 11 }}>{r}</span>)}
         </div>
       )}
       <div style={label}>Cette saison</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+      <div style={grid(3)}>
         {tile("Buts / match", dash(st.goalsPerMatch, (v) => v.toFixed(2)))}
-        {tile("Décisifs", st.decisive, "buts + passes")}
-        {tile("Décisifs / match", dash(st.decisivePerMatch, (v) => v.toFixed(2)))}
-        {tile("Matchs joués", dash(st.playedPct, (v) => `${v}%`), "des matchs")}
+        {tile("Décisifs", st.decisive)}
+        {tile("Décisifs / m.", dash(st.decisivePerMatch, (v) => v.toFixed(2)))}
+        {tile("Matchs joués", dash(st.playedPct, (v) => `${v}%`))}
         {tile("Meilleure note", dash(st.best, (v) => (Math.round(v * 10) / 10).toFixed(1)))}
-        {tile("Note moyenne", dash(st.rating, (v) => v.toFixed(1)))}
+        {tile("Note moy.", dash(st.rating, (v) => v.toFixed(1)))}
       </div>
       <div style={label}>3 derniers matchs notés</div>
-      {st.lastRatings.length === 0 ? <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Pas encore de note cette saison</div> : st.lastRatings.map((r, k) => (
-        <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: k ? "1px solid rgba(255,255,255,0.08)" : "none" }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>vs {r.opponent}</span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{r.date ? new Date(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }) : ""}</span>
-          <span style={{ minWidth: 44, textAlign: "center", fontFamily: FF.display, fontSize: 18, borderRadius: 10, padding: "2px 6px", background: r.rating >= 7 ? "#2f9a55" : r.rating >= 5.5 ? "rgba(255,255,255,0.15)" : "#c0262d" }}>{r.rating.toFixed(1)}</span>
+      {st.lastRatings.length === 0 ? <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Pas encore de note cette saison</div> : (
+        <div style={grid(3)}>
+          {st.lastRatings.map((r, k) => (
+            <div key={k} style={{ borderRadius: 11, padding: "5px 4px 4px", textAlign: "center", minWidth: 0, background: r.rating >= 7 ? "rgba(47,154,85,0.85)" : r.rating >= 5.5 ? "rgba(255,255,255,0.1)" : "rgba(192,38,45,0.85)" }}>
+              <div style={{ fontFamily: FF.display, fontSize: 17, lineHeight: 1.1 }}>{r.rating.toFixed(1)}</div>
+              <div style={{ fontSize: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>vs {r.opponent}</div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       {st.career && (
         <>
           <div style={label}>Carrière au club</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
-            {tile("Matchs", st.career.played)}{tile("Buts", st.career.goals)}{tile("Passes D", st.career.assists)}{tile("HDM", st.career.motm)}
-          </div>
+          <div style={grid(4)}>{tile("Matchs", st.career.played)}{tile("Buts", st.career.goals)}{tile("Passes D", st.career.assists)}{tile("HDM", st.career.motm)}</div>
         </>
       )}
     </div>
@@ -2585,6 +2583,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
   const [savingPresence, setSavingPresence] = React.useState(false);
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
   const [statsOpen, setStatsOpen] = React.useState(false);
+  const [arrived, setArrived] = React.useState(null); // the corner the camera has finished travelling to
   const { photos, framings } = React.useContext(FootCtx);
   const meId = currentPlayer ? currentPlayer.id : null;
   const zone = FOOT_ROOM_ZONES[page] || "rack";
@@ -2642,6 +2641,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
       room.current = window.FootRoom.create(host.current, {
         zone, accent: FC.accent, accentDeep: FC.deep,
         onShirt: (i, p) => alive && setShirt(p || null),
+        onArrive: (z) => alive && setArrived(z),
         onTap: (surface, id) => tap.current(surface, id),
       });
       setState("ready");
@@ -2652,7 +2652,8 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
   React.useEffect(() => { if (room.current) room.current.pause(!visible); }, [visible, state]);
   React.useEffect(() => {
     if (!room.current) return;
-    room.current.setZone(zone); setPaper(null); setStatsOpen(false);
+    if (room.current.zone() !== zone) { setArrived(null); room.current.setZone(zone); } else setArrived(zone);
+    setPaper(null); setStatsOpen(false);
     if (zone === "rack" && meId) room.current.selectId(meId);
   }, [zone, state]);
   React.useEffect(() => { if (room.current) { room.current.setAccent(FC.accent, FC.deep); room.current.setSquad(squad, kit, currentPlayer?.id); } }, [squad, kit, state]);
@@ -2724,7 +2725,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
       )}
       {/* vestiaire: the shirt in front */}
       {state === "ready" && zone === "rack" && shirt && meId && shirt.id !== meId && (
-        <div style={{ position: "absolute", left: 0, right: 0, top: "calc(78px + env(safe-area-inset-top))", textAlign: "center" }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: "calc(64px + env(safe-area-inset-top))", textAlign: "center", opacity: arrived === "rack" ? 1 : 0, transition: "opacity 0.45s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
           <button onClick={() => room.current && room.current.selectId(meId)}
             style={{ ...glass, borderRadius: 999, padding: "9px 16px", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.04em", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
             <FIcon name="shirt" size={16} /> Revenir à mon maillot
@@ -2732,7 +2733,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
         </div>
       )}
       {state === "ready" && zone === "rack" && shirt && (
-        <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, padding: "12px 12px 10px", maxHeight: "calc(100% - 200px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background, padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px", opacity: arrived === "rack" ? 1 : 0, transform: arrived === "rack" ? "none" : "translateY(14px)", transition: "opacity 0.5s ease, transform 0.5s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => room.current && room.current.step(-1)} aria-label="Maillot précédent" style={roundBtn}>‹</button>
             <button onClick={() => openPlayer(shirt.id)} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0, textAlign: "left" }}>
@@ -2753,10 +2754,10 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
           </div>
           {statsOpen && more && <FootShirtMore st={more} />}
           <button onClick={() => setStatsOpen(!statsOpen)} aria-expanded={statsOpen}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: 10, border: "none", borderRadius: 14, padding: "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: statsOpen ? 8 : 10, border: "none", borderRadius: 14, padding: statsOpen ? "7px 0" : "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
             {statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"}
           </button>
-          <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 6, letterSpacing: "0.04em" }}>Saison {season} · glisse pour parcourir · touche le maillot pour le retourner</div>
+          {!statsOpen && <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 6, letterSpacing: "0.04em" }}>Saison {season} · glisse pour parcourir · touche le maillot pour le retourner</div>}
         </div>
       )}
       {state === "ready" && hint && !paper && (
@@ -2812,8 +2813,8 @@ function FootballApp({ currentPlayer, onBack }) {
   const isAdmin = isBureau(currentPlayer);
   const setTheme = (t) => { setThemeState(t); writePref("foot_theme", t); };
   // 3D club room (beta, bureau only for now): Calendrier / Classement / Vestiaire become corners of one locker room
-  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "off", ["on", "off"]));
-  const roomOn = isAdmin && roomPref === "on";
+  const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "on", ["on", "off"]));
+  const roomOn = roomPref === "on";
   const setRoom = (on) => {
     setRoomPref(on ? "on" : "off"); writePref("foot_room", on ? "on" : "off");
     setPage((p) => (on && p === "stats" ? "vestiaire" : !on && p === "vestiaire" ? "stats" : p));
@@ -2894,7 +2895,7 @@ function FootballApp({ currentPlayer, onBack }) {
   ];
   const settingsItems = [
     ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone", on: page === "reseaux", onClick: () => nav("reseaux") }, { id: "admin", label: "Admin", icon: "sliders", on: page === "admin", onClick: () => nav("admin") }] : []),
-    ...(isAdmin ? [{ id: "room", label: roomOn ? "Pages classiques" : "Vestiaire 3D", icon: "cube", hint: roomOn ? null : "bêta", onClick: () => setRoom(!roomOn) }] : []),
+    { id: "room", label: roomOn ? "Pages classiques" : "Vestiaire 3D", icon: "cube", onClick: () => setRoom(!roomOn) },
     { id: "refresh", label: "Actualiser", icon: "refresh", onClick: () => window.location.reload() },
   ];
   const detail = page === "matchDetail";
