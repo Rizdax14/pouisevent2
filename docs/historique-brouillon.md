@@ -184,7 +184,7 @@ Meilleur joueur de la saison (vote) : Maxime (24 voix), Nils (8), Thisma (6).
 | Julien Courat | 9 | 5.05 | 0 | 0 |
 | TOTAL ÉQUIPE | 124 | 6.86 | 50 | 35 |
 
-Pas de notes pour la phase 1 2025-26 : seulement les votes « tops du match ».
+Pas de notes pour la phase 1 2025-26 (il n'y en a jamais eu) : seulement les votes « tops du match ».
 
 ## 2026-2027 (déjà dans l'appli)
 Amicaux : 27/08 Les potes à Nathan 4-8, 03/09 En Avant Guinguette 7-3, 10/09 AS Sampicot 7-3.
@@ -197,7 +197,7 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 1. 16/01/2025 vs Genilac : FSGT dit 1-3, Insta dit 3-1 (victoire, « première victoire »). → je pense que le PDF est inversé, je prends **3-1**.
 2. 12/02/2026 Dunières 8-7 vs 9-8 et 19/02/2026 PSV 8-11 vs 8-10 : je prends le **PDF officiel FSGT**.
 3. 31/10/2024 : Celda ou JBV ?
-4. Scores manquants : amical d'octobre 2024, Patronage Saint Joseph (10/07/2025) → affiché « ? - ? » (colonne `score_unknown`), compte comme match joué sans V/N/D.
+4. Scores manquants : amical d'octobre 2024 (abandonné, pas dans l'appli), Patronage Saint Joseph (10/07/2025) → affiché « ? - ? » (colonne `score_unknown`), compte comme match joué sans V/N/D.
 
 ## Import en base (07/10/2026)
 - 54 matchs importés : `foot_matches` id 67 à 120 (scores, buteurs, passeurs, feuilles de match).
@@ -212,3 +212,4 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Recoupement des buts/passes de la phase 2 avec « moyenne 25-26 » : les écarts (Romain ou Sam contre Dunières le 12/02, passes de Thisma, but de Mathis F contre PSV le 23/04) contredisent « Stats phase 2 » (dossier Drive 25-26 > 25/26 Stats), qui reste la référence : rien de modifié.
 - Les anciens apparaissent dans les stats et les classements des saisons où ils ont joué (pas sur le portant du vestiaire).
 - Amicaux de juin 2026 : foot_matches 121 et 122.
+- Hommes du match 2024-25 : la meilleure note de chaque match noté (ex æquo compris), enregistrée comme un vote dans `foot_motm_votes` (21 matchs, 24 votes). Pas d'homme du match pour les matchs sans notes (EAG amical, Genilac retour, AS Links et Kiss Cool retour).
