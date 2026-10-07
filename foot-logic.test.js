@@ -33,6 +33,7 @@ const {
   averageRating,
   buildRatingPayload,
   statsRoster,
+  statsPopulation,
   buildStatsRows,
   sortStatsRows,
   submitRatings,
@@ -394,6 +395,17 @@ test("computePlayerStats counts a match with an unknown score as played, without
   const ms = [{ id: 1, status: "finished", score_unknown: true }, { id: 2, status: "finished" }];
   const st = computePlayerStats(ms, [{ match_id: 1, player_id: 7 }, { match_id: 2, player_id: 7 }], [{ match_id: 2, type: "goal_bl", player_id: 7 }], {});
   assert.deepEqual([st[0].played, st[0].wins, st[0].draws, st[0].losses, st[0].goals], [2, 1, 0, 0, 1]);
+});
+
+test("statsPopulation: listed squad of a past season, roster for the current one, everyone for all time", () => {
+  const roster = [{ player_id: 116, role: "regulier" }, { player_id: 500, role: "regulier" }, { player_id: 501, role: "invite" }];
+  const past = statsPopulation(roster, "2024-2025", [{ match_id: 1, player_id: 500 }, { match_id: 1, player_id: 501 }]);
+  assert.ok(past.includes(55) && past.includes(116) && past.includes(500)); // Marlon (listed), a regular who played
+  assert.ok(!past.includes(501)); // a guest never counts
+  assert.ok(!statsPopulation(roster, "2024-2025", []).includes(500)); // a regular who didn't play that season
+  assert.deepEqual(statsPopulation(roster, "2026-2027", []), [116, 500]);
+  const all = statsPopulation(roster, "all", []);
+  assert.ok(all.includes(17) && all.includes(55) && all.includes(500));
 });
 
 test("buildStatsRows adds zero rows and ratings for the roster only", () => {

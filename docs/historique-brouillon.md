@@ -154,7 +154,7 @@ Meilleur joueur de la saison (vote) : Maxime (24 voix), Nils (8), Thisma (6).
 | Simon | 0 | 1 |
 | Nils | 0 | 0 |
 
-### 2025-2026 — notes moyennes (phase 2 + amicaux Yoni et Copains, fichier « moyenne 25-26 »)
+### 2025-2026 — notes moyennes (phase 2 + amicaux Yoni et Copains, fichier « moyenne 25-26 », noms corrigés)
 
 | Joueur | Matchs notés | Note moy. | Buts | Passes D |
 |---|---|---|---|---|
@@ -163,31 +163,37 @@ Meilleur joueur de la saison (vote) : Maxime (24 voix), Nils (8), Thisma (6).
 | Jean Jean Brunon | 2 | 8.45 | 0 | 2 |
 | Clément Desjoyaux | 1 | 8.3 | 0 | 0 |
 | Maxime Marechal | 4 | 8.3 | 0 | 0 |
-| Vianel Chanut | 1 | 8.3 | 3 | 1 |
-| Titouan Brunon | 11 | 7.44 | 10 | 12 |
+| Mahé Chanut (« Vianel » dans le fichier) | 1 | 8.3 | 3 | 1 |
+| Thisma Brunon | 11 | 7.44 | 10 | 12 |
 | Léandre Cagna | 2 | 7.05 | 0 | 1 |
 | Mathis France | 2 | 7.05 | 2 | 0 |
-| Esteban Brunon | 5 | 7.02 | 8 | 3 |
+| Esté Brunon | 5 | 7.02 | 8 | 3 |
 | Baptiste Lurel | 1 | 7.0 | 0 | 0 |
-| Nils Brenquet | 1 | 7.0 | 0 | 0 |
-| Solal Gruyers | 8 | 6.9 | 1 | 1 |
-| Samuel Olagnier | 10 | 6.64 | 5 | 6 |
+| Nils Branquet | 1 | 7.0 | 0 | 0 |
+| Solal Bruyère | 8 | 6.9 | 1 | 1 |
+| Samuel Ollagnier | 10 | 6.64 | 5 | 6 |
 | Simon Grangy | 5 | 6.48 | 0 | 2 |
 | Etienne Ollagnier | 6 | 6.22 | 1 | 0 |
 | Nolan Martin | 10 | 6.03 | 4 | 0 |
 | Louis Marcoux | 10 | 6.01 | 7 | 5 |
-| Thomas Peyreton | 9 | 5.99 | 0 | 0 |
-| Romain Curtil | 4 | 5.72 | 1 | 1 |
-| Timothée Deville | 11 | 5.48 | 1 | 0 |
-| Ilan Tifra | 6 | 5.27 | 2 | 1 |
-| Nathan Devitte | 4 | 5.15 | 1 | 0 |
-| Julien Courat | 9 | 5.05 | 0 | 0 |
+| Thomas Peycelon | 9 | 5.99 | 0 | 0 |
+| Romain Curbilié | 4 | 5.72 | 1 | 1 |
+| Timo Deville | 11 | 5.48 | 1 | 0 |
+| Ilian Tifra | 6 | 5.27 | 2 | 1 |
+| Nathan Deville | 4 | 5.15 | 1 | 0 |
+| Juju Courat | 9 | 5.05 | 0 | 0 |
 | TOTAL ÉQUIPE | 124 | 6.86 | 50 | 35 |
 
 Pas de notes pour la phase 1 2025-26 (il n'y en a jamais eu) : seulement les votes « tops du match ».
 
 ## 2026-2027 (déjà dans l'appli)
 Amicaux : 27/08 Les potes à Nathan 4-8, 03/09 En Avant Guinguette 7-3, 10/09 AS Sampicot 7-3.
+
+## Effectifs par saison (vestiaire et stats de l'appli)
+- 2024-25 : Thisma, Sam, Florent, Simon, Quentin H, Louis, Nils, Maxime, Timo, Léandre, Nolan, Juju, Marlon, Thomas.
+- 2025-26 : Esté, Thisma, Sam, Louis, Nolan, Ilian, Nathan, Quentin H, Timo, Solal, Etienne, Florent, Léandre, Thomas, Mathis F, Juju, Maxime, Romain, Simon, Nils.
+- 2026-27 : l'effectif actuel de l'appli.
+Dans le code : `FOOT_SEASON_SQUADS` (foot-logic.js).
 
 ## Noms → joueurs
 Este = Esteban · Sam = Samuel · France = Mathis F · Mathis (24-25) = Thisma · Etienne = effectif actuel.
@@ -206,7 +212,7 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Anciens joueurs ajoutés à `foot_roster` avec le rôle `ancien` : Marlon (55), Simon (14), Florent E (36), Quentin H (56), Romain C (136).
 - Les buts sans buteur connu sont enregistrés avec un joueur vide (forfait 6-0, Tottenaam 7-1, amicaux sans détail).
 - Pour annuler l'import : `delete from foot_matches where id between 67 and 120;` (les buts, feuilles de match et votes partent avec).
-- Notes et feuilles de match de la phase 2 25-26 (10 matchs), tirées du fichier « moyenne 25-26 ». Correspondances : Titouan Brunon = Thisma, Vianel/Mahé Chanut = Mahé. Les invités (Baptiste Lurel, Clément Desjoyaux, Quentin Laurent, Jean Jean) ne sont pas importés.
+- Notes et feuilles de match de la phase 2 25-26 (10 matchs), tirées du fichier « moyenne 25-26 ». Correspondances (le fichier a des coquilles) : Titouan Brunon = Thisma, Vianel/Mahé Chanut = Mahé, Nathan Devitte = Nathan Deville, Timothée Deville = Timo, Julien Courat = Juju, Ilan Tifra = Ilian, Solal Gruyers = Solal Bruyère, Thomas Peyreton = Thomas Peycelon, Romain Curtil = Romain Curbilié, Nils Brenquet = Nils Branquet, Samuel Olagnier = Samuel Ollagnier, Esteban = Esté. Les invités (Baptiste Lurel, Clément Desjoyaux, Quentin Laurent, Jean Jean) ne sont pas importés.
 - Amicaux de fin de saison (score SportEasy, feuilles et notes du fichier « moyenne 25-26 ») : 18/06/2026 Copains Chopines 1-3 (Nolan, passe Thisma) et 25/06/2026 Equipe Yoni 3-7 (Ilian, Thisma, 1 buteur inconnu ; passes Samuel, Louis). Le fichier date le match Yoni du 07/05 : j'ai pris la date SportEasy.
 - Esté (17) : ancien joueur, pas encore dans l'effectif (à ajouter plus tard).
 - Recoupement des buts/passes de la phase 2 avec « moyenne 25-26 » : les écarts (Romain ou Sam contre Dunières le 12/02, passes de Thisma, but de Mathis F contre PSV le 23/04) contredisent « Stats phase 2 » (dossier Drive 25-26 > 25/26 Stats), qui reste la référence : rien de modifié.

@@ -268,7 +268,7 @@ function FTopBar({ title, subtitle, onHome, onBack, theme, onTheme, right }) {
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
         {onBack ? <FIconBtn icon="back" label="Retour" tone="glass" onClick={onBack} /> : <FIconBtn icon="home" label="Retour à l'accueil" tone="glass" onClick={onHome} />}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{right}<FThemeSwitch value={theme} onChange={onTheme} /></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{right}{onTheme && <FThemeSwitch value={theme} onChange={onTheme} />}</div>
       </div>
       <FTitle>{title}</FTitle>
       {subtitle && <div style={{ color: "rgba(255,255,255,0.92)", fontFamily: FF.ui, fontSize: 15, letterSpacing: "0.03em", marginTop: 2, textShadow: "1px 2px 0 rgba(0,0,0,0.18)" }}>{subtitle}</div>}

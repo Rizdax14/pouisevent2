@@ -817,7 +817,7 @@ function FTopBar({
       alignItems: "center",
       gap: 8
     }
-  }, right, /*#__PURE__*/React.createElement(FThemeSwitch, {
+  }, right, onTheme && /*#__PURE__*/React.createElement(FThemeSwitch, {
     value: theme,
     onChange: onTheme
   }))), /*#__PURE__*/React.createElement(FTitle, null, title), subtitle && /*#__PURE__*/React.createElement("div", {

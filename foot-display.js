@@ -66,6 +66,16 @@ function rackSquad(roster, nameOf) {
     .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
 }
 
+// "2025-2026" → "25-26"
+function shortSeason(s) { return String(s).replace(/^20(\d\d)-20(\d\d)$/, "$1-$2"); }
+
+// Shirts of a past season: its listed squad, alphabetical, numbers as on today's roster.
+function seasonRack(ids, roster, nameOf) {
+  const num = Object.fromEntries(roster.map((r) => [r.player_id, r.jersey_number || ""]));
+  return ids.map((id) => ({ id, num: num[id] || "", name: nameOf(id), role: "saison" }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+}
+
 // The cool numbers behind a shirt. seasonMatches: the season's matches; allMatches for the career line.
 // row / careerRow: buildStatsRows rows; series: playerRatingSeries of the season (oldest first).
 function shirtStats({ row, careerRow, series, seasonFinished, scoreOf, lineups, playerId, allMatches }) {
@@ -167,4 +177,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

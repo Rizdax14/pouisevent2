@@ -1591,7 +1591,7 @@ function FootStatsPage({ matches, lineups, events, ratings, motmVotes, roster, c
   const seasonOptions = [...new Set([currentSeason, ...seasonsFromMatches(matches), ...(season !== "all" ? [season] : [])])].sort().reverse();
   const filtered = filterMatchesForStats(matches, { season, type });
   const filteredIds = new Set(filtered.map((m) => m.id));
-  const population = statsRoster(roster, lineups.filter((l) => filteredIds.has(l.match_id)));
+  const population = statsPopulation(roster, season, lineups.filter((l) => filteredIds.has(l.match_id)));
   const ratingBy = Object.fromEntries(population.map((id) => [id, averageRating(playerRatingSeries(filtered, ratings, lineups, id))]));
   const motmBy = motmWinners(filtered, motmVotes || []);
   const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events, motmBy), ratingBy);
@@ -1691,7 +1691,7 @@ function FootRankingsPanel({ seasonMatches, season, lineups, events, ratings, mo
   const pick = (v) => { setTab(v); writePref("foot_rank_tab", v); };
   const ids = new Set(seasonMatches.map((m) => m.id));
   const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
-  const rows = buildStatsRows(statsRoster(roster, seasonLineups), computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)), motmWinners(seasonMatches, motmVotes || [])), {});
+  const rows = buildStatsRows(statsPopulation(roster, season, seasonLineups), computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)), motmWinners(seasonMatches, motmVotes || [])), {});
   for (const r of rows) {
     const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
     r.rating = averageRating(series);
@@ -2572,7 +2572,20 @@ function FootShirtMore({ st }) {
   );
 }
 
-function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, roster, attendance, reload, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
+// A compact season / matches picker floating over the 3D room (native select: easy on a phone).
+function FootRoomPicker({ label, value, options, onChange }) {
+  const current = options.find(([v]) => v === value);
+  return (
+    <label style={{ position: "relative", pointerEvents: "auto", display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(16,12,14,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 999, padding: "7px 14px", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+      {current ? current[1] : value} <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer", fontSize: 16 }}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attendance, reload, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
   const host = React.useRef(null);
   const room = React.useRef(null);
   const [state, setState] = React.useState("loading");
@@ -2587,29 +2600,41 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
   const [statsOpen, setStatsOpen] = React.useState(false);
   const [arrived, setArrived] = React.useState(null);
+  const roomSquad = React.useRef(null); // the squad the room is showing
   const pendingShirt = React.useRef(null); // shirt to show when arriving at the rack (a name tapped on the board)
-  const [statsType, setStatsTypeState] = React.useState(() => readPref("foot_room_stats_type", "all", ["all", "championnat"]));
-  const setStatsType = (v) => { setStatsTypeState(v); writePref("foot_room_stats_type", v); }; // the corner the camera has finished travelling to
+  const [statsType, setStatsTypeState] = React.useState(() => readPref("foot_room_stats_type", "all", ["all", "championnat", "amical"]));
+  const setStatsType = (v) => { setStatsTypeState(v); writePref("foot_room_stats_type", v); };
+  // seasons: the current one, those with matches, those with a listed squad (newest first)
+  const season = seasonOf(new Date().toISOString());
+  const seasons = React.useMemo(() => [...new Set([season, ...seasonsFromMatches(matches), ...Object.keys(FOOT_SEASON_SQUADS)])].sort().reverse(), [matches, season]);
+  const rackSeasons = seasons.filter((s) => s === season || FOOT_SEASON_SQUADS[s]);
+  const [boardSeason, setBoardSeasonState] = React.useState(() => readPref("foot_room_board_season", season, ["all", ...seasons]));
+  const setBoardSeason = (v) => { setBoardSeasonState(v); writePref("foot_room_board_season", v); };
+  const [boardType, setBoardTypeState] = React.useState(() => readPref("foot_room_board_type", "all", ["all", "championnat", "amical"]));
+  const setBoardType = (v) => { setBoardTypeState(v); writePref("foot_room_board_type", v); };
+  const [rackSeason, setRackSeason] = React.useState(season);
   const { photos, framings } = React.useContext(FootCtx);
   const meId = currentPlayer ? currentPlayer.id : null;
   const zone = FOOT_ROOM_ZONES[page] || "rack";
-  const kit = theme === "pink" ? "away" : "home";
+  const kit = "home";
 
   // ---- data ----
-  const squad = React.useMemo(() => rackSquad(roster, footNameOf), [roster]);
+  const squad = React.useMemo(() => (rackSeason === season ? rackSquad(roster, footNameOf) : seasonRack(FOOT_SEASON_SQUADS[rackSeason] || [], roster, footNameOf)), [roster, rackSeason, season]);
   const scoreById = React.useMemo(() => {
     const by = {}; for (const e of events) (by[e.match_id] = by[e.match_id] || []).push(e);
     return Object.fromEntries(matches.map((m) => [m.id, computeFootScore(by[m.id] || [])]));
   }, [matches, events]);
-  const season = seasonOf(new Date().toISOString());
-  const rows = React.useMemo(() => {
-    const filtered = filterMatchesForStats(matches, { season, type: "all" });
+  // stats rows of the matches of a season ("all": every season) and a type, for the given players
+  const rowsFor = (s, type, population) => {
+    const filtered = filterMatchesForStats(matches, { season: s, type });
     const ids = new Set(filtered.map((m) => m.id));
     const ls = lineups.filter((l) => ids.has(l.match_id));
-    const out = buildStatsRows(statsRoster(roster, ls), computePlayerStats(filtered, ls, events.filter((e) => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
-    for (const r of out) { const s = playerRatingSeries(filtered, ratings, ls, r.playerId); r.rating = averageRating(s); r.rated = s.length; }
+    const out = buildStatsRows(population(ls), computePlayerStats(filtered, ls, events.filter((e) => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
+    for (const r of out) { const sr = playerRatingSeries(filtered, ratings, ls, r.playerId); r.rating = averageRating(sr); r.rated = sr.length; }
     return out;
-  }, [matches, lineups, events, ratings, motmVotes, roster, season]);
+  };
+  const rows = React.useMemo(() => rowsFor(boardSeason, boardType, (ls) => statsPopulation(roster, boardSeason, ls)),
+    [matches, lineups, events, ratings, motmVotes, roster, boardSeason, boardType]);
   const bounds = React.useMemo(() => calendarBounds(matches), [matches]);
   // face photo for the board's post-its (same framing as the avatars)
   const faceFor = (id) => {
@@ -2634,7 +2659,13 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
     const [kind, rest] = [id.split(":")[0], id.slice(id.indexOf(":") + 1)];
     if (kind === "mode") { setBoardModeState(rest); writePref("foot_room_board", rest); }
     else if (kind === "tab") { setBoardTabState(rest); writePref("foot_rank_tab", rest); }
-    else if (kind === "player") { pendingShirt.current = Number(rest); nav("vestiaire"); } // profiles live in the vestiaire
+    else if (kind === "player") { // profiles live in the vestiaire: open the one of the season the board shows
+      const id = Number(rest);
+      const has = (s) => (s === season ? rackSquad(roster, footNameOf) : seasonRack(FOOT_SEASON_SQUADS[s] || [], roster, footNameOf)).some((p) => p.id === id);
+      const target = boardSeason !== "all" && rackSeasons.includes(boardSeason) && has(boardSeason) ? boardSeason : rackSeasons.find(has);
+      if (target) setRackSeason(target);
+      pendingShirt.current = id; nav("vestiaire");
+    }
     else if (kind === "next") { if (upcoming[0]) setPaper(upcoming[0]); }
     else if (kind === "match") { const m = matches.find((x) => String(x.id) === rest); if (m) nav("matchDetail", { matchId: m.id }); }
     else if (kind === "presence") answer(rest);
@@ -2666,9 +2697,11 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
     if (!room.current) return;
     if (room.current.zone() !== zone) { setArrived(null); room.current.setZone(zone); } else setArrived(zone);
     setPaper(null); setStatsOpen(false);
-    if (zone === "rack") { const id = pendingShirt.current || meId; pendingShirt.current = null; if (id) room.current.selectId(id); }
+    // (a name tapped on the board may change the season's rack: then the squad effect below selects it)
+    if (zone === "rack") { const id = pendingShirt.current || meId; if (id) room.current.selectId(id); if (roomSquad.current === squad) pendingShirt.current = null; }
   }, [zone, state]);
-  React.useEffect(() => { if (room.current) { room.current.setAccent(FC.accent, FC.deep); room.current.setSquad(squad, kit, currentPlayer?.id); } }, [squad, kit, state]);
+  React.useEffect(() => { if (room.current) { room.current.setAccent(FC.accent, FC.deep); const keep = shirt && squad.some((p) => p.id === shirt.id) ? shirt.id : currentPlayer?.id;
+    room.current.setSquad(squad, kit, pendingShirt.current || keep); pendingShirt.current = null; roomSquad.current = squad; } }, [squad, kit, state]);
 
   React.useEffect(() => {
     if (!room.current) return;
@@ -2676,8 +2709,9 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
       playerId: e.playerId, name: footNameOf(e.playerId), value: boardTab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, boardTab, "abs"),
       face: faceFor(e.playerId),
     }));
-    room.current.setBoard({ mode: boardMode, tab: boardTab, tabs: FOOT_RANKING_TABS.map(({ key, label }) => ({ key, label })), season: `Saison ${season}`, entries });
-  }, [rows, boardMode, boardTab, state, photos, framings, theme]);
+    const label = (boardSeason === "all" ? "Toutes les saisons" : `Saison ${shortSeason(boardSeason)}`) + (boardType === "championnat" ? " · Championnat" : boardType === "amical" ? " · Amicaux" : "");
+    room.current.setBoard({ mode: boardMode, tab: boardTab, tabs: FOOT_RANKING_TABS.map(({ key, label }) => ({ key, label })), season: label, entries });
+  }, [rows, boardMode, boardTab, boardSeason, boardType, state, photos, framings, theme]);
 
   React.useEffect(() => {
     if (!room.current) return;
@@ -2704,20 +2738,21 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
     });
   }, [upcoming, matches, scoreById, month, months, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
 
+  // the desk calendar's season (August → July) and the jump to another one
+  const deskSeason = (() => { const y = Math.floor(month / 12), m0 = month % 12; const st = m0 >= 7 ? y : y - 1; return `${st}-${st + 1}`; })();
+  const jumpToSeason = (s) => {
+    if (s === season) { const st = calendarStartMonth(matches); setMonth(st.year * 12 + st.month - 1); return; }
+    const first = months.find((k) => { const y = Math.floor(k / 12), m0 = k % 12; return `${m0 >= 7 ? y : y - 1}-${(m0 >= 7 ? y : y - 1) + 1}` === s; });
+    if (first != null) setMonth(first);
+  };
+
   // ---- overlays ----
-  const vestRows = React.useMemo(() => {
-    if (statsType === "all") return rows;
-    const filtered = filterMatchesForStats(matches, { season, type: statsType });
-    const ids = new Set(filtered.map((m) => m.id));
-    const ls = lineups.filter((l) => ids.has(l.match_id));
-    const out = buildStatsRows(statsRoster(roster, ls), computePlayerStats(filtered, ls, events.filter((e) => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
-    for (const r of out) { const s = playerRatingSeries(filtered, ratings, ls, r.playerId); r.rating = averageRating(s); r.rated = s.length; }
-    return out;
-  }, [statsType, rows, matches, lineups, events, ratings, motmVotes, roster, season]);
+  const vestRows = React.useMemo(() => rowsFor(rackSeason, statsType, () => squad.map((p) => p.id)),
+    [statsType, squad, matches, lineups, events, ratings, motmVotes, rackSeason]);
   const row = shirt && vestRows.find((r) => r.playerId === shirt.id);
   const more = React.useMemo(() => {
     if (!shirt) return null;
-    const seasonMs = filterMatchesForStats(matches, { season, type: statsType });
+    const seasonMs = filterMatchesForStats(matches, { season: rackSeason, type: statsType });
     const ids = new Set(seasonMs.map((m) => m.id));
     const careerMs = filterMatchesForStats(matches, { season: "all", type: statsType });
     const career = buildStatsRows([shirt.id], computePlayerStats(careerMs, lineups, events, motmWinners(careerMs, motmVotes || [])), {})[0];
@@ -2726,10 +2761,10 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
       seasonFinished: seasonMs.filter((m) => m.status === "finished").length, scoreOf: (m) => scoreById[m.id] || { bl: 0, opponent: 0 },
       lineups, playerId: shirt.id, allMatches: careerMs,
     });
-  }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, season, statsType]);
+  }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, rackSeason, statsType]);
   const glass = { background: "rgba(16,12,14,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 22, color: "#fff" };
   const roundBtn = { width: 42, height: 42, borderRadius: 21, border: "1px solid rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 20, cursor: "pointer", flex: "0 0 auto" };
-  const hint = zone === "board" ? "Touchez le tableau pour changer de classement" : zone === "desk" ? "Touchez une feuille ou un match du calendrier" : null;
+  const hint = zone === "desk" ? "Touchez une feuille ou un match du calendrier" : null;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5, background: "#100c0e", display: visible ? "block" : "none" }}>
@@ -2741,9 +2776,19 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
         <div style={{ fontFamily: FF.display, fontSize: 26, color: "#fff", textShadow: "0 2px 0 rgba(0,0,0,0.4)" }}>{FOOT_ROOM_TITLES[page]}</div>
         <div style={{ pointerEvents: "auto", display: "flex", gap: 6, alignItems: "center" }}>
           <FSettingsMenu items={settings} />
-          <FThemeSwitch value={theme} onChange={setTheme} />
         </div>
       </div>
+      {/* season filters of the corner */}
+      {state === "ready" && (
+        <div style={{ position: "absolute", left: 0, right: 0, ...(zone === "board" ? { bottom: "calc(98px + env(safe-area-inset-bottom))" } : { top: "calc(66px + env(safe-area-inset-top))" }), display: "flex", justifyContent: "center", gap: 8, padding: "0 16px", pointerEvents: "none" }}>
+          {zone === "board" && <>
+            <FootRoomPicker label="Saison" value={boardSeason} onChange={setBoardSeason} options={[...seasons.map((s) => [s, `Saison ${shortSeason(s)}`]), ["all", "Toutes les saisons"]]} />
+            <FootRoomPicker label="Matchs" value={boardType} onChange={setBoardType} options={[["all", "Tous les matchs"], ["championnat", "Championnat"], ["amical", "Amicaux"]]} />
+          </>}
+          {zone === "rack" && <FootRoomPicker label="Saison" value={rackSeason} onChange={setRackSeason} options={rackSeasons.map((s) => [s, `Vestiaire ${shortSeason(s)}`])} />}
+          {zone === "desk" && <FootRoomPicker label="Saison" value={deskSeason} onChange={jumpToSeason} options={seasonsFromMatches(matches).map((s) => [s, `Saison ${shortSeason(s)}`])} />}
+        </div>
+      )}
       {state === "loading" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.7)", fontFamily: FF.ui, fontSize: 18 }}>On ouvre le vestiaire…</div>}
       {state === "error" && (
         <div style={{ position: "absolute", left: 16, right: 16, top: "40%", ...glass, padding: 18, textAlign: "center", fontFamily: FF.ui }}>
@@ -2753,7 +2798,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
       {/* vestiaire: the shirt in front */}
       {state === "ready" && zone === "rack" && shirt && (
         <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background, padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px", opacity: arrived === "rack" ? 1 : 0, transform: arrived === "rack" ? "none" : "translateY(14px)", transition: "opacity 0.5s ease, transform 0.5s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
-          {meId && shirt.id !== meId && (
+          {meId && shirt.id !== meId && squad.some((p) => p.id === meId) && (
             <div style={{ position: "absolute", left: 0, right: 0, top: -54, textAlign: "center" }}>
               <button onClick={() => room.current && room.current.selectId(meId)}
                 style={{ ...glass, borderRadius: 999, padding: "9px 16px", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.04em", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -2767,13 +2812,13 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
               <span style={{ fontFamily: FF.display, fontSize: 40, lineHeight: 0.9, color: "#fff", textShadow: `0 3px 0 ${FC.accent}` }}>{shirt.num || "–"}</span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontFamily: FF.ui, fontSize: 20, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shirt.label || shirt.name}</span>
-                <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{shirt.name} · {shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"}</span>
+                <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{shirt.name} · {shirt.role === "saison" ? `Saison ${shortSeason(rackSeason)}` : shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"}</span>
               </span>
             </div>
             <button onClick={() => room.current && room.current.step(1)} aria-label="Maillot suivant" style={roundBtn}>›</button>
           </div>
           <div role="radiogroup" aria-label="Matchs pris en compte" style={{ display: "flex", gap: 4, marginTop: 10, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
-            {[["all", "Tous les matchs"], ["championnat", "Championnat"]].map(([k, l]) => (
+            {[["all", "Tous"], ["championnat", "Championnat"], ["amical", "Amicaux"]].map(([k, l]) => (
               <button key={k} role="radio" aria-checked={statsType === k} onClick={() => setStatsType(k)}
                 style={{ flex: 1, border: "none", borderRadius: 999, padding: "6px 0", cursor: "pointer", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.04em", textTransform: "uppercase", background: statsType === k ? FC.accent : "transparent", color: statsType === k ? "#fff" : "rgba(255,255,255,0.7)" }}>{l}</button>
             ))}
@@ -2790,7 +2835,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: statsOpen ? 8 : 10, border: "none", borderRadius: 14, padding: statsOpen ? "7px 0" : "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
             {statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"}
           </button>
-          {!statsOpen && <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 6, letterSpacing: "0.04em" }}>Saison {season}{statsType === "championnat" ? " · championnat" : ""} · glisse pour parcourir · touche le maillot pour le retourner</div>}
+          {!statsOpen && <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 6, letterSpacing: "0.04em" }}>Saison {shortSeason(rackSeason)}{statsType === "championnat" ? " · championnat" : statsType === "amical" ? " · amicaux" : ""} · glisse pour parcourir · touche le maillot pour le retourner</div>}
         </div>
       )}
       {state === "ready" && hint && !paper && (
@@ -2825,7 +2870,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
 }
 
 function FootballApp({ currentPlayer, onBack }) {
-  const [theme, setThemeState] = React.useState(() => readPref("foot_theme", "green", ["green", "pink"]));
+  const theme = "green"; // one theme only: the green of the club
   setFootTheme(theme); // the colour tokens must be current before any child renders
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
@@ -2844,7 +2889,6 @@ function FootballApp({ currentPlayer, onBack }) {
   const [activityAttendance, setActivityAttendance_] = React.useState([]);
 
   const isAdmin = isBureau(currentPlayer);
-  const setTheme = (t) => { setThemeState(t); writePref("foot_theme", t); };
   // 3D club room (beta, bureau only for now): Calendrier / Classement / Vestiaire become corners of one locker room
   const [roomPref, setRoomPref] = React.useState(() => readPref("foot_room", "on", ["on", "off"]));
   const roomOn = roomPref === "on";
@@ -2944,11 +2988,11 @@ function FootballApp({ currentPlayer, onBack }) {
   return (
     <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
       {roomOn && loaded && (
-        <FootRoomScreen visible={roomVisible} page={page} theme={theme} setTheme={setTheme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
+        <FootRoomScreen visible={roomVisible} page={page} theme={theme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
           roster={roster} attendance={attendance} reload={reloadFoot} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer} />
       )}
       {!roomVisible && <FootShell wide={page === "stats" || page === "reseaux" || playerPage}>
-        <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined}
+        <FTopBar title={title} subtitle={subtitle} theme={theme} onHome={onBack} onBack={detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined}
           right={<FSettingsMenu items={settingsItems} />} />
         {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
         {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} activities={activities} activityAttendance={activityAttendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}

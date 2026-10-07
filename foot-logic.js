@@ -326,6 +326,20 @@ function statsRoster(roster, lineups) {
   return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel" || (r.role === "ancien" && played.has(r.player_id))).map((r) => r.player_id);
 }
 
+// The squads of past seasons (players.id), as the club lists them. The current season's squad is the roster.
+const FOOT_SEASON_SQUADS = {
+  "2024-2025": [59, 78, 36, 14, 56, 116, 35, 22, 30, 29, 69, 21, 55, 60],
+  "2025-2026": [17, 59, 78, 116, 69, 117, 52, 56, 30, 80, 82, 36, 29, 60, 150, 21, 22, 136, 14, 35],
+};
+// Who the stats count for a season ("all" = every season): its listed squad, or the roster's regulars for a season
+// without one, plus roster members who played the matches looked at (lineups).
+function statsPopulation(roster, season, lineups) {
+  const listed = season === "all" ? Object.values(FOOT_SEASON_SQUADS).flat() : FOOT_SEASON_SQUADS[season] || null;
+  const played = new Set((lineups || []).map((l) => l.player_id));
+  const fromRoster = statsRoster(roster, lineups).filter((id) => !listed || season === "all" || played.has(id));
+  return [...new Set([...(listed || []), ...fromRoster])];
+}
+
 function buildStatsRows(rosterIds, stats, ratingByPlayer) {
   return rosterIds.map((id) => {
     const s = stats.find((x) => x.playerId === id) || { playerId: id, played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 };
@@ -424,6 +438,8 @@ if (typeof module !== "undefined" && module.exports) {
     averageRating,
     buildRatingPayload,
     statsRoster,
+    statsPopulation,
+    FOOT_SEASON_SQUADS,
     buildStatsRows,
     sortStatsRows,
     submitRatings,
