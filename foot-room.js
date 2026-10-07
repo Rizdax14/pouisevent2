@@ -353,23 +353,23 @@
       m.rotation.x = -Math.PI / 2; m.receiveShadow = true;
       return { mesh: m, canvas: c, tex, regions: [] };
     }
-    const nextSheet = sheet(0.64, 0.88, 760); nextSheet.mesh.position.set(DX - 0.34, DY + 0.008, DZ - 0.38); nextSheet.mesh.rotation.z = 0.03; nextSheet.mesh.userData.surface = "next";
-    const listSheet = sheet(0.6, 0.82, 720); listSheet.mesh.position.set(DX + 0.35, DY + 0.009, DZ - 0.36); listSheet.mesh.rotation.z = -0.04; listSheet.mesh.userData.surface = "list";
-    const calSheet = sheet(1.24, 0.96, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.6); calSheet.mesh.userData.surface = "calendar";
+    const nextSheet = sheet(0.68, 1.22, 760); nextSheet.mesh.position.set(DX - 0.36, DY + 0.008, DZ - 0.41); nextSheet.mesh.rotation.z = 0.025; nextSheet.mesh.userData.surface = "next";
+    const listSheet = sheet(0.66, 1.22, 720); listSheet.mesh.position.set(DX + 0.36, DY + 0.009, DZ - 0.4); listSheet.mesh.rotation.z = -0.03; listSheet.mesh.userData.surface = "list";
+    const calSheet = sheet(1.0, 0.76, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.67); calSheet.mesh.userData.surface = "calendar";
     gDesk.add(nextSheet.mesh, listSheet.mesh, calSheet.mesh);
     // calendar pad thickness + binding rings
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.016, 0.98), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY + 0.002, DZ + 0.6); gDesk.add(pad);
-    for (let k = 0; k < 9; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.004, 6, 16), steel); ring.position.set(DX - 0.48 + k * 0.12, DY + 0.016, DZ + 0.13); gDesk.add(ring); }
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.016, 0.78), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY + 0.002, DZ + 0.67); gDesk.add(pad);
+    for (let k = 0; k < 8; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 6, 16), steel); ring.position.set(DX - 0.42 + k * 0.12, DY + 0.016, DZ + 0.3); gDesk.add(ring); }
     // mug, pen, whistle, notebook, lamp
     const mugMat = new THREE.MeshStandardMaterial({ color: opts.accent || "#2f8f5b", roughness: 0.4 });
-    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.13, 24, 1, true), mugMat); mug.position.set(DX + 0.95, DY + 0.065, DZ + 0.2); mug.castShadow = true;
-    const mugIn = new THREE.Mesh(new THREE.CircleGeometry(0.055, 24), new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.2 })); mugIn.rotation.x = -Math.PI / 2; mugIn.position.set(DX + 0.95, DY + 0.11, DZ + 0.2);
-    const mugH = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 16), mugMat); mugH.position.set(DX + 1.015, DY + 0.07, DZ + 0.2); mugH.rotation.y = Math.PI / 2;
-    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.26, 10), new THREE.MeshStandardMaterial({ color: "#1b2a8f", roughness: 0.3 })); pen.rotation.set(Math.PI / 2, 0, 0.6); pen.position.set(DX + 0.86, DY + 0.009, DZ + 0.75); pen.castShadow = true;
-    const nb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.66), new THREE.MeshStandardMaterial({ color: opts.accentDeep || "#1d5a3a", roughness: 0.7 })); nb.position.set(DX - 1.0, DY + 0.015, DZ + 0.45); nb.rotation.y = 0.12; nb.castShadow = true;
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.13, 24, 1, true), mugMat); mug.position.set(DX + 0.95, DY + 0.065, DZ + 0.45); mug.castShadow = true;
+    const mugIn = new THREE.Mesh(new THREE.CircleGeometry(0.055, 24), new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.2 })); mugIn.rotation.x = -Math.PI / 2; mugIn.position.set(DX + 0.95, DY + 0.11, DZ + 0.45);
+    const mugH = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 16), mugMat); mugH.position.set(DX + 1.015, DY + 0.07, DZ + 0.45); mugH.rotation.y = Math.PI / 2;
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.26, 10), new THREE.MeshStandardMaterial({ color: "#1b2a8f", roughness: 0.3 })); pen.rotation.set(Math.PI / 2, 0, 0.6); pen.position.set(DX + 0.72, DY + 0.009, DZ + 0.85); pen.castShadow = true;
+    const nb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.66), new THREE.MeshStandardMaterial({ color: opts.accentDeep || "#1d5a3a", roughness: 0.7 })); nb.position.set(DX - 0.88, DY + 0.015, DZ + 0.75); nb.rotation.y = 0.12; nb.castShadow = true;
     const whistle = new THREE.Group();
     const wb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), steel); const wm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.025, 0.03), steel); wm.position.x = 0.045; whistle.add(wb, wm);
-    whistle.position.set(DX - 0.95, DY + 0.035, DZ - 0.45); whistle.rotation.y = 0.8;
+    whistle.position.set(DX - 0.95, DY + 0.035, DZ + 0.3); whistle.rotation.y = 0.8;
     const lampMat = new THREE.MeshStandardMaterial({ color: "#1a1a1c", metalness: 0.5, roughness: 0.4, envMap });
     const lampG = new THREE.Group();
     const lb = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.03, 24), lampMat);
@@ -387,13 +387,30 @@
     function circleAround(ctx, x, y, w, h, color) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 + 12, h / 2 + 8, -0.03, 0.15, Math.PI * 2 + 0.35); ctx.stroke(); ctx.restore(); }
 
     // Whiteboard: Équipe / Individuel, the ranking categories and the table, in marker.
-    const faceImgs = {}; let lastBoard = null;
+    const faceImgs = {}; let lastBoard = null, lastDesk = null;
     const initials = (n) => String(n || "?").split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    // surfaces to redraw once a face photo has loaded (one entry per surface, called from a snapshot)
+    const redraws = new Map();
+    function needFace(face, redraw, key) {
+      const u = face && face.url;
+      if (!u) return null;
+      if (key) redraws.set(key, redraw);
+      if (!faceImgs[u]) { faceImgs[u] = "loading"; loadImg(u).then((im) => { faceImgs[u] = im || "failed"; [...redraws.values()].forEach((f) => f()); }); }
+      const img = faceImgs[u];
+      return img && img !== "loading" && img !== "failed" ? img : null;
+    }
+    function drawFace(ctx, face, name, x, y, F, radius, redraw) {
+      const img = needFace(face, redraw, "next");
+      ctx.save(); roundRect(ctx, x, y, F, F, radius); ctx.clip();
+      if (img) { const k = F / 300, r = face.rect; ctx.fillStyle = "#e9e4da"; ctx.fillRect(x, y, F, F); ctx.drawImage(img, x + r.x * k, y + r.y * k, r.width * k, r.height * k); }
+      else { ctx.fillStyle = opts.accent || "#2f8f5b"; ctx.fillRect(x, y, F, F); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `${Math.round(F * 0.42)}px ${FONT_DISPLAY}`; ctx.fillText(initials(name), x + F / 2, y + F * 0.66); }
+      ctx.restore();
+    }
     function drawBoard(m) {
       lastBoard = m;
       for (const en of (m.entries || []).slice(0, 3)) {
         const u = en.face && en.face.url;
-        if (u && !faceImgs[u]) { faceImgs[u] = "loading"; loadImg(u).then((im) => { faceImgs[u] = im || "failed"; if (lastBoard) drawBoard(lastBoard); }); }
+        if (u) needFace(en.face, () => lastBoard && drawBoard(lastBoard), "board");
       }
       const c = boardCanvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); board.userData.scale = S;
       const regions = [];
@@ -521,7 +538,26 @@
         ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(80, y - 40); ctx.lineTo(W - 80, y - 40); ctx.stroke();
         ctx.fillStyle = "#1b1b1b"; y = wrap(m.date, FONT_UI, 58, W - 70, y + 34, 66, 1);
         ctx.font = `54px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, y + 22); y += 96;
-        ctx.fillStyle = "#5d554b"; wrap(m.place || "", FONT_UI, 40, W - 90, y, 48, 2);
+        ctx.fillStyle = "#5d554b"; y = wrap(m.place || "", FONT_UI, 40, W - 90, y, 48, 2);
+        // the two players bringing the balls, with their faces
+        const keepers = (m.ballKeepers || []).slice(0, 2);
+        if (!keepers.length) {
+          const top = Math.max(y + 16, H - 520);
+          ctx.fillStyle = accent; ctx.font = `40px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("⚽ RESPONSABLES BALLONS", W / 2, top + 40);
+          ctx.fillStyle = "#8a7f72"; ctx.font = `54px ${FONT_HAND}`; ctx.fillText("pas encore choisis…", W / 2, top + 130);
+        } else {
+          const top = Math.max(y + 16, H - 520);
+          ctx.fillStyle = accent; ctx.font = `40px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("⚽ RESPONSABLES BALLONS", W / 2, top + 40);
+          const F = 160, gap = 90, x0 = W / 2 - (keepers.length * F + (keepers.length - 1) * gap) / 2;
+          keepers.forEach((kp, k) => {
+            const x = x0 + k * (F + gap);
+            ctx.save(); ctx.translate(x + F / 2, top + 70 + F / 2); ctx.rotate(k ? 0.05 : -0.05);
+            ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4; ctx.fillStyle = "#fff"; ctx.fillRect(-F / 2 - 10, -F / 2 - 10, F + 20, F + 54); ctx.shadowColor = "transparent";
+            drawFace(ctx, kp.face, kp.name, -F / 2, -F / 2, F, 6, () => lastDesk && drawNext(lastDesk.next));
+            ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "center"; fitFont(ctx, kp.name, FONT_HAND, 40, F + 10); ctx.fillText(kp.name, 0, F / 2 + 36);
+            ctx.restore();
+          });
+        }
       }
       const regions = [];
       if (m && m.canAnswer) {
@@ -543,16 +579,34 @@
     }
     function drawList(items) {
       const s = listSheet, c = s.canvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); s.mesh.userData.scale = S;
-      paper(ctx, W, H, true);
-      ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "left"; ctx.font = `70px ${FONT_HAND}`; ctx.fillText("Les 3 prochains", 110, 116);
+      paper(ctx, W, H, false);
+      ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "left"; ctx.font = `66px ${FONT_HAND}`; ctx.fillText("Les 3 prochains", 50, 100);
       const regions = [];
-      if (!items || !items.length) { ctx.fillStyle = "#6b6257"; ctx.font = `60px ${FONT_HAND}`; ctx.fillText("Rien d'autre de prévu", 110, 330); }
+      if (!items || !items.length) { ctx.fillStyle = "#6b6257"; ctx.font = `58px ${FONT_HAND}`; ctx.fillText("Rien d'autre de prévu", 50, 320); }
+      const cardH = 390, gap = 30;
       (items || []).slice(0, 3).forEach((it, k) => {
-        const y = 250 + k * 250;
-        ctx.fillStyle = "#1b2a8f"; fitFont(ctx, it.date, FONT_HAND, 52, W - 140); ctx.fillText(it.date, 110, y);
-        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + it.opponent, FONT_HAND, 72, W - 140); ctx.fillText("vs " + it.opponent, 110, y + 74);
-        ctx.fillStyle = "#6b6257"; ctx.font = `44px ${FONT_HAND}`; ctx.fillText(it.sub || "", 110, y + 130);
-        regions.push({ id: "match:" + it.id, x: 0, y: y - 60, w: W, h: 240 });
+        const x = 30, y = 150 + k * (cardH + gap), w = W - 60;
+        // the card: raised, with a chevron, so it reads as something to tap
+        ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
+        ctx.fillStyle = "#ffffff"; roundRect(ctx, x, y, w, cardH, 26); ctx.fill(); ctx.restore();
+        ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 3; roundRect(ctx, x, y, w, cardH, 26); ctx.stroke();
+        ctx.fillStyle = opts.accent || "#2f8f5b"; roundRect(ctx, x, y, 16, cardH, 8); ctx.fill();
+        ctx.textAlign = "left";
+        ctx.fillStyle = opts.accent || "#2f8f5b"; fitFont(ctx, it.date, FONT_UI, 48, w - 120); ctx.fillText(it.date, x + 44, y + 64);
+        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + it.opponent, FONT_DISPLAY, 62, w - 120); ctx.fillText("vs " + it.opponent, x + 44, y + 138);
+        ctx.fillStyle = "#6b6257"; ctx.font = `42px ${FONT_UI}`; ctx.fillText(it.sub || "", x + 44, y + 192);
+        ctx.fillStyle = "#9b8f80"; ctx.font = `70px ${FONT_UI}`; ctx.textAlign = "right"; ctx.fillText("›", x + w - 26, y + 128);
+        if (it.canAnswer) {
+          const bw = (w - 88 - 20) / 2, bh = 104, by = y + cardH - bh - 26;
+          [["present", "✓ PRÉSENT", "#1f8a4c", x + 44], ["absent", "✕ ABSENT", "#c0262d", x + 44 + bw + 20]].forEach(([key, label, color, bx]) => {
+            const on = it.presence === key;
+            ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 22); ctx.fill();
+            if (!on) { ctx.strokeStyle = "#cfc8bc"; ctx.lineWidth = 3; roundRect(ctx, bx, by, bw, bh, 22); ctx.stroke(); }
+            ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.textAlign = "center"; fitFont(ctx, label, FONT_UI, 46, bw - 20); ctx.fillText(label, bx + bw / 2, by + bh / 2 + 16);
+            regions.push({ id: `pres:${it.id}:${key}`, x: bx, y: by, w: bw, h: bh });
+          });
+        }
+        regions.push({ id: "match:" + it.id, x, y, w, h: cardH });
       });
       s.mesh.userData.regions = regions;
       s.tex.needsUpdate = true;
@@ -585,6 +639,12 @@
           ctx.fillStyle = "#fff"; ctx.textAlign = "center";
           fitFont(ctx, info.top, FONT_UI, 30, cw - 26); ctx.fillText(info.top, x + cw / 2, y + 46 + (rowH - 58) / 2 - 2);
           fitFont(ctx, info.bottom, FONT_UI, 24, cw - 26); ctx.fillText(info.bottom, x + cw / 2, y + 46 + (rowH - 58) / 2 + 26);
+          if (info.rating != null) {
+            const bx = x + cw - 30, by = y + 26;
+            ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(bx, by, 26, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#1b1b1b"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "center"; ctx.font = `24px ${FONT_UI}`; ctx.fillText(info.rating.toFixed(1), bx, by + 8);
+          }
           regions.push({ id: "match:" + info.id, x, y, w: cw, h: rowH });
         }
       }
@@ -599,7 +659,7 @@
       const a = camera.aspect, fitW = (w) => w / (2 * HALF * a), fitH = (h) => h / (2 * HALF);
       // positions in the corner's own frame (x around 0, wall at z = -0.75, facing +z)
       if (zone === "board") { const d = Math.max(fitW(1.55), fitH(2.75)); return { theta: corners.board.theta, pos: V(0, 0.6, -0.7 + d), look: V(0, 0.55, -0.7) }; }
-      if (zone === "desk") { const h = Math.max(fitW(1.4), fitH(2.35)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ + 0.16 + h * 0.18), look: V(0, DY, DZ + 0.16) }; }
+      if (zone === "desk") { const h = Math.max(fitW(1.46), fitH(2.2)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ + 0.02 + h * 0.18), look: V(0, DY, DZ + 0.02) }; }
       const d = Math.max(3.0, fitW(a < 0.8 ? 1.3 : 1.8));
       return { theta: corners.rack.theta, pos: V(0, a < 0.8 ? 0.42 : 0.6, d), look: V(0, a < 0.8 ? 0.2 : 0.42, 0) };
     }
@@ -662,7 +722,7 @@
           const h = hit(e, rack.shirts.flatMap((s) => [s.backMesh, s.frontMesh]));
           if (!h) return;
           const i = h.object.userData.shirt;
-          if (i === Math.round(rack.target)) { const s = rack.shirts[i]; s.flip = s.flip ? 0 : 1; cb.onTap("shirt", rack.squad[i]); }
+          if (i === Math.round(rack.target)) { const s = rack.shirts[i]; s.flip = s.flip ? 0 : 1; }
           else selectShirt(i);
           return;
         }
@@ -732,7 +792,7 @@
       selectId(id) { const i = rack.squad.findIndex((p) => p.id === id); if (i >= 0) selectShirt(i); return i >= 0; },
       step: (n) => selectShirt(Math.round(rack.target) + n),
       setBoard: drawBoard,
-      setDesk(m) { drawNext(m.next); drawList(m.upcoming); drawCalendar(m.calendar); },
+      setDesk(m) { lastDesk = m; drawNext(m.next); drawList(m.upcoming); drawCalendar(m.calendar); },
       setAccent(accent, deep) { mugMat.color.set(accent); nb.material.color.set(deep || accent); opts.accent = accent; },
       pause(p) { paused = !!p; if (!p) { clock.getDelta(); resize(); } },
       destroy() {

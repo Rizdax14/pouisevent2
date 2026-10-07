@@ -84,8 +84,11 @@ test("calendarMonth: Monday-first grid by Paris day, score and tone for played m
   assert.equal(cal.offset, 3); // Oct 1st 2026 is a Thursday
   assert.equal(cal.length, 31);
   assert.equal(cal.today, 7);
-  assert.deepEqual(cal.days[1], { id: 1, top: "Montreu.", bottom: "3-1", tone: "win" });
-  assert.deepEqual(cal.days[15], { id: 3, top: "Bagnolet", bottom: "19h30", tone: null });
+  assert.deepEqual(cal.days[1], { id: 1, top: "Montreu.", bottom: "3-1", tone: "win", rating: null });
+  assert.deepEqual(cal.days[15], { id: 3, top: "Bagnolet", bottom: "19h30", tone: null, rating: null });
+  const rated = D.calendarMonth(ms, () => ({ bl: 3, opponent: 1 }), 2026, 10, 0, (m) => (m.id === 1 ? 6.4 : m.id === 3 ? 9 : null));
+  assert.equal(rated.days[1].rating, 6.4);
+  assert.equal(rated.days[15].rating, null); // not played yet: no rating shown
   assert.equal(cal.days[31], undefined); // belongs to November in Paris
 });
 

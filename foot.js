@@ -6855,7 +6855,13 @@ function FootRoomScreen({
   const [savingPresence, setSavingPresence] = React.useState(false);
   const [presenceDraft, setPresenceDraft] = React.useState(null); // answer shown on the sheet while it is being saved
   const [statsOpen, setStatsOpen] = React.useState(false);
-  const [arrived, setArrived] = React.useState(null); // the corner the camera has finished travelling to
+  const [arrived, setArrived] = React.useState(null);
+  const pendingShirt = React.useRef(null); // shirt to show when arriving at the rack (a name tapped on the board)
+  const [statsType, setStatsTypeState] = React.useState(() => readPref("foot_room_stats_type", "all", ["all", "championnat"]));
+  const setStatsType = v => {
+    setStatsTypeState(v);
+    writePref("foot_room_stats_type", v);
+  }; // the corner the camera has finished travelling to
   const {
     photos,
     framings
@@ -6897,8 +6903,10 @@ function FootRoomScreen({
     } : null;
   };
   const upcoming = React.useMemo(() => upcomingMatches(matches, 4), [matches]);
-  async function answer(status) {
-    const m = upcoming[0];
+  // my final rating of each played match (only once the ratings are validated)
+  const myRatings = React.useMemo(() => meId ? Object.fromEntries(playerRatingSeries(matches, ratings, lineups, meId).map(r => [r.matchId, r.rating])) : {}, [matches, ratings, lineups, meId]);
+  async function answer(status, matchId) {
+    const m = matchId != null ? matches.find(x => String(x.id) === String(matchId)) : upcoming[0];
     if (!m || !meId || m.status !== "scheduled") return;
     setPresenceDraft({
       id: m.id,
@@ -6925,14 +6933,21 @@ function FootRoomScreen({
     } else if (kind === "tab") {
       setBoardTabState(rest);
       writePref("foot_rank_tab", rest);
-    } else if (kind === "player") openPlayer(Number(rest));else if (kind === "next") {
+    } else if (kind === "player") {
+      pendingShirt.current = Number(rest);
+      nav("vestiaire");
+    } // profiles live in the vestiaire
+    else if (kind === "next") {
       if (upcoming[0]) setPaper(upcoming[0]);
     } else if (kind === "match") {
       const m = matches.find(x => String(x.id) === rest);
       if (m) nav("matchDetail", {
         matchId: m.id
       });
-    } else if (kind === "presence") answer(rest);else if (kind === "cal") setMonth(v => Math.max(bounds.min, Math.min(bounds.max, v + (rest === "next" ? 1 : -1))));
+    } else if (kind === "presence") answer(rest);else if (kind === "pres") {
+      const [mid, st] = rest.split(":");
+      answer(st, mid);
+    } else if (kind === "cal") setMonth(v => Math.max(bounds.min, Math.min(bounds.max, v + (rest === "next" ? 1 : -1))));
   };
 
   // ---- the room itself: created once, kept while the football app is open ----
@@ -6972,7 +6987,11 @@ function FootRoomScreen({
     } else setArrived(zone);
     setPaper(null);
     setStatsOpen(false);
-    if (zone === "rack" && meId) room.current.selectId(meId);
+    if (zone === "rack") {
+      const id = pendingShirt.current || meId;
+      pendingShirt.current = null;
+      if (id) room.current.selectId(id);
+    }
   }, [zone, state]);
   React.useEffect(() => {
     if (room.current) {
@@ -7006,7 +7025,8 @@ function FootRoomScreen({
     if (!room.current) return;
     const venue = m => m.venue === "exterieur" ? "Extérieur" : "Domicile";
     const next = upcoming[0];
-    const mine = !next || !meId ? "none" : presenceDraft && presenceDraft.id === next.id ? presenceDraft.status : presenceMap(attendance, next.id)[meId] || "none";
+    const presenceOf = m => !m || !meId ? "none" : presenceDraft && presenceDraft.id === m.id ? presenceDraft.status : presenceMap(attendance, m.id)[meId] || "none";
+    const mine = presenceOf(next);
     const longDate = iso => new Date(iso).toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
@@ -7023,31 +7043,57 @@ function FootRoomScreen({
         hours: `Match ${footHour(next.match_datetime)}${next.meeting_at ? ` · RDV ${footHour(next.meeting_at)}` : ""}`,
         place: formatMatchPlace(next),
         presence: mine,
-        canAnswer: !!meId && next.status === "scheduled"
+        canAnswer: !!meId && next.status === "scheduled",
+        ballKeepers: (next.ball_keepers || []).map(id => ({
+          name: footNameOf(id),
+          face: faceFor(id)
+        }))
       },
       upcoming: upcoming.slice(1, 4).map(m => ({
         id: m.id,
         date: longDate(m.match_datetime),
         opponent: m.opponent_name,
-        sub: `${footHour(m.match_datetime)} · ${venue(m)}`
+        sub: `${footHour(m.match_datetime)} · ${venue(m)}`,
+        canAnswer: !!meId && m.status === "scheduled",
+        presence: presenceOf(m)
       })),
       calendar: calendarMonth(matches, m => scoreById[m.id] || {
         bl: 0,
         opponent: 0
-      }, y, mo)
+      }, y, mo, undefined, m => myRatings[m.id])
     });
-  }, [upcoming, matches, scoreById, month, theme, state, attendance, presenceDraft]);
+  }, [upcoming, matches, scoreById, month, theme, state, attendance, presenceDraft, myRatings, photos, framings]);
 
   // ---- overlays ----
-  const row = shirt && rows.find(r => r.playerId === shirt.id);
+  const vestRows = React.useMemo(() => {
+    if (statsType === "all") return rows;
+    const filtered = filterMatchesForStats(matches, {
+      season,
+      type: statsType
+    });
+    const ids = new Set(filtered.map(m => m.id));
+    const ls = lineups.filter(l => ids.has(l.match_id));
+    const out = buildStatsRows(statsRoster(roster), computePlayerStats(filtered, ls, events.filter(e => ids.has(e.match_id)), motmWinners(filtered, motmVotes || [])), {});
+    for (const r of out) {
+      const s = playerRatingSeries(filtered, ratings, ls, r.playerId);
+      r.rating = averageRating(s);
+      r.rated = s.length;
+    }
+    return out;
+  }, [statsType, rows, matches, lineups, events, ratings, motmVotes, roster, season]);
+  const row = shirt && vestRows.find(r => r.playerId === shirt.id);
   const more = React.useMemo(() => {
     if (!shirt) return null;
     const seasonMs = filterMatchesForStats(matches, {
       season,
-      type: "all"
+      type: statsType
     });
     const ids = new Set(seasonMs.map(m => m.id));
-    const career = buildStatsRows([shirt.id], computePlayerStats(matches, lineups, events, motmWinners(matches, motmVotes || [])), {})[0];
+    const careerMs = filterMatchesForStats(matches, {
+      season: "all",
+      type: statsType
+    });
+    const career = buildStatsRows([shirt.id], computePlayerStats(careerMs, lineups, events, motmWinners(careerMs, motmVotes || [])), {})[0];
     return shirtStats({
       row,
       careerRow: career,
@@ -7059,9 +7105,9 @@ function FootRoomScreen({
       },
       lineups,
       playerId: shirt.id,
-      allMatches: matches
+      allMatches: careerMs
     });
-  }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, season]);
+  }, [shirt, row, matches, lineups, events, ratings, motmVotes, scoreById, season, statsType]);
   const glass = {
     background: "rgba(16,12,14,0.72)",
     backdropFilter: "blur(10px)",
@@ -7221,19 +7267,14 @@ function FootRoomScreen({
     onClick: () => room.current && room.current.step(-1),
     "aria-label": "Maillot pr\xE9c\xE9dent",
     style: roundBtn
-  }, "\u2039"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => openPlayer(shirt.id),
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       minWidth: 0,
       display: "flex",
       alignItems: "center",
       gap: 10,
-      background: "none",
-      border: "none",
       color: "#fff",
-      cursor: "pointer",
-      padding: 0,
       textAlign: "left"
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -7264,11 +7305,40 @@ function FootRoomScreen({
       fontSize: 12,
       color: "rgba(255,255,255,0.7)"
     }
-  }, shirt.name, " \xB7 ", shirt.role === "occasionnel" ? "Occasionnel" : "Régulier", " \xB7 voir sa fiche"))), /*#__PURE__*/React.createElement("button", {
+  }, shirt.name, " \xB7 ", shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => room.current && room.current.step(1),
     "aria-label": "Maillot suivant",
     style: roundBtn
   }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    role: "radiogroup",
+    "aria-label": "Matchs pris en compte",
+    style: {
+      display: "flex",
+      gap: 4,
+      marginTop: 10,
+      padding: 3,
+      borderRadius: 999,
+      background: "rgba(255,255,255,0.08)"
+    }
+  }, [["all", "Tous les matchs"], ["championnat", "Championnat"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    role: "radio",
+    "aria-checked": statsType === k,
+    onClick: () => setStatsType(k),
+    style: {
+      flex: 1,
+      border: "none",
+      borderRadius: 999,
+      padding: "6px 0",
+      cursor: "pointer",
+      fontFamily: FF.ui,
+      fontSize: 13,
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      background: statsType === k ? FC.accent : "transparent",
+      color: statsType === k ? "#fff" : "rgba(255,255,255,0.7)"
+    }
+  }, l))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -7322,7 +7392,7 @@ function FootRoomScreen({
       marginTop: 6,
       letterSpacing: "0.04em"
     }
-  }, "Saison ", season, " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), state === "ready" && hint && !paper && /*#__PURE__*/React.createElement("div", {
+  }, "Saison ", season, statsType === "championnat" ? " · championnat" : "", " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), state === "ready" && hint && !paper && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       left: 0,

@@ -109,7 +109,8 @@ function shortOpponent(name) {
 }
 // One month of the desk calendar, by Paris day. month is 1-12. scoreOf(match) → { bl, opponent } for a played match.
 // A cell shows the opponent and either the score (played: tone win / loss / draw) or the kick-off hour.
-function calendarMonth(matches, scoreOf, year, month, nowMs) {
+// ratingOf(match) → my final rating of a played match (null when I didn't play it or it isn't rated yet).
+function calendarMonth(matches, scoreOf, year, month, nowMs, ratingOf) {
   const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const offset = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7; // Monday first
   const days = {};
@@ -122,6 +123,7 @@ function calendarMonth(matches, scoreOf, year, month, nowMs) {
       id: m.id, top: shortOpponent(m.opponent_name),
       bottom: played ? `${sc.bl}-${sc.opponent}` : m.status === "live" ? "En direct" : parisHour(m.match_datetime),
       tone: played ? { V: "win", D: "loss", N: "draw" }[footOutcome(sc)] : null,
+      rating: played && ratingOf ? (ratingOf(m) ?? null) : null,
     };
   }
   const t = _parisParts(new Date(nowMs === undefined ? Date.now() : nowMs));
