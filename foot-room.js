@@ -387,7 +387,14 @@
     function circleAround(ctx, x, y, w, h, color) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2 + 12, h / 2 + 8, -0.03, 0.15, Math.PI * 2 + 0.35); ctx.stroke(); ctx.restore(); }
 
     // Whiteboard: Équipe / Individuel, the ranking categories and the table, in marker.
+    const faceImgs = {}; let lastBoard = null;
+    const initials = (n) => String(n || "?").split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
     function drawBoard(m) {
+      lastBoard = m;
+      for (const en of (m.entries || []).slice(0, 3)) {
+        const u = en.face && en.face.url;
+        if (u && !faceImgs[u]) { faceImgs[u] = "loading"; loadImg(u).then((im) => { faceImgs[u] = im || "failed"; if (lastBoard) drawBoard(lastBoard); }); }
+      }
       const c = boardCanvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); board.userData.scale = S;
       const regions = [];
       const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#fbfbf8"); g.addColorStop(1, "#eef0ee");
@@ -399,14 +406,14 @@
       ctx.fillStyle = ink; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
       ctx.font = `76px ${FONT_MARKER}`; ctx.fillText("CLASSEMENT", W / 2, 110);
       ctx.strokeStyle = red; ctx.lineWidth = 5; wobbleLine(ctx, W / 2 - 250, 130, W / 2 + 250, 126, 3);
-      if (m.season) { ctx.fillStyle = blue; ctx.font = `34px ${FONT_MARKER}`; ctx.fillText(m.season, W / 2, 178); }
+      if (m.season) { ctx.fillStyle = blue; ctx.font = `40px ${FONT_MARKER}`; ctx.fillText(m.season, W / 2, 182); }
       // Équipe / Individuel
       const modes = [["team", "ÉQUIPE"], ["indiv", "INDIVIDUEL"]];
       modes.forEach(([key, label], k) => {
         const x = k === 0 ? W * 0.27 : W * 0.7, y = 258;
-        ctx.font = `46px ${FONT_MARKER}`; ctx.fillStyle = m.mode === key ? ink : "#8a909a";
+        ctx.font = `54px ${FONT_MARKER}`; ctx.fillStyle = m.mode === key ? ink : "#8a909a";
         const w = ctx.measureText(label).width; ctx.fillText(label, x, y);
-        if (m.mode === key) circleAround(ctx, x - w / 2, y - 44, w, 52, red);
+        if (m.mode === key) circleAround(ctx, x - w / 2, y - 50, w, 60, red);
         regions.push({ id: "mode:" + key, x: x - w / 2 - 30, y: y - 70, w: w + 60, h: 100 });
       });
       ctx.strokeStyle = "#c9ccd2"; ctx.lineWidth = 3; wobbleLine(ctx, 60, 300, W - 60, 302, 5);
@@ -418,44 +425,62 @@
         [[300, 900], [500, 860], [720, 920], [420, 1040], [620, 1060]].forEach(([x, y], k) => { ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.stroke(); if (k) { ctx.save(); ctx.setLineDash([12, 10]); wobbleLine(ctx, x - 30, y + 10, 300 + 20, 900 + 20, k); ctx.restore(); } });
         ctx.strokeStyle = red; [[380, 960], [560, 960]].forEach(([x, y]) => { ctx.beginPath(); ctx.moveTo(x - 18, y - 18); ctx.lineTo(x + 18, y + 18); ctx.moveTo(x + 18, y - 18); ctx.lineTo(x - 18, y + 18); ctx.stroke(); });
       } else {
-        // categories
+        // categories, as big as the board allows
         const tabs = m.tabs || [];
-        ctx.font = `34px ${FONT_MARKER}`;
-        const widths = tabs.map((t) => ctx.measureText(t.label).width), gap = 34;
-        let x = (W - (widths.reduce((a, b) => a + b, 0) + gap * (tabs.length - 1))) / 2;
+        let tf = 50; ctx.font = `${tf}px ${FONT_MARKER}`;
+        const gap = 40, total = () => tabs.reduce((a, t) => a + ctx.measureText(t.label).width, 0) + gap * (tabs.length - 1);
+        while (total() > W - 70 && tf > 30) { tf -= 2; ctx.font = `${tf}px ${FONT_MARKER}`; }
+        let x = (W - total()) / 2;
         tabs.forEach((t, k) => {
-          const on = t.key === m.tab, y = 368;
+          const on = t.key === m.tab, y = 385, w = ctx.measureText(t.label).width;
           ctx.fillStyle = on ? blue : "#8a909a"; ctx.textAlign = "left"; ctx.fillText(t.label, x, y);
-          if (on) { ctx.strokeStyle = blue; ctx.lineWidth = 4; wobbleLine(ctx, x - 4, y + 12, x + widths[k] + 4, y + 10, k + 1); }
-          regions.push({ id: "tab:" + t.key, x: x - gap / 2, y: y - 50, w: widths[k] + gap, h: 80 });
-          x += widths[k] + gap;
+          if (on) { ctx.strokeStyle = blue; ctx.lineWidth = 5; wobbleLine(ctx, x - 4, y + 14, x + w + 4, y + 12, k + 1); }
+          regions.push({ id: "tab:" + t.key, x: x - gap / 2, y: y - 60, w: w + gap, h: 95 });
+          x += w + gap;
         });
         ctx.textAlign = "center";
         const e = m.entries || [];
         if (!e.length) {
-          ctx.fillStyle = "#6a707a"; ctx.font = `40px ${FONT_MARKER}`; ctx.fillText("Pas encore de classement", W / 2, 640);
+          ctx.fillStyle = "#6a707a"; ctx.font = `52px ${FONT_MARKER}`; ctx.fillText("Pas encore de classement", W / 2, 700);
         } else {
-          // podium 2 - 1 - 3
-          const base = 820, colW = 270, heights = { 1: 210, 2: 150, 3: 110 };
+          // podium 2 - 1 - 3, a square post-it with the player's face stuck above each step
+          const base = 905, colW = 310, heights = { 1: 150, 2: 105, 3: 75 }, P = 262;
           [[e[1], 2, W / 2 - colW], [e[0], 1, W / 2], [e[2], 3, W / 2 + colW]].forEach(([en, place, cx]) => {
             if (!en) return;
             const hgt = heights[place];
-            ctx.strokeStyle = ink; ctx.lineWidth = 5; ctx.beginPath(); ctx.rect(cx - colW / 2 + 16, base - hgt, colW - 32, hgt); ctx.stroke();
-            ctx.fillStyle = place === 1 ? red : ink; ctx.font = `${place === 1 ? 84 : 66}px ${FONT_MARKER}`; ctx.fillText(String(place), cx, base - hgt / 2 + 26);
-            ctx.fillStyle = ink; fitFont(ctx, en.name, FONT_MARKER, place === 1 ? 44 : 38, colW - 20); ctx.fillText(en.name, cx, base - hgt - 62);
-            ctx.fillStyle = blue; ctx.font = `${place === 1 ? 44 : 36}px ${FONT_MARKER}`; ctx.fillText(en.value, cx, base - hgt - 16);
-            regions.push({ id: "player:" + en.playerId, x: cx - colW / 2, y: base - hgt - 120, w: colW, h: hgt + 120 });
+            ctx.strokeStyle = ink; ctx.lineWidth = 6; ctx.beginPath(); ctx.rect(cx - colW / 2 + 22, base - hgt, colW - 44, hgt); ctx.stroke();
+            const top = base - hgt - 18 - P, tilt = place === 1 ? -0.02 : place === 2 ? -0.05 : 0.045;
+            ctx.save(); ctx.translate(cx, top + P / 2); ctx.rotate(tilt);
+            ctx.shadowColor = "rgba(0,0,0,0.25)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+            ctx.fillStyle = place === 1 ? "#ffe45c" : place === 2 ? "#ffd0e4" : "#c9f0ff"; ctx.fillRect(-P / 2, -P / 2, P, P);
+            ctx.shadowColor = "transparent";
+            ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(-46, -P / 2 - 14, 92, 30); // tape
+            const F = 140, fx = -F / 2, fy = -P / 2 + 22;
+            const img = en.face && faceImgs[en.face.url];
+            ctx.save(); roundRect(ctx, fx, fy, F, F, 14); ctx.clip();
+            if (img && img !== "loading" && img !== "failed") {
+              const k = F / 300, r = en.face.rect; ctx.fillStyle = "#e9e4da"; ctx.fillRect(fx, fy, F, F);
+              ctx.drawImage(img, fx + r.x * k, fy + r.y * k, r.width * k, r.height * k);
+            } else {
+              ctx.fillStyle = opts.accent || "#2f8f5b"; ctx.fillRect(fx, fy, F, F);
+              ctx.fillStyle = "#fff"; ctx.font = `64px ${FONT_DISPLAY}`; ctx.fillText(initials(en.name), 0, fy + F / 2 + 24);
+            }
+            ctx.restore();
+            ctx.fillStyle = ink; fitFont(ctx, en.name, FONT_MARKER, 44, P - 24); ctx.fillText(en.name, 0, P / 2 - 46);
+            ctx.fillStyle = blue; ctx.font = `40px ${FONT_MARKER}`; ctx.fillText(en.value, 0, P / 2 - 6);
+            ctx.restore();
+            regions.push({ id: "player:" + en.playerId, x: cx - colW / 2, y: top - 20, w: colW, h: base - top + 20 });
           });
-          ctx.strokeStyle = ink; ctx.lineWidth = 5; wobbleLine(ctx, W / 2 - colW * 1.5 + 4, base + 2, W / 2 + colW * 1.5 - 4, base, 8);
+          ctx.strokeStyle = ink; ctx.lineWidth = 6; wobbleLine(ctx, W / 2 - colW * 1.5 + 8, base + 2, W / 2 + colW * 1.5 - 8, base, 8);
           // 4th and after
           let y = base + 92;
-          e.slice(3, 10).forEach((en, k) => {
-            ctx.textAlign = "left"; ctx.fillStyle = "#6a707a"; ctx.font = `36px ${FONT_MARKER}`; ctx.fillText(`${k + 4}.`, 150, y);
-            ctx.fillStyle = ink; fitFont(ctx, en.name, FONT_MARKER, 38, 480); ctx.fillText(en.name, 220, y);
-            ctx.textAlign = "right"; ctx.fillStyle = blue; ctx.font = `38px ${FONT_MARKER}`; ctx.fillText(en.value, W - 150, y);
-            ctx.strokeStyle = "#d4d7dc"; ctx.lineWidth = 2; ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.moveTo(220, y + 14); ctx.lineTo(W - 150, y + 14); ctx.stroke(); ctx.setLineDash([]);
-            regions.push({ id: "player:" + en.playerId, x: 120, y: y - 48, w: W - 240, h: 64 });
-            y += 66;
+          e.slice(3, 9).forEach((en, k) => {
+            ctx.textAlign = "left"; ctx.fillStyle = "#6a707a"; ctx.font = `46px ${FONT_MARKER}`; ctx.fillText(`${k + 4}.`, 90, y);
+            ctx.fillStyle = ink; fitFont(ctx, en.name, FONT_MARKER, 50, 560); ctx.fillText(en.name, 175, y);
+            ctx.textAlign = "right"; ctx.fillStyle = blue; ctx.font = `50px ${FONT_MARKER}`; ctx.fillText(en.value, W - 90, y);
+            ctx.strokeStyle = "#d4d7dc"; ctx.lineWidth = 2; ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.moveTo(175, y + 16); ctx.lineTo(W - 90, y + 16); ctx.stroke(); ctx.setLineDash([]);
+            regions.push({ id: "player:" + en.playerId, x: 60, y: y - 56, w: W - 120, h: 72 });
+            y += 72;
           });
           ctx.textAlign = "center";
         }
@@ -490,28 +515,30 @@
       if (!m) {
         ctx.fillStyle = "#1b1b1b"; ctx.font = `72px ${FONT_HAND}`; ctx.fillText("Aucun match prévu", W / 2, H / 2);
       } else {
-        ctx.fillStyle = accent; ctx.font = `44px ${FONT_UI}`; ctx.fillText(m.kicker || "", W / 2, 228);
+        ctx.fillStyle = accent; ctx.font = `44px ${FONT_UI}`; ctx.fillText(m.kicker || "", W / 2, 215);
         ctx.fillStyle = "#1b1b1b";
-        let y = wrap("vs " + m.opponent, FONT_DISPLAY, 96, W - 70, 340, 110, 2);
+        let y = wrap("vs " + m.opponent, FONT_DISPLAY, 90, W - 70, 310, 100, 2);
         ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(80, y - 40); ctx.lineTo(W - 80, y - 40); ctx.stroke();
-        ctx.fillStyle = "#1b1b1b"; y = wrap(m.date, FONT_UI, 60, W - 70, y + 40, 70, 2);
-        ctx.font = `56px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, y + 30); y += 110;
-        ctx.fillStyle = "#5d554b"; y = wrap(m.place || "", FONT_UI, 42, W - 90, y, 52, 3);
-        // my answer, as a rubber stamp
-        const st = { present: ["PRÉSENT", "#1f8a4c"], absent: ["ABSENT", "#c0262d"] }[m.presence];
-        ctx.save(); ctx.translate(W / 2, Math.max(y + 60, H - 140)); ctx.rotate(-0.06);
-        if (st) {
-          ctx.font = `84px ${FONT_UI}`; const tw = ctx.measureText(st[0]).width;
-          ctx.strokeStyle = st[1]; ctx.lineWidth = 9; roundRect(ctx, -tw / 2 - 34, -78, tw + 68, 110, 16); ctx.stroke();
-          ctx.lineWidth = 3; roundRect(ctx, -tw / 2 - 22, -66, tw + 44, 86, 10); ctx.stroke();
-          ctx.fillStyle = st[1]; ctx.fillText(st[0], 0, 6);
-        } else {
-          ctx.fillStyle = "#8a7f72"; ctx.font = `60px ${FONT_HAND}`; ctx.fillText("Tu n'as pas encore répondu", 0, 0);
-        }
-        ctx.restore();
+        ctx.fillStyle = "#1b1b1b"; y = wrap(m.date, FONT_UI, 58, W - 70, y + 34, 66, 1);
+        ctx.font = `54px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, y + 22); y += 96;
+        ctx.fillStyle = "#5d554b"; wrap(m.place || "", FONT_UI, 40, W - 90, y, 48, 2);
       }
-      ctx.fillStyle = "#9b8f80"; ctx.font = `28px ${FONT_UI}`; ctx.fillText("toucher pour ouvrir", W / 2, H - 28);
-      s.mesh.userData.regions = [{ id: "next", x: 0, y: 0, w: W, h: H }];
+      const regions = [];
+      if (m && m.canAnswer) {
+        // Présent / Absent: grey until chosen, then green or red
+        const bw = (W - 110) / 2, bh = 120, by = H - 200;
+        [["present", "PRÉSENT", "#1f8a4c", 40], ["absent", "ABSENT", "#c0262d", 70 + bw]].forEach(([key, label, color, bx]) => {
+          const on = m.presence === key;
+          ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = on ? 10 : 4; ctx.shadowOffsetY = 4;
+          ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 26); ctx.fill(); ctx.restore();
+          if (!on) { ctx.strokeStyle = "#cfc8bc"; ctx.lineWidth = 3; roundRect(ctx, bx, by, bw, bh, 26); ctx.stroke(); }
+          ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.font = `54px ${FONT_UI}`; ctx.fillText((key === "present" ? "✓ " : "✕ ") + label, bx + bw / 2, by + bh / 2 + 19);
+          regions.push({ id: "presence:" + key, x: bx, y: by, w: bw, h: bh });
+        });
+      }
+      ctx.fillStyle = "#9b8f80"; ctx.font = `28px ${FONT_UI}`; ctx.fillText("toucher la feuille pour ouvrir", W / 2, H - 28);
+      regions.push({ id: "next", x: 0, y: 0, w: W, h: H });
+      s.mesh.userData.regions = regions;
       s.tex.needsUpdate = true;
     }
     function drawList(items) {
@@ -702,6 +729,7 @@
         if (!sameKit && rack.shirts.length) rack.shirts.forEach((s) => (s.ry += Math.PI * 2));
       },
       select: (i) => selectShirt(i),
+      selectId(id) { const i = rack.squad.findIndex((p) => p.id === id); if (i >= 0) selectShirt(i); return i >= 0; },
       step: (n) => selectShirt(Math.round(rack.target) + n),
       setBoard: drawBoard,
       setDesk(m) { drawNext(m.next); drawList(m.upcoming); drawCalendar(m.calendar); },

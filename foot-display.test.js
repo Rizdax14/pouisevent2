@@ -56,13 +56,13 @@ test("mapLinks builds Waze, Plans and Google Maps links from the match address",
 });
 
 // ---- club room ----
-test("rackSquad: regular and occasional players by shirt number, numberless last", () => {
+test("rackSquad: regular and occasional players, alphabetical", () => {
   const roster = [
     { player_id: 1, jersey_number: "14", role: "regulier" }, { player_id: 2, jersey_number: "02", role: "occasionnel" },
     { player_id: 3, jersey_number: null, role: "regulier" }, { player_id: 4, jersey_number: "7", role: "ancien" }, { player_id: 5, jersey_number: "100", role: "regulier" },
   ];
   const names = { 1: "Louis", 2: "Nolan", 3: "Zed", 5: "Timo" };
-  assert.deepEqual(D.rackSquad(roster, (id) => names[id]).map((p) => [p.id, p.num]), [[2, "02"], [1, "14"], [5, "100"], [3, ""]]);
+  assert.deepEqual(D.rackSquad(roster, (id) => names[id]).map((p) => [p.id, p.num]), [[1, "14"], [2, "02"], [5, "100"], [3, ""]]);
 });
 
 test("upcomingMatches: the live match first, then scheduled ones soonest first", () => {
@@ -94,4 +94,24 @@ test("calendarBounds spans the first match to the last one, today included", () 
   const b = D.calendarBounds(ms, new Date("2026-10-07T10:00:00Z").getTime());
   assert.equal(b.min, 2025 * 12 + 8);
   assert.equal(b.max, 2026 * 12 + 11);
+});
+
+test("shirtStats: win rate, per-match numbers, last ratings newest first, recent form", () => {
+  const ms = [
+    { id: 1, status: "finished", match_datetime: "2026-09-01T17:00:00Z" }, { id: 2, status: "finished", match_datetime: "2026-09-08T17:00:00Z" },
+    { id: 3, status: "finished", match_datetime: "2026-09-15T17:00:00Z" }, { id: 4, status: "scheduled", match_datetime: "2026-10-15T17:00:00Z" },
+  ];
+  const scores = { 1: { bl: 2, opponent: 1 }, 2: { bl: 0, opponent: 3 }, 3: { bl: 1, opponent: 1 } };
+  const st = D.shirtStats({
+    row: { played: 3, wins: 1, draws: 1, losses: 1, goals: 4, assists: 2, decisive: 6, motm: 1 }, careerRow: { played: 10, goals: 9, assists: 4, motm: 2 },
+    series: [{ opponent: "A", rating: 6 }, { opponent: "B", rating: 7.25 }, { opponent: "C", rating: 5 }, { opponent: "D", rating: 8 }],
+    seasonFinished: 4, scoreOf: (m) => scores[m.id], lineups: [1, 2, 3].map((id) => ({ match_id: id, player_id: 9 })), playerId: 9, allMatches: ms,
+  });
+  assert.equal(st.winPct, 33);
+  assert.equal(st.goalsPerMatch, 1.33);
+  assert.equal(st.playedPct, 75);
+  assert.equal(st.best, 8);
+  assert.equal(st.rating, 6.6);
+  assert.deepEqual(st.lastRatings.map((x) => x.opponent), ["D", "C", "B"]);
+  assert.deepEqual(st.form, ["N", "D", "V"]);
 });

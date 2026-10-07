@@ -59,12 +59,37 @@ function mapLinks(match) {
 }
 
 // ---- the club room (Vestiaire / Classement / Calendrier in 3D) ----
-// Shirts on the rack: regular and occasional players, by shirt number (no number last), then name.
+// Shirts on the rack: regular and occasional players, in alphabetical order.
 function rackSquad(roster, nameOf) {
-  const n = (v) => (v === "" || v == null || isNaN(Number(v)) ? 1e9 : Number(v));
   return roster.filter((r) => r.role === "regulier" || r.role === "occasionnel")
     .map((r) => ({ id: r.player_id, num: r.jersey_number || "", name: nameOf(r.player_id), role: r.role }))
-    .sort((a, b) => n(a.num) - n(b.num) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+}
+
+// The cool numbers behind a shirt. seasonMatches: the season's matches; allMatches for the career line.
+// row / careerRow: buildStatsRows rows; series: playerRatingSeries of the season (oldest first).
+function shirtStats({ row, careerRow, series, seasonFinished, scoreOf, lineups, playerId, allMatches }) {
+  const r = row || { played: 0, wins: 0, draws: 0, losses: 0, goals: 0, assists: 0, decisive: 0, motm: 0 };
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
+  const per = (a, b) => (b ? Math.round((a / b) * 100) / 100 : null);
+  const ratings = (series || []).map((s) => s.rating);
+  // last matches played (on the sheet of a finished match), newest first, with the result
+  const mine = new Set((lineups || []).filter((l) => l.player_id === playerId).map((l) => l.match_id));
+  const lastPlayed = (allMatches || []).filter((m) => m.status === "finished" && mine.has(m.id))
+    .sort((a, b) => new Date(b.match_datetime) - new Date(a.match_datetime)).slice(0, 5)
+    .map((m) => { const sc = scoreOf(m); return sc.bl > sc.opponent ? "V" : sc.bl < sc.opponent ? "D" : "N"; });
+  return {
+    played: r.played, wins: r.wins, draws: r.draws, losses: r.losses,
+    winPct: pct(r.wins, r.played),
+    goals: r.goals, assists: r.assists, decisive: r.decisive, motm: r.motm,
+    goalsPerMatch: per(r.goals, r.played), decisivePerMatch: per(r.decisive, r.played),
+    playedPct: pct(r.played, seasonFinished),
+    rating: ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null,
+    best: ratings.length ? Math.max(...ratings) : null,
+    lastRatings: (series || []).slice(-3).reverse().map((s) => ({ opponent: s.opponent, rating: Math.round(s.rating * 10) / 10, date: s.date })),
+    form: lastPlayed,
+    career: careerRow ? { played: careerRow.played, goals: careerRow.goals, assists: careerRow.assists, motm: careerRow.motm } : null,
+  };
 }
 
 // The match being played (if any) then the scheduled ones, soonest first.
@@ -116,4 +141,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

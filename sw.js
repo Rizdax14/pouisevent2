@@ -1,5 +1,5 @@
 // VERSION: bump this string to force cache clear on all clients
-const CACHE_VERSION = 'pouis-v2-' + '20261007142319';
+const CACHE_VERSION = 'pouis-v2-' + '20261007145303';
 const ASSETS = [
   '/',
   '/index.html',
