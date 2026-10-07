@@ -179,10 +179,14 @@ function goalLines(events, players) {
   return goalRows(events, players).map((g) => `${g.minute}' ${g.scorer}${g.assist ? ` (${g.assist})` : ""}`);
 }
 
-// The average-rating ranking only counts players rated in at least RATING_MIN_MATCHES matches (rows carry `rated`).
-const RATING_MIN_MATCHES = 1;
+// The average-rating ranking only counts players rated in at least RATING_MIN_MATCHES matches (rows carry `rated`);
+// over every season (rows carry `ratedSeasons`), only players rated in at least RATING_MIN_SEASONS different seasons.
+const RATING_MIN_MATCHES = 1, RATING_MIN_SEASONS = 2;
+const ratingEligible = (r) => (r.rated == null || r.rated >= RATING_MIN_MATCHES) && (r.ratedSeasons == null || r.ratedSeasons >= RATING_MIN_SEASONS);
+// how many seasons a rating series (playerRatingSeries) spans — set on all-seasons rows only
+function ratedSeasonsOf(series, seasonOfFn) { return new Set((series || []).map((s) => seasonOfFn(s.date))).size; }
 function rankingEntries(rows, key, nameOf, limit = 15) {
-  return rows.filter((r) => (r[key] || 0) > 0 && (key !== "rating" || r.rated == null || r.rated >= RATING_MIN_MATCHES))
+  return rows.filter((r) => (r[key] || 0) > 0 && (key !== "rating" || ratingEligible(r)))
     .sort((a, b) => b[key] - a[key] || nameOf(a.playerId).localeCompare(nameOf(b.playerId)))
     .slice(0, limit).map((r) => ({ playerId: r.playerId, value: r[key] }));
 }
@@ -410,5 +414,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { RATING_MIN_SEASONS, ratingEligible, ratedSeasonsOf, RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
 }

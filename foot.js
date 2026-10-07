@@ -3644,6 +3644,7 @@ function FootBallKeepersCard({
   match,
   matches,
   roster,
+  lineups,
   canEdit,
   reload
 }) {
@@ -3654,7 +3655,8 @@ function FootBallKeepersCard({
   const season = seasonOf(match.match_datetime);
   const counts = ballKeeperCounts(matches.filter(m => seasonOf(m.match_datetime) === season));
   const keepers = match.ball_keepers || [];
-  const pool = attendanceRoster(roster).map(r => r.player_id).sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || footNameOf(a).localeCompare(footNameOf(b)));
+  // only the players called up for this match (its sheet) can bring the balls
+  const pool = lineups.filter(l => l.match_id === match.id).map(l => l.player_id).sort((a, b) => (counts[a] || 0) - (counts[b] || 0) || footNameOf(a).localeCompare(footNameOf(b)));
   const times = id => {
     const n = counts[id] || 0;
     return `${n} fois cette saison`;
@@ -3749,7 +3751,7 @@ function FootBallKeepersCard({
       color: FC.muted,
       marginBottom: 8
     }
-  }, "Choisis 2 joueurs (", picked.length, " / 2). Ceux qui l'ont fait le moins souvent sont en haut."), /*#__PURE__*/React.createElement("div", {
+  }, pool.length ? `Choisis 2 joueurs parmi les convoqués (${picked.length} / 2). Ceux qui l'ont fait le moins souvent sont en haut.` : "Fais d'abord la convocation : les responsables ballons se choisissent parmi les convoqués."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gap: 6
@@ -3925,6 +3927,7 @@ function FootMatchDetailPage({
     match: match,
     matches: matches,
     roster: roster,
+    lineups: lineups,
     canEdit: isBureau(currentPlayer),
     reload: reload
   });
@@ -4297,7 +4300,10 @@ function FootStatsPage({
   const motmBy = motmWinners(filtered, motmVotes || []);
   const rows = buildStatsRows(population, computePlayerStats(filtered, lineups, events, motmBy), ratingBy);
   const pool = rows.filter(r => r.played > 0);
-  const ratingPool = rows.filter(r => r.rating != null && seriesBy[r.playerId].length >= RATING_MIN_MATCHES);
+  const ratingPool = rows.filter(r => r.rating != null && ratingEligible({
+    rated: seriesBy[r.playerId].length,
+    ratedSeasons: season === "all" ? ratedSeasonsOf(seriesBy[r.playerId], seasonOf) : null
+  }));
   const ranks = Object.fromEntries(FOOT_STAT_COLUMNS.map(c => [c.key, rankPlayers(c.key === "rating" ? ratingPool : pool, c.key, mode)]));
   // A player outside the regular roster (guest…) still has a page; he is just not ranked.
   const me = rows.find(r => r.playerId === subject) || (subject ? buildStatsRows([subject], computePlayerStats(filtered, lineups, events, motmBy), {
@@ -4545,6 +4551,7 @@ function FootRankingsPanel({
     const series = playerRatingSeries(seasonMatches, ratings, seasonLineups, r.playerId);
     r.rating = averageRating(series);
     r.rated = series.length;
+    if (season === "all") r.ratedSeasons = ratedSeasonsOf(series, seasonOf);
   }
   const byId = Object.fromEntries(rows.map(r => [r.playerId, r]));
   const t = FOOT_RANKING_TABS.find(x => x.key === tab);
@@ -7247,6 +7254,7 @@ function FootRoomScreen({
       const sr = playerRatingSeries(filtered, ratings, ls, r.playerId);
       r.rating = averageRating(sr);
       r.rated = sr.length;
+      if (s === "all") r.ratedSeasons = ratedSeasonsOf(sr, seasonOf);
     }
     return out;
   };

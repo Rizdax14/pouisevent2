@@ -96,6 +96,12 @@ test("rankingEntries: the rating ranking needs a rated match", () => {
   assert.deepEqual(L.rankingEntries(rows, "rating", String).map((e) => e.playerId), [3, 2]);
 });
 
+test("rankingEntries: over every season, the rating ranking needs marks in two different seasons", () => {
+  const rows = [{ playerId: 1, rating: 9, rated: 6, ratedSeasons: 1 }, { playerId: 2, rating: 7, rated: 2, ratedSeasons: 2 }];
+  assert.deepEqual(L.rankingEntries(rows, "rating", String).map((e) => e.playerId), [2]);
+  assert.equal(L.ratedSeasonsOf([{ date: "2025-01-01" }, { date: "2025-10-01" }, { date: "2026-01-01" }], (d) => (d < "2025-08" ? "a" : "b")), 2);
+});
+
 test("rankingEntries keeps positive values, sorted, limited", () => {
   const rows = [{ playerId: 1, goals: 2 }, { playerId: 2, goals: 0 }, { playerId: 3, goals: 5 }, { playerId: 4, goals: 2 }];
   const name = (id) => ({ 1: "B", 3: "C", 4: "A" })[id];
