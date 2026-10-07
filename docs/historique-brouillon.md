@@ -166,3 +166,11 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 2. 12/02/2026 Dunières 8-7 vs 9-8 et 19/02/2026 PSV 8-11 vs 8-10 : je prends le **PDF officiel FSGT**.
 3. 31/10/2024 : Celda ou JBV ?
 4. Scores manquants : amical d'octobre 2024, Patronage Saint Joseph (10/07/2025).
+
+## Import en base (07/10/2026)
+- 54 matchs importés : `foot_matches` id 67 à 120 (scores, buteurs, passeurs, feuilles de match).
+- Notes finales 2024-25 dans `rating_overrides`, calculées à partir des formulaires.
+- Hommes du match 2025-26 : `foot_motm_votes`, le top 1 de chaque votant des « tops du match ».
+- Anciens joueurs ajoutés à `foot_roster` avec le rôle `ancien` : Marlon (55), Simon (14), Florent E (36), Quentin H (56), Romain C (136).
+- Les buts sans buteur connu sont enregistrés avec un joueur vide (forfait 6-0, Tottenaam 7-1, amicaux sans détail).
+- Pour annuler l'import : `delete from foot_matches where id between 67 and 120;` (les buts, feuilles de match et votes partent avec).
