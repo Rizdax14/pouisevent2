@@ -6673,6 +6673,7 @@ function FootRoomScreen({
   theme,
   setTheme,
   onHome,
+  settings,
   roster,
   matches,
   events,
@@ -6912,11 +6913,8 @@ function FootRoomScreen({
       gap: 6,
       alignItems: "center"
     }
-  }, /*#__PURE__*/React.createElement(FIconBtn, {
-    icon: "cube",
-    label: "Revenir aux pages classiques",
-    tone: "glass",
-    onClick: onLeaveRoom
+  }, /*#__PURE__*/React.createElement(FSettingsMenu, {
+    items: settings
   }), /*#__PURE__*/React.createElement(FThemeSwitch, {
     value: theme,
     onChange: setTheme
@@ -7264,15 +7262,31 @@ function FootballApp({
     id: "stats",
     label: "Stats",
     icon: "chart"
-  }, ...(isAdmin ? [{
+  }];
+  const settingsItems = [...(isAdmin ? [{
     id: "reseaux",
     label: "Réseaux",
-    icon: "megaphone"
+    icon: "megaphone",
+    on: page === "reseaux",
+    onClick: () => nav("reseaux")
   }, {
     id: "admin",
     label: "Admin",
-    icon: "sliders"
-  }] : [])];
+    icon: "sliders",
+    on: page === "admin",
+    onClick: () => nav("admin")
+  }] : []), ...(isAdmin ? [{
+    id: "room",
+    label: roomOn ? "Pages classiques" : "Vestiaire 3D",
+    icon: "cube",
+    hint: roomOn ? null : "bêta",
+    onClick: () => setRoom(!roomOn)
+  }] : []), {
+    id: "refresh",
+    label: "Actualiser",
+    icon: "refresh",
+    onClick: () => window.location.reload()
+  }];
   const detail = page === "matchDetail";
   const playerPage = page === "player";
   const openPlayer = id => nav("player", {
@@ -7304,6 +7318,7 @@ function FootballApp({
     setTheme: setTheme,
     onHome: onBack,
     onLeaveRoom: () => setRoom(false),
+    settings: settingsItems,
     roster: roster,
     matches: matches,
     events: events,
@@ -7322,12 +7337,9 @@ function FootballApp({
     onTheme: setTheme,
     onHome: onBack,
     onBack: detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined,
-    right: isAdmin && !roomOn ? /*#__PURE__*/React.createElement(FIconBtn, {
-      icon: "cube",
-      label: "Essayer le vestiaire 3D",
-      tone: "glass",
-      onClick: () => setRoom(true)
-    }) : null
+    right: /*#__PURE__*/React.createElement(FSettingsMenu, {
+      items: settingsItems
+    })
   }), loaded && loadError && /*#__PURE__*/React.createElement(FMessage, null, "Chargement incomplet : ", loadError), loaded && page === "calendar" && /*#__PURE__*/React.createElement(FootCalendarPage, {
     matches: matches,
     events: events,

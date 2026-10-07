@@ -2512,7 +2512,7 @@ function FootRoomStat({ label, value }) {
   );
 }
 
-function FootRoomScreen({ visible, page, theme, setTheme, onHome, roster, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
+function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, roster, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
   const host = React.useRef(null);
   const room = React.useRef(null);
   const [state, setState] = React.useState("loading");
@@ -2615,7 +2615,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, roster, matche
         <div style={{ pointerEvents: "auto" }}><FIconBtn icon="home" label="Retour à l'accueil" tone="glass" onClick={onHome} /></div>
         <div style={{ fontFamily: FF.display, fontSize: 26, color: "#fff", textShadow: "0 2px 0 rgba(0,0,0,0.4)" }}>{FOOT_ROOM_TITLES[page]}</div>
         <div style={{ pointerEvents: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-          <FIconBtn icon="cube" label="Revenir aux pages classiques" tone="glass" onClick={onLeaveRoom} />
+          <FSettingsMenu items={settings} />
           <FThemeSwitch value={theme} onChange={setTheme} />
         </div>
       </div>
@@ -2775,7 +2775,11 @@ function FootballApp({ currentPlayer, onBack }) {
     { id: "calendar", label: "Calendrier", icon: "calendar" },
     { id: "rankings", label: "Classement", icon: "trophy" },
     roomOn ? { id: "vestiaire", label: "Vestiaire", icon: "shirt" } : { id: "stats", label: "Stats", icon: "chart" },
-    ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone" }, { id: "admin", label: "Admin", icon: "sliders" }] : []),
+  ];
+  const settingsItems = [
+    ...(isAdmin ? [{ id: "reseaux", label: "Réseaux", icon: "megaphone", on: page === "reseaux", onClick: () => nav("reseaux") }, { id: "admin", label: "Admin", icon: "sliders", on: page === "admin", onClick: () => nav("admin") }] : []),
+    ...(isAdmin ? [{ id: "room", label: roomOn ? "Pages classiques" : "Vestiaire 3D", icon: "cube", hint: roomOn ? null : "bêta", onClick: () => setRoom(!roomOn) }] : []),
+    { id: "refresh", label: "Actualiser", icon: "refresh", onClick: () => window.location.reload() },
   ];
   const detail = page === "matchDetail";
   const playerPage = page === "player";
@@ -2790,12 +2794,12 @@ function FootballApp({ currentPlayer, onBack }) {
   return (
     <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
       {roomOn && loaded && (
-        <FootRoomScreen visible={roomVisible} page={page} theme={theme} setTheme={setTheme} onHome={onBack} onLeaveRoom={() => setRoom(false)}
+        <FootRoomScreen visible={roomVisible} page={page} theme={theme} setTheme={setTheme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
           roster={roster} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer} />
       )}
       {!roomVisible && <FootShell wide={page === "stats" || page === "reseaux" || playerPage}>
         <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined}
-          right={isAdmin && !roomOn ? <FIconBtn icon="cube" label="Essayer le vestiaire 3D" tone="glass" onClick={() => setRoom(true)} /> : null} />
+          right={<FSettingsMenu items={settingsItems} />} />
         {loaded && loadError && <FMessage>Chargement incomplet : {loadError}</FMessage>}
         {loaded && page === "calendar" && <FootCalendarPage matches={matches} events={events} roster={roster} attendance={attendance} activities={activities} activityAttendance={activityAttendance} nav={nav} currentPlayer={currentPlayer} reload={reloadFoot} />}
         {loaded && detail && (

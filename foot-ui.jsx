@@ -33,6 +33,7 @@ const FOOT_ICONS = {
   home: "M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V11z",
   shirt: "M8 3l-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3a4 4 0 0 1-8 0z",
   cube: "M12 2l9 5v10l-9 5-9-5V7l9-5zM12 22V12M21 7l-9 5-9-5",
+  gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
   calendar: "M7 3v4M17 3v4M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
   trophy: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3",
   chart: "M4 20V10M10 20V4M16 20v-8M22 20H2",
@@ -276,6 +277,34 @@ function FTopBar({ title, subtitle, onHome, onBack, theme, onTheme, right }) {
 }
 
 // Floating bottom bar.
+// Gear in the top bar: pages that are not in the bottom bar (Réseaux, Admin), refresh, and the 3D / classic switch.
+function FSettingsMenu({ items }) {
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    const t = setTimeout(() => document.addEventListener("click", close), 0);
+    return () => { clearTimeout(t); document.removeEventListener("click", close); };
+  }, [open]);
+  return (
+    <div style={{ position: "relative" }}>
+      <FIconBtn icon="gear" label="Paramètres" tone="glass" onClick={() => setOpen(!open)} />
+      {open && (
+        <div role="menu" style={{ position: "absolute", right: 0, top: 50, zIndex: 200, minWidth: 220, background: "#fff", borderRadius: 18, padding: 6, boxShadow: "0 12px 34px rgba(0,0,0,0.28)" }}>
+          {items.map((it) => (
+            <button key={it.id} role="menuitem" onClick={() => { setOpen(false); it.onClick(); }}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, border: "none", background: it.on ? FC.accentSoft : "transparent", borderRadius: 12, padding: "11px 12px", cursor: "pointer", color: FC.deep, fontFamily: FF.ui, fontSize: 15, textAlign: "left" }}>
+              <FIcon name={it.icon} size={19} />
+              <span style={{ flex: 1 }}>{it.label}</span>
+              {it.hint && <span style={{ fontSize: 12, color: FC.muted }}>{it.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FNav({ page, items, onGo }) {
   return (
     <nav aria-label="Navigation du module foot" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100, display: "flex", justifyContent: "center", padding: "0 12px calc(12px + env(safe-area-inset-bottom))", pointerEvents: "none" }}>
@@ -284,17 +313,12 @@ function FNav({ page, items, onGo }) {
           const on = page === it.id;
           return (
             <button key={it.id} onClick={() => onGo(it.id)} aria-current={on ? "page" : undefined}
-              style={{ flex: 1, minWidth: 0, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: on ? FC.accent : "transparent", color: on ? "#fff" : FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer", boxShadow: on ? `0 3px 0 ${FC.deep}` : "none" }}>
+              style={{ flex: 1, minWidth: 0, border: "none", borderRadius: 24, padding: "9px 2px 8px", background: on ? FC.accent : "transparent", color: on ? "#fff" : FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer", boxShadow: on ? `0 3px 0 ${FC.deep}` : "none" }}>
               <FIcon name={it.icon} size={21} stroke={on ? 2.4 : 2} />
-              <span style={{ fontFamily: FF.ui, fontSize: "clamp(9px, 2.6vw, 11px)", letterSpacing: 0, textTransform: "uppercase", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+              <span style={{ fontFamily: FF.ui, fontSize: 12, letterSpacing: "0.03em", textTransform: "uppercase", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
             </button>
           );
         })}
-        <button onClick={() => window.location.reload()} aria-label="Actualiser la page"
-          style={{ flex: "0 0 auto", width: 44, border: "none", borderRadius: 24, padding: "8px 2px 7px", background: "transparent", color: FC.muted, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}>
-          <FIcon name="refresh" size={21} />
-          <span style={{ fontFamily: FF.ui, fontSize: 11, letterSpacing: "0.03em", textTransform: "uppercase" }}>Actu.</span>
-        </button>
       </div>
     </nav>
   );
