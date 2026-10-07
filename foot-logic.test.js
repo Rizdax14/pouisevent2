@@ -9,6 +9,8 @@ const {
   nextHalfState,
   canConfirmGoal,
   nextLiveAction,
+  formatMatchClock,
+  formatEventMinute,
   assertUpsertOk,
   filterPlayersByName,
   toDatetimeLocalValue,
@@ -544,4 +546,23 @@ test("motmWinners: validated matches only, most votes wins, ties share; computeP
 test("ballKeeperCounts counts each player's ball duties", () => {
   const { ballKeeperCounts } = require("./foot-logic.js");
   assert.deepEqual(ballKeeperCounts([{ ball_keepers: [1, 2] }, { ball_keepers: [2, 3] }, { ball_keepers: null }, {}]), { 1: 1, 2: 2, 3: 1 });
+});
+
+test("nextLiveAction is 'paused' while the clock is paused, even on the last half", () => {
+  assert.equal(nextLiveAction(false, true, 900, true), "paused");
+  assert.equal(nextLiveAction(false, false, 300, true), "paused");
+});
+
+test("formatMatchClock counts added time past the half's duration instead of stopping", () => {
+  assert.deepEqual(formatMatchClock(125, 45), { main: "02:05", extra: null });
+  assert.deepEqual(formatMatchClock(45 * 60, 45), { main: "45:00", extra: "+0:00" });
+  assert.deepEqual(formatMatchClock(47 * 60 + 10, 45), { main: "45:00", extra: "+2:10" });
+  assert.deepEqual(formatMatchClock(4000, null), { main: "66:40", extra: null });
+});
+
+test("formatEventMinute shows added-time goals as 45+n'", () => {
+  assert.equal(formatEventMinute(12, 45), "12'");
+  assert.equal(formatEventMinute(45, 45), "45+1'");
+  assert.equal(formatEventMinute(47, 45), "45+3'");
+  assert.equal(formatEventMinute(50, null), "50'");
 });

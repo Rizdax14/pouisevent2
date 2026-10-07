@@ -1879,6 +1879,7 @@ function FootLiveClock({
   }, [match.half_started_at]);
   const secs = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
   const running = !!match.half_started_at;
+  const state = running ? formatEventMinute(Math.floor(secs / 60), match.half_duration_min) : match.clock_paused ? `pause (${Math.floor(secs / 60)}')` : secs > 0 ? "terminée" : "à démarrer";
   return /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
@@ -1887,7 +1888,7 @@ function FootLiveClock({
       color: FC.deep,
       marginTop: 4
     }
-  }, footHalfLabel(match.current_half || 1), " \xB7 ", running ? `${Math.floor(secs / 60)}'` : secs > 0 ? "terminée" : "à démarrer");
+  }, footHalfLabel(match.current_half || 1), " \xB7 ", state);
 }
 function FootTeamMark({
   name,
@@ -2319,7 +2320,7 @@ function FootEventTimeline({
         color: FC.deep,
         lineHeight: 1.1
       }
-    }, e.minute, "'"), /*#__PURE__*/React.createElement("span", {
+    }, formatEventMinute(e.minute, match && match.half_duration_min)), /*#__PURE__*/React.createElement("span", {
       style: {
         display: "block",
         fontSize: 11,
@@ -2490,6 +2491,8 @@ function FootLiveAdminConsole({
   const elapsedSeconds = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
   const minutesElapsed = Math.floor(elapsedSeconds / 60);
   const running = !!match.half_started_at;
+  const paused = !running && !!match.clock_paused;
+  const clock = formatMatchClock(elapsedSeconds, match.half_duration_min);
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
     try {
@@ -2524,7 +2527,27 @@ function FootLiveAdminConsole({
       await sbUpdate("foot_matches", {
         id: match.id
       }, {
-        half_started_at: new Date().toISOString()
+        half_started_at: new Date().toISOString(),
+        clock_paused: false
+      });
+      await reload();
+    } catch (e) {
+      console.warn(e);
+    }
+    setBusy(false);
+  }
+
+  // Freezes the clock without ending the half; "Reprendre" (startHalf) carries on from the frozen time.
+  async function pauseClock() {
+    setBusy(true);
+    try {
+      const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
+      await sbUpdate("foot_matches", {
+        id: match.id
+      }, {
+        half_elapsed_seconds: frozenElapsed,
+        half_started_at: null,
+        clock_paused: true
       });
       await reload();
     } catch (e) {
@@ -2543,6 +2566,7 @@ function FootLiveAdminConsole({
         }, {
           half_elapsed_seconds: 0,
           half_started_at: null,
+          clock_paused: false,
           current_half: next.half
         });
       } else {
@@ -2550,7 +2574,8 @@ function FootLiveAdminConsole({
           id: match.id
         }, {
           half_elapsed_seconds: frozenElapsed,
-          half_started_at: null
+          half_started_at: null,
+          clock_paused: false
         });
       }
       await reload();
@@ -2566,7 +2591,8 @@ function FootLiveAdminConsole({
         id: match.id
       }, {
         status: "finished",
-        half_started_at: null
+        half_started_at: null,
+        clock_paused: false
       });
       await reload();
     } catch (e) {
@@ -2575,7 +2601,7 @@ function FootLiveAdminConsole({
     }
   }
   const isLastHalf = match.current_half >= match.nb_halves;
-  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
+  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds, paused);
   return /*#__PURE__*/React.createElement(FCard, {
     style: {
       border: `2px solid ${FC.accent}`
@@ -2593,21 +2619,43 @@ function FootLiveAdminConsole({
   }, "/ ", match.nb_halves)), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
+      margin: "2px 0 14px",
+      opacity: paused ? 0.55 : 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       fontFamily: FF.display,
       fontSize: 60,
       lineHeight: 1.1,
       color: FC.deep,
-      margin: "2px 0 14px",
       fontVariantNumeric: "tabular-nums"
     }
-  }, String(minutesElapsed).padStart(2, "0"), ":", String(elapsedSeconds % 60).padStart(2, "0")), liveAction === "start" && /*#__PURE__*/React.createElement(FBtn, {
+  }, clock.main, clock.extra && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 34,
+      color: FC.bad,
+      marginLeft: 8
+    }
+  }, clock.extra)), clock.extra && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 13,
+      color: FC.bad
+    }
+  }, "Temps additionnel : le chrono continue jusqu'\xE0 ce que tu termines la mi-temps"), paused && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      color: FC.muted
+    }
+  }, "Chrono en pause")), liveAction === "start" && /*#__PURE__*/React.createElement(FBtn, {
     variant: "success",
     size: "lg",
     full: true,
     icon: "play",
     disabled: busy,
     onClick: startHalf
-  }, "D\xE9marrer la mi-temps"), liveAction === "playing" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "D\xE9marrer la mi-temps"), (liveAction === "playing" || liveAction === "paused") && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -2636,16 +2684,37 @@ function FootLiveAdminConsole({
     busy: busy,
     onCancel: () => setPicking(null),
     onConfirm: (playerId, assistId) => logGoal("goal_bl", playerId, assistId)
-  }), /*#__PURE__*/React.createElement(FBtn, {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 10
+    }
+  }, paused ? /*#__PURE__*/React.createElement(FBtn, {
+    variant: "success",
+    icon: "play",
+    disabled: busy,
+    onClick: startHalf,
+    style: {
+      flex: 1
+    }
+  }, "Reprendre") : /*#__PURE__*/React.createElement(FBtn, {
+    variant: "ghost",
+    icon: "pause",
+    disabled: busy,
+    onClick: pauseClock,
+    style: {
+      flex: 1
+    }
+  }, "Pause"), /*#__PURE__*/React.createElement(FBtn, {
     variant: "secondary",
-    full: true,
-    icon: isLastHalf ? "flag" : "pause",
+    icon: "flag",
     disabled: busy,
     onClick: endHalf,
     style: {
-      marginTop: 10
+      flex: 1
     }
-  }, isLastHalf ? "Fin de la dernière mi-temps" : "Terminer la mi-temps")), liveAction === "close" && /*#__PURE__*/React.createElement(FBtn, {
+  }, isLastHalf ? "Fin du match" : "Fin de la mi-temps"))), liveAction === "close" && /*#__PURE__*/React.createElement(FBtn, {
     variant: "danger",
     size: "lg",
     full: true,
@@ -3845,6 +3914,7 @@ function FootMatchDetailPage({
         current_half: null,
         half_started_at: null,
         half_elapsed_seconds: 0,
+        clock_paused: false,
         started_by: null,
         ratings_validated_at: null,
         rating_overrides: {}

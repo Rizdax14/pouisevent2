@@ -695,9 +695,10 @@ function FootLiveClock({ match }) {
   }, [match.half_started_at]);
   const secs = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
   const running = !!match.half_started_at;
+  const state = running ? formatEventMinute(Math.floor(secs / 60), match.half_duration_min) : match.clock_paused ? `pause (${Math.floor(secs / 60)}')` : secs > 0 ? "terminée" : "à démarrer";
   return (
     <div style={{ textAlign: "center", fontFamily: FF.ui, fontSize: 16, color: FC.deep, marginTop: 4 }}>
-      {footHalfLabel(match.current_half || 1)} · {running ? `${Math.floor(secs / 60)}'` : secs > 0 ? "terminée" : "à démarrer"}
+      {footHalfLabel(match.current_half || 1)} · {state}
     </div>
   );
 }
@@ -875,7 +876,7 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
         return (
           <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
             <span style={{ flex: "0 0 52px", textAlign: "center" }}>
-              <span style={{ display: "block", fontFamily: FF.display, fontSize: 18, color: FC.deep, lineHeight: 1.1 }}>{e.minute}'</span>
+              <span style={{ display: "block", fontFamily: FF.display, fontSize: 18, color: FC.deep, lineHeight: 1.1 }}>{formatEventMinute(e.minute, match && match.half_duration_min)}</span>
               <span style={{ display: "block", fontSize: 11, color: FC.muted }}>{e.half}{e.half === 1 ? "re" : "e"} MT</span>
             </span>
             {ours && e.own_goal ? <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.accentSoft, color: FC.deep, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: FF.ui, fontSize: 12 }}>CSC</span> : ours ? <FAvatar playerId={e.player_id} name={footNameOf(e.player_id)} size={36} linkable /> : <span style={{ width: 36, height: 36, borderRadius: 18, background: FC.badSoft, color: FC.bad, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><FIcon name="ball" size={18} /></span>}
@@ -945,6 +946,8 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   const elapsedSeconds = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, now);
   const minutesElapsed = Math.floor(elapsedSeconds / 60);
   const running = !!match.half_started_at;
+  const paused = !running && !!match.clock_paused;
+  const clock = formatMatchClock(elapsedSeconds, match.half_duration_min);
 
   async function logGoal(type, playerId, assistId) {
     setBusy(true);
@@ -963,8 +966,19 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
 
   async function startHalf() {
     setBusy(true);
-    try { await sbUpdate("foot_matches", { id: match.id }, { half_started_at: new Date().toISOString() }); await reload(); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { half_started_at: new Date().toISOString(), clock_paused: false }); await reload(); }
     catch (e) { console.warn(e); }
+    setBusy(false);
+  }
+
+  // Freezes the clock without ending the half; "Reprendre" (startHalf) carries on from the frozen time.
+  async function pauseClock() {
+    setBusy(true);
+    try {
+      const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
+      await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: frozenElapsed, half_started_at: null, clock_paused: true });
+      await reload();
+    } catch (e) { console.warn(e); }
     setBusy(false);
   }
 
@@ -974,9 +988,9 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
       const frozenElapsed = computeHalfElapsedSeconds(match.half_started_at, match.half_elapsed_seconds, Date.now());
       const next = nextHalfState(match.current_half, match.nb_halves);
       if (next.type === "next") {
-        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: 0, half_started_at: null, current_half: next.half });
+        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: 0, half_started_at: null, clock_paused: false, current_half: next.half });
       } else {
-        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: frozenElapsed, half_started_at: null });
+        await sbUpdate("foot_matches", { id: match.id }, { half_elapsed_seconds: frozenElapsed, half_started_at: null, clock_paused: false });
       }
       await reload();
     } catch (e) { console.warn(e); }
@@ -985,30 +999,39 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
 
   async function closeMatch() {
     setBusy(true);
-    try { await sbUpdate("foot_matches", { id: match.id }, { status: "finished", half_started_at: null }); await reload(); }
+    try { await sbUpdate("foot_matches", { id: match.id }, { status: "finished", half_started_at: null, clock_paused: false }); await reload(); }
     catch (e) { console.warn(e); setBusy(false); }
   }
 
   const isLastHalf = match.current_half >= match.nb_halves;
-  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds);
+  const liveAction = nextLiveAction(running, isLastHalf, match.half_elapsed_seconds, paused);
 
   return (
     <FCard style={{ border: `2px solid ${FC.accent}` }}>
       <FHeading right={<FChip tone="accent">Console admin</FChip>}>{footHalfLabel(match.current_half)} <span style={{ fontFamily: FF.ui, fontSize: 15, color: FC.muted }}>/ {match.nb_halves}</span></FHeading>
-      <div style={{ textAlign: "center", fontFamily: FF.display, fontSize: 60, lineHeight: 1.1, color: FC.deep, margin: "2px 0 14px", fontVariantNumeric: "tabular-nums" }}>
-        {String(minutesElapsed).padStart(2, "0")}:{String(elapsedSeconds % 60).padStart(2, "0")}
+      <div style={{ textAlign: "center", margin: "2px 0 14px", opacity: paused ? 0.55 : 1 }}>
+        <div style={{ fontFamily: FF.display, fontSize: 60, lineHeight: 1.1, color: FC.deep, fontVariantNumeric: "tabular-nums" }}>
+          {clock.main}{clock.extra && <span style={{ fontSize: 34, color: FC.bad, marginLeft: 8 }}>{clock.extra}</span>}
+        </div>
+        {clock.extra && <div style={{ fontFamily: FF.ui, fontSize: 13, color: FC.bad }}>Temps additionnel : le chrono continue jusqu'à ce que tu termines la mi-temps</div>}
+        {paused && <div style={{ fontFamily: FF.ui, fontSize: 14, color: FC.muted }}>Chrono en pause</div>}
       </div>
 
       {liveAction === "start" && <FBtn variant="success" size="lg" full icon="play" disabled={busy} onClick={startHalf}>Démarrer la mi-temps</FBtn>}
 
-      {liveAction === "playing" && (
+      {(liveAction === "playing" || liveAction === "paused") && (
         <>
           <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
             <FBtn size="lg" icon="ball" disabled={busy} onClick={() => setPicking("bl")} style={{ flex: 1 }}>But BL</FBtn>
             <FBtn variant="ghost" size="lg" icon="ball" disabled={busy} onClick={() => logGoal("goal_opponent", null, null)} style={{ flex: 1 }}>But adverse</FBtn>
           </div>
           {picking === "bl" && <FootGoalPicker roster={roster} withAssist busy={busy} onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />}
-          <FBtn variant="secondary" full icon={isLastHalf ? "flag" : "pause"} disabled={busy} onClick={endHalf} style={{ marginTop: 10 }}>{isLastHalf ? "Fin de la dernière mi-temps" : "Terminer la mi-temps"}</FBtn>
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            {paused
+              ? <FBtn variant="success" icon="play" disabled={busy} onClick={startHalf} style={{ flex: 1 }}>Reprendre</FBtn>
+              : <FBtn variant="ghost" icon="pause" disabled={busy} onClick={pauseClock} style={{ flex: 1 }}>Pause</FBtn>}
+            <FBtn variant="secondary" icon="flag" disabled={busy} onClick={endHalf} style={{ flex: 1 }}>{isLastHalf ? "Fin du match" : "Fin de la mi-temps"}</FBtn>
+          </div>
         </>
       )}
 
@@ -1441,7 +1464,7 @@ function FootMatchDetailPage({ matchId, matches, roster, attendance, events, lin
     try {
       await sbFetch("foot_match_events", `?match_id=eq.${match.id}`, { method: "DELETE" });
       await sbFetch("foot_ratings", `?match_id=eq.${match.id}`, { method: "DELETE" });
-      await sbUpdate("foot_matches", { id: match.id }, { status: "scheduled", nb_halves: null, half_duration_min: null, current_half: null, half_started_at: null, half_elapsed_seconds: 0, started_by: null, ratings_validated_at: null, rating_overrides: {} });
+      await sbUpdate("foot_matches", { id: match.id }, { status: "scheduled", nb_halves: null, half_duration_min: null, current_half: null, half_started_at: null, half_elapsed_seconds: 0, clock_paused: false, started_by: null, ratings_validated_at: null, rating_overrides: {} });
       setStartingConfig(false);
       await reload();
     } catch (e) { console.warn("reset match failed", e); window.alert("Impossible de remettre le match à zéro : " + e.message); }

@@ -69,10 +69,28 @@ function canConfirmGoal(playerId, busy) {
   return !!playerId && !busy;
 }
 
-function nextLiveAction(running, isLastHalf, halfElapsedSeconds) {
+// paused: the referee stopped the clock mid-half; it resumes from where it stopped.
+function nextLiveAction(running, isLastHalf, halfElapsedSeconds, paused = false) {
   if (running) return "playing";
+  if (paused) return "paused";
   if (isLastHalf && halfElapsedSeconds > 0) return "close";
   return "start";
+}
+
+// The clock never stops on its own: past the half's duration it keeps counting as added time.
+// 47:10 in a 45-minute half → { main: "45:00", extra: "+2:10" }.
+function formatMatchClock(seconds, durationMin) {
+  const mmss = (t) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  const limit = durationMin > 0 ? durationMin * 60 : Infinity;
+  if (seconds < limit) return { main: mmss(seconds), extra: null };
+  const over = seconds - limit;
+  return { main: mmss(limit), extra: `+${Math.floor(over / 60)}:${String(over % 60).padStart(2, "0")}` };
+}
+
+// Minute shown for a goal: the 46th minute of a 45-minute half is "45+1'".
+function formatEventMinute(minute, durationMin) {
+  if (!(durationMin > 0) || minute < durationMin) return `${minute}'`;
+  return `${durationMin}+${minute - durationMin + 1}'`;
 }
 
 function assertUpsertOk(result) {
@@ -373,6 +391,8 @@ if (typeof module !== "undefined" && module.exports) {
     nextHalfState,
     canConfirmGoal,
     nextLiveAction,
+    formatMatchClock,
+    formatEventMinute,
     assertUpsertOk,
     filterPlayersByName,
     toDatetimeLocalValue,
