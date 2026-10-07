@@ -6688,8 +6688,8 @@ function FootRoomStat({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FF.display,
-      fontSize: 22,
-      lineHeight: 1.1,
+      fontSize: 20,
+      lineHeight: 1.05,
       color: "#fff"
     }
   }, value), /*#__PURE__*/React.createElement("div", {
@@ -7527,7 +7527,7 @@ function FootRoomScreen({
     });
   }, [shirt, matches, lineups, events, ratings, motmVotes, statsType]);
   const multiSeason = evo.length >= 2;
-  const view = multiSeason ? rackView : "stats";
+  const view = statsOpen && multiSeason ? rackView : "stats";
   const glass = {
     background: "rgba(16,12,14,0.72)",
     backdropFilter: "blur(10px)",
@@ -7675,7 +7675,7 @@ function FootRoomScreen({
       margin: "0 auto",
       ...glass,
       background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background,
-      padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px",
+      padding: "8px 10px",
       opacity: arrived === "rack" ? 1 : 0,
       transform: arrived === "rack" ? "none" : "translateY(14px)",
       transition: "opacity 0.5s ease, transform 0.5s ease",
@@ -7715,7 +7715,12 @@ function FootRoomScreen({
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => room.current && room.current.step(-1),
     "aria-label": "Maillot pr\xE9c\xE9dent",
-    style: roundBtn
+    style: {
+      ...roundBtn,
+      width: 36,
+      height: 36,
+      fontSize: 18
+    }
   }, "\u2039"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -7729,7 +7734,7 @@ function FootRoomScreen({
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: FF.display,
-      fontSize: 40,
+      fontSize: 32,
       lineHeight: 0.9,
       color: "#fff",
       textShadow: `0 3px 0 ${FC.accent}`
@@ -7742,7 +7747,7 @@ function FootRoomScreen({
     style: {
       display: "block",
       fontFamily: FF.ui,
-      fontSize: 20,
+      fontSize: 18,
       lineHeight: 1.05,
       whiteSpace: "nowrap",
       overflow: "hidden",
@@ -7752,19 +7757,27 @@ function FootRoomScreen({
     style: {
       display: "block",
       fontSize: 12,
-      color: "rgba(255,255,255,0.7)"
+      color: "rgba(255,255,255,0.7)",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
     }
-  }, shirt.name, " \xB7 ", shirt.role === "saison" ? `Saison ${shortSeason(rackSeason)}` : shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"))), /*#__PURE__*/React.createElement("button", {
+  }, shirt.name, " \xB7 ", shirt.role === "saison" ? `Saison ${shortSeason(rackSeason)}` : shirt.role === "occasionnel" ? "Occasionnel" : "Régulier", statsType === "championnat" ? " · Championnat" : statsType === "amical" ? " · Amicaux" : ""))), /*#__PURE__*/React.createElement("button", {
     onClick: () => room.current && room.current.step(1),
     "aria-label": "Maillot suivant",
-    style: roundBtn
-  }, "\u203A")), multiSeason && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...roundBtn,
+      width: 36,
+      height: 36,
+      fontSize: 18
+    }
+  }, "\u203A")), statsOpen && multiSeason && /*#__PURE__*/React.createElement("div", {
     role: "radiogroup",
     "aria-label": "Vue",
     style: {
       display: "flex",
       gap: 4,
-      marginTop: 10,
+      marginTop: 8,
       padding: 3,
       borderRadius: 999,
       background: "rgba(255,255,255,0.08)"
@@ -7778,7 +7791,7 @@ function FootRoomScreen({
       flex: 1,
       border: "none",
       borderRadius: 999,
-      padding: "6px 0",
+      padding: "5px 0",
       cursor: "pointer",
       fontFamily: FF.ui,
       fontSize: 13,
@@ -7787,13 +7800,13 @@ function FootRoomScreen({
       background: view === k ? "rgba(255,255,255,0.24)" : "transparent",
       color: view === k ? "#fff" : "rgba(255,255,255,0.7)"
     }
-  }, l))), /*#__PURE__*/React.createElement("div", {
+  }, l))), statsOpen && /*#__PURE__*/React.createElement("div", {
     role: "radiogroup",
     "aria-label": "Matchs pris en compte",
     style: {
       display: "flex",
       gap: 4,
-      marginTop: 10,
+      marginTop: 6,
       padding: 3,
       borderRadius: 999,
       background: "rgba(255,255,255,0.08)"
@@ -7807,7 +7820,7 @@ function FootRoomScreen({
       flex: 1,
       border: "none",
       borderRadius: 999,
-      padding: "6px 0",
+      padding: "5px 0",
       cursor: "pointer",
       fontFamily: FF.ui,
       fontSize: 13,
@@ -7820,8 +7833,8 @@ function FootRoomScreen({
     style: {
       display: "flex",
       gap: 4,
-      marginTop: 10,
-      paddingTop: 10,
+      marginTop: 8,
+      paddingTop: 8,
       borderTop: "1px solid rgba(255,255,255,0.12)"
     }
   }, /*#__PURE__*/React.createElement(FootRoomStat, {
@@ -7853,56 +7866,30 @@ function FootRoomScreen({
     style: {
       display: "flex",
       gap: 6,
-      marginTop: statsOpen && view === "stats" ? 8 : 10
+      marginTop: 8
     }
-  }, view === "stats" && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setStatsOpen(!statsOpen),
-    "aria-expanded": statsOpen,
+  }, [[statsOpen ? "Moins de stats ▴" : "Plus de stats ▾", () => setStatsOpen(!statsOpen)], ["Tous ses matchs ›", () => nav("playerMatches", {
+    playerId: shirt.id,
+    season: rackSeason,
+    type: statsType
+  })]].map(([l, on]) => /*#__PURE__*/React.createElement("button", {
+    key: l,
+    onClick: on,
+    "aria-expanded": l.startsWith("Plus") || l.startsWith("Moins") ? statsOpen : undefined,
     style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
       flex: 1,
       border: "none",
-      borderRadius: 14,
-      padding: statsOpen ? "7px 0" : "9px 0",
+      borderRadius: 12,
+      padding: "7px 0",
       background: "rgba(255,255,255,0.1)",
       color: "#fff",
       fontFamily: FF.ui,
-      fontSize: 14,
+      fontSize: 13,
       letterSpacing: "0.05em",
       textTransform: "uppercase",
       cursor: "pointer"
     }
-  }, statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => nav("playerMatches", {
-      playerId: shirt.id,
-      season: rackSeason,
-      type: statsType
-    }),
-    style: {
-      flex: 1,
-      border: "none",
-      borderRadius: 14,
-      padding: statsOpen && view === "stats" ? "7px 0" : "9px 0",
-      background: "rgba(255,255,255,0.1)",
-      color: "#fff",
-      fontFamily: FF.ui,
-      fontSize: 14,
-      letterSpacing: "0.05em",
-      textTransform: "uppercase",
-      cursor: "pointer"
-    }
-  }, "Tous ses matchs \u203A")), !statsOpen && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      fontSize: 10,
-      color: "rgba(255,255,255,0.5)",
-      marginTop: 6,
-      letterSpacing: "0.04em"
-    }
-  }, "Saison ", shortSeason(rackSeason), statsType === "championnat" ? " · championnat" : statsType === "amical" ? " · amicaux" : "", " \xB7 glisse pour parcourir \xB7 touche le maillot pour le retourner")), paper && /*#__PURE__*/React.createElement("div", {
+  }, l)))), paper && /*#__PURE__*/React.createElement("div", {
     onClick: () => setPaper(null),
     style: {
       position: "absolute",

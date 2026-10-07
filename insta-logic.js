@@ -180,7 +180,7 @@ function goalLines(events, players) {
 }
 
 // The average-rating ranking only counts players rated in at least RATING_MIN_MATCHES matches (rows carry `rated`).
-const RATING_MIN_MATCHES = 2;
+const RATING_MIN_MATCHES = 1;
 function rankingEntries(rows, key, nameOf, limit = 15) {
   return rows.filter((r) => (r[key] || 0) > 0 && (key !== "rating" || r.rated == null || r.rated >= RATING_MIN_MATCHES))
     .sort((a, b) => b[key] - a[key] || nameOf(a.playerId).localeCompare(nameOf(b.playerId)))

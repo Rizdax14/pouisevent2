@@ -2514,7 +2514,7 @@ const FOOT_ROOM_TITLES = { calendar: "Calendrier", rankings: "Classement", vesti
 function FootRoomStat({ label, value }) {
   return (
     <div style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-      <div style={{ fontFamily: FF.display, fontSize: 22, lineHeight: 1.1, color: "#fff" }}>{value}</div>
+      <div style={{ fontFamily: FF.display, fontSize: 20, lineHeight: 1.05, color: "#fff" }}>{value}</div>
       <div style={{ fontFamily: FF.ui, fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{label}</div>
     </div>
   );
@@ -2888,7 +2888,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
     });
   }, [shirt, matches, lineups, events, ratings, motmVotes, statsType]);
   const multiSeason = evo.length >= 2;
-  const view = multiSeason ? rackView : "stats";
+  const view = statsOpen && multiSeason ? rackView : "stats";
   const glass = { background: "rgba(16,12,14,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 22, color: "#fff" };
   const roundBtn = { width: 42, height: 42, borderRadius: 21, border: "1px solid rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 20, cursor: "pointer", flex: "0 0 auto" };
 
@@ -2923,7 +2923,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
       )}
       {/* vestiaire: the shirt in front */}
       {state === "ready" && zone === "rack" && shirt && (
-        <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background, padding: statsOpen ? "10px 12px 8px" : "12px 12px 10px", opacity: arrived === "rack" ? 1 : 0, transform: arrived === "rack" ? "none" : "translateY(14px)", transition: "opacity 0.5s ease, transform 0.5s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
+        <div style={{ position: "absolute", left: 12, right: 12, bottom: "calc(96px + env(safe-area-inset-bottom))", maxWidth: 560, margin: "0 auto", ...glass, background: statsOpen ? "rgba(16,12,14,0.9)" : glass.background, padding: "8px 10px", opacity: arrived === "rack" ? 1 : 0, transform: arrived === "rack" ? "none" : "translateY(14px)", transition: "opacity 0.5s ease, transform 0.5s ease", pointerEvents: arrived === "rack" ? "auto" : "none" }}>
           {meId && shirt.id !== meId && squad.some((p) => p.id === meId) && (
             <div style={{ position: "absolute", left: 0, right: 0, top: -54, textAlign: "center" }}>
               <button onClick={() => room.current && room.current.selectId(meId)}
@@ -2933,54 +2933,52 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={() => room.current && room.current.step(-1)} aria-label="Maillot précédent" style={roundBtn}>‹</button>
+            <button onClick={() => room.current && room.current.step(-1)} aria-label="Maillot précédent" style={{ ...roundBtn, width: 36, height: 36, fontSize: 18 }}>‹</button>
             <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, color: "#fff", textAlign: "left" }}>
-              <span style={{ fontFamily: FF.display, fontSize: 40, lineHeight: 0.9, color: "#fff", textShadow: `0 3px 0 ${FC.accent}` }}>{shirt.num || "–"}</span>
+              <span style={{ fontFamily: FF.display, fontSize: 32, lineHeight: 0.9, color: "#fff", textShadow: `0 3px 0 ${FC.accent}` }}>{shirt.num || "–"}</span>
               <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontFamily: FF.ui, fontSize: 20, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shirt.label || shirt.name}</span>
-                <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{shirt.name} · {shirt.role === "saison" ? `Saison ${shortSeason(rackSeason)}` : shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"}</span>
+                <span style={{ display: "block", fontFamily: FF.ui, fontSize: 18, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shirt.label || shirt.name}</span>
+                <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shirt.name} · {shirt.role === "saison" ? `Saison ${shortSeason(rackSeason)}` : shirt.role === "occasionnel" ? "Occasionnel" : "Régulier"}{statsType === "championnat" ? " · Championnat" : statsType === "amical" ? " · Amicaux" : ""}</span>
               </span>
             </div>
-            <button onClick={() => room.current && room.current.step(1)} aria-label="Maillot suivant" style={roundBtn}>›</button>
+            <button onClick={() => room.current && room.current.step(1)} aria-label="Maillot suivant" style={{ ...roundBtn, width: 36, height: 36, fontSize: 18 }}>›</button>
           </div>
-          {multiSeason && (
-            <div role="radiogroup" aria-label="Vue" style={{ display: "flex", gap: 4, marginTop: 10, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
+          {/* the filters and the Stats / Évolution switch only show once the card is opened */}
+          {statsOpen && multiSeason && (
+            <div role="radiogroup" aria-label="Vue" style={{ display: "flex", gap: 4, marginTop: 8, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
               {[["stats", "Stats"], ["evo", "Évolution"]].map(([k, l]) => (
                 <button key={k} role="radio" aria-checked={view === k} onClick={() => setRackView(k)}
-                  style={{ flex: 1, border: "none", borderRadius: 999, padding: "6px 0", cursor: "pointer", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.04em", textTransform: "uppercase", background: view === k ? "rgba(255,255,255,0.24)" : "transparent", color: view === k ? "#fff" : "rgba(255,255,255,0.7)" }}>{l}</button>
+                  style={{ flex: 1, border: "none", borderRadius: 999, padding: "5px 0", cursor: "pointer", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.04em", textTransform: "uppercase", background: view === k ? "rgba(255,255,255,0.24)" : "transparent", color: view === k ? "#fff" : "rgba(255,255,255,0.7)" }}>{l}</button>
               ))}
             </div>
           )}
-          <div role="radiogroup" aria-label="Matchs pris en compte" style={{ display: "flex", gap: 4, marginTop: 10, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
-            {[["all", "Tous"], ["championnat", "Championnat"], ["amical", "Amicaux"]].map(([k, l]) => (
-              <button key={k} role="radio" aria-checked={statsType === k} onClick={() => setStatsType(k)}
-                style={{ flex: 1, border: "none", borderRadius: 999, padding: "6px 0", cursor: "pointer", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.04em", textTransform: "uppercase", background: statsType === k ? FC.accent : "transparent", color: statsType === k ? "#fff" : "rgba(255,255,255,0.7)" }}>{l}</button>
-            ))}
-          </div>
+          {statsOpen && (
+            <div role="radiogroup" aria-label="Matchs pris en compte" style={{ display: "flex", gap: 4, marginTop: 6, padding: 3, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
+              {[["all", "Tous"], ["championnat", "Championnat"], ["amical", "Amicaux"]].map(([k, l]) => (
+                <button key={k} role="radio" aria-checked={statsType === k} onClick={() => setStatsType(k)}
+                  style={{ flex: 1, border: "none", borderRadius: 999, padding: "5px 0", cursor: "pointer", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.04em", textTransform: "uppercase", background: statsType === k ? FC.accent : "transparent", color: statsType === k ? "#fff" : "rgba(255,255,255,0.7)" }}>{l}</button>
+              ))}
+            </div>
+          )}
           {view === "stats" ? (
             <>
-          <div style={{ display: "flex", gap: 4, marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-            <FootRoomStat label="Matchs" value={row ? row.played : 0} />
-            <FootRoomStat label="Buts" value={row ? row.goals : 0} />
-            <FootRoomStat label="Passes D" value={row ? row.assists : 0} />
-            <FootRoomStat label="Décisifs" value={row ? row.decisive : 0} />
-            <FootRoomStat label="Note" value={row && row.rating != null ? row.rating.toFixed(1) : "–"} />
-            <FootRoomStat label="HDM" value={row ? row.motm : 0} />
-          </div>
-          {statsOpen && more && <FootShirtMore st={more} onOpenMatch={(id) => nav("matchDetail", { matchId: id })} />}
-          </>
+              <div style={{ display: "flex", gap: 4, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+                <FootRoomStat label="Matchs" value={row ? row.played : 0} />
+                <FootRoomStat label="Buts" value={row ? row.goals : 0} />
+                <FootRoomStat label="Passes D" value={row ? row.assists : 0} />
+                <FootRoomStat label="Décisifs" value={row ? row.decisive : 0} />
+                <FootRoomStat label="Note" value={row && row.rating != null ? row.rating.toFixed(1) : "–"} />
+                <FootRoomStat label="HDM" value={row ? row.motm : 0} />
+              </div>
+              {statsOpen && more && <FootShirtMore st={more} onOpenMatch={(id) => nav("matchDetail", { matchId: id })} />}
+            </>
           ) : <FootEvolution data={evo} />}
-          <div style={{ display: "flex", gap: 6, marginTop: statsOpen && view === "stats" ? 8 : 10 }}>
-          {view === "stats" && <button onClick={() => setStatsOpen(!statsOpen)} aria-expanded={statsOpen}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flex: 1, border: "none", borderRadius: 14, padding: statsOpen ? "7px 0" : "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
-            {statsOpen ? "Moins de stats ▴" : "Plus de stats ▾"}
-          </button>}
-          <button onClick={() => nav("playerMatches", { playerId: shirt.id, season: rackSeason, type: statsType })}
-            style={{ flex: 1, border: "none", borderRadius: 14, padding: statsOpen && view === "stats" ? "7px 0" : "9px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>
-            Tous ses matchs ›
-          </button>
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            {[[statsOpen ? "Moins de stats ▴" : "Plus de stats ▾", () => setStatsOpen(!statsOpen)], ["Tous ses matchs ›", () => nav("playerMatches", { playerId: shirt.id, season: rackSeason, type: statsType })]].map(([l, on]) => (
+              <button key={l} onClick={on} aria-expanded={l.startsWith("Plus") || l.startsWith("Moins") ? statsOpen : undefined}
+                style={{ flex: 1, border: "none", borderRadius: 12, padding: "7px 0", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.05em", textTransform: "uppercase", cursor: "pointer" }}>{l}</button>
+            ))}
           </div>
-          {!statsOpen && <div style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 6, letterSpacing: "0.04em" }}>Saison {shortSeason(rackSeason)}{statsType === "championnat" ? " · championnat" : statsType === "amical" ? " · amicaux" : ""} · glisse pour parcourir · touche le maillot pour le retourner</div>}
         </div>
       )}
       {/* the next-match sheet, readable */}
