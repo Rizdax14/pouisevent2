@@ -46,4 +46,16 @@ function meetingTimeValue(iso) {
   return `${String(p.hh).padStart(2, "0")}:${String(p.mm).padStart(2, "0")}`;
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue };
+// Links that open the match address in Waze, Apple Plans or Google Maps (null when there is no address).
+function mapLinks(match) {
+  const q = [match.stadium_name, match.address, [match.postal_code, match.city].filter(Boolean).join(" ")].filter((x) => x && String(x).trim()).join(", ");
+  if (!q) return null;
+  const e = encodeURIComponent(q);
+  return {
+    waze: `https://waze.com/ul?q=${e}&navigate=yes`,
+    plans: `https://maps.apple.com/?q=${e}`,
+    google: `https://www.google.com/maps/search/?api=1&query=${e}`,
+  };
+}
+
+if (typeof module !== "undefined" && module.exports) module.exports = { footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks };

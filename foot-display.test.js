@@ -45,3 +45,12 @@ test("meetingIsoFor puts the meeting time on the match's Paris day (evening befo
   assert.equal(D.meetingTimeValue("2026-10-08T16:30:00.000Z"), "18:30");
   assert.equal(D.meetingTimeValue(null), "");
 });
+
+test("mapLinks builds Waze, Plans and Google Maps links from the match address", () => {
+  const l = D.mapLinks({ stadium_name: "L'Etivaliere", address: "Rue X", postal_code: "42000", city: "Saint-Etienne" });
+  const q = encodeURIComponent("L'Etivaliere, Rue X, 42000 Saint-Etienne");
+  assert.equal(l.waze, `https://waze.com/ul?q=${q}&navigate=yes`);
+  assert.equal(l.plans, `https://maps.apple.com/?q=${q}`);
+  assert.equal(l.google, `https://www.google.com/maps/search/?api=1&query=${q}`);
+  assert.equal(D.mapLinks({ city: "" }), null);
+});

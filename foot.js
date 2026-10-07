@@ -125,6 +125,9 @@ function FootWhenWhere({
   size = 14
 }) {
   const place = formatMatchPlace(match);
+  const links = mapLinks(match);
+  const [open, setOpen] = React.useState(false);
+  const stop = e => e.stopPropagation();
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
@@ -161,7 +164,59 @@ function FootWhenWhere({
   }, /*#__PURE__*/React.createElement(FIcon, {
     name: "users",
     size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Heure de RDV : ", /*#__PURE__*/React.createElement("b", null, footHour(match.meeting_at)))), place && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, "Heure de RDV : ", /*#__PURE__*/React.createElement("b", null, footHour(match.meeting_at)))), place && (links ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      stop(e);
+      setOpen(!open);
+    },
+    "aria-expanded": open,
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8,
+      border: "none",
+      background: "none",
+      padding: 0,
+      margin: 0,
+      font: "inherit",
+      color: FC.deep,
+      textAlign: "left",
+      cursor: "pointer",
+      textDecoration: "underline",
+      textUnderlineOffset: 3
+    }
+  }, /*#__PURE__*/React.createElement(FIcon, {
+    name: "pin",
+    size: 16,
+    style: {
+      marginTop: 1
+    }
+  }), /*#__PURE__*/React.createElement("span", null, place)), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      margin: "8px 0 2px 24px"
+    }
+  }, [["waze", "Waze"], ["plans", "Plans"], ["google", "Google Maps"]].map(([k, label]) => /*#__PURE__*/React.createElement("a", {
+    key: k,
+    href: links[k],
+    target: "_blank",
+    rel: "noreferrer",
+    onClick: stop,
+    style: {
+      fontFamily: FF.ui,
+      fontSize: 14,
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      textDecoration: "none",
+      color: "#fff",
+      background: FC.accent,
+      borderRadius: 999,
+      padding: "8px 14px",
+      minHeight: 20
+    }
+  }, label)))) : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "flex-start",
@@ -173,7 +228,7 @@ function FootWhenWhere({
     style: {
       marginTop: 1
     }
-  }), /*#__PURE__*/React.createElement("span", null, place)));
+  }), /*#__PURE__*/React.createElement("span", null, place))));
 }
 
 // Portrait with a small status dot in its corner: green = present, red = absent, grey = no answer yet (no dot when unknown).

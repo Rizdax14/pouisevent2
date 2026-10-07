@@ -75,12 +75,28 @@ function FootMetaChips({ match }) {
 
 function FootWhenWhere({ match, size = 14 }) {
   const place = formatMatchPlace(match);
+  const links = mapLinks(match);
+  const [open, setOpen] = React.useState(false);
+  const stop = (e) => e.stopPropagation();
   return (
     <div style={{ display: "grid", gap: 5, fontSize: size, color: FC.muted }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FIcon name="calendar" size={16} />{footDate(match.match_datetime)}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="clock" size={16} /><span>Heure du match : <b>{footHour(match.match_datetime)}</b></span></div>
       {match.meeting_at && <div style={{ display: "flex", alignItems: "center", gap: 8, color: FC.text }}><FIcon name="users" size={16} /><span>Heure de RDV : <b>{footHour(match.meeting_at)}</b></span></div>}
-      {place && <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span></div>}
+      {place && (links ? (
+        <div>
+          <button onClick={(e) => { stop(e); setOpen(!open); }} aria-expanded={open} style={{ display: "flex", alignItems: "flex-start", gap: 8, border: "none", background: "none", padding: 0, margin: 0, font: "inherit", color: FC.deep, textAlign: "left", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            <FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span>
+          </button>
+          {open && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0 2px 24px" }}>
+              {[["waze", "Waze"], ["plans", "Plans"], ["google", "Google Maps"]].map(([k, label]) => (
+                <a key={k} href={links[k]} target="_blank" rel="noreferrer" onClick={stop} style={{ fontFamily: FF.ui, fontSize: 14, letterSpacing: "0.04em", textTransform: "uppercase", textDecoration: "none", color: "#fff", background: FC.accent, borderRadius: 999, padding: "8px 14px", minHeight: 20 }}>{label}</a>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><FIcon name="pin" size={16} style={{ marginTop: 1 }} /><span>{place}</span></div>)}
     </div>
   );
 }
