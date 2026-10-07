@@ -497,7 +497,18 @@
         ctx.fillStyle = "#1b1b1b"; y = wrap(m.date, FONT_UI, 60, W - 70, y + 40, 70, 2);
         ctx.font = `56px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, y + 30); y += 110;
         ctx.fillStyle = "#5d554b"; y = wrap(m.place || "", FONT_UI, 42, W - 90, y, 52, 3);
-        ctx.fillStyle = "#c0262d"; ctx.font = `76px ${FONT_HAND}`; ctx.save(); ctx.translate(W / 2, Math.max(y + 70, H - 120)); ctx.rotate(-0.05); ctx.fillText(m.note || "Allez les gars !", 0, 0); ctx.restore();
+        // my answer, as a rubber stamp
+        const st = { present: ["PRÉSENT", "#1f8a4c"], absent: ["ABSENT", "#c0262d"] }[m.presence];
+        ctx.save(); ctx.translate(W / 2, Math.max(y + 60, H - 140)); ctx.rotate(-0.06);
+        if (st) {
+          ctx.font = `84px ${FONT_UI}`; const tw = ctx.measureText(st[0]).width;
+          ctx.strokeStyle = st[1]; ctx.lineWidth = 9; roundRect(ctx, -tw / 2 - 34, -78, tw + 68, 110, 16); ctx.stroke();
+          ctx.lineWidth = 3; roundRect(ctx, -tw / 2 - 22, -66, tw + 44, 86, 10); ctx.stroke();
+          ctx.fillStyle = st[1]; ctx.fillText(st[0], 0, 6);
+        } else {
+          ctx.fillStyle = "#8a7f72"; ctx.font = `60px ${FONT_HAND}`; ctx.fillText("Tu n'as pas encore répondu", 0, 0);
+        }
+        ctx.restore();
       }
       ctx.fillStyle = "#9b8f80"; ctx.font = `28px ${FONT_UI}`; ctx.fillText("toucher pour ouvrir", W / 2, H - 28);
       s.mesh.userData.regions = [{ id: "next", x: 0, y: 0, w: W, h: H }];

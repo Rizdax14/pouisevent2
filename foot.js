@@ -6675,6 +6675,8 @@ function FootRoomScreen({
   onHome,
   settings,
   roster,
+  attendance,
+  reload,
   matches,
   events,
   lineups,
@@ -6697,6 +6699,7 @@ function FootRoomScreen({
     return s.year * 12 + s.month - 1;
   });
   const [paper, setPaper] = React.useState(null);
+  const [savingPresence, setSavingPresence] = React.useState(false);
   const zone = FOOT_ROOM_ZONES[page] || "rack";
   const kit = theme === "pink" ? "away" : "home";
 
@@ -6811,6 +6814,7 @@ function FootRoomScreen({
     if (!room.current) return;
     const venue = m => m.venue === "exterieur" ? "Extérieur" : "Domicile";
     const next = upcoming[0];
+    const mine = next && currentPlayer ? presenceMap(attendance, next.id)[currentPlayer.id] || "none" : "none";
     const longDate = iso => new Date(iso).toLocaleDateString("fr-FR", {
       weekday: "long",
       day: "numeric",
@@ -6825,7 +6829,8 @@ function FootRoomScreen({
         opponent: next.opponent_name,
         date: longDate(next.match_datetime),
         hours: `Match ${footHour(next.match_datetime)}${next.meeting_at ? ` · RDV ${footHour(next.meeting_at)}` : ""}`,
-        place: formatMatchPlace(next)
+        place: formatMatchPlace(next),
+        presence: mine
       },
       upcoming: upcoming.slice(1, 4).map(m => ({
         id: m.id,
@@ -6838,7 +6843,7 @@ function FootRoomScreen({
         opponent: 0
       }, y, mo)
     });
-  }, [upcoming, matches, scoreById, month, theme, state]);
+  }, [upcoming, matches, scoreById, month, theme, state, attendance]);
 
   // ---- overlays ----
   const row = shirt && rows.find(r => r.playerId === shirt.id);
@@ -7110,7 +7115,25 @@ function FootRoomScreen({
   }, "vs ", paper.opponent_name), /*#__PURE__*/React.createElement(FootWhenWhere, {
     match: paper,
     size: 15
-  }), /*#__PURE__*/React.createElement("div", {
+  }), currentPlayer && paper.status === "scheduled" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    compact: true,
+    myStatus: presenceMap(attendance, paper.id)[currentPlayer.id],
+    saving: savingPresence,
+    onSet: async st => {
+      setSavingPresence(true);
+      try {
+        await setMatchAttendance(paper.id, currentPlayer.id, st);
+        await reload();
+      } catch (e) {
+        console.warn("attendance failed", e);
+      }
+      setSavingPresence(false);
+    }
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -7320,6 +7343,8 @@ function FootballApp({
     onLeaveRoom: () => setRoom(false),
     settings: settingsItems,
     roster: roster,
+    attendance: attendance,
+    reload: reloadFoot,
     matches: matches,
     events: events,
     lineups: lineups,

@@ -2512,7 +2512,7 @@ function FootRoomStat({ label, value }) {
   );
 }
 
-function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, roster, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
+function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, roster, attendance, reload, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
   const host = React.useRef(null);
   const room = React.useRef(null);
   const [state, setState] = React.useState("loading");
@@ -2522,6 +2522,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
   const [boardTab, setBoardTabState] = React.useState(() => readPref("foot_rank_tab", "goals", FOOT_RANKING_TABS.map((t) => t.key)));
   const [month, setMonth] = React.useState(() => { const s = calendarStartMonth(matches); return s.year * 12 + s.month - 1; });
   const [paper, setPaper] = React.useState(null);
+  const [savingPresence, setSavingPresence] = React.useState(false);
   const zone = FOOT_ROOM_ZONES[page] || "rack";
   const kit = theme === "pink" ? "away" : "home";
 
@@ -2586,6 +2587,7 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
     if (!room.current) return;
     const venue = (m) => (m.venue === "exterieur" ? "Extérieur" : "Domicile");
     const next = upcoming[0];
+    const mine = next && currentPlayer ? presenceMap(attendance, next.id)[currentPlayer.id] || "none" : "none";
     const longDate = (iso) => new Date(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" });
     const y = Math.floor(month / 12), mo = month % 12 + 1;
     room.current.setDesk({
@@ -2594,11 +2596,12 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
         opponent: next.opponent_name, date: longDate(next.match_datetime),
         hours: `Match ${footHour(next.match_datetime)}${next.meeting_at ? ` · RDV ${footHour(next.meeting_at)}` : ""}`,
         place: formatMatchPlace(next),
+        presence: mine,
       },
       upcoming: upcoming.slice(1, 4).map((m) => ({ id: m.id, date: longDate(m.match_datetime), opponent: m.opponent_name, sub: `${footHour(m.match_datetime)} · ${venue(m)}` })),
       calendar: calendarMonth(matches, (m) => scoreById[m.id] || { bl: 0, opponent: 0 }, y, mo),
     });
-  }, [upcoming, matches, scoreById, month, theme, state]);
+  }, [upcoming, matches, scoreById, month, theme, state, attendance]);
 
   // ---- overlays ----
   const row = shirt && rows.find((r) => r.playerId === shirt.id);
@@ -2662,6 +2665,12 @@ function FootRoomScreen({ visible, page, theme, setTheme, onHome, settings, rost
             <div style={{ padding: "16px 18px 18px", color: "#1b1b1b" }}>
               <div style={{ fontFamily: FF.display, fontSize: 28, lineHeight: 1.1, marginBottom: 10 }}>vs {paper.opponent_name}</div>
               <FootWhenWhere match={paper} size={15} />
+              {currentPlayer && paper.status === "scheduled" && (
+                <div style={{ marginTop: 14 }}>
+                  <FootAttendanceButtons compact myStatus={presenceMap(attendance, paper.id)[currentPlayer.id]} saving={savingPresence}
+                    onSet={async (st) => { setSavingPresence(true); try { await setMatchAttendance(paper.id, currentPlayer.id, st); await reload(); } catch (e) { console.warn("attendance failed", e); } setSavingPresence(false); }} />
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <FBtn full onClick={() => nav("matchDetail", { matchId: paper.id })}>Ouvrir le match</FBtn>
                 <FBtn variant="ghost" onClick={() => setPaper(null)}>Fermer</FBtn>
@@ -2795,7 +2804,7 @@ function FootballApp({ currentPlayer, onBack }) {
     <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
       {roomOn && loaded && (
         <FootRoomScreen visible={roomVisible} page={page} theme={theme} setTheme={setTheme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
-          roster={roster} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer} />
+          roster={roster} attendance={attendance} reload={reloadFoot} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer} />
       )}
       {!roomVisible && <FootShell wide={page === "stats" || page === "reseaux" || playerPage}>
         <FTopBar title={title} subtitle={subtitle} theme={theme} onTheme={setTheme} onHome={onBack} onBack={detail ? () => nav("calendar") : playerPage ? backFromPlayer : undefined}
