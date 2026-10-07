@@ -396,14 +396,14 @@ function FootCalendarPage({ matches, events, roster, attendance, activities, act
 // ---- roster & admin -------------------------------------------------------------------------------------------------------------
 // Private details of one player (birth date, phone, e-mail). Stored server-side behind the admin key.
 function FootPlayerDetailsEditor({ player, detail, onSaved }) {
-  const [f, setF] = React.useState({ birth_date: (detail && detail.birth_date) || "", phone: (detail && detail.phone) || "", email: (detail && detail.email) || "" });
+  const [f, setF] = React.useState({ birth_date: (detail && detail.birth_date) || "", phone: (detail && detail.phone) || "", email: (detail && detail.email) || "", instagram: (detail && detail.instagram) || "" });
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   async function save() {
     setBusy(true); setMsg(null);
     try {
-      const r = await instaAdminFetch("player-details", { player_id: player.id, birth_date: f.birth_date, phone: f.phone, email: f.email });
+      const r = await instaAdminFetch("player-details", { player_id: player.id, birth_date: f.birth_date, phone: f.phone, email: f.email, instagram: f.instagram });
       onSaved(r.detail);
       setMsg({ t: "good", m: "Enregistré ✓" });
     } catch (e) { setMsg({ t: "bad", m: e.message }); }
@@ -414,6 +414,7 @@ function FootPlayerDetailsEditor({ player, detail, onSaved }) {
       <FField label="Date de naissance"><input style={FOOT_INPUT_STYLE} type="date" value={f.birth_date} onChange={set("birth_date")} max={new Date().toISOString().slice(0, 10)} aria-label="Date de naissance" /></FField>
       <FField label="Téléphone"><input style={FOOT_INPUT_STYLE} type="tel" inputMode="tel" placeholder="06 12 34 56 78" value={f.phone} onChange={set("phone")} aria-label="Téléphone" autoComplete="off" /></FField>
       <FField label="E-mail"><input style={FOOT_INPUT_STYLE} type="email" inputMode="email" placeholder="prenom@exemple.fr" value={f.email} onChange={set("email")} aria-label="E-mail" autoCapitalize="off" autoComplete="off" /></FField>
+      <FField label="Instagram"><input style={FOOT_INPUT_STYLE} placeholder="@pseudo" value={f.instagram} onChange={set("instagram")} aria-label="Pseudo Instagram" autoCapitalize="off" autoCorrect="off" autoComplete="off" spellCheck={false} /></FField>
       {msg && <FMessage tone={msg.t}>{msg.m}</FMessage>}
       <FBtn size="sm" onClick={save} disabled={busy}>{busy ? "…" : "Enregistrer les infos"}</FBtn>
     </div>
@@ -494,7 +495,7 @@ function FootRosterManager({ roster, reload }) {
                 <FAvatar playerId={p.id} name={nameOf(p)} size={38} linkable />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, overflowWrap: "anywhere" }}>{nameOf(p)}</div>
-                  {d && (d.birth_date || d.phone || d.email) && <div style={{ fontSize: 12, color: FC.muted, overflowWrap: "anywhere" }}>{[d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · ")}</div>}
+                  {d && (d.birth_date || d.phone || d.email || d.instagram) && <div style={{ fontSize: 12, color: FC.muted, overflowWrap: "anywhere" }}>{[d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email, d.instagram ? `@${d.instagram}` : null].filter(Boolean).join(" · ")}</div>}
                 </div>
                 <FIconBtn icon="user" label={`Infos de ${nameOf(p)}`} tone={open ? "soft" : "ghost"} onClick={() => setOpenId(open ? null : p.id)} />
               </div>
@@ -510,7 +511,7 @@ function FootRosterManager({ roster, reload }) {
                 </select>
               </div>
             </div>
-            {open && (hasKey ? <FootPlayerDetailsEditor key={`${p.id}-${d ? d.phone : ""}`} player={p} detail={d} onSaved={(row) => setDetails({ ...details, [p.id]: row })} /> : <div style={{ fontSize: 13, color: FC.muted, padding: "0 0 12px 48px" }}>Saisis la clé admin ci-dessus pour voir et modifier les infos.</div>)}
+            {open && (hasKey ? <FootPlayerDetailsEditor key={`${p.id}-${d ? [d.phone, d.email, d.birth_date, d.instagram].join("|") : ""}`} player={p} detail={d} onSaved={(row) => setDetails({ ...details, [p.id]: row })} /> : <div style={{ fontSize: 13, color: FC.muted, padding: "0 0 12px 48px" }}>Saisis la clé admin ci-dessus pour voir et modifier les infos.</div>)}
           </div>
         );
       })}

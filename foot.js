@@ -1045,7 +1045,8 @@ function FootPlayerDetailsEditor({
   const [f, setF] = React.useState({
     birth_date: detail && detail.birth_date || "",
     phone: detail && detail.phone || "",
-    email: detail && detail.email || ""
+    email: detail && detail.email || "",
+    instagram: detail && detail.instagram || ""
   });
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
@@ -1061,7 +1062,8 @@ function FootPlayerDetailsEditor({
         player_id: player.id,
         birth_date: f.birth_date,
         phone: f.phone,
-        email: f.email
+        email: f.email,
+        instagram: f.instagram
       });
       onSaved(r.detail);
       setMsg({
@@ -1112,6 +1114,18 @@ function FootPlayerDetailsEditor({
     "aria-label": "E-mail",
     autoCapitalize: "off",
     autoComplete: "off"
+  })), /*#__PURE__*/React.createElement(FField, {
+    label: "Instagram"
+  }, /*#__PURE__*/React.createElement("input", {
+    style: FOOT_INPUT_STYLE,
+    placeholder: "@pseudo",
+    value: f.instagram,
+    onChange: set("instagram"),
+    "aria-label": "Pseudo Instagram",
+    autoCapitalize: "off",
+    autoCorrect: "off",
+    autoComplete: "off",
+    spellCheck: false
   })), msg && /*#__PURE__*/React.createElement(FMessage, {
     tone: msg.t
   }, msg.m), /*#__PURE__*/React.createElement(FBtn, {
@@ -1262,13 +1276,13 @@ function FootRosterManager({
         fontSize: 16,
         overflowWrap: "anywhere"
       }
-    }, nameOf(p)), d && (d.birth_date || d.phone || d.email) && /*#__PURE__*/React.createElement("div", {
+    }, nameOf(p)), d && (d.birth_date || d.phone || d.email || d.instagram) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: FC.muted,
         overflowWrap: "anywhere"
       }
-    }, [d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement(FIconBtn, {
+    }, [d.birth_date ? `${ageOf(d.birth_date)} ans` : null, d.phone, d.email, d.instagram ? `@${d.instagram}` : null].filter(Boolean).join(" · "))), /*#__PURE__*/React.createElement(FIconBtn, {
       icon: "user",
       label: `Infos de ${nameOf(p)}`,
       tone: open ? "soft" : "ghost",
@@ -1319,7 +1333,7 @@ function FootRosterManager({
     }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
       value: "invite"
     }, "Invit\xE9")))), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
-      key: `${p.id}-${d ? d.phone : ""}`,
+      key: `${p.id}-${d ? [d.phone, d.email, d.birth_date, d.instagram].join("|") : ""}`,
       player: p,
       detail: d,
       onSaved: row => setDetails({

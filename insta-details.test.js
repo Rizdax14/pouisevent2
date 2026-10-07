@@ -31,10 +31,16 @@ test("player-details: GET lists, POST validates then saves", async () => {
   res = mockRes();
   await handler({ method: "POST", headers: KEY, body: { player_id: 6, birth_date: "", phone: "", email: "" } }, res);
   assert.deepStrictEqual([saved[1].birth_date, saved[1].phone, saved[1].email], [null, null, null]);
-  for (const bad of [{ player_id: 0 }, { player_id: 5, birth_date: "02/03/1995" }, { player_id: 5, birth_date: "2999-01-01" }, { player_id: 5, phone: "abc" }, { player_id: 5, email: "pas-un-mail" }]) {
+  res = mockRes();
+  await handler({ method: "POST", headers: KEY, body: { player_id: 7, instagram: " @louis.mar " } }, res);
+  assert.strictEqual(saved[2].instagram, "louis.mar");
+  res = mockRes();
+  await handler({ method: "POST", headers: KEY, body: { player_id: 7, instagram: "https://www.instagram.com/nolan_bl/?hl=fr" } }, res);
+  assert.strictEqual(saved[3].instagram, "nolan_bl");
+  for (const bad of [{ player_id: 5, instagram: "pas valide !" }, { player_id: 0 }, { player_id: 5, birth_date: "02/03/1995" }, { player_id: 5, birth_date: "2999-01-01" }, { player_id: 5, phone: "abc" }, { player_id: 5, email: "pas-un-mail" }]) {
     res = mockRes();
     await handler({ method: "POST", headers: KEY, body: bad }, res);
     assert.strictEqual(res.code, 400, JSON.stringify(bad));
   }
-  assert.strictEqual(saved.length, 2);
+  assert.strictEqual(saved.length, 4);
 });
