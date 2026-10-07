@@ -19,7 +19,7 @@ test.before(async () => {
 });
 test.after(() => { global.fetch = realFetch; });
 
-const R = require("./api/insta/render");
+const R = require("./lib/insta/routes/render");
 const L = require("./insta-logic.js");
 const { renderJpeg } = require("./lib/insta/render");
 

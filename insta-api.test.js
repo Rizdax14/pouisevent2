@@ -4,9 +4,9 @@ const assert = require("node:assert");
 
 process.env.INSTA_ADMIN_KEY = "test-admin-key-123456";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_dummy";
-const sign = require("./api/insta/photo-sign");
-const register = require("./api/insta/photo-register");
-const del = require("./api/insta/photo-delete");
+const sign = require("./lib/insta/routes/photo-sign");
+const register = require("./lib/insta/routes/photo-register");
+const del = require("./lib/insta/routes/photo-delete");
 
 function mockRes() {
   const r = { code: 200, body: null, status(c) { r.code = c; return r; }, json(b) { r.body = b; return r; }, end() { return r; } };

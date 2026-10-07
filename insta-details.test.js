@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert");
 
 process.env.INSTA_ADMIN_KEY = "test-admin-key-123456";
-const handler = require("./api/insta/player-details");
+const handler = require("./lib/insta/routes/player-details");
 const KEY = { "x-insta-admin-key": "test-admin-key-123456" };
 function mockRes() { const r = { code: 200, body: null, status(c) { r.code = c; return r; }, json(b) { r.body = b; return r; }, end() { return r; } }; return r; }
 

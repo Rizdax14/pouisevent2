@@ -20,7 +20,7 @@ test.before(async () => {
   };
 });
 test.after(() => { global.fetch = realFetch; });
-const { build } = require("./api/insta/render");
+const { build } = require("./lib/insta/routes/render");
 
 let uid = 0; // unique file names: the renderer caches images by URL
 const photo = (id, player, kind = "celebration", kit = "exterieur") => ({ id, player_id: player, kit, kind, retouched: false, path: `${player}/${kit}/${kind}-${++uid}.png`, width: 400, height: 500 });

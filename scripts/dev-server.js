@@ -1,4 +1,4 @@
-// Local dev server: serves the static site and runs api/insta/*.js like Vercel Node functions.
+// Local dev server: serves the static site and runs api/insta/[route].js like Vercel Node functions.
 // Usage: node scripts/dev-server.js [port]   (reads .env.local if present)
 const http = require("http");
 const fs = require("fs");
@@ -30,10 +30,12 @@ function readBody(req) {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname.startsWith("/api/")) {
-    const file = path.join(ROOT, url.pathname + ".js");
-    if (!fs.existsSync(file)) { res.writeHead(404); return res.end("not found"); }
+    // like Vercel: /api/insta/<route> → api/insta/[route].js with req.query.route
+    const m = url.pathname.match(/^\/api\/insta\/([a-z-]+)$/);
+    const file = m ? path.join(ROOT, "api/insta/[route].js") : null;
+    if (!file) { res.writeHead(404); return res.end("not found"); }
     delete require.cache[require.resolve(file)];
-    req.query = Object.fromEntries(url.searchParams);
+    req.query = { ...Object.fromEntries(url.searchParams), route: m[1] };
     req.body = req.method === "POST" ? await readBody(req) : undefined;
     res.status = (c) => { res.statusCode = c; return res; };
     res.json = (o) => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(o)); };

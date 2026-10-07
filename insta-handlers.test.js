@@ -4,10 +4,10 @@ const assert = require("node:assert/strict");
 process.env.INSTA_ADMIN_KEY = "test-admin-key-123456";
 process.env.CRON_SECRET = "cron-secret-1234567";
 const L = require("./insta-logic.js");
-const settingsH = require("./api/insta/settings");
-const publishH = require("./api/insta/publish");
-const cronH = require("./api/insta/cron");
-const refreshH = require("./api/insta/refresh-token");
+const settingsH = require("./lib/insta/routes/settings");
+const publishH = require("./lib/insta/routes/publish");
+const cronH = require("./lib/insta/routes/cron");
+const refreshH = require("./lib/insta/routes/refresh-token");
 
 const res = () => { const r = { code: 200, body: null, status(c) { r.code = c; return r; }, json(b) { r.body = b; return r; }, end() { return r; } }; return r; };
 const ADMIN = { "x-insta-admin-key": "test-admin-key-123456" };
@@ -168,7 +168,7 @@ test("settings: switching a section to automatic stamps the activation date; sta
 });
 
 test("posts: admin only, returns the rows", async () => {
-  const postsH = require("./api/insta/posts");
+  const postsH = require("./lib/insta/routes/posts");
   postsH.deps = { list: async () => [{ id: 1, kind: "matchday", status: "published" }] };
   let r = res(); await postsH({ method: "GET", headers: {} }, r); assert.equal(r.code, 401);
   r = res(); await postsH({ method: "GET", headers: ADMIN }, r);
@@ -178,7 +178,7 @@ test("posts: admin only, returns the rows", async () => {
 });
 
 // ---------- Choosing the player on the photo ----------
-const featuredH = require("./api/insta/featured");
+const featuredH = require("./lib/insta/routes/featured");
 
 test("featured: admin only; stores a choice, clears it with null, rejects bad input", async () => {
   let stored = { "matchday:match:2": 5 };
@@ -212,4 +212,19 @@ test("cron: the chosen player is passed to the publication", async () => {
   await run();
   assert.equal(log.length, 1);
   assert.equal(log[0].t.player, 7);
+});
+
+test("the single /api/insta function dispatches every route and 404s the rest", async () => {
+  const fs = require("fs");
+  const router = require("./api/insta/[route].js");
+  const files = fs.readdirSync("./lib/insta/routes").map((f) => f.replace(/\.js$/, "")).sort();
+  assert.deepEqual(Object.keys(router.ROUTES).sort(), files);
+  for (const k of files) assert.equal(typeof router.ROUTES[k](), "function");
+  let status = 0, body = null;
+  const res = { status(c) { status = c; return res; }, json(o) { body = o; } };
+  await router({ query: { route: "constructor" } }, res);
+  assert.equal(status, 404);
+  let seen = null;
+  await router({ query: { route: "health", x: "1" }, method: "GET" }, { status() { return this; }, json(o) { seen = o; }, setHeader() {}, end() {} });
+  assert.ok(seen);
 });
