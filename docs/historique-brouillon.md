@@ -174,3 +174,4 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Anciens joueurs ajoutés à `foot_roster` avec le rôle `ancien` : Marlon (55), Simon (14), Florent E (36), Quentin H (56), Romain C (136).
 - Les buts sans buteur connu sont enregistrés avec un joueur vide (forfait 6-0, Tottenaam 7-1, amicaux sans détail).
 - Pour annuler l'import : `delete from foot_matches where id between 67 and 120;` (les buts, feuilles de match et votes partent avec).
+- Notes et feuilles de match de la phase 2 25-26 (10 matchs), tirées du fichier « moyenne 25-26 ». Correspondances : Titouan Brunon = Thisma, Vianel/Mahé Chanut = Mahé. Les invités (Baptiste Lurel, Clément Desjoyaux, Quentin Laurent, Jean Jean) ne sont pas importés.
