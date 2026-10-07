@@ -238,6 +238,7 @@
       rack.squad.forEach((p, i) => {
         const fm = K.meta.flocages[p.id];
         p.label = fm && !fm.typeset ? fm.label : (p.name || "").toUpperCase();
+        if (fm && fm.num != null) p.num = fm.num; // the number worn that season
         const c = canvas2d(Math.round(K.back.width * scale), Math.round(K.back.height * scale)), ctx = c.getContext("2d");
         ctx.scale(scale, scale);
         ctx.drawImage(K.back, 0, 0);

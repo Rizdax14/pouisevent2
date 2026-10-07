@@ -143,3 +143,10 @@ test("monthMatches: the month's matches with score, result, hour or my rating", 
     [2, "jeu.", 24, null, null, "19h", null],
   ]);
 });
+
+test("seasonKits: the kits of each season, the current ones for today", () => {
+  assert.deepEqual(D.seasonKits("2024-2025", "2026-2027"), ["h2425"]);
+  assert.deepEqual(D.seasonKits("2025-2026", "2026-2027"), ["h2526", "a2526"]);
+  assert.deepEqual(D.seasonKits("2026-2027", "2026-2027"), ["home", "away"]);
+  assert.equal(D.shortSeason("2025-2026"), "25-26");
+});

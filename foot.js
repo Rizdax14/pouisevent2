@@ -6931,13 +6931,15 @@ function FootRoomScreen({
     writePref("foot_room_board_type", v);
   };
   const [rackSeason, setRackSeason] = React.useState(season);
+  const [rackAway, setRackAway] = React.useState(false); // home or away kit of the season (when it had two)
   const {
     photos,
     framings
   } = React.useContext(FootCtx);
   const meId = currentPlayer ? currentPlayer.id : null;
   const zone = FOOT_ROOM_ZONES[page] || "rack";
-  const kit = "home";
+  const kits = seasonKits(rackSeason, season);
+  const kit = rackAway && kits[1] ? kits[1] : kits[0];
 
   // ---- data ----
   const squad = React.useMemo(() => rackSeason === season ? rackSquad(roster, footNameOf) : seasonRack(FOOT_SEASON_SQUADS[rackSeason] || [], roster, footNameOf), [roster, rackSeason, season]);
@@ -7305,6 +7307,11 @@ function FootRoomScreen({
     value: rackSeason,
     onChange: setRackSeason,
     options: rackSeasons.map(s => [s, `Vestiaire ${shortSeason(s)}`])
+  }), zone === "rack" && kits.length > 1 && /*#__PURE__*/React.createElement(FootRoomPicker, {
+    label: "Maillot",
+    value: rackAway ? "away" : "home",
+    onChange: v => setRackAway(v === "away"),
+    options: [["home", "Domicile"], ["away", "Extérieur"]]
   }), zone === "desk" && /*#__PURE__*/React.createElement(FootRoomPicker, {
     label: "Saison",
     value: deskSeason,

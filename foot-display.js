@@ -69,6 +69,10 @@ function rackSquad(roster, nameOf) {
 // "2025-2026" → "25-26"
 function shortSeason(s) { return String(s).replace(/^20(\d\d)-20(\d\d)$/, "$1-$2"); }
 
+// The kits on the rack for a season: [home, away?] (assets/vestiaire/<kit>/). Today's season: the current kits.
+const FOOT_SEASON_KITS = { "2024-2025": ["h2425"], "2025-2026": ["h2526", "a2526"] };
+function seasonKits(season, current) { return FOOT_SEASON_KITS[season] || (season === current ? ["home", "away"] : ["home"]); }
+
 // Shirts of a past season: its listed squad, alphabetical, numbers as on today's roster.
 function seasonRack(ids, roster, nameOf) {
   const num = Object.fromEntries(roster.map((r) => [r.player_id, r.jersey_number || ""]));
@@ -177,4 +181,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

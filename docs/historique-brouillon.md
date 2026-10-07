@@ -195,6 +195,13 @@ Amicaux : 27/08 Les potes à Nathan 4-8, 03/09 En Avant Guinguette 7-3, 10/09 AS
 - 2026-27 : l'effectif actuel de l'appli.
 Dans le code : `FOOT_SEASON_SQUADS` (foot-logic.js).
 
+## Maillots des saisons passées (vestiaire 3D)
+- 24-25 (domicile seul) : `assets/vestiaire/h2425` — maillot blanc, col vert, écusson ; flocages découpés dans les PDF d'impression (Drive Leverculsec/24-25/lettre et NUMERO). Numéros d'après les compos Instagram : Flo 3, Quentin 7, Thisma 8, Simon 9, Samuel 10, Nils 13, Louis 14, Nolan 2, Juju 4, Thomas 25, Max 27, Timo 51, Léandre 21, Marlon 1 (MARLON recomposé avec la police Evolventa des PDF).
+- 25-26 domicile : `h2526` — motif bière de « jersey front/back.ai », manches et col blancs, flocage blanc Bebas + America Club.
+- 25-26 extérieur : `a2526` — maquette « mockup.ai » (noir et or), flocage or.
+- Noms et numéros 25-26 : feuille « Bière Leverculsec Away Jersey » + effectif. Hypothèses : KANT 7 = Quentin H, ILIAN 15 (la feuille dit « L'ARABE - 15 »), FLO 3, Romain sans numéro.
+- Script : `build-old-kits.js` (scratch).
+
 ## Noms → joueurs
 Este = Esteban · Sam = Samuel · France = Mathis F · Mathis (24-25) = Thisma · Etienne = effectif actuel.
 Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon, Florent (Flo), Simon. Autres : Quentin L, Mahé, Jean jean, Enzo, Adrien, Jules.
