@@ -8,7 +8,7 @@
   "use strict";
   const KIT_BASE = "/assets/vestiaire/";
   const BX = 6.4; // board corner (x)
-  const DX = -6.4, DY = -0.28, DZ = 0.75; // desk top centre
+  const DX = -6.4, DY = -0.28, DZ = 0.28; // desk: papers' reference point (the desk itself runs from the wall to z = 1.38)
   const RAIL_Y = 1.15;
   const SP = 0.19, GAP = 0.62; // rack spacing: side-on shirts, gap around the one in front
 
@@ -86,9 +86,9 @@
     const rim = new THREE.DirectionalLight("#e6c6ff", 0.4); rim.position.set(-3, 2, -1); scene.add(rim);
     const boardLight = new THREE.SpotLight("#fffaf0", 1.25, 9, 0.75, 0.7, 1.2);
     boardLight.position.set(BX, 2.9, 2.2); boardLight.target.position.set(BX, 0.5, -0.7); gBoard.add(boardLight, boardLight.target);
-    const lamp = new THREE.PointLight("#ffd9a0", 1.1, 4.5, 1.6); lamp.position.set(DX + 0.95, DY + 1.0, DZ - 0.55); gDesk.add(lamp);
+    const lamp = new THREE.PointLight("#ffd9a0", 1.1, 4.5, 1.6); lamp.position.set(DX + 0.9, DY + 1.0, DZ - 0.6); gDesk.add(lamp);
     const deskTop = new THREE.SpotLight("#fff6ea", 0.9, 8, 0.8, 0.8, 1.2);
-    deskTop.position.set(DX, 2.8, DZ + 1.2); deskTop.target.position.set(DX, DY, DZ); gDesk.add(deskTop, deskTop.target);
+    deskTop.position.set(DX, 2.8, DZ + 1.6); deskTop.target.position.set(DX, DY, DZ + 0.15); gDesk.add(deskTop, deskTop.target);
 
     // ---------- room ----------
     function woodTexture(hue = 20, light = 11) {
@@ -112,7 +112,12 @@
       const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, 5), new THREE.MeshStandardMaterial({ map: wood, roughness: 0.85 }));
       wall.position.set(x, 0.8, -0.75); wall.receiveShadow = true; g.add(wall);
     }
-    const floorMat = new THREE.MeshStandardMaterial({ color: "#140e10", roughness: 0.95 });
+    const floorMat = new THREE.MeshStandardMaterial({ map: (() => {
+      const c = canvas2d(512, 512), ctx = c.getContext("2d");
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { ctx.fillStyle = (x + y) % 2 ? "#1d1a1c" : "#232023"; ctx.fillRect(x * 128, y * 128, 128, 128); }
+      ctx.strokeStyle = "#0c0a0b"; ctx.lineWidth = 4; for (let k = 0; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(k * 128, 0); ctx.lineTo(k * 128, 512); ctx.moveTo(0, k * 128); ctx.lineTo(512, k * 128); ctx.stroke(); }
+      const t = finish(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(9, 9); return t;
+    })(), roughness: 0.8 });
     const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48), floorMat);
     floor.rotation.x = -Math.PI / 2; floor.position.set(0, -0.8, 0); floor.receiveShadow = true;
     const shelfMat = new THREE.MeshStandardMaterial({ color: "#35241b", roughness: 0.7 });
@@ -320,8 +325,14 @@
     // ---------- desk corner ----------
     const deskWood = woodTexture(26, 22); deskWood.repeat.set(2, 1);
     const deskMat = new THREE.MeshStandardMaterial({ map: deskWood, roughness: 0.55 });
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.07, 1.6), deskMat); desk.position.set(DX, DY - 0.035, DZ); desk.receiveShadow = true; gDesk.add(desk);
-    for (const [x, z] of [[-1.15, -0.7], [1.15, -0.7], [-1.15, 0.7], [1.15, 0.7]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.07), deskMat); leg.position.set(DX + x, DY - 0.32, DZ + z); gDesk.add(leg); }
+    const DESK_Z0 = -0.72, DESK_Z1 = 1.38, DESK_W = 2.6, deskZ = (DESK_Z0 + DESK_Z1) / 2;
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(DESK_W, 0.09, DESK_Z1 - DESK_Z0), deskMat); desk.position.set(DX, DY - 0.045, deskZ); desk.receiveShadow = desk.castShadow = true; gDesk.add(desk);
+    const edgeMat = new THREE.MeshStandardMaterial({ color: "#3a2416", roughness: 0.6 });
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(DESK_W + 0.02, 0.12, 0.05), edgeMat); lip.position.set(DX, DY - 0.07, DESK_Z1); gDesk.add(lip);
+    const apron = new THREE.Mesh(new THREE.BoxGeometry(DESK_W - 0.2, 0.18, DESK_Z1 - DESK_Z0 - 0.2), edgeMat); apron.position.set(DX, DY - 0.18, deskZ); gDesk.add(apron);
+    for (const [x, z] of [[-1.2, DESK_Z0 + 0.1], [1.2, DESK_Z0 + 0.1], [-1.2, DESK_Z1 - 0.1], [1.2, DESK_Z1 - 0.1]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), edgeMat); leg.position.set(DX + x, DY - 0.36, z); leg.castShadow = true; gDesk.add(leg); }
+    // leather desk mat under the papers
+    const blotter = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.006, 1.92), new THREE.MeshStandardMaterial({ color: "#2b211c", roughness: 0.75 })); blotter.position.set(DX, DY + 0.003, DZ + 0.1); blotter.receiveShadow = true; gDesk.add(blotter);
     // framed club crest above the desk
     loadImg("/logo-bl.png").then((im) => {
       if (!im) return;
@@ -342,23 +353,23 @@
       m.rotation.x = -Math.PI / 2; m.receiveShadow = true;
       return { mesh: m, canvas: c, tex, regions: [] };
     }
-    const nextSheet = sheet(0.56, 0.78, 720); nextSheet.mesh.position.set(DX - 0.31, DY + 0.002, DZ - 0.62); nextSheet.mesh.rotation.z = 0.05; nextSheet.mesh.userData.surface = "next";
-    const listSheet = sheet(0.56, 0.78, 720); listSheet.mesh.position.set(DX + 0.31, DY + 0.003, DZ - 0.58); listSheet.mesh.rotation.z = -0.06; listSheet.mesh.userData.surface = "list";
-    const calSheet = sheet(1.16, 0.92, 1280); calSheet.mesh.position.set(DX, DY + 0.004, DZ + 0.36); calSheet.mesh.userData.surface = "calendar";
+    const nextSheet = sheet(0.64, 0.88, 760); nextSheet.mesh.position.set(DX - 0.34, DY + 0.008, DZ - 0.38); nextSheet.mesh.rotation.z = 0.03; nextSheet.mesh.userData.surface = "next";
+    const listSheet = sheet(0.6, 0.82, 720); listSheet.mesh.position.set(DX + 0.35, DY + 0.009, DZ - 0.36); listSheet.mesh.rotation.z = -0.04; listSheet.mesh.userData.surface = "list";
+    const calSheet = sheet(1.24, 0.96, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.6); calSheet.mesh.userData.surface = "calendar";
     gDesk.add(nextSheet.mesh, listSheet.mesh, calSheet.mesh);
     // calendar pad thickness + binding rings
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.02, 0.94), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY - 0.008, DZ + 0.36); gDesk.add(pad);
-    for (let k = 0; k < 9; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.004, 6, 16), steel); ring.position.set(DX - 0.48 + k * 0.12, DY + 0.01, DZ - 0.1); gDesk.add(ring); }
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.016, 0.98), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY + 0.002, DZ + 0.6); gDesk.add(pad);
+    for (let k = 0; k < 9; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.004, 6, 16), steel); ring.position.set(DX - 0.48 + k * 0.12, DY + 0.016, DZ + 0.13); gDesk.add(ring); }
     // mug, pen, whistle, notebook, lamp
     const mugMat = new THREE.MeshStandardMaterial({ color: opts.accent || "#2f8f5b", roughness: 0.4 });
-    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.13, 24, 1, true), mugMat); mug.position.set(DX + 0.8, DY + 0.065, DZ + 0.05); mug.castShadow = true;
-    const mugIn = new THREE.Mesh(new THREE.CircleGeometry(0.055, 24), new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.2 })); mugIn.rotation.x = -Math.PI / 2; mugIn.position.set(DX + 0.8, DY + 0.11, DZ + 0.05);
-    const mugH = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 16), mugMat); mugH.position.set(DX + 0.865, DY + 0.07, DZ + 0.05); mugH.rotation.y = Math.PI / 2;
-    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.26, 10), new THREE.MeshStandardMaterial({ color: "#1b2a8f", roughness: 0.3 })); pen.rotation.set(Math.PI / 2, 0, 0.6); pen.position.set(DX + 0.68, DY + 0.009, DZ - 0.15); pen.castShadow = true;
-    const nb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.66), new THREE.MeshStandardMaterial({ color: opts.accentDeep || "#1d5a3a", roughness: 0.7 })); nb.position.set(DX - 0.85, DY + 0.015, DZ + 0.2); nb.rotation.y = 0.18; nb.castShadow = true;
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.13, 24, 1, true), mugMat); mug.position.set(DX + 0.95, DY + 0.065, DZ + 0.2); mug.castShadow = true;
+    const mugIn = new THREE.Mesh(new THREE.CircleGeometry(0.055, 24), new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.2 })); mugIn.rotation.x = -Math.PI / 2; mugIn.position.set(DX + 0.95, DY + 0.11, DZ + 0.2);
+    const mugH = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 16), mugMat); mugH.position.set(DX + 1.015, DY + 0.07, DZ + 0.2); mugH.rotation.y = Math.PI / 2;
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.26, 10), new THREE.MeshStandardMaterial({ color: "#1b2a8f", roughness: 0.3 })); pen.rotation.set(Math.PI / 2, 0, 0.6); pen.position.set(DX + 0.86, DY + 0.009, DZ + 0.75); pen.castShadow = true;
+    const nb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.66), new THREE.MeshStandardMaterial({ color: opts.accentDeep || "#1d5a3a", roughness: 0.7 })); nb.position.set(DX - 1.0, DY + 0.015, DZ + 0.45); nb.rotation.y = 0.12; nb.castShadow = true;
     const whistle = new THREE.Group();
     const wb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), steel); const wm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.025, 0.03), steel); wm.position.x = 0.045; whistle.add(wb, wm);
-    whistle.position.set(DX + 0.72, DY + 0.035, DZ + 0.45); whistle.rotation.y = 0.8;
+    whistle.position.set(DX - 0.95, DY + 0.035, DZ - 0.45); whistle.rotation.y = 0.8;
     const lampMat = new THREE.MeshStandardMaterial({ color: "#1a1a1c", metalness: 0.5, roughness: 0.4, envMap });
     const lampG = new THREE.Group();
     const lb = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.03, 24), lampMat);
@@ -366,7 +377,7 @@
     const la2 = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.45, 8), lampMat); la2.position.set(-0.13, 0.6, 0.1); la2.rotation.set(0.9, 0, 0.6);
     const shade = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.16, 24, 1, true), lampMat); shade.position.set(-0.22, 0.72, 0.28); shade.rotation.x = 0.9;
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshBasicMaterial({ color: "#ffe2a8" })); bulb.position.set(-0.22, 0.68, 0.31);
-    lampG.add(lb, la1, la2, shade, bulb); lampG.position.set(DX + 1.0, DY + 0.015, DZ - 0.6); lampG.rotation.y = -0.5;
+    lampG.add(lb, la1, la2, shade, bulb); lampG.position.set(DX + 1.0, DY + 0.015, DZ - 0.75); lampG.rotation.y = -0.5;
     gDesk.add(mug, mugIn, mugH, pen, nb, whistle, lampG);
 
     // ---------- drawing helpers ----------
@@ -462,38 +473,48 @@
     function drawNext(m) {
       const s = nextSheet, c = s.canvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); s.mesh.userData.scale = S;
       paper(ctx, W, H, false);
-      ctx.fillStyle = opts.accent || "#2f8f5b"; ctx.fillRect(0, 0, W, 120);
-      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `46px ${FONT_UI}`; ctx.fillText("PROCHAIN MATCH", W / 2, 78);
-      ctx.fillStyle = "#1b1b1b";
+      const accent = opts.accent || "#2f8f5b";
+      ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 150);
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `64px ${FONT_UI}`; ctx.fillText("PROCHAIN MATCH", W / 2, 100);
+      const wrap = (text, family, size, maxW, y, lh, maxLines = 3) => { // centred lines, shrinking the font if needed
+        let s2 = size, lines;
+        for (;;) {
+          ctx.font = `${s2}px ${family}`; lines = []; let line = "";
+          for (const w of String(text).split(" ")) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+          if (line) lines.push(line);
+          if (lines.length <= maxLines || s2 <= 26) break; s2 -= 4;
+        }
+        lines.forEach((l, k) => ctx.fillText(l, W / 2, y + k * lh * s2 / size));
+        return y + lines.length * lh * s2 / size;
+      };
       if (!m) {
-        ctx.font = `44px ${FONT_HAND}`; ctx.fillText("Aucun match prévu", W / 2, 360);
+        ctx.fillStyle = "#1b1b1b"; ctx.font = `72px ${FONT_HAND}`; ctx.fillText("Aucun match prévu", W / 2, H / 2);
       } else {
-        ctx.font = `34px ${FONT_UI}`; ctx.fillStyle = "#6b6257"; ctx.fillText(m.kicker || "", W / 2, 190);
-        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + m.opponent, FONT_DISPLAY, 70, W - 80); ctx.fillText("vs " + m.opponent, W / 2, 290);
-        ctx.font = `40px ${FONT_UI}`; ctx.fillText(m.date, W / 2, 380);
-        ctx.font = `36px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, 440);
-        ctx.fillStyle = "#6b6257"; ctx.font = `30px ${FONT_UI}`;
-        const words = (m.place || "").split(" "); let line = "", y = 520;
-        for (const w of words) { if (ctx.measureText(line + w).width > W - 120) { ctx.fillText(line.trim(), W / 2, y); y += 40; line = ""; } line += w + " "; }
-        if (line.trim()) ctx.fillText(line.trim(), W / 2, y);
-        ctx.fillStyle = "#c0262d"; ctx.font = `48px ${FONT_HAND}`; ctx.save(); ctx.translate(W / 2, H - 110); ctx.rotate(-0.06); ctx.fillText(m.note || "Allez les gars !", 0, 0); ctx.restore();
+        ctx.fillStyle = accent; ctx.font = `44px ${FONT_UI}`; ctx.fillText(m.kicker || "", W / 2, 228);
+        ctx.fillStyle = "#1b1b1b";
+        let y = wrap("vs " + m.opponent, FONT_DISPLAY, 96, W - 70, 340, 110, 2);
+        ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(80, y - 40); ctx.lineTo(W - 80, y - 40); ctx.stroke();
+        ctx.fillStyle = "#1b1b1b"; y = wrap(m.date, FONT_UI, 60, W - 70, y + 40, 70, 2);
+        ctx.font = `56px ${FONT_UI}`; ctx.fillText(m.hours, W / 2, y + 30); y += 110;
+        ctx.fillStyle = "#5d554b"; y = wrap(m.place || "", FONT_UI, 42, W - 90, y, 52, 3);
+        ctx.fillStyle = "#c0262d"; ctx.font = `76px ${FONT_HAND}`; ctx.save(); ctx.translate(W / 2, Math.max(y + 70, H - 120)); ctx.rotate(-0.05); ctx.fillText(m.note || "Allez les gars !", 0, 0); ctx.restore();
       }
-      ctx.fillStyle = "#9b8f80"; ctx.font = `24px ${FONT_UI}`; ctx.fillText("toucher pour ouvrir", W / 2, H - 30);
+      ctx.fillStyle = "#9b8f80"; ctx.font = `28px ${FONT_UI}`; ctx.fillText("toucher pour ouvrir", W / 2, H - 28);
       s.mesh.userData.regions = [{ id: "next", x: 0, y: 0, w: W, h: H }];
       s.tex.needsUpdate = true;
     }
     function drawList(items) {
       const s = listSheet, c = s.canvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); s.mesh.userData.scale = S;
       paper(ctx, W, H, true);
-      ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "left"; ctx.font = `50px ${FONT_HAND}`; ctx.fillText("Les 3 prochains", 110, 110);
+      ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "left"; ctx.font = `70px ${FONT_HAND}`; ctx.fillText("Les 3 prochains", 110, 116);
       const regions = [];
-      if (!items || !items.length) { ctx.font = `40px ${FONT_HAND}`; ctx.fillText("Rien de prévu", 110, 300); }
+      if (!items || !items.length) { ctx.fillStyle = "#6b6257"; ctx.font = `60px ${FONT_HAND}`; ctx.fillText("Rien d'autre de prévu", 110, 330); }
       (items || []).slice(0, 3).forEach((it, k) => {
-        const y = 230 + k * 156;
-        ctx.fillStyle = "#1b2a8f"; ctx.font = `40px ${FONT_HAND}`; ctx.fillText(it.date, 110, y);
-        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + it.opponent, FONT_HAND, 52, W - 140); ctx.fillText("vs " + it.opponent, 110, y + 54);
-        ctx.fillStyle = "#6b6257"; ctx.font = `30px ${FONT_HAND}`; ctx.fillText(it.sub || "", 110, y + 96);
-        regions.push({ id: "match:" + it.id, x: 0, y: y - 50, w: W, h: 150 });
+        const y = 250 + k * 250;
+        ctx.fillStyle = "#1b2a8f"; fitFont(ctx, it.date, FONT_HAND, 52, W - 140); ctx.fillText(it.date, 110, y);
+        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + it.opponent, FONT_HAND, 72, W - 140); ctx.fillText("vs " + it.opponent, 110, y + 74);
+        ctx.fillStyle = "#6b6257"; ctx.font = `44px ${FONT_HAND}`; ctx.fillText(it.sub || "", 110, y + 130);
+        regions.push({ id: "match:" + it.id, x: 0, y: y - 60, w: W, h: 240 });
       });
       s.mesh.userData.regions = regions;
       s.tex.needsUpdate = true;
@@ -540,7 +561,7 @@
       const a = camera.aspect, fitW = (w) => w / (2 * HALF * a), fitH = (h) => h / (2 * HALF);
       // positions in the corner's own frame (x around 0, wall at z = -0.75, facing +z)
       if (zone === "board") { const d = Math.max(fitW(1.55), fitH(2.75)); return { theta: corners.board.theta, pos: V(0, 0.6, -0.7 + d), look: V(0, 0.55, -0.7) }; }
-      if (zone === "desk") { const h = Math.max(fitW(1.32), fitH(2.15)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ + 0.02 + h * 0.2), look: V(0, DY, DZ + 0.02) }; }
+      if (zone === "desk") { const h = Math.max(fitW(1.4), fitH(2.35)); return { theta: corners.desk.theta, pos: V(0, DY + h, DZ + 0.16 + h * 0.18), look: V(0, DY, DZ + 0.16) }; }
       const d = Math.max(3.0, fitW(a < 0.8 ? 1.3 : 1.8));
       return { theta: corners.rack.theta, pos: V(0, a < 0.8 ? 0.42 : 0.6, d), look: V(0, a < 0.8 ? 0.2 : 0.42, 0) };
     }
