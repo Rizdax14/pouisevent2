@@ -195,14 +195,14 @@
     async function loadKit(kit) {
       if (kitCache[kit]) return kitCache[kit];
       const base = KIT_BASE + kit + "/";
-      const [meta, front, back, collar] = await Promise.all([fetch(base + "kit.json?v=3").then((r) => r.json()), loadImg(base + "front.png?v=3"), loadImg(base + "back.png?v=3"), loadImg(base + "collar.png?v=3")]);
+      const [meta, front, back, collar] = await Promise.all([fetch(base + "kit.json?v=4").then((r) => r.json()), loadImg(base + "front.png?v=4"), loadImg(base + "back.png?v=4"), loadImg(base + "collar.png?v=4")]);
       kitCache[kit] = { kit, base, meta, front, back, collar, flocs: {} };
       return kitCache[kit];
     }
     async function flocageFor(K, p) {
       if (K.flocs[p.id] !== undefined) return K.flocs[p.id];
       const f = K.meta.flocages[p.id];
-      K.flocs[p.id] = f ? { img: await loadImg(`${K.base}flocages/${p.id}.png?v=3`), x: f.x, y: f.y } : null;
+      K.flocs[p.id] = f ? { img: await loadImg(`${K.base}flocages/${p.id}.png?v=4`), x: f.x, y: f.y } : null;
       return K.flocs[p.id];
     }
     // A player the kit file doesn't have yet: name and number typeset on the fly where the others sit.
@@ -410,7 +410,7 @@
     const boardList = { scroll: 0, max: 0, key: null, top: 0, bottom: 0 }; // the rows under the podium scroll
     function drawBoard(m) {
       lastBoard = m;
-      const key = [m.mode, m.tab, m.season].join("|");
+      const key = [m.mode, m.tab, m.season, m.team && m.team.phase].join("|");
       if (key !== boardList.key) { boardList.key = key; boardList.scroll = 0; }
       for (const en of (m.entries || []).slice(0, 3)) {
         const u = en.face && en.face.url;
@@ -439,12 +439,85 @@
       });
       ctx.strokeStyle = "#c9ccd2"; ctx.lineWidth = 3; wobbleLine(ctx, 60, 300, W - 60, 302, 5);
       if (m.mode === "team") {
-        ctx.fillStyle = ink; ctx.font = `58px ${FONT_MARKER}`; ctx.fillText("Bientôt", W / 2, 620);
-        ctx.fillStyle = blue; ctx.font = `36px ${FONT_MARKER}`; ctx.fillText("le classement du championnat", W / 2, 690); ctx.fillText("arrive ici", W / 2, 738);
-        // a tactics doodle
-        ctx.strokeStyle = blue; ctx.lineWidth = 4;
-        [[300, 900], [500, 860], [720, 920], [420, 1040], [620, 1060]].forEach(([x, y], k) => { ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.stroke(); if (k) { ctx.save(); ctx.setLineDash([12, 10]); wobbleLine(ctx, x - 30, y + 10, 300 + 20, 900 + 20, k); ctx.restore(); } });
-        ctx.strokeStyle = red; [[380, 960], [560, 960]].forEach(([x, y]) => { ctx.beginPath(); ctx.moveTo(x - 18, y - 18); ctx.lineTo(x + 18, y + 18); ctx.moveTo(x + 18, y - 18); ctx.lineTo(x - 18, y + 18); ctx.stroke(); });
+        const T = m.team || {};
+        const tables = T.tables || [];
+        if (!tables.length) {
+          ctx.fillStyle = ink; ctx.font = `56px ${FONT_MARKER}`; ctx.fillText(T.emptyTitle || "Pas encore de classement", W / 2, 620);
+          ctx.fillStyle = blue; ctx.font = `36px ${FONT_MARKER}`; (T.emptyText || []).forEach((l, k) => ctx.fillText(l, W / 2, 690 + k * 48));
+        } else {
+          // phases, like the categories of the individual rankings
+          ctx.font = `46px ${FONT_MARKER}`;
+          const gap = 60, total = tables.reduce((a2, t) => a2 + ctx.measureText(t.label).width, 0) + gap * (tables.length - 1);
+          let x = (W - total) / 2;
+          const cur = tables.find((t) => t.key === T.phase) || tables[tables.length - 1];
+          tables.forEach((t, k) => {
+            const on = t === cur, y = 385, w = ctx.measureText(t.label).width;
+            ctx.fillStyle = on ? blue : "#8a909a"; ctx.textAlign = "left"; ctx.fillText(t.label, x, y);
+            if (on) { ctx.strokeStyle = blue; ctx.lineWidth = 5; wobbleLine(ctx, x - 4, y + 14, x + w + 4, y + 12, k + 1); }
+            regions.push({ id: "phase:" + t.key, x: x - gap / 2, y: y - 60, w: w + gap, h: 95 });
+            x += w + gap;
+          });
+          ctx.textAlign = "center"; ctx.fillStyle = "#8a909a"; ctx.font = `30px ${FONT_MARKER}`; ctx.fillText(cur.poule || "", W / 2, 432);
+          // columns
+          const cols = [["J", 556], ["V", 606], ["N", 656], ["D", 706], ["BP", 780], ["BC", 852], ["DIFF", 972]];
+          const hy = 488; ctx.fillStyle = "#6a707a"; ctx.font = `30px ${FONT_MARKER}`;
+          ctx.textAlign = "left"; ctx.fillText("ÉQUIPE", 175, hy);
+          ctx.textAlign = "right"; cols.forEach(([l, cx]) => ctx.fillText(l, cx, hy));
+          ctx.strokeStyle = "#c9ccd2"; ctx.lineWidth = 3; wobbleLine(ctx, 50, hy + 14, W - 40, hy + 16, 9);
+          const listTop = hy + 22, listBottom = H - 18, rowH = 76, matchH = 62;
+          const rows = cur.rows || [], open = T.selected, against = T.against || [];
+          const contentH = rows.length * rowH + (open ? Math.max(1, against.length) * matchH + 24 : 0) + 20;
+          boardList.top = listTop; boardList.bottom = listBottom;
+          boardList.max = Math.max(0, contentH - (listBottom - listTop));
+          boardList.scroll = Math.min(boardList.max, Math.max(0, boardList.scroll));
+          ctx.save(); ctx.beginPath(); ctx.rect(0, listTop, W, listBottom - listTop); ctx.clip();
+          let y = listTop - boardList.scroll;
+          const visible = (y0, h) => y0 + h > listTop - 10 && y0 < listBottom + 10;
+          rows.forEach((r) => {
+            const mid = y + rowH / 2;
+            if (visible(y, rowH)) {
+              if (r.us) { ctx.fillStyle = "rgba(255,228,92,0.55)"; roundRect(ctx, 44, y + 6, W - 80, rowH - 12, 14); ctx.fill(); }
+              if (open === r.name) { ctx.strokeStyle = blue; ctx.lineWidth = 4; roundRect(ctx, 44, y + 6, W - 80, rowH - 12, 14); ctx.stroke(); }
+              ctx.textAlign = "right"; ctx.fillStyle = "#6a707a"; ctx.font = `36px ${FONT_MARKER}`; ctx.fillText(String(r.rank), 98, mid + 13);
+              // badge: our crest colour for us, a colour of its own for the others
+              const b = r.badge || { initials: "?", hue: 0 };
+              ctx.fillStyle = r.us ? (opts.accent || "#2f8f5b") : `hsl(${b.hue}, 55%, 42%)`; ctx.beginPath(); ctx.arc(138, mid, 27, 0, Math.PI * 2); ctx.fill();
+              ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 2; ctx.stroke();
+              ctx.fillStyle = "#fff"; ctx.textAlign = "center"; fitFont(ctx, b.initials, FONT_UI, 24, 46); ctx.fillText(b.initials, 138, mid + 8);
+              ctx.textAlign = "left"; ctx.fillStyle = ink; fitFont(ctx, r.label || r.name, FONT_MARKER, 36, 340); ctx.fillText(r.label || r.name, 180, mid + 12);
+              ctx.textAlign = "right"; ctx.font = `36px ${FONT_MARKER}`;
+              [[r.played, 556], [r.w, 606], [r.d, 656], [r.l, 706], [r.bp, 780], [r.bc, 852]].forEach(([v, cx]) => { ctx.fillStyle = ink; ctx.fillText(v == null ? "–" : String(v), cx, mid + 12); });
+              ctx.fillStyle = r.diff > 0 ? "#2f8f5b" : r.diff < 0 ? red : ink; ctx.fillText((r.diff > 0 ? "+" : "") + r.diff, 972, mid + 12);
+              if (!r.us && y >= listTop - 20 && y + rowH <= listBottom + 20) regions.push({ id: "team:" + r.name, x: 40, y, w: W - 80, h: rowH });
+            }
+            y += rowH;
+            if (open === r.name) {
+              // our matches against them, right under their line
+              const list = against.length ? against : [null];
+              list.forEach((g) => {
+                const mm = y + matchH / 2;
+                if (visible(y, matchH)) {
+                  ctx.textAlign = "left"; ctx.fillStyle = blue; ctx.font = `32px ${FONT_MARKER}`;
+                  if (!g) ctx.fillText("Pas de match contre eux en championnat", 120, mm + 10);
+                  else {
+                    ctx.fillText(g.label, 120, mm + 10);
+                    const tone = { V: "#2f8f5b", N: "#9a8a2a", D: "#c0262d" }[g.result] || "#8a909a";
+                    ctx.fillStyle = tone; roundRect(ctx, W - 250, mm - 24, 170, 48, 12); ctx.fill();
+                    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `34px ${FONT_UI}`; ctx.fillText(g.score, W - 165, mm + 12);
+                    if (y >= listTop - 10 && y + matchH <= listBottom + 10) regions.push({ id: "match:" + g.id, x: 80, y, w: W - 140, h: matchH });
+                  }
+                }
+                y += matchH;
+              });
+              y += 24;
+            }
+          });
+          ctx.restore();
+          const fade = (y0, up) => { const gr = ctx.createLinearGradient(0, y0, 0, y0 + (up ? 60 : -60)); gr.addColorStop(0, "rgba(242,243,240,1)"); gr.addColorStop(1, "rgba(242,243,240,0)"); ctx.fillStyle = gr; ctx.fillRect(40, up ? y0 : y0 - 60, W - 80, 60); };
+          if (boardList.scroll > 2) fade(listTop, true);
+          if (boardList.scroll < boardList.max - 2) { fade(listBottom, false); ctx.fillStyle = "#8a909a"; ctx.beginPath(); ctx.moveTo(W - 70, listBottom - 30); ctx.lineTo(W - 46, listBottom - 30); ctx.lineTo(W - 58, listBottom - 14); ctx.closePath(); ctx.fill(); }
+          ctx.textAlign = "center";
+        }
       } else {
         // categories, as big as the board allows
         const tabs = m.tabs || [];

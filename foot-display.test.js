@@ -163,3 +163,33 @@ test("playerMatchRows: his finished matches, newest first, with his goals, assis
   assert.equal(rows[0].score, "? - ?");
   assert.equal(rows[0].result, null);
 });
+
+test("teamKey: one key whatever the spelling", () => {
+  assert.equal(D.teamKey("FC Dunières"), D.teamKey("FC DUNIERES"));
+  assert.equal(D.teamKey("FC Arsenul"), D.teamKey("ARSENUL FC"));
+  assert.equal(D.teamKey("Shouf Team (forfait)"), D.teamKey("SHOUF TEAM"));
+  assert.equal(D.teamKey("Clos Pascal"), D.teamKey("FC CLOS PASCAL"));
+  assert.equal(D.teamKey("JBV"), D.teamKey("JVB"));
+  assert.notEqual(D.teamKey("ABH 1"), D.teamKey("ABH 2"));
+});
+
+test("leagueTables: ranked on goal difference, our line flagged; matchesAgainst finds both legs", () => {
+  const t = D.leagueTables("2025-2026");
+  assert.deepEqual(t.map((p) => p.key), ["p1", "p2"]);
+  const p2 = t[1].rows;
+  assert.equal(p2[0].name, "FC CARIBOU");
+  assert.deepEqual(p2.find((r) => r.us), { name: "BIERE LEVERCULSEC", played: 16, w: 7, d: 1, l: 8, bp: 83, bc: 81, diff: 2, us: true, rank: 5 });
+  assert.deepEqual(D.leagueTables("2026-2027"), []);
+  const ms = [
+    { id: 1, match_type: "championnat", status: "finished", match_datetime: "2026-04-09T18:00:00Z", opponent_name: "FC Caribou", venue: "domicile" },
+    { id: 2, match_type: "championnat", status: "finished", match_datetime: "2026-02-05T18:30:00Z", opponent_name: "FC Caribou", venue: "exterieur" },
+    { id: 3, match_type: "amical", status: "finished", match_datetime: "2026-03-01T18:30:00Z", opponent_name: "FC Caribou" },
+  ];
+  const vs = D.matchesAgainst(ms, "2025-2026", "FC CARIBOU", () => ({ bl: 1, opponent: 5 }), () => "2025-2026");
+  assert.deepEqual(vs.map((m) => [m.id, m.score, m.result]), [[2, "1 - 5", "D"], [1, "1 - 5", "D"]]);
+  assert.deepEqual(D.matchesAgainst([...ms, { id: 4, match_type: "championnat", status: "finished", match_datetime: "2025-11-27T18:30:00Z", opponent_name: "FC Caribou" }], "2025-2026", "FC CARIBOU", () => ({ bl: 6, opponent: 1 }), () => "2025-2026", "p1").map((m) => m.id), [4]);
+  assert.deepEqual(D.teamBadge("FC DUNIERES").initials, "DUN");
+  assert.deepEqual(D.teamBadge("ATHLETIC CLUB SAINTE").initials, "ACS");
+  assert.deepEqual(D.teamBadge("ABH 2").initials, "ABH2");
+  assert.deepEqual(D.teamBadge("LES PANTHERES").initials, "PAN");
+});

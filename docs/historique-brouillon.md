@@ -199,7 +199,7 @@ Dans le code : `FOOT_SEASON_SQUADS` (foot-logic.js).
 - 24-25 (domicile seul) : `assets/vestiaire/h2425` — maillot blanc, col vert, écusson ; flocages découpés dans les PDF d'impression (Drive Leverculsec/24-25/lettre et NUMERO). Numéros d'après les compos Instagram : Flo 3, Quentin 7, Thisma 8, Simon 9, Samuel 10, Nils 13, Louis 14, Nolan 2, Juju 4, Thomas 25, Max 27, Timo 51, Léandre 21, Marlon 1 (MARLON recomposé avec la police Evolventa des PDF).
 - 25-26 domicile : `h2526` — motif bière de « jersey front/back.ai », manches et col blancs, flocage blanc Bebas + America Club.
 - 25-26 extérieur : `a2526` — maquette « mockup.ai » (noir et or), flocage or.
-- Noms et numéros 25-26 : feuille « Bière Leverculsec Away Jersey » + effectif. Hypothèses : KANT 7 = Quentin H, ILIAN 15 (la feuille dit « L'ARABE - 15 »), FLO 3, Romain sans numéro.
+- Noms et numéros 25-26 : feuille « Bière Leverculsec Away Jersey » + effectif. Confirmé : KANT 7 = Quentin H, ILIAN 15, FLO 17, ROMAIN 00.
 - Script : `build-old-kits.js` (scratch).
 
 ## Noms → joueurs
@@ -226,3 +226,11 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - Les anciens apparaissent dans les stats et les classements des saisons où ils ont joué (pas sur le portant du vestiaire).
 - Amicaux de juin 2026 : foot_matches 121 et 122.
 - Hommes du match 2024-25 : la meilleure note de chaque match noté (ex æquo compris), enregistrée comme un vote dans `foot_motm_votes` (21 matchs, 24 votes). Pas d'homme du match pour les matchs sans notes (EAG amical, Genilac retour, AS Links et Kiss Cool retour).
+
+## Classements FSGT (tableau Équipe du Classement)
+- 24-25 phase 1 (brassage) : image Instagram « classement poule de brassage » (BP, BC, points seulement).
+- 24-25 phase 2 (Seniors D) et 25-26 phase 2 (Seniors D) : PDF FSGT Clas.-jeudi-1 et DEF.JEUDI, V/N/D recalculés des scores (totaux identiques aux PDF).
+- 25-26 phase 1 : image Instagram « Classement phase 1 ».
+- La FSGT classe à la différence de buts (colonne pts = BP − BC).
+- 26-27 : poules pas encore publiées sur fsgt42.com (7 octobre 2026).
+- Dans le code : `FOOT_STANDINGS` (foot-display.js). JBV dans nos matchs = JVB à la FSGT.

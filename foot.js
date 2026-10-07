@@ -3169,12 +3169,14 @@ function FootRatingsAdminPanel({
   const [scores, setScores] = React.useState({});
   const [finals, setFinals] = React.useState({});
   const [resets, setResets] = React.useState([]);
+  const [unrated, setUnrated] = React.useState([]);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const clear = () => {
     setScores({});
     setFinals({});
     setResets([]);
+    setUnrated([]);
   };
   React.useEffect(() => {
     setScores({});
@@ -3182,6 +3184,7 @@ function FootRatingsAdminPanel({
   React.useEffect(() => {
     setFinals({});
     setResets([]);
+    setUnrated([]);
   }, [open]);
   if (!open) return /*#__PURE__*/React.createElement(FBtn, {
     variant: "secondary",
@@ -3231,7 +3234,7 @@ function FootRatingsAdminPanel({
   async function saveFinals() {
     let next;
     try {
-      next = mergeFinalNotes(match.rating_overrides, finals, resets);
+      next = mergeFinalNotes(match.rating_overrides, finals, resets, unrated);
     } catch (e) {
       setMsg({
         t: "error",
@@ -3239,10 +3242,10 @@ function FootRatingsAdminPanel({
       });
       return;
     }
-    if (!Object.values(finals).some(v => String(v || "").trim() !== "") && !resets.length) {
+    if (!Object.values(finals).some(v => String(v || "").trim() !== "") && !resets.length && !unrated.length) {
       setMsg({
         t: "error",
-        m: "Écris au moins une note finale (ou remets un joueur en auto)."
+        m: "Écris au moins une note finale (ou choisis « auto » ou « non noté »)."
       });
       return;
     }
@@ -3258,6 +3261,7 @@ function FootRatingsAdminPanel({
       await reload();
       setFinals({});
       setResets([]);
+      setUnrated([]);
       setMsg({
         t: "success",
         m: "Notes finales enregistrées et validées ✓"
@@ -3354,7 +3358,7 @@ function FootRatingsAdminPanel({
       marginBottom: 6,
       lineHeight: 1.4
     }
-  }, "\xC9cris la note (ex : 6.1) ou remets \xAB auto \xBB (moyenne des votes). Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
+  }, "\xC9cris la note (ex : 6.1), remets \xAB auto \xBB (moyenne des votes) ou choisis \xAB non not\xE9 \xBB (pas de note pour ce match). Enregistrer valide les notes : plus personne ne peut voter et tout le monde les voit."), sheetIds.map(id => /*#__PURE__*/React.createElement("div", {
     key: id,
     style: {
       display: "flex",
@@ -3372,6 +3376,7 @@ function FootRatingsAdminPanel({
     disabled: busy,
     onClick: () => {
       setResets(resets.includes(id) ? resets.filter(x => x !== id) : [...resets, id]);
+      setUnrated(unrated.filter(x => x !== id));
       setFinals({
         ...finals,
         [id]: ""
@@ -3388,12 +3393,34 @@ function FootRatingsAdminPanel({
       fontSize: 12,
       cursor: "pointer"
     }
-  }, "Auto"), /*#__PURE__*/React.createElement("input", {
+  }, "Auto"), /*#__PURE__*/React.createElement("button", {
+    disabled: busy,
+    onClick: () => {
+      setUnrated(unrated.includes(id) ? unrated.filter(x => x !== id) : [...unrated, id]);
+      setResets(resets.filter(x => x !== id));
+      setFinals({
+        ...finals,
+        [id]: ""
+      });
+    },
+    "aria-pressed": unrated.includes(id),
+    style: {
+      border: `1.5px solid ${unrated.includes(id) ? FC.bad : FC.line}`,
+      background: unrated.includes(id) ? FC.badSoft : "transparent",
+      color: unrated.includes(id) ? FC.bad : FC.muted,
+      borderRadius: 12,
+      padding: "6px 9px",
+      fontFamily: FF.ui,
+      fontSize: 12,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, "Non not\xE9"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     inputMode: "decimal",
     placeholder: "Inchang\xE9e",
     value: finals[id] ?? "",
-    disabled: busy || resets.includes(id),
+    disabled: busy || resets.includes(id) || unrated.includes(id),
     onChange: e => setFinals({
       ...finals,
       [id]: e.target.value
@@ -7175,6 +7202,8 @@ function FootRoomScreen({
   const setBoardSeason = v => {
     setBoardSeasonState(v);
     writePref("foot_room_board_season", v);
+    setBoardPhase(null);
+    setBoardTeam(null);
   };
   const [boardType, setBoardTypeState] = React.useState(() => readPref("foot_room_board_type", "all", ["all", "championnat", "amical"]));
   const setBoardType = v => {
@@ -7182,6 +7211,8 @@ function FootRoomScreen({
     writePref("foot_room_board_type", v);
   };
   const [rackSeason, setRackSeason] = React.useState(season);
+  const [boardPhase, setBoardPhase] = React.useState(null); // league table shown (Équipe): phase key, latest by default
+  const [boardTeam, setBoardTeam] = React.useState(null); // the team whose matches against us are unfolded
   const [rackAway, setRackAway] = React.useState(false); // home or away kit of the season (when it had two)
   const [rackView, setRackView] = React.useState("stats"); // "stats" | "evo" (season-by-season charts)
   const {
@@ -7260,7 +7291,10 @@ function FootRoomScreen({
     } else if (kind === "tab") {
       setBoardTabState(rest);
       writePref("foot_rank_tab", rest);
-    } else if (kind === "player") {
+    } else if (kind === "phase") {
+      setBoardPhase(rest);
+      setBoardTeam(null);
+    } else if (kind === "team") setBoardTeam(t => t === rest ? null : rest);else if (kind === "player") {
       // profiles live in the vestiaire: open the one of the season the board shows
       const id = Number(rest);
       const has = s => (s === season ? rackSquad(roster, footNameOf) : seasonRack(FOOT_SEASON_SQUADS[s] || [], roster, footNameOf)).some(p => p.id === id);
@@ -7346,7 +7380,42 @@ function FootRoomScreen({
       value: boardTab === "rating" ? e.value.toFixed(1) : formatStatValue(e.value, boardTab, "abs"),
       face: faceFor(e.playerId)
     }));
-    const label = (boardSeason === "all" ? "Toutes les saisons" : `Saison ${shortSeason(boardSeason)}`) + (boardType === "championnat" ? " · Championnat" : boardType === "amical" ? " · Amicaux" : "");
+    const team = boardMode === "team";
+    const label = team ? boardSeason === "all" ? "Toutes les saisons" : `Saison ${shortSeason(boardSeason)} · Championnat` : (boardSeason === "all" ? "Toutes les saisons" : `Saison ${shortSeason(boardSeason)}`) + (boardType === "championnat" ? " · Championnat" : boardType === "amical" ? " · Amicaux" : "");
+    // Équipe: the FSGT table of our poule, phase by phase, and our matches against the team tapped
+    let teamData = null;
+    if (team) {
+      const tables = boardSeason === "all" ? [] : leagueTables(boardSeason);
+      const cur = tables.find(t => t.key === boardPhase) || tables[tables.length - 1];
+      const ours = Object.fromEntries(matches.map(m => [teamKey(m.opponent_name), m.opponent_name.replace(/\s*\(.*?\)/, "")]));
+      const pretty = n => ours[teamKey(n)] || n.split(" ").map(w => /\d|^(FC|AS|US|AL|ES|ABH|PSV|TRV|JVB|APC|ESMC|SC)$/.test(w) ? w : w[0] + w.slice(1).toLowerCase()).join(" ");
+      const dateOf = iso => new Date(iso).toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        timeZone: "Europe/Paris"
+      });
+      teamData = {
+        phase: cur && cur.key,
+        tables: tables.map(t => ({
+          ...t,
+          rows: t.rows.map(r => ({
+            ...r,
+            label: r.us ? "Bière Leverculsec" : pretty(r.name),
+            badge: teamBadge(r.name)
+          }))
+        })),
+        selected: boardTeam,
+        against: boardTeam ? matchesAgainst(matches, boardSeason, boardTeam, m => scoreById[m.id] || {
+          bl: 0,
+          opponent: 0
+        }, seasonOf, cur && cur.key).map((g, k, all) => ({
+          ...g,
+          label: `${all.length === 2 ? k ? "Retour" : "Aller" : `Match ${k + 1}`} · ${dateOf(g.date)} · ${g.venue === "exterieur" ? "Ext." : "Dom."}`
+        })) : [],
+        emptyTitle: boardSeason === "all" ? "Choisis une saison" : "Pas encore de classement",
+        emptyText: boardSeason === "all" ? ["le classement est celui", "de notre poule FSGT"] : [`les poules ${shortSeason(boardSeason)} de la FSGT`, "ne sont pas encore publiées"]
+      };
+    }
     room.current.setBoard({
       mode: boardMode,
       tab: boardTab,
@@ -7358,9 +7427,10 @@ function FootRoomScreen({
         label
       })),
       season: label,
-      entries
+      entries,
+      team: teamData
     });
-  }, [rows, boardMode, boardTab, boardSeason, boardType, state, photos, framings, theme]);
+  }, [rows, boardMode, boardTab, boardSeason, boardType, boardPhase, boardTeam, matches, scoreById, state, photos, framings, theme]);
   React.useEffect(() => {
     if (!room.current) return;
     const venue = m => m.venue === "exterieur" ? "Extérieur" : "Domicile";
@@ -7551,7 +7621,7 @@ function FootRoomScreen({
     value: boardSeason,
     onChange: setBoardSeason,
     options: [...seasons.map(s => [s, `Saison ${shortSeason(s)}`]), ["all", "Toutes les saisons"]]
-  }), /*#__PURE__*/React.createElement(FootRoomPicker, {
+  }), boardMode !== "team" && /*#__PURE__*/React.createElement(FootRoomPicker, {
     label: "Matchs",
     value: boardType,
     onChange: setBoardType,

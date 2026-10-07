@@ -590,3 +590,12 @@ test("formatEventMinute shows added-time goals as 45+n'", () => {
   assert.equal(formatEventMinute(47, 45), "45+3'");
   assert.equal(formatEventMinute(50, null), "50'");
 });
+
+test("a final note can be « non noté »: the player gets no mark for the match", () => {
+  const L = require("./foot-logic.js");
+  const ratings = [{ rater_id: 2, ratee_id: 1, score: 6 }, { rater_id: 1, ratee_id: 2, score: 8 }];
+  const match = { rating_overrides: L.mergeFinalNotes({ 2: 7.5 }, {}, [], [1]) };
+  assert.deepEqual(match.rating_overrides, { 1: "nn", 2: 7.5 });
+  assert.deepEqual(L.finalAverages(match, [1, 2], ratings), { 2: 7.5 });
+  assert.deepEqual(L.mergeFinalNotes(match.rating_overrides, {}, [1]), { 2: 7.5 }); // back to automatic
+});

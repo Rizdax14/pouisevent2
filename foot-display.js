@@ -119,6 +119,81 @@ function playerMatchRows({ matches, lineups, events, ratingByMatch, motmByMatch,
     });
 }
 
+// ---- the league tables (FSGT Loire, foot à 7 du jeudi) ----
+// Our poule each phase, from the FSGT tables: [team, played, won, drawn, lost, goals for, goals against]
+// (24-25 phase 1 only has the goals). The FSGT ranks on goal difference: "pts" = for − against.
+const FOOT_STANDINGS = {"2024-2025": [{"key": "p1", "label": "Phase 1", "poule": "Poule de brassage", "teams": [
+      ["FC DUNIERES", null, null, null, null, 49, 12],
+      ["AL RICAMARIE", null, null, null, null, 37, 11],
+      ["CREDIT AGRICOLE", null, null, null, null, 36, 21],
+      ["CELDA", null, null, null, null, 24, 19],
+      ["INTER MITEMPS", null, null, null, null, 33, 29],
+      ["BIERE LEVERCULSEC", null, null, null, null, 24, 21],
+      ["CITY STADE TEAM", null, null, null, null, 19, 42],
+      ["JVB", null, null, null, null, 11, 43],
+      ["FC CLOS PASCAL", null, null, null, null, 10, 45]]}, {"key": "p2", "label": "Phase 2", "poule": "Seniors D", "teams": [
+      ["ABH 2", 16, 14, 0, 2, 96, 48],
+      ["LES PANTHERES", 16, 12, 0, 4, 104, 57],
+      ["FC KISS COOL", 16, 9, 1, 6, 67, 50],
+      ["AS LINKS", 16, 10, 1, 5, 77, 63],
+      ["FC CARIBOU", 16, 9, 1, 6, 90, 77],
+      ["FC COIFFEURS", 16, 4, 1, 11, 75, 91],
+      ["BIERE LEVERCULSEC", 15, 4, 2, 9, 59, 75],
+      ["FC GENILAC 1", 15, 6, 0, 9, 40, 65],
+      ["TOTTENAAM HOTWINGS", 16, 0, 0, 16, 30, 112]]}], "2025-2026": [{"key": "p1", "label": "Phase 1", "poule": "Poule de brassage", "teams": [
+      ["ABH 1", 9, 8, 0, 1, 74, 40],
+      ["BELLEGARDE SPORT", 9, 6, 2, 1, 54, 27],
+      ["BASSET ATHLETIC 1", 8, 5, 2, 1, 42, 29],
+      ["FC PASTEQUE 2", 9, 5, 0, 4, 48, 39],
+      ["BIERE LEVERCULSEC", 9, 3, 1, 5, 54, 50],
+      ["ATHLETIC CLUB SAINTE", 9, 5, 0, 4, 40, 37],
+      ["VERALLIA", 8, 4, 0, 4, 48, 53],
+      ["LA DETENTE", 9, 3, 0, 6, 34, 43],
+      ["FC FIFOU", 9, 1, 0, 8, 22, 58],
+      ["FC LOIRE ASCENSEURS", 9, 1, 0, 8, 21, 61]]}, {"key": "p2", "label": "Phase 2", "poule": "Seniors D", "teams": [
+      ["FC CARIBOU", 16, 11, 2, 3, 83, 50],
+      ["ATHLETIC CLUB SAINTE", 16, 11, 2, 3, 92, 60],
+      ["PSV HEINEKEN", 16, 8, 3, 5, 81, 71],
+      ["FC DUNIERES", 16, 7, 2, 7, 91, 82],
+      ["BIERE LEVERCULSEC", 16, 7, 1, 8, 83, 81],
+      ["COPAINS CHOPINES", 16, 5, 4, 7, 63, 66],
+      ["AS TRV", 16, 4, 2, 10, 51, 75],
+      ["SHOUF TEAM", 16, 5, 3, 8, 48, 74],
+      ["FC ARSENUL", 16, 4, 1, 11, 61, 94]]}]};
+const FOOT_US = "BIERE LEVERCULSEC";
+// "FC Dunières", "DUNIERES FC", "Shouf Team (forfait)" → one key; the FSGT and our sheets don't always spell a team the same way
+const TEAM_ALIASES = { jbv: "jvb" };
+function teamKey(name) {
+  const k = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\(.*?\)/g, " ")
+    .split(/[^a-z0-9]+/).filter((w) => w && w !== "fc" && w !== "as").sort().join(" ");
+  return TEAM_ALIASES[k] || k;
+}
+// A season's tables, ranked: goal difference, then goals scored. [] when the FSGT hasn't published them.
+function leagueTables(season) {
+  return (FOOT_STANDINGS[season] || []).map((ph) => ({
+    key: ph.key, label: ph.label, poule: ph.poule,
+    rows: ph.teams.map(([name, played, w, d, l, bp, bc]) => ({ name, played, w, d, l, bp, bc, diff: bp - bc, us: teamKey(name) === teamKey(FOOT_US) }))
+      .sort((a, b) => b.diff - a.diff || b.bp - a.bp).map((r, i) => ({ ...r, rank: i + 1 })),
+  }));
+}
+// Our league matches of the season against a team, oldest first, with the score and its result.
+// phase "p1" = autumn (brassage, until December), "p2" = from January; none = the whole season.
+function matchesAgainst(matches, season, team, scoreOf, seasonOfFn, phase) {
+  const key = teamKey(team);
+  const inPhase = (iso) => !phase || (phase === "p1") === (_parisParts(new Date(iso)).m >= 8);
+  return matches.filter((m) => m.match_type === "championnat" && m.status === "finished" && seasonOfFn(m.match_datetime) === season && teamKey(m.opponent_name) === key && inPhase(m.match_datetime))
+    .sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))
+    .map((m) => { const sc = scoreOf(m); return { id: m.id, date: m.match_datetime, venue: m.venue, score: `${sc.bl} - ${sc.opponent}`, result: footOutcome(sc) }; });
+}
+// A small badge for a team without a logo: up to 3 initials on a colour of its own.
+function teamBadge(name) {
+  const words = String(name || "").replace(/\(.*?\)/g, "").split(/\s+/).filter((w) => w && !/^(FC|AS|US|AL|ES|SC|LA|LE|LES|DE|DU)$/i.test(w));
+  // a short word (ABH, PSV, 2) is kept whole, a long one gives its first letter
+  const initials = (words.length === 1 ? words[0].slice(0, 3) : words.map((w) => (w.length <= 3 ? w : w[0])).join("").slice(0, 4)).toUpperCase();
+  let h = 0; for (const c of teamKey(name)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return { initials, hue: h };
+}
+
 // The match being played (if any) then the scheduled ones, soonest first.
 function upcomingMatches(matches, limit = 4) {
   const live = matches.filter((m) => m.status === "live");
@@ -194,4 +269,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { playerMatchRows, FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { FOOT_STANDINGS, teamKey, leagueTables, matchesAgainst, teamBadge, playerMatchRows, FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

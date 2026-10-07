@@ -266,10 +266,15 @@ function matchAverages(sheetIds, matchRatings) {
 }
 
 // Average per player, with the final notes an admin may have set by hand on the match (rating_overrides: {playerId: score}).
+// A final note can also be "non noté": the player was on the sheet but gets no mark (left out of every average).
+const FOOT_UNRATED = "nn";
 function finalAverages(match, sheetIds, matchRatings) {
   const out = matchAverages(sheetIds, matchRatings);
   const over = (match && match.rating_overrides) || {};
-  for (const id of sheetIds) if (over[id] != null && over[id] !== "") out[id] = Number(over[id]);
+  for (const id of sheetIds) {
+    if (over[id] === FOOT_UNRATED) delete out[id]; // "non noté": no mark at all for this match
+    else if (over[id] != null && over[id] !== "") out[id] = Number(over[id]);
+  }
   return out;
 }
 
@@ -283,11 +288,12 @@ function parseFinalNote(raw) {
 }
 
 // Final notes are write-only for admins: what they type is merged over the notes already set (which they never see);
-// an id in `resetIds` goes back to the automatic average.
-function mergeFinalNotes(existing, typed, resetIds) {
+// an id in `resetIds` goes back to the automatic average, one in `unratedIds` becomes "non noté".
+function mergeFinalNotes(existing, typed, resetIds, unratedIds) {
   const out = { ...(existing || {}) };
   for (const [id, raw] of Object.entries(typed || {})) { const n = parseFinalNote(raw); if (n != null) out[id] = n; }
   for (const id of resetIds || []) delete out[id];
+  for (const id of unratedIds || []) out[id] = FOOT_UNRATED;
   return out;
 }
 
@@ -432,6 +438,7 @@ if (typeof module !== "undefined" && module.exports) {
     ratingProgress,
     matchAverages,
     finalAverages,
+    FOOT_UNRATED,
     parseFinalNote,
     mergeFinalNotes,
     playerRatingSeries,
