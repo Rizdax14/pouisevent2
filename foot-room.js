@@ -91,6 +91,14 @@
     deskTop.position.set(DX, 2.8, DZ + 1.6); deskTop.target.position.set(DX, DY, DZ + 0.15); gDesk.add(deskTop, deskTop.target);
 
     // ---------- room ----------
+    let aoTex = null;
+    function aoBand() { // black → transparent, from the bottom edge up
+      if (aoTex) return aoTex;
+      const c = canvas2d(4, 128), ctx = c.getContext("2d"), g = ctx.createLinearGradient(0, 128, 0, 0);
+      g.addColorStop(0, "rgba(0,0,0,0.55)"); g.addColorStop(0.35, "rgba(0,0,0,0.18)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 4, 128);
+      return (aoTex = finish(c, false));
+    }
     function woodTexture(hue = 20, light = 11) {
       const c = canvas2d(1024, 512), ctx = c.getContext("2d");
       let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -108,9 +116,16 @@
     }
     const wood = woodTexture(); wood.repeat.set(6, 1);
     const WALL_W = 2 * Math.sqrt(3) * (R + 0.75); // the three walls close an equilateral triangle around the centre
+    const wallMat = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.85 });
+    const wallGeo = new THREE.PlaneGeometry(WALL_W, 5);
     for (const [g, x] of [[gRack, 0], [gBoard, BX], [gDesk, DX]]) {
-      const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, 5), new THREE.MeshStandardMaterial({ map: wood, roughness: 0.85 }));
+      const wall = new THREE.Mesh(wallGeo, wallMat);
       wall.position.set(x, 0.8, -0.75); wall.receiveShadow = true; g.add(wall);
+      // where the wall meets the floor it gets darker (a soft band instead of computed ambient occlusion)
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, 0.9), new THREE.MeshBasicMaterial({ map: aoBand(), transparent: true, depthWrite: false }));
+      band.position.set(x, -0.35, -0.745); g.add(band);
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, 1.1), new THREE.MeshBasicMaterial({ map: aoBand(), transparent: true, depthWrite: false }));
+      strip.rotation.x = -Math.PI / 2; strip.position.set(x, -0.797, -0.2); strip.rotation.z = Math.PI; g.add(strip);
     }
     const floorMat = new THREE.MeshStandardMaterial({ map: (() => {
       const c = canvas2d(512, 512), ctx = c.getContext("2d");
@@ -128,6 +143,35 @@
     const steel = new THREE.MeshStandardMaterial({ color: "#cfc8cc", metalness: 0.9, roughness: 0.28, envMap });
     const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 8.2, 16), steel); rail.rotation.z = Math.PI / 2; rail.position.y = RAIL_Y;
     scene.add(floor); gRack.add(shelf, bench, rail);
+
+    // Photographic materials (Poly Haven, CC0) replace the drawn ones once downloaded: nothing waits for them.
+    const ROOM = "/assets/room/", SUF = low ? "-sm.jpg?v=1" : ".jpg?v=1";
+    const texLoader = new THREE.TextureLoader();
+    const loadTex = (name, srgb, rx, ry) => new Promise((res) => texLoader.load(ROOM + name + SUF, (t) => {
+      if (srgb) t.encoding = THREE.sRGBEncoding;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4);
+      res(t);
+    }, undefined, () => res(null)));
+    function pbr(mat, geo, base, rx, ry, extra) {
+      Promise.all([loadTex(base + "-diff", true, rx, ry), loadTex(base + "-nor", false, rx, ry), loadTex(base + "-arm", false, rx, ry)]).then(([d, n, a]) => {
+        if (!d) return;
+        if (geo && !geo.attributes.uv2) geo.setAttribute("uv2", geo.attributes.uv);
+        Object.assign(mat, { map: d, normalMap: n, roughnessMap: a, aoMap: geo ? a : null, roughness: 1, ...extra });
+        if (n) mat.normalScale.set(0.9, 0.9);
+        mat.needsUpdate = true;
+      });
+    }
+    pbr(wallMat, wallGeo, "wall", WALL_W / 2.4, 5 / 2.4, { color: new THREE.Color("#b9a99a") });
+    pbr(floorMat, floor.geometry, "floor", 7, 7, { color: new THREE.Color("#8a8a8e") });
+    // a real gym, photographed all around, for what metal, glass and varnish reflect
+    texLoader.load(ROOM + "env.jpg?v=1", (t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping; t.encoding = THREE.sRGBEncoding;
+      const pm = new THREE.PMREMGenerator(renderer), env = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose();
+      scene.traverse((o) => { const m = o.material; if (m && m.envMap) { m.envMap = env; m.needsUpdate = true; } });
+      for (const m of reflective) { m.envMap = env; m.envMapIntensity = m.userData.envI || 0.6; m.needsUpdate = true; }
+      roomEnv = env;
+    });
+    let roomEnv = null; const reflective = [];
 
     // ---------- shirts ----------
     const SW = 1.0;
@@ -380,6 +424,131 @@
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshBasicMaterial({ color: "#ffe2a8" })); bulb.position.set(-0.22, 0.68, 0.31);
     lampG.add(lb, la1, la2, shade, bulb); lampG.position.set(DX + 1.0, DY + 0.015, DZ - 0.75); lampG.rotation.y = -0.5;
     gDesk.add(mug, mugIn, mugH, pen, nb, whistle, lampG);
+
+    // ---------- club things lying around ----------
+    const GREEN = "#17703a", GREEN_D = "#0f4f28", CREAM = "#f4f1e8";
+    const crestImg = loadImg("/logo-bl.png");
+    // felt pennant on a little rod, hanging from a cord on the wall
+    function pennant(bg, fg, text) {
+      const c = canvas2d(512, 768), ctx = c.getContext("2d");
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(512, 0); ctx.lineTo(256, 768); ctx.closePath(); ctx.fillStyle = bg; ctx.fill();
+      ctx.lineWidth = 22; ctx.strokeStyle = fg; ctx.beginPath(); ctx.moveTo(30, 18); ctx.lineTo(482, 18); ctx.lineTo(256, 712); ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.font = `64px ${FONT_UI}`; ctx.fillText(text[0], 256, 330); ctx.font = `46px ${FONT_UI}`; ctx.fillText(text[1], 256, 392);
+      // felt grain
+      let seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      ctx.globalCompositeOperation = "source-atop"; ctx.globalAlpha = 0.06;
+      for (let k = 0; k < 2500; k++) { ctx.fillStyle = rnd() > 0.5 ? "#000" : "#fff"; ctx.fillRect(rnd() * 512, rnd() * 768, 2, 2); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      const tex = finish(c);
+      crestImg.then((im) => { if (!im) return; const s = 210 / Math.max(im.width, im.height); ctx.drawImage(im, 256 - im.width * s / 2, 60, im.width * s, im.height * s); tex.needsUpdate = true; });
+      const g = new THREE.Group();
+      const geo = new THREE.PlaneGeometry(0.34, 0.51, 6, 10);
+      const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, 0.012 * Math.sin(p.getY(i) * 9 + p.getX(i) * 4)); geo.computeVertexNormals();
+      const flag = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.4, roughness: 0.95, side: THREE.DoubleSide }));
+      flag.position.y = -0.27; flag.castShadow = true;
+      const rodMat = new THREE.MeshStandardMaterial({ color: "#c9a24a", metalness: 0.9, roughness: 0.3, envMap }); reflective.push(rodMat);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.4, 8), rodMat); rod.rotation.z = Math.PI / 2;
+      const cordMat = new THREE.MeshStandardMaterial({ color: "#d8d0c0", roughness: 0.9 });
+      const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(-0.17, 0, 0), V3(0, 0.11, 0), V3(0.17, 0, 0)]), 16, 0.003, 5), cordMat);
+      // tassels
+      for (const sx of [-1, 1]) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.06, 8), new THREE.MeshStandardMaterial({ color: fg })); t.position.set(sx * 0.2, -0.03, 0); g.add(t); }
+      g.add(flag, rod, cord);
+      return g;
+    }
+    function V3(x, y, z) { return new THREE.Vector3(x, y, z); }
+    const pen1 = pennant(GREEN, CREAM, ["BIÈRE", "LEVERCULSEC"]); pen1.position.set(DX - 0.62, 0.92, -0.72); pen1.rotation.z = 0.05; gDesk.add(pen1);
+    const pen2 = pennant("#151515", "#c9a24a", ["SAISON", "25 · 26"]); pen2.position.set(DX + 0.62, 0.92, -0.72); pen2.rotation.z = -0.04; gDesk.add(pen2);
+    // bunting: a string of little club flags along the shelf over the rail
+    (function bunting() {
+      const n = 48, span = 6.4, g = new THREE.Group();
+      const pts = []; for (let k = 0; k <= 40; k++) { const t = k / 40, x = -span / 2 + span * t; pts.push(V3(x, RAIL_Y + 0.3 - 0.05 * Math.sin(Math.PI * ((t * 8) % 1)), -0.55)); }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.003, 4), new THREE.MeshStandardMaterial({ color: "#e8e2d4", roughness: 0.9 })));
+      const tri = new THREE.BufferGeometry(); tri.setAttribute("position", new THREE.Float32BufferAttribute([-0.045, 0, 0, 0.045, 0, 0, 0, -0.09, 0], 3)); tri.computeVertexNormals();
+      const mats = [GREEN, CREAM, "#151515"].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, side: THREE.DoubleSide }));
+      for (let k = 0; k < n; k++) { const p = curve.getPointAt((k + 0.5) / n); const f = new THREE.Mesh(tri, mats[k % 3]); f.position.copy(p); f.rotation.set(0.15, 0, (k % 2 ? 0.06 : -0.05)); g.add(f); }
+      gRack.add(g);
+    })();
+
+    // knitted club scarf, thrown over the bench and hanging off its front
+    function scarfTexture() {
+      const c = canvas2d(256, 2048), ctx = c.getContext("2d");
+      for (let y = 0; y < 2048; y += 128) { ctx.fillStyle = (y / 128) % 2 ? CREAM : GREEN; ctx.fillRect(0, y, 256, 128); }
+      ctx.fillStyle = GREEN_D; ctx.fillRect(0, 0, 256, 300); ctx.fillRect(0, 1748, 256, 300);
+      ctx.save(); ctx.translate(128, 150); ctx.fillStyle = CREAM; ctx.font = `64px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("BL", 0, 22); ctx.restore();
+      ctx.save(); ctx.translate(128, 1900); ctx.fillStyle = CREAM; ctx.font = `64px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("BL", 0, 22); ctx.restore();
+      // knit: little V stitches
+      ctx.globalAlpha = 0.18; ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
+      for (let y = 0; y < 2048; y += 10) for (let x = 0; x < 256; x += 12) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 6, y + 8); ctx.lineTo(x + 12, y); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      return finish(c);
+    }
+    (function scarf() {
+      const path = new THREE.CatmullRomCurve3([V3(0, 0.01, -0.58), V3(0.02, 0.012, -0.3), V3(0.0, 0.012, -0.12), V3(-0.01, -0.03, -0.055), V3(0.01, -0.2, -0.04), V3(0.03, -0.36, -0.03)]);
+      const N = 60, W = 0.17, pos = [], uv = [], idx = [];
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, p = path.getPointAt(t), tw = 0.02 * Math.sin(t * 9);
+        pos.push(p.x - W / 2, p.y + tw * 0.2, p.z, p.x + W / 2, p.y - tw * 0.2, p.z); uv.push(0, 1 - t, 1, 1 - t);
+        if (i < N) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: scarfTexture(), roughness: 1, side: THREE.DoubleSide }));
+      m.position.set(0.48, -0.37, 0); m.rotation.y = 0.5; m.castShadow = m.receiveShadow = true; gRack.add(m);
+      // fringe at the hanging end
+      const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.06), new THREE.MeshStandardMaterial({ map: (() => { const c = canvas2d(64, 32), x = c.getContext("2d"); for (let k = 0; k < 16; k++) { x.fillStyle = k % 2 ? CREAM : GREEN; x.fillRect(k * 4, 0, 2, 32); } return finish(c); })(), alphaTest: 0.5, transparent: true, side: THREE.DoubleSide }));
+      fr.position.set(0.48 + 0.03, -0.37 - 0.39, -0.03); fr.rotation.y = 0.5; gRack.add(fr);
+    })();
+
+    // duffel bag on the floor and a ball next to it
+    (function bag() {
+      const c = canvas2d(1024, 512), ctx = c.getContext("2d");
+      ctx.fillStyle = "#18181b"; ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillStyle = GREEN; ctx.fillRect(0, 300, 1024, 46); ctx.fillStyle = CREAM; ctx.fillRect(0, 346, 1024, 10);
+      ctx.fillStyle = CREAM; ctx.font = `70px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("BIÈRE LEVERCULSEC", 512, 250);
+      let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      ctx.globalAlpha = 0.08; for (let k = 0; k < 6000; k++) { ctx.fillStyle = rnd() > 0.5 ? "#000" : "#888"; ctx.fillRect(rnd() * 1024, rnd() * 512, 2, 2); } ctx.globalAlpha = 1;
+      const mat = new THREE.MeshStandardMaterial({ map: finish(c), roughness: 0.7 });
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.62, 32, 1), mat); body.rotation.z = Math.PI / 2; body.scale.set(1, 1, 0.85); body.castShadow = true;
+      const capMat = new THREE.MeshStandardMaterial({ color: "#121214", roughness: 0.75 });
+      for (const sx of [-1, 1]) { const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), capMat); cap.rotation.z = -sx * Math.PI / 2; cap.scale.set(1, 0.18, 0.85); cap.position.x = sx * 0.31; g.add(cap); }
+      const strapMat = new THREE.MeshStandardMaterial({ color: "#0e0e10", roughness: 0.6 });
+      for (const sx of [-0.12, 0.12]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 24, Math.PI), strapMat); h.position.set(sx, 0.13, 0); h.rotation.y = Math.PI / 2 * 0; g.add(h); }
+      g.add(body); g.position.set(-0.46, -0.38 + 0.09, -0.4); g.rotation.y = 0.3; g.scale.setScalar(0.58); gRack.add(g);
+      const ball2 = new THREE.Mesh(new THREE.SphereGeometry(0.11, 32, 24), new THREE.MeshStandardMaterial({ map: ballTexture(), roughness: 0.5 }));
+      ball2.position.set(-0.62, -0.69, 0.42); ball2.rotation.set(1.1, 0.3, 0.2); ball2.castShadow = true; gRack.add(ball2);
+    })();
+
+    // the club flag pinned on the board wall, like the one at the fence
+    (function banner() {
+      const c = canvas2d(1024, 512), ctx = c.getContext("2d");
+      ctx.fillStyle = "#f2efe6"; ctx.fillRect(0, 0, 1024, 512);
+      ctx.strokeStyle = GREEN; ctx.lineWidth = 18; ctx.strokeRect(20, 20, 984, 472);
+      ctx.fillStyle = GREEN; ctx.font = `92px ${FONT_DISPLAY}`; ctx.textAlign = "center"; ctx.fillText("Allez", 700, 210); ctx.font = `74px ${FONT_UI}`; ctx.fillText("LEVERCULSEC", 700, 320);
+      const tex = finish(c);
+      crestImg.then((im) => { if (!im) return; const s = 360 / Math.max(im.width, im.height); ctx.drawImage(im, 230 - im.width * s / 2, 256 - im.height * s / 2, im.width * s, im.height * s); tex.needsUpdate = true; });
+      const geo = new THREE.PlaneGeometry(1.4, 0.55, 20, 8), p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); p.setZ(i, 0.02 * Math.sin(x * 5) * (0.5 - y) + 0.03 * (0.37 - Math.abs(y)) * Math.cos(x * 2)); p.setY(i, y - 0.04 * Math.cos(x * 2.1) * (0.5 - y)); }
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, side: THREE.DoubleSide }));
+      m.position.set(BX, -0.15, -0.73); m.rotation.z = -0.015; m.receiveShadow = true; gBoard.add(m);
+    })();
+
+    // a cold one on the coach's desk
+    (function bottle() {
+      const glass = new THREE.MeshStandardMaterial({ color: "#5a2a08", roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.92, envMap });
+      glass.userData.envI = 1.2; reflective.push(glass);
+      const prof = [[0, 0], [0.033, 0], [0.034, 0.005], [0.034, 0.14], [0.03, 0.16], [0.014, 0.2], [0.012, 0.245], [0.014, 0.25], [0.0, 0.25]].map(([x, y]) => new THREE.Vector2(x, y));
+      const b = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), glass); b.castShadow = true;
+      const c = canvas2d(512, 128), ctx = c.getContext("2d");
+      ctx.fillStyle = GREEN; ctx.fillRect(0, 0, 512, 128); ctx.fillStyle = "#c9a24a"; ctx.fillRect(0, 10, 512, 6); ctx.fillRect(0, 112, 512, 6);
+      ctx.fillStyle = CREAM; ctx.font = `48px ${FONT_UI}`; ctx.textAlign = "center"; ctx.fillText("BIÈRE · BL · 2024", 256, 82);
+      const label = new THREE.Mesh(new THREE.CylinderGeometry(0.0345, 0.0345, 0.07, 24, 1, true), new THREE.MeshStandardMaterial({ map: finish(c), roughness: 0.6 }));
+      label.position.y = 0.07;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.012, 16), new THREE.MeshStandardMaterial({ color: "#c9a24a", metalness: 0.9, roughness: 0.3 }));
+      cap.position.y = 0.255;
+      const g = new THREE.Group(); g.add(b, label, cap); g.position.set(DX - 0.7, DY, -0.64); gDesk.add(g);
+    })();
 
     // ---------- drawing helpers ----------
     function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
