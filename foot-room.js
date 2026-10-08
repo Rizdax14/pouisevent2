@@ -498,12 +498,12 @@
                 const mm = y + matchH / 2;
                 if (visible(y, matchH)) {
                   ctx.textAlign = "left"; ctx.fillStyle = blue; ctx.font = `32px ${FONT_MARKER}`;
-                  if (!g) ctx.fillText("Pas de match contre eux en championnat", 120, mm + 10);
+                  if (!g) ctx.fillText("Pas encore de match prévu contre eux", 120, mm + 10);
                   else {
                     ctx.fillText(g.label, 120, mm + 10);
                     const tone = { V: "#2f8f5b", N: "#9a8a2a", D: "#c0262d" }[g.result] || "#8a909a";
                     ctx.fillStyle = tone; roundRect(ctx, W - 250, mm - 24, 170, 48, 12); ctx.fill();
-                    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `34px ${FONT_UI}`; ctx.fillText(g.score, W - 165, mm + 12);
+                    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `34px ${FONT_UI}`; fitFont(ctx, g.score || (g.upcoming ? "à venir" : "? - ?"), FONT_UI, 34, 150); ctx.fillText(g.score || (g.upcoming ? "à venir" : "? - ?"), W - 165, mm + 12);
                     if (y >= listTop - 10 && y + matchH <= listBottom + 10) regions.push({ id: "match:" + g.id, x: 80, y, w: W - 140, h: matchH });
                   }
                 }

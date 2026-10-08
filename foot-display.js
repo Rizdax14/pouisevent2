@@ -168,7 +168,9 @@ const FOOT_STANDINGS = {"2024-2025": [{"key": "p1", "label": "Phase 1", "poule":
       ["COPAINS CHOPINES", 16, 5, 4, 7, 63, 66],
       ["AS TRV", 16, 4, 2, 10, 51, 75],
       ["SHOUF TEAM", 16, 5, 3, 8, 48, 74],
-      ["FC ARSENUL", 16, 4, 1, 11, 61, 94]]}]};
+      ["FC ARSENUL", 16, 4, 1, 11, 61, 94]]}], "2026-2027": [{"key": "p1", "label": "Phase 1", "poule": "Poule de brassage", "teams": [
+      ["ABH 1", 0, 0, 0, 0, 0, 0], ["LUDO TEAM", 0, 0, 0, 0, 0, 0], ["PATROLD SCHOOL FC", 0, 0, 0, 0, 0, 0], ["BIERE LEVERCULSEC", 0, 0, 0, 0, 0, 0], ["SHOUF TEAM", 0, 0, 0, 0, 0, 0],
+      ["FC CAF LOIRE", 0, 0, 0, 0, 0, 0], ["FC GENILAC 5", 0, 0, 0, 0, 0, 0], ["AS LES COLLEGUES", 0, 0, 0, 0, 0, 0], ["EN AVANT GUINGUETTE", 0, 0, 0, 0, 0, 0], ["FC FIFOU", 0, 0, 0, 0, 0, 0]]}]};
 const FOOT_US = "BIERE LEVERCULSEC";
 // "FC Dunières", "DUNIERES FC", "Shouf Team (forfait)" → one key; the FSGT and our sheets don't always spell a team the same way
 const TEAM_ALIASES = { jbv: "jvb" };
@@ -190,9 +192,13 @@ function leagueTables(season) {
 function matchesAgainst(matches, season, team, scoreOf, seasonOfFn, phase) {
   const key = teamKey(team);
   const inPhase = (iso) => !phase || (phase === "p1") === (_parisParts(new Date(iso)).m >= 8);
-  return matches.filter((m) => m.match_type === "championnat" && m.status === "finished" && seasonOfFn(m.match_datetime) === season && teamKey(m.opponent_name) === key && inPhase(m.match_datetime))
+  // played ones with their score, the ones to come too (no score yet)
+  return matches.filter((m) => m.match_type === "championnat" && seasonOfFn(m.match_datetime) === season && teamKey(m.opponent_name) === key && inPhase(m.match_datetime))
     .sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))
-    .map((m) => { const sc = scoreOf(m); return { id: m.id, date: m.match_datetime, venue: m.venue, score: `${sc.bl} - ${sc.opponent}`, result: footOutcome(sc) }; });
+    .map((m) => {
+      if (m.status !== "finished" || m.score_unknown) return { id: m.id, date: m.match_datetime, venue: m.venue, score: null, result: null, upcoming: m.status !== "finished" };
+      const sc = scoreOf(m); return { id: m.id, date: m.match_datetime, venue: m.venue, score: `${sc.bl} - ${sc.opponent}`, result: footOutcome(sc) };
+    });
 }
 // A small badge for a team without a logo: up to 3 initials on a colour of its own.
 function teamBadge(name) {

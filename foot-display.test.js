@@ -179,7 +179,10 @@ test("leagueTables: ranked on goal difference, our line flagged; matchesAgainst 
   const p2 = t[1].rows;
   assert.equal(p2[0].name, "FC CARIBOU");
   assert.deepEqual(p2.find((r) => r.us), { name: "BIERE LEVERCULSEC", played: 16, w: 7, d: 1, l: 8, bp: 83, bc: 81, diff: 2, us: true, rank: 5 });
-  assert.deepEqual(D.leagueTables("2026-2027"), []);
+  assert.deepEqual(D.leagueTables("2027-2028"), []);
+  const next = D.leagueTables("2026-2027")[0];
+  assert.equal(next.rows.length, 10);
+  assert.equal(next.rows[0].name, "ABH 1"); // nothing played yet: the FSGT order is kept
   const ms = [
     { id: 1, match_type: "championnat", status: "finished", match_datetime: "2026-04-09T18:00:00Z", opponent_name: "FC Caribou", venue: "domicile" },
     { id: 2, match_type: "championnat", status: "finished", match_datetime: "2026-02-05T18:30:00Z", opponent_name: "FC Caribou", venue: "exterieur" },

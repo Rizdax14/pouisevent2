@@ -234,3 +234,4 @@ Anciens réguliers (à créer comme anciens joueurs) : Quentin H, Romain, Marlon
 - La FSGT classe à la différence de buts (colonne pts = BP − BC).
 - 26-27 : poules pas encore publiées sur fsgt42.com (7 octobre 2026).
 - Dans le code : `FOOT_STANDINGS` (foot-display.js). JBV dans nos matchs = JVB à la FSGT.
+- 26-27 phase 1 (brassage) : ABH 1, Ludo Team, Patrold School FC, Bière Leverculsec, Shouf Team, FC CAF Loire, FC Genilac 5, AS Les Collègues, En Avant Guinguette, FC Fifou (compteurs à 0 en attendant les résultats).
