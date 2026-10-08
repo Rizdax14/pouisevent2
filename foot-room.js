@@ -414,9 +414,9 @@
       ctx.fillStyle = "#f3efe6"; ctx.fillRect(0, 0, 512, 512);
       const s = 380 / Math.max(im.width, im.height); ctx.drawImage(im, 256 - im.width * s / 2, 256 - im.height * s / 2, im.width * s, im.height * s);
       const frame = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.62, 0.03), new THREE.MeshStandardMaterial({ color: "#1c1512", roughness: 0.6 }));
-      frame.position.set(DX, 0.85, -0.72);
+      frame.position.set(DX, 0.36, -0.72);
       const pic = new THREE.Mesh(new THREE.PlaneGeometry(0.54, 0.54), new THREE.MeshStandardMaterial({ map: finish(c), roughness: 0.8 }));
-      pic.position.set(DX, 0.85, -0.70);
+      pic.position.set(DX, 0.36, -0.70);
       gDesk.add(frame, pic);
     });
     // papers lie flat on the desk (top of the sheet = away from the camera)
@@ -485,8 +485,8 @@
       return g;
     }
     function V3(x, y, z) { return new THREE.Vector3(x, y, z); }
-    const pen1 = pennant(GREEN, CREAM, ["BIÈRE", "LEVERCULSEC"]); pen1.position.set(DX - 0.62, 0.92, -0.72); pen1.rotation.z = 0.05; gDesk.add(pen1);
-    const pen2 = pennant("#151515", "#c9a24a", ["SAISON", "25 · 26"]); pen2.position.set(DX + 0.62, 0.92, -0.72); pen2.rotation.z = -0.04; gDesk.add(pen2);
+    const pen1 = pennant(GREEN, CREAM, ["BIÈRE", "LEVERCULSEC"]); pen1.position.set(DX - 0.52, 0.6, -0.72); pen1.rotation.z = 0.05; gDesk.add(pen1);
+    const pen2 = pennant("#151515", "#c9a24a", ["SAISON", "25 · 26"]); pen2.position.set(DX + 0.52, 0.6, -0.72); pen2.rotation.z = -0.04; gDesk.add(pen2);
     // bunting: a string of little club flags along the shelf over the rail
     (function bunting() {
       const n = 48, span = 6.4, g = new THREE.Group();
@@ -629,7 +629,7 @@
       label.position.y = 0.07;
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.012, 16), new THREE.MeshStandardMaterial({ color: "#c9a24a", metalness: 0.9, roughness: 0.3 }));
       cap.position.y = 0.255;
-      const g = new THREE.Group(); g.add(b, label, cap); g.position.set(DX - 0.7, DY, -0.64); gDesk.add(g);
+      const g = new THREE.Group(); g.add(b, label, cap); g.position.set(DX - 0.56, DY, -0.68); g.scale.setScalar(1.7); gDesk.add(g);
     })();
 
     // ---------- drawing helpers ----------
