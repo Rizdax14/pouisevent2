@@ -46,6 +46,15 @@ function meetingTimeValue(iso) {
   return `${String(p.hh).padStart(2, "0")}:${String(p.mm).padStart(2, "0")}`;
 }
 
+// "Présent" opens on the Sunday 17:00 (Paris) before the match day; "Absent" can be said any time.
+function presenceOpensAt(matchIso) {
+  const p = _parisParts(new Date(matchIso));
+  const back = p.wd === 0 ? 7 : p.wd; // the Sunday before (a week earlier for a Sunday match)
+  const d = new Date(Date.UTC(p.y, p.m - 1, p.d - back));
+  return _parisToDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), 17, 0);
+}
+function presenceOpen(matchIso, nowMs) { return (nowMs === undefined ? Date.now() : nowMs) >= presenceOpensAt(matchIso).getTime(); }
+
 // Links that open the match address in Waze, Apple Plans or Google Maps (null when there is no address).
 function mapLinks(match) {
   const q = [match.stadium_name, match.address, [match.postal_code, match.city].filter(Boolean).join(" ")].filter((x) => x && String(x).trim()).join(", ");
@@ -269,4 +278,4 @@ function calendarBounds(matches, nowMs) {
   return { min: lo, max: hi };
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { FOOT_STANDINGS, teamKey, leagueTables, matchesAgainst, teamBadge, playerMatchRows, FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };
+if (typeof module !== "undefined" && module.exports) module.exports = { presenceOpensAt, presenceOpen, FOOT_STANDINGS, teamKey, leagueTables, matchesAgainst, teamBadge, playerMatchRows, FOOT_SEASON_KITS, seasonKits, shortSeason, seasonRack, matchMonths, monthMatches, shirtStats, footRelative, footOutcome, footFeaturedMatch, playerInitials, meetingIsoFor, meetingTimeValue, mapLinks, rackSquad, upcomingMatches, calendarMonth, calendarStartMonth, calendarBounds, shortOpponent, parisHour };

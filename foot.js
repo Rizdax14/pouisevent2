@@ -2,7 +2,12 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
 // foot.jsx — screens of the football app (design system: foot-ui.jsx, tokens: foot-theme.js)
 
 // ---- data helpers ------------------------------------------------------------------------------------------
-async function setMatchAttendance(matchId, playerId, status) {
+// "Présent" is only open from the Sunday 17:00 before the match (the bureau can still set it for someone: force).
+async function setMatchAttendance(matchId, playerId, status, {
+  force
+} = {}) {
+  const m = !force && status === "present" && FOOT_MATCHES_REF.current.find(x => x.id === matchId);
+  if (m && !presenceOpen(m.match_datetime)) throw new Error(`Les présences ouvrent ${presenceOpensLabel(m.match_datetime)}`);
   assertUpsertOk(await SUPABASE.from("foot_attendance").upsert({
     match_id: matchId,
     player_id: playerId,
@@ -11,6 +16,18 @@ async function setMatchAttendance(matchId, playerId, status) {
   }, {
     onConflict: "match_id,player_id"
   }));
+}
+const FOOT_MATCHES_REF = {
+  current: []
+}; // the loaded matches, for the attendance guard
+// "dimanche 4 oct. à 17h"
+function presenceOpensLabel(iso) {
+  return presenceOpensAt(iso).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Paris"
+  }) + " à 17h";
 }
 
 // An admin can clear an answer (back to "no response").
@@ -356,13 +373,15 @@ function FootAttendanceButtons({
   myStatus,
   saving,
   onSet,
-  compact
+  compact,
+  matchIso
 }) {
   const pick = status => e => {
     e.stopPropagation();
     onSet(status);
   };
-  return /*#__PURE__*/React.createElement("div", {
+  const locked = matchIso && !presenceOpen(matchIso) && myStatus !== "present";
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10
@@ -370,11 +389,12 @@ function FootAttendanceButtons({
   }, /*#__PURE__*/React.createElement(FBtn, {
     variant: myStatus === "present" ? "success" : "ghost",
     size: compact ? "md" : "lg",
-    icon: "check",
-    disabled: saving,
+    icon: locked ? "clock" : "check",
+    disabled: saving || locked,
     onClick: pick("present"),
     style: {
-      flex: 1
+      flex: 1,
+      opacity: locked ? 0.55 : 1
     }
   }, "Pr\xE9sent"), /*#__PURE__*/React.createElement(FBtn, {
     variant: myStatus === "absent" ? "danger" : "ghost",
@@ -385,7 +405,14 @@ function FootAttendanceButtons({
     style: {
       flex: 1
     }
-  }, "Absent"));
+  }, "Absent")), locked && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: FC.muted,
+      marginTop: 6,
+      textAlign: "center"
+    }
+  }, "\xAB Pr\xE9sent \xBB s'ouvre ", presenceOpensLabel(matchIso)));
 }
 
 // ---- lineup (feuille de match) ------------------------------------------------------------------------------------
@@ -912,6 +939,7 @@ function FootMatchHero({
       marginTop: 14
     }
   }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    matchIso: match.match_datetime,
     myStatus: myStatus,
     saving: saving,
     onSet: onSetStatus
@@ -3853,7 +3881,9 @@ function FootScheduledView({
     setSaving(false);
   }
   const setPlayer = async (id, status) => {
-    if (status === null) await clearMatchAttendance(match.id, id);else await setMatchAttendance(match.id, id, status);
+    if (status === null) await clearMatchAttendance(match.id, id);else await setMatchAttendance(match.id, id, status, {
+      force: true
+    });
     await reload();
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -3872,6 +3902,7 @@ function FootScheduledView({
     isAdmin: isAdmin,
     reload: reload
   }), isOnRoster && /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Ma pr\xE9sence"), /*#__PURE__*/React.createElement(FootAttendanceButtons, {
+    matchIso: match.match_datetime,
     myStatus: myStatus,
     saving: saving,
     onSet: setMyStatus
@@ -7274,6 +7305,7 @@ function FootRoomScreen({
   async function answer(status, matchId) {
     const m = matchId != null ? matches.find(x => String(x.id) === String(matchId)) : upcoming[0];
     if (!m || !meId || m.status !== "scheduled") return;
+    if (status === "present" && !presenceOpen(m.match_datetime)) return;
     setPresenceDraft({
       id: m.id,
       status
@@ -7462,6 +7494,7 @@ function FootRoomScreen({
         place: formatMatchPlace(next),
         presence: mine,
         canAnswer: !!meId && next.status === "scheduled",
+        presentLock: presenceOpen(next.match_datetime) || mine === "present" ? null : "dim. 17h",
         ballKeepers: (next.ball_keepers || []).map(id => ({
           name: footNameOf(id),
           face: faceFor(id)
@@ -7473,7 +7506,8 @@ function FootRoomScreen({
         opponent: m.opponent_name,
         sub: `${footHour(m.match_datetime)} · ${venue(m)}`,
         canAnswer: !!meId && m.status === "scheduled",
-        presence: presenceOf(m)
+        presence: presenceOf(m),
+        presentLock: presenceOpen(m.match_datetime) || presenceOf(m) === "present" ? null : "dim. 17h"
       })),
       calendar: {
         ...monthMatches(matches, m => scoreById[m.id] || {
@@ -7950,6 +7984,7 @@ function FootRoomScreen({
     }
   }, /*#__PURE__*/React.createElement(FootAttendanceButtons, {
     compact: true,
+    matchIso: paper.match_datetime,
     myStatus: presenceMap(attendance, paper.id)[currentPlayer.id],
     saving: savingPresence,
     onSet: async st => {
@@ -8029,6 +8064,7 @@ function FootballApp({
     setActivities(ac || []);
     setActivityAttendance_(aa || []);
     setRoster(r || []);
+    FOOT_MATCHES_REF.current = m || [];
     setMatches(m || []);
     setAttendance(a || []);
     setEvents(e || []);

@@ -652,12 +652,13 @@
         // Présent / Absent: grey until chosen, then green or red
         const bw = (W - 110) / 2, bh = 120, by = H - 200;
         [["present", "PRÉSENT", "#1f8a4c", 40], ["absent", "ABSENT", "#c0262d", 70 + bw]].forEach(([key, label, color, bx]) => {
-          const on = m.presence === key;
-          ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = on ? 10 : 4; ctx.shadowOffsetY = 4;
+          const on = m.presence === key, lock = key === "present" && m.presentLock;
+          ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.18)"; ctx.shadowBlur = on ? 10 : 4; ctx.shadowOffsetY = 4; if (lock) ctx.globalAlpha = 0.5;
           ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 26); ctx.fill(); ctx.restore();
           if (!on) { ctx.strokeStyle = "#cfc8bc"; ctx.lineWidth = 3; roundRect(ctx, bx, by, bw, bh, 26); ctx.stroke(); }
-          ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.font = `54px ${FONT_UI}`; ctx.fillText((key === "present" ? "✓ " : "✕ ") + label, bx + bw / 2, by + bh / 2 + 19);
-          regions.push({ id: "presence:" + key, x: bx, y: by, w: bw, h: bh });
+          ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.font = `54px ${FONT_UI}`;
+          if (lock) { fitFont(ctx, "🔒 " + lock, FONT_UI, 50, bw - 20); ctx.fillText("🔒 " + lock, bx + bw / 2, by + bh / 2 + 17); }
+          else { ctx.fillText((key === "present" ? "✓ " : "✕ ") + label, bx + bw / 2, by + bh / 2 + 19); regions.push({ id: "presence:" + key, x: bx, y: by, w: bw, h: bh }); }
         });
       }
       ctx.fillStyle = "#9b8f80"; ctx.font = `28px ${FONT_UI}`; ctx.fillText("toucher la feuille pour ouvrir", W / 2, H - 28);
@@ -687,11 +688,12 @@
         if (it.canAnswer) {
           const bw = (w - 88 - 20) / 2, bh = 104, by = y + cardH - bh - 26;
           [["present", "✓ PRÉSENT", "#1f8a4c", x + 44], ["absent", "✕ ABSENT", "#c0262d", x + 44 + bw + 20]].forEach(([key, label, color, bx]) => {
-            const on = it.presence === key;
-            ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 22); ctx.fill();
+            const on = it.presence === key, lock = key === "present" && it.presentLock, text = lock ? "🔒 " + lock : label;
+            ctx.save(); if (lock) ctx.globalAlpha = 0.5;
+            ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 22); ctx.fill(); ctx.restore();
             if (!on) { ctx.strokeStyle = "#cfc8bc"; ctx.lineWidth = 3; roundRect(ctx, bx, by, bw, bh, 22); ctx.stroke(); }
-            ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.textAlign = "center"; fitFont(ctx, label, FONT_UI, 46, bw - 20); ctx.fillText(label, bx + bw / 2, by + bh / 2 + 16);
-            regions.push({ id: `pres:${it.id}:${key}`, x: bx, y: by, w: bw, h: bh });
+            ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.textAlign = "center"; fitFont(ctx, text, FONT_UI, 46, bw - 20); ctx.fillText(text, bx + bw / 2, by + bh / 2 + 16);
+            if (!lock) regions.push({ id: `pres:${it.id}:${key}`, x: bx, y: by, w: bw, h: bh });
           });
         }
         regions.push({ id: "match:" + it.id, x, y, w, h: cardH });

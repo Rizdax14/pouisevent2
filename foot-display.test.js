@@ -193,3 +193,13 @@ test("leagueTables: ranked on goal difference, our line flagged; matchesAgainst 
   assert.deepEqual(D.teamBadge("ABH 2").initials, "ABH2");
   assert.deepEqual(D.teamBadge("LES PANTHERES").initials, "PAN");
 });
+
+test("presence opens on the Sunday 17:00 (Paris) before the match", () => {
+  // Thursday 8 Oct 2026, 19:30 Paris → Sunday 4 Oct 2026, 17:00 Paris (15:00 UTC)
+  assert.equal(D.presenceOpensAt("2026-10-08T17:30:00Z").toISOString(), "2026-10-04T15:00:00.000Z");
+  assert.equal(D.presenceOpen("2026-10-08T17:30:00Z", Date.parse("2026-10-04T14:59:00Z")), false);
+  assert.equal(D.presenceOpen("2026-10-08T17:30:00Z", Date.parse("2026-10-04T15:00:00Z")), true);
+  // winter time, and a Sunday match goes back a full week
+  assert.equal(D.presenceOpensAt("2026-12-10T18:30:00Z").toISOString(), "2026-12-06T16:00:00.000Z");
+  assert.equal(D.presenceOpensAt("2026-12-13T14:00:00Z").toISOString(), "2026-12-06T16:00:00.000Z");
+});

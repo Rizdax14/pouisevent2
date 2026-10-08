@@ -1,11 +1,20 @@
 // foot.jsx — screens of the football app (design system: foot-ui.jsx, tokens: foot-theme.js)
 
 // ---- data helpers ------------------------------------------------------------------------------------------
-async function setMatchAttendance(matchId, playerId, status) {
+// "Présent" is only open from the Sunday 17:00 before the match (the bureau can still set it for someone: force).
+async function setMatchAttendance(matchId, playerId, status, { force } = {}) {
+  const m = !force && status === "present" && FOOT_MATCHES_REF.current.find((x) => x.id === matchId);
+  if (m && !presenceOpen(m.match_datetime)) throw new Error(`Les présences ouvrent ${presenceOpensLabel(m.match_datetime)}`);
   assertUpsertOk(await SUPABASE.from("foot_attendance").upsert(
     { match_id: matchId, player_id: playerId, status, responded_at: new Date().toISOString() },
     { onConflict: "match_id,player_id" }
   ));
+}
+
+const FOOT_MATCHES_REF = { current: [] }; // the loaded matches, for the attendance guard
+// "dimanche 4 oct. à 17h"
+function presenceOpensLabel(iso) {
+  return presenceOpensAt(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short", timeZone: "Europe/Paris" }) + " à 17h";
 }
 
 // An admin can clear an answer (back to "no response").
@@ -138,12 +147,16 @@ function FootPlayerPill({ id, number, tone = "soft", dim, status }) {
   );
 }
 
-function FootAttendanceButtons({ myStatus, saving, onSet, compact }) {
+function FootAttendanceButtons({ myStatus, saving, onSet, compact, matchIso }) {
   const pick = (status) => (e) => { e.stopPropagation(); onSet(status); };
+  const locked = matchIso && !presenceOpen(matchIso) && myStatus !== "present";
   return (
-    <div style={{ display: "flex", gap: 10 }}>
-      <FBtn variant={myStatus === "present" ? "success" : "ghost"} size={compact ? "md" : "lg"} icon="check" disabled={saving} onClick={pick("present")} style={{ flex: 1 }}>Présent</FBtn>
-      <FBtn variant={myStatus === "absent" ? "danger" : "ghost"} size={compact ? "md" : "lg"} icon="x" disabled={saving} onClick={pick("absent")} style={{ flex: 1 }}>Absent</FBtn>
+    <div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <FBtn variant={myStatus === "present" ? "success" : "ghost"} size={compact ? "md" : "lg"} icon={locked ? "clock" : "check"} disabled={saving || locked} onClick={pick("present")} style={{ flex: 1, opacity: locked ? 0.55 : 1 }}>Présent</FBtn>
+        <FBtn variant={myStatus === "absent" ? "danger" : "ghost"} size={compact ? "md" : "lg"} icon="x" disabled={saving} onClick={pick("absent")} style={{ flex: 1 }}>Absent</FBtn>
+      </div>
+      {locked && <div style={{ fontSize: 12, color: FC.muted, marginTop: 6, textAlign: "center" }}>« Présent » s'ouvre {presenceOpensLabel(matchIso)}</div>}
     </div>
   );
 }
@@ -329,7 +342,7 @@ function FootMatchHero({ match, score, presentIds, waitingCount, rosterSize, onO
       {!live && (
         <>
           <FootPresenceStack ids={presentIds} total={rosterSize} min={match.min_players} waiting={waitingCount} />
-          {isOnRoster && <div style={{ marginTop: 14 }}><FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={onSetStatus} /></div>}
+          {isOnRoster && <div style={{ marginTop: 14 }}><FootAttendanceButtons matchIso={match.match_datetime} myStatus={myStatus} saving={saving} onSet={onSetStatus} /></div>}
         </>
       )}
     </FCard>
@@ -1429,7 +1442,7 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
     setSaving(false);
   }
 
-  const setPlayer = async (id, status) => { if (status === null) await clearMatchAttendance(match.id, id); else await setMatchAttendance(match.id, id, status); await reload(); };
+  const setPlayer = async (id, status) => { if (status === null) await clearMatchAttendance(match.id, id); else await setMatchAttendance(match.id, id, status, { force: true }); await reload(); };
   return (
     <div className="ft-page">
       <FootScoreboard match={match} score={{ bl: 0, opponent: 0 }} />
@@ -1440,7 +1453,7 @@ function FootScheduledView({ match, roster, attendance, lineups, currentPlayer, 
       {isOnRoster && (
         <FCard>
           <FHeading>Ma présence</FHeading>
-          <FootAttendanceButtons myStatus={myStatus} saving={saving} onSet={setMyStatus} />
+          <FootAttendanceButtons matchIso={match.match_datetime} myStatus={myStatus} saving={saving} onSet={setMyStatus} />
           {myPlace && <div style={{ marginTop: 10 }}><FChip tone={myPlace.waiting ? "warn" : "good"}>{myPlace.waiting ? `En liste d'attente · n°${myPlace.rank}` : `Confirmé · n°${myPlace.rank}`}</FChip></div>}
         </FCard>
       )}
@@ -2751,6 +2764,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
   async function answer(status, matchId) {
     const m = matchId != null ? matches.find((x) => String(x.id) === String(matchId)) : upcoming[0];
     if (!m || !meId || m.status !== "scheduled") return;
+    if (status === "present" && !presenceOpen(m.match_datetime)) return;
     setPresenceDraft({ id: m.id, status });
     try { await setMatchAttendance(m.id, meId, status); await reload(); } catch (e) { console.warn("attendance failed", e); }
     setPresenceDraft(null);
@@ -2853,11 +2867,13 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
         hours: `Match ${footHour(next.match_datetime)}${next.meeting_at ? ` · RDV ${footHour(next.meeting_at)}` : ""}`,
         place: formatMatchPlace(next),
         presence: mine, canAnswer: !!meId && next.status === "scheduled",
+        presentLock: presenceOpen(next.match_datetime) || mine === "present" ? null : "dim. 17h",
         ballKeepers: (next.ball_keepers || []).map((id) => ({ name: footNameOf(id), face: faceFor(id) })),
       },
       upcoming: upcoming.slice(1, 4).map((m) => ({
         id: m.id, date: longDate(m.match_datetime), opponent: m.opponent_name, sub: `${footHour(m.match_datetime)} · ${venue(m)}`,
         canAnswer: !!meId && m.status === "scheduled", presence: presenceOf(m),
+        presentLock: presenceOpen(m.match_datetime) || presenceOf(m) === "present" ? null : "dim. 17h",
       })),
       calendar: { ...monthMatches(matches, (m) => scoreById[m.id] || { bl: 0, opponent: 0 }, month, (m) => myRatings[m.id]), hasPrev: months.some((x) => x < month), hasNext: months.some((x) => x > month) },
     });
@@ -2993,7 +3009,7 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
               <FootWhenWhere match={paper} size={15} />
               {currentPlayer && paper.status === "scheduled" && (
                 <div style={{ marginTop: 14 }}>
-                  <FootAttendanceButtons compact myStatus={presenceMap(attendance, paper.id)[currentPlayer.id]} saving={savingPresence}
+                  <FootAttendanceButtons compact matchIso={paper.match_datetime} myStatus={presenceMap(attendance, paper.id)[currentPlayer.id]} saving={savingPresence}
                     onSet={async (st) => { setSavingPresence(true); try { await setMatchAttendance(paper.id, currentPlayer.id, st); await reload(); } catch (e) { console.warn("attendance failed", e); } setSavingPresence(false); }} />
                 </div>
               )}
@@ -3062,6 +3078,7 @@ function FootballApp({ currentPlayer, onBack }) {
     setActivities(ac || []);
     setActivityAttendance_(aa || []);
     setRoster(r || []);
+    FOOT_MATCHES_REF.current = m || [];
     setMatches(m || []);
     setAttendance(a || []);
     setEvents(e || []);
