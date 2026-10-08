@@ -7405,7 +7405,7 @@ function FootRoomScreen({
   }, [zone, state]);
   React.useEffect(() => {
     if (room.current) {
-      room.current.setAccent(FC.accent, FC.deep);
+      room.current.setAccent(FOOT_THEMES.green.accent, FOOT_THEMES.green.deep);
       const keep = shirt && squad.some(p => p.id === shirt.id) ? shirt.id : currentPlayer?.id;
       room.current.setSquad(squad, kit, pendingShirt.current || keep);
       pendingShirt.current = null;
@@ -7495,6 +7495,7 @@ function FootRoomScreen({
         presence: mine,
         canAnswer: !!meId && next.status === "scheduled",
         presentLock: presenceOpen(next.match_datetime) || mine === "present" ? null : "dim. 17h",
+        accent: next.venue === "exterieur" ? FOOT_THEMES.pink.accent : null,
         ballKeepers: (next.ball_keepers || []).map(id => ({
           name: footNameOf(id),
           face: faceFor(id)
@@ -7504,10 +7505,9 @@ function FootRoomScreen({
         id: m.id,
         date: longDate(m.match_datetime),
         opponent: m.opponent_name,
-        sub: `${footHour(m.match_datetime)} · ${venue(m)}`,
-        canAnswer: !!meId && m.status === "scheduled",
-        presence: presenceOf(m),
-        presentLock: presenceOpen(m.match_datetime) || presenceOf(m) === "present" ? null : "dim. 17h"
+        sub: `${footHour(m.match_datetime)} · ${venue(m)}${m.match_type === "amical" ? " · Amical" : ""}`,
+        place: formatMatchPlace(m),
+        accent: m.venue === "exterieur" ? FOOT_THEMES.pink.accent : null
       })),
       calendar: {
         ...monthMatches(matches, m => scoreById[m.id] || {
@@ -7955,7 +7955,7 @@ function FootRoomScreen({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: FC.accent,
+      background: themeFor(paper.venue === "exterieur" ? "pink" : "green").accent,
       color: "#fff",
       fontFamily: FF.ui,
       fontSize: 18,
@@ -8017,8 +8017,6 @@ function FootballApp({
   currentPlayer,
   onBack
 }) {
-  const theme = "green"; // one theme only: the green of the club
-  setFootTheme(theme); // the colour tokens must be current before any child renders
   const [page, setPage] = React.useState("calendar");
   const [sub, setSub] = React.useState({});
   const [loaded, setLoaded] = React.useState(false);
@@ -8034,6 +8032,11 @@ function FootballApp({
   const [activities, setActivities] = React.useState([]);
   const [motmVotes, setMotmVotes] = React.useState([]);
   const [activityAttendance, setActivityAttendance_] = React.useState([]);
+  // green everywhere, pink on the page of a match played away (like the Instagram visuals)
+  const awayPage = page === "matchDetail" && (matches.find(m => m.id === sub.matchId) || {}).venue === "exterieur";
+  const theme = awayPage ? "pink" : "green";
+  setFootTheme(theme); // the colour tokens must be current before any child renders
+
   const isAdmin = isBureau(currentPlayer);
   // the 3D club room: Calendrier / Classement / Vestiaire are corners of one locker room.
   // The flat pages only come back if the room can't open on this device.

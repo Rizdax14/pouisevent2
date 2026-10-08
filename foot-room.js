@@ -603,7 +603,7 @@
     function drawNext(m) {
       const s = nextSheet, c = s.canvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); s.mesh.userData.scale = S;
       paper(ctx, W, H, false);
-      const accent = opts.accent || "#2f8f5b";
+      const accent = m.accent || opts.accent || "#2f8f5b";
       ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 150);
       ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `64px ${FONT_UI}`; ctx.fillText("PROCHAIN MATCH", W / 2, 100);
       const wrap = (text, family, size, maxW, y, lh, maxLines = 3) => { // centred lines, shrinking the font if needed
@@ -679,22 +679,21 @@
         ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
         ctx.fillStyle = "#ffffff"; roundRect(ctx, x, y, w, cardH, 26); ctx.fill(); ctx.restore();
         ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 3; roundRect(ctx, x, y, w, cardH, 26); ctx.stroke();
-        ctx.fillStyle = opts.accent || "#2f8f5b"; roundRect(ctx, x, y, 16, cardH, 8); ctx.fill();
+        const acc = it.accent || opts.accent || "#2f8f5b"; // pink for an away match
+        ctx.fillStyle = acc; roundRect(ctx, x, y, 16, cardH, 8); ctx.fill();
         ctx.textAlign = "left";
-        ctx.fillStyle = opts.accent || "#2f8f5b"; fitFont(ctx, it.date, FONT_UI, 48, w - 120); ctx.fillText(it.date, x + 44, y + 64);
+        ctx.fillStyle = acc; fitFont(ctx, it.date, FONT_UI, 48, w - 120); ctx.fillText(it.date, x + 44, y + 64);
         ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + it.opponent, FONT_DISPLAY, 62, w - 120); ctx.fillText("vs " + it.opponent, x + 44, y + 138);
         ctx.fillStyle = "#6b6257"; ctx.font = `42px ${FONT_UI}`; ctx.fillText(it.sub || "", x + 44, y + 192);
         ctx.fillStyle = "#9b8f80"; ctx.font = `70px ${FONT_UI}`; ctx.textAlign = "right"; ctx.fillText("›", x + w - 26, y + 128);
-        if (it.canAnswer) {
-          const bw = (w - 88 - 20) / 2, bh = 104, by = y + cardH - bh - 26;
-          [["present", "✓ PRÉSENT", "#1f8a4c", x + 44], ["absent", "✕ ABSENT", "#c0262d", x + 44 + bw + 20]].forEach(([key, label, color, bx]) => {
-            const on = it.presence === key, lock = key === "present" && it.presentLock, text = lock ? "🔒 " + lock : label;
-            ctx.save(); if (lock) ctx.globalAlpha = 0.5;
-            ctx.fillStyle = on ? color : "#e3ded5"; roundRect(ctx, bx, by, bw, bh, 22); ctx.fill(); ctx.restore();
-            if (!on) { ctx.strokeStyle = "#cfc8bc"; ctx.lineWidth = 3; roundRect(ctx, bx, by, bw, bh, 22); ctx.stroke(); }
-            ctx.fillStyle = on ? "#fff" : "#7a7166"; ctx.textAlign = "center"; fitFont(ctx, text, FONT_UI, 46, bw - 20); ctx.fillText(text, bx + bw / 2, by + bh / 2 + 16);
-            if (!lock) regions.push({ id: `pres:${it.id}:${key}`, x: bx, y: by, w: bw, h: bh });
-          });
+        // where: the place, on up to 3 lines
+        if (it.place) {
+          ctx.textAlign = "left"; ctx.fillStyle = "#3f3a33"; ctx.font = `38px ${FONT_UI}`;
+          const words = ("📍 " + it.place).split(" "), lines = [];
+          let cur = "";
+          for (const wd of words) { const t = cur ? cur + " " + wd : wd; if (ctx.measureText(t).width > w - 80 && cur) { lines.push(cur); cur = wd; } else cur = t; }
+          if (cur) lines.push(cur);
+          lines.slice(0, 3).forEach((l, i) => ctx.fillText(i === 2 && lines.length > 3 ? l + "…" : l, x + 44, y + 252 + i * 46));
         }
         regions.push({ id: "match:" + it.id, x, y, w, h: cardH });
       });
