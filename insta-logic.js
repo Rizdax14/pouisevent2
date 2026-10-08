@@ -214,7 +214,8 @@ function userTagsFor(points, usernames, [w, h] = [1080, 1350]) {
   const out = [], seen = new Set();
   const clamp = (v) => Math.min(0.98, Math.max(0.02, Math.round(v * 1000) / 1000));
   for (const p of points || []) {
-    const u = usernames && usernames[p.playerId];
+    // "@Thisma.0 " → "thisma.0": Instagram usernames are lower case, without the @
+    const u = String((usernames && usernames[p.playerId]) || "").trim().replace(/^@+/, "").toLowerCase();
     if (!u || seen.has(u)) continue;
     seen.add(u);
     out.push({ username: u, x: clamp(p.x / w), y: clamp(p.y / h) });

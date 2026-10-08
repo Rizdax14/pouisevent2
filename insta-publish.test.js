@@ -91,7 +91,8 @@ test("refreshToken returns the new token", async () => {
 // ---------- Publisher: exactly-once publication ----------
 const { createPublisher } = require("./lib/insta/publisher");
 
-function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail = false } = {}) {
+function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail = false, badTag = false } = {}) {
+  const w = { badTag };
   const db = rows.map((r) => ({ ...r }));
   let id = 100;
   const log = [];
@@ -112,7 +113,7 @@ function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail 
     featuredId: async (t) => { if (featuredFail) throw new Error("db down"); log.push(`featured ${t.player || "auto"}`); return t.player || 21; },
     async uploadImage(p) { log.push("upload " + p); if (uploadFail) throw new Error("storage down"); },
     publicUrl: (p) => `https://pub/${p}`,
-    igClient: () => ({ async publishImages({ urls, caption, userTags }) { log.push(`ig ${urls.length} ${caption}`); if (userTags && userTags.some((t) => t.length)) log.push("tags " + JSON.stringify(userTags)); if (igFail) throw igFail; return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
+    igClient: () => ({ async publishImages({ urls, caption, userTags }) { log.push(`ig ${urls.length} ${caption}`); const tagged = userTags && userTags.some((t) => t.length); if (tagged) log.push("tags " + JSON.stringify(userTags)); if (igFail) throw igFail; if (tagged && w.badTag) throw new Error("Instagram : Invalid user id"); return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
   };
   return { db, log, pub: createPublisher(deps) };
 }
@@ -128,6 +129,15 @@ test("publishes once: row created, images uploaded, Instagram called, row marked
   assert.equal(w.db[0].permalink, "https://instagram.com/p/z");
   assert.match(w.db[0].image_paths[0], /^matchday\/2-\d+-1\.jpg$/);
   assert.match(w.log.find((l) => l.startsWith("ig ")), /^ig 2 MATCH DAY/); // Match Day + Groupe: a two-image carousel
+});
+
+test("a tagged username Instagram refuses: the post still goes out, without the tags, and says why", async () => {
+  const w = fakeWorld({ badTag: true });
+  const r = await w.pub.publishTarget({ kind: "result", matchId: 2 }, { data: { ...DATA, matches: [{ ...DATA.matches[0], status: "finished" }], instagram: { 1: "@Louis.BL " } } });
+  assert.equal(r.status, "published");
+  assert.equal(w.log.filter((l) => l.startsWith("ig ")).length, 2);
+  assert.match(w.log.find((l) => l.startsWith("tags ")), /"louis.bl"/);
+  assert.match(w.db[0].error, /sans identifier.*louis\.bl/);
 });
 
 test("a second publish of the same post never calls Instagram again", async () => {
