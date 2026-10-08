@@ -131,15 +131,10 @@ test("publishes once: row created, images uploaded, Instagram called, row marked
   assert.match(w.log.find((l) => l.startsWith("ig ")), /^ig 2 MATCH DAY/); // Match Day + Groupe: a two-image carousel
 });
 
-test("a tagged account Instagram refuses (private): the post goes out with the other tags and says who was left out", async () => {
-  const w = fakeWorld({ badTag: "priv.acc" });
-  const r = await w.pub.publishTarget({ kind: "result", matchId: 2 }, { data: { ...DATA, matches: [{ ...DATA.matches[0], status: "finished" }], instagram: { 1: "@Louis.BL ", 9: "priv.acc" } } });
-  assert.equal(r.status, "published");
-  const tags = w.log.filter((l) => l.startsWith("tags "));
-  assert.equal(tags.length, 2);
-  assert.match(tags[1], /louis\.bl/);
-  assert.doesNotMatch(tags[1], /priv\.acc/);
-  assert.match(w.db[0].error, /sans identifier priv\.acc/);
+test("posts never tag anybody", async () => {
+  const w = fakeWorld();
+  await w.pub.publishTarget({ kind: "result", matchId: 2 }, { data: { ...DATA, matches: [{ ...DATA.matches[0], status: "finished" }], instagram: { 1: "louis.bl" } } });
+  assert.equal(w.log.filter((l) => l.startsWith("tags ")).length, 0);
 });
 
 test("a second publish of the same post never calls Instagram again", async () => {
@@ -216,13 +211,6 @@ test("a failure while recording the featured player never fails a published post
   const r = await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
   assert.equal(r.status, "published");
   assert.deepEqual(w.db[0].featured, {});
-});
-
-test("players with an Instagram username are tagged where the image shows them", async () => {
-  const w = fakeWorld();
-  const data = { ...DATA, matches: [{ ...DATA.matches[0], status: "finished" }], instagram: { 1: "louis.bl" } };
-  await w.pub.publishTarget({ kind: "result", matchId: 2 }, { data });
-  assert.ok(w.log.includes('tags [[{"username":"louis.bl","x":0.08,"y":0.92}]]'), w.log.join("\n"));
 });
 
 test("Instagram client sends user_tags on the images that have some", async () => {
