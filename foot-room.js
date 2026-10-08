@@ -146,7 +146,9 @@
 
     // Photographic materials (Poly Haven, CC0) replace the drawn ones once downloaded: nothing waits for them.
     const ROOM = "/assets/room/", SUF = low ? "-sm.jpg?v=1" : ".jpg?v=1";
-    const texLoader = new THREE.TextureLoader();
+    const baseLoader = new THREE.TextureLoader(), pending = [];
+    // every download the room starts is tracked, so warm() can wait for all of them
+    const texLoader = { load(url, onLoad, onProgress, onError) { pending.push(new Promise((res) => baseLoader.load(url, (t) => { try { onLoad && onLoad(t); } finally { res(); } }, onProgress, (e) => { try { onError && onError(e); } finally { res(); } }))); } };
     const loadTex = (name, srgb, rx, ry) => new Promise((res) => texLoader.load(ROOM + name + SUF, (t) => {
       if (srgb) t.encoding = THREE.sRGBEncoding;
       t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4);
@@ -235,6 +237,7 @@
     }
 
     const rack = { kit: null, squad: [], shirts: [], scroll: 0, target: 0, art: null, geo: null, building: 0 };
+    let rackBuilt; const rackReady = new Promise((r) => (rackBuilt = r));
     const kitCache = {};
     async function loadKit(kit) {
       if (kitCache[kit]) return kitCache[kit];
@@ -308,6 +311,7 @@
         rack.shirts.push(s);
       });
       cb.onReady("rack");
+      rackBuilt();
     }
     function selectShirt(i, instant) {
       i = Math.max(0, Math.min(rack.squad.length - 1, i));
@@ -452,7 +456,7 @@
 
     // ---------- club things lying around ----------
     const GREEN = "#17703a", GREEN_D = "#0f4f28", CREAM = "#f4f1e8";
-    const crestImg = loadImg("/logo-bl.png");
+    const crestImg = loadImg("/logo-bl.png"); pending.push(crestImg);
     // felt pennant on a little rod, hanging from a cord on the wall
     function pennant(bg, fg, text) {
       const c = canvas2d(512, 768), ctx = c.getContext("2d");
@@ -1139,6 +1143,19 @@
         rack.shirts.forEach((s) => (s.flip = 0));
         // spin the shirts once when the kit changes
         if (!sameKit && rack.shirts.length) rack.shirts.forEach((s) => (s.ry += Math.PI * 2));
+      },
+      // Everything loaded and drawn once from each corner: the GPU has every texture and shader, so nothing stalls later.
+      async warm(maxMs = 15000) {
+        const until = (p) => Promise.race([p, new Promise((r) => setTimeout(r, maxMs))]);
+        await until(Promise.all([rackReady, ...pending]));
+        await until(new Promise((r) => { const check = () => (Object.values(faceImgs).some((v) => v === "loading") ? setTimeout(check, 120) : r()); check(); }));
+        await until(Promise.all(pending)); // late ones (env reflections) started while waiting
+        renderer.compile(scene, camera);
+        const keep = cam.cur;
+        for (const z of ["desk", "board", "rack"]) { place(preset(z)); renderer.render(scene, camera); }
+        if (keep) place(keep); else place(preset(cam.zone));
+        renderer.render(scene, camera);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       },
       select: (i) => selectShirt(i),
       selectId(id) { const i = rack.squad.findIndex((p) => p.id === id); if (i >= 0) selectShirt(i); return i >= 0; },

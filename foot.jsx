@@ -2479,7 +2479,7 @@ const FOOT_PAGE_TITLES = {
 };
 
 // ---- opening screen -------------------------------------------------------------------------------------------------------------------
-const FOOT_SPLASH_STEPS = [["calendar", "Calendrier", "calendar"], ["rankings", "Classement", "trophy"], ["stats", "Stats", "chart"]];
+const FOOT_SPLASH_STEPS = [["calendar", "Calendrier", "calendar"], ["rankings", "Classement", "trophy"], ["stats", "Vestiaire", "shirt"]];
 
 function FootSplash({ steps, leaving, theme }) {
   const done = FOOT_SPLASH_STEPS.filter(([k]) => steps[k]).length;
@@ -2693,7 +2693,7 @@ function FootRoomPicker({ label, value, options, onChange }) {
   );
 }
 
-function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attendance, reload, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
+function FootRoomScreen({ onWarm, onBroken, visible, page, theme, onHome, settings, roster, attendance, reload, matches, events, lineups, ratings, motmVotes, currentPlayer, nav, openPlayer, onLeaveRoom }) {
   const host = React.useRef(null);
   const room = React.useRef(null);
   const [state, setState] = React.useState("loading");
@@ -2807,11 +2807,17 @@ function FootRoomScreen({ visible, page, theme, onHome, settings, roster, attend
         onTap: (surface, id) => tap.current(surface, id),
       });
       setState("ready");
-    }).catch((e) => { if (alive) { setError(e.message); setState("error"); } });
+    }).catch((e) => { if (alive) { setError(e.message); setState("error"); onBroken && onBroken(); } });
     return () => { alive = false; if (room.current) room.current.destroy(); room.current = null; };
   }, []);
 
   React.useEffect(() => { if (room.current) room.current.pause(!visible); }, [visible, state]);
+  // once the room has its data (shirts, board, desk set by the effects below), load and draw everything before the splash goes
+  React.useEffect(() => {
+    if (state !== "ready" || !room.current) return;
+    const t = setTimeout(() => room.current && room.current.warm().then(() => onWarm && onWarm(), () => onWarm && onWarm()), 50);
+    return () => clearTimeout(t);
+  }, [state]);
   React.useEffect(() => {
     if (!room.current) return;
     if (room.current.zone() !== zone) { setArrived(null); room.current.setZone(zone); } else setArrived(zone);
@@ -3094,11 +3100,14 @@ function FootballApp({ currentPlayer, onBack }) {
   // Opening screen: loads everything the three main pages need (calendar data, player pictures, fonts and backgrounds)
   // so nothing pops in afterwards. The steps tick off for real; the screen stays at least MIN_MS so it never flashes.
   const [steps, setSteps] = React.useState({ calendar: false, rankings: false, stats: false });
+  const [dataReady, setDataReady] = React.useState(false); // the 3D room mounts then, behind the splash
+  const roomWarm = React.useRef(null); // resolves once the room has loaded and drawn its three corners
+  if (!roomWarm.current) { let r; roomWarm.current = new Promise((res) => (r = res)); roomWarm.current.resolve = r; }
   const [leaving, setLeaving] = React.useState(false);
   const [splashOn, setSplashOn] = React.useState(true);
   React.useEffect(() => {
     let alive = true;
-    const MIN_MS = 1500, started = Date.now();
+    const MIN_MS = 2200, started = Date.now();
     const tick = (k) => alive && setSteps((o) => ({ ...o, [k]: true }));
     const withTimeout = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(res, ms))]);
     const preload = (url) => new Promise((res) => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = url; });
@@ -3106,11 +3115,14 @@ function FootballApp({ currentPlayer, onBack }) {
       let photoRows = [];
       try { photoRows = await reloadFoot(); } catch (err) { console.warn("foot load failed", err); if (alive) setLoadError(err.message); }
       tick("calendar");
+      if (alive) setDataReady(true);
       const faces = photoRows.filter((x) => x.kind === "render").map((x) => instaPublicUrl(x.path));
       await withTimeout(Promise.all(faces.map(preload)), 5000);
       tick("rankings");
       const bgs = ["/assets/foot/bg-green.jpg?v=crt1", "/assets/foot/bg-pink.jpg?v=crt1", "/logo-bl.png", "/logo-bl-rose.png"];
       await withTimeout(Promise.all([document.fonts ? document.fonts.ready : null, ...bgs.map(preload)]), 4000);
+      // the 3D room: shirts, textures, photos, every corner drawn once (never more than 20 s, a slow phone still gets in)
+      await withTimeout(roomWarm.current, 20000);
       tick("stats");
       await new Promise((res) => setTimeout(res, Math.max(350, MIN_MS - (Date.now() - started))));
       if (!alive) return;
@@ -3150,7 +3162,7 @@ function FootballApp({ currentPlayer, onBack }) {
   const playerPage = page === "player";
   const playerMatchesPage = page === "playerMatches";
   const openPlayer = (id) => nav("player", { playerId: id });
-  const roomVisible = roomOn && loaded && !!FOOT_ROOM_ZONES[page];
+  const roomVisible = roomOn && dataReady && !!FOOT_ROOM_ZONES[page]; // already showing under the splash, so it warms up for real
   const openMatch = detail ? matches.find((m) => m.id === sub.matchId) : null;
   const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : playerMatchesPage ? [footNameOf(sub.playerId), "Tous ses matchs"] : detail
     ? [openMatch ? { scheduled: "Match", live: "En direct", finished: "Résultat" }[openMatch.status] : "Match", openMatch ? `vs ${openMatch.opponent_name}` : null]
@@ -3158,9 +3170,9 @@ function FootballApp({ currentPlayer, onBack }) {
 
   return (
     <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
-      {roomOn && loaded && (
+      {roomOn && dataReady && (
         <FootRoomScreen visible={roomVisible} page={page} theme={theme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
-          roster={roster} attendance={attendance} reload={reloadFoot} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer} />
+          roster={roster} attendance={attendance} reload={reloadFoot} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer}  onWarm={() => roomWarm.current.resolve()} onBroken={() => roomWarm.current.resolve()} />
       )}
       {!roomVisible && <FootShell wide={page === "stats" || page === "reseaux" || playerPage || playerMatchesPage}>
         <FTopBar title={title} subtitle={subtitle} theme={theme} onHome={onBack} onBack={detail || playerPage || playerMatchesPage ? goBack : undefined}

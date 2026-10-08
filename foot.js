@@ -6556,7 +6556,7 @@ const FOOT_PAGE_TITLES = {
 };
 
 // ---- opening screen -------------------------------------------------------------------------------------------------------------------
-const FOOT_SPLASH_STEPS = [["calendar", "Calendrier", "calendar"], ["rankings", "Classement", "trophy"], ["stats", "Stats", "chart"]];
+const FOOT_SPLASH_STEPS = [["calendar", "Calendrier", "calendar"], ["rankings", "Classement", "trophy"], ["stats", "Vestiaire", "shirt"]];
 function FootSplash({
   steps,
   leaving,
@@ -7190,6 +7190,8 @@ function FootRoomPicker({
   }, l))));
 }
 function FootRoomScreen({
+  onWarm,
+  onBroken,
   visible,
   page,
   theme,
@@ -7377,6 +7379,7 @@ function FootRoomScreen({
       if (alive) {
         setError(e.message);
         setState("error");
+        onBroken && onBroken();
       }
     });
     return () => {
@@ -7388,6 +7391,12 @@ function FootRoomScreen({
   React.useEffect(() => {
     if (room.current) room.current.pause(!visible);
   }, [visible, state]);
+  // once the room has its data (shirts, board, desk set by the effects below), load and draw everything before the splash goes
+  React.useEffect(() => {
+    if (state !== "ready" || !room.current) return;
+    const t = setTimeout(() => room.current && room.current.warm().then(() => onWarm && onWarm(), () => onWarm && onWarm()), 50);
+    return () => clearTimeout(t);
+  }, [state]);
   React.useEffect(() => {
     if (!room.current) return;
     if (room.current.zone() !== zone) {
@@ -8088,11 +8097,18 @@ function FootballApp({
     rankings: false,
     stats: false
   });
+  const [dataReady, setDataReady] = React.useState(false); // the 3D room mounts then, behind the splash
+  const roomWarm = React.useRef(null); // resolves once the room has loaded and drawn its three corners
+  if (!roomWarm.current) {
+    let r;
+    roomWarm.current = new Promise(res => r = res);
+    roomWarm.current.resolve = r;
+  }
   const [leaving, setLeaving] = React.useState(false);
   const [splashOn, setSplashOn] = React.useState(true);
   React.useEffect(() => {
     let alive = true;
-    const MIN_MS = 1500,
+    const MIN_MS = 2200,
       started = Date.now();
     const tick = k => alive && setSteps(o => ({
       ...o,
@@ -8113,11 +8129,14 @@ function FootballApp({
         if (alive) setLoadError(err.message);
       }
       tick("calendar");
+      if (alive) setDataReady(true);
       const faces = photoRows.filter(x => x.kind === "render").map(x => instaPublicUrl(x.path));
       await withTimeout(Promise.all(faces.map(preload)), 5000);
       tick("rankings");
       const bgs = ["/assets/foot/bg-green.jpg?v=crt1", "/assets/foot/bg-pink.jpg?v=crt1", "/logo-bl.png", "/logo-bl-rose.png"];
       await withTimeout(Promise.all([document.fonts ? document.fonts.ready : null, ...bgs.map(preload)]), 4000);
+      // the 3D room: shirts, textures, photos, every corner drawn once (never more than 20 s, a slow phone still gets in)
+      await withTimeout(roomWarm.current, 20000);
       tick("stats");
       await new Promise(res => setTimeout(res, Math.max(350, MIN_MS - (Date.now() - started))));
       if (!alive) return;
@@ -8212,7 +8231,7 @@ function FootballApp({
   const openPlayer = id => nav("player", {
     playerId: id
   });
-  const roomVisible = roomOn && loaded && !!FOOT_ROOM_ZONES[page];
+  const roomVisible = roomOn && dataReady && !!FOOT_ROOM_ZONES[page]; // already showing under the splash, so it warms up for real
   const openMatch = detail ? matches.find(m => m.id === sub.matchId) : null;
   const [title, subtitle] = playerPage ? [footNameOf(sub.playerId), "Stats du joueur"] : playerMatchesPage ? [footNameOf(sub.playerId), "Tous ses matchs"] : detail ? [openMatch ? {
     scheduled: "Match",
@@ -8226,7 +8245,7 @@ function FootballApp({
       themeName: theme,
       openPlayer
     }
-  }, roomOn && loaded && /*#__PURE__*/React.createElement(FootRoomScreen, {
+  }, roomOn && dataReady && /*#__PURE__*/React.createElement(FootRoomScreen, {
     visible: roomVisible,
     page: page,
     theme: theme,
@@ -8243,7 +8262,9 @@ function FootballApp({
     motmVotes: motmVotes,
     currentPlayer: currentPlayer,
     nav: nav,
-    openPlayer: openPlayer
+    openPlayer: openPlayer,
+    onWarm: () => roomWarm.current.resolve(),
+    onBroken: () => roomWarm.current.resolve()
   }), !roomVisible && /*#__PURE__*/React.createElement(FootShell, {
     wide: page === "stats" || page === "reseaux" || playerPage || playerMatchesPage
   }, /*#__PURE__*/React.createElement(FTopBar, {
