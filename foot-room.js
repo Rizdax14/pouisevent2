@@ -401,12 +401,12 @@
     const deskMat = new THREE.MeshStandardMaterial({ map: deskWood, roughness: 0.55 });
     const DESK_Z0 = -0.72, DESK_Z1 = 1.38, DESK_W = 2.6, deskZ = (DESK_Z0 + DESK_Z1) / 2;
     const desk = new THREE.Mesh(new THREE.BoxGeometry(DESK_W, 0.09, DESK_Z1 - DESK_Z0), deskMat); desk.position.set(DX, DY - 0.045, deskZ); desk.receiveShadow = desk.castShadow = true; gDesk.add(desk);
+    pbr(deskMat, desk.geometry, "desk", 2.2, 1.8, { color: new THREE.Color("#c9b29a") });
     const edgeMat = new THREE.MeshStandardMaterial({ color: "#3a2416", roughness: 0.6 });
     const lip = new THREE.Mesh(new THREE.BoxGeometry(DESK_W + 0.02, 0.12, 0.05), edgeMat); lip.position.set(DX, DY - 0.07, DESK_Z1); gDesk.add(lip);
     const apron = new THREE.Mesh(new THREE.BoxGeometry(DESK_W - 0.2, 0.18, DESK_Z1 - DESK_Z0 - 0.2), edgeMat); apron.position.set(DX, DY - 0.18, deskZ); gDesk.add(apron);
     for (const [x, z] of [[-1.2, DESK_Z0 + 0.1], [1.2, DESK_Z0 + 0.1], [-1.2, DESK_Z1 - 0.1], [1.2, DESK_Z1 - 0.1]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), edgeMat); leg.position.set(DX + x, DY - 0.36, z); leg.castShadow = true; gDesk.add(leg); }
     // leather desk mat under the papers
-    const blotter = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.006, 1.92), new THREE.MeshStandardMaterial({ color: "#2b211c", roughness: 0.75 })); blotter.position.set(DX, DY + 0.003, DZ + 0.1); blotter.receiveShadow = true; gDesk.add(blotter);
     // framed club crest above the desk
     loadImg("/logo-bl.png").then((im) => {
       if (!im) return;
@@ -432,8 +432,14 @@
     const calSheet = sheet(1.38, 0.63, 1280); calSheet.mesh.position.set(DX, DY + 0.012, DZ + 0.7); calSheet.mesh.userData.surface = "calendar";
     gDesk.add(nextSheet.mesh, listSheet.mesh, calSheet.mesh);
     // calendar pad thickness + binding rings
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.016, 0.52), new THREE.MeshStandardMaterial({ color: "#e9e4d8", roughness: 0.9 })); pad.position.set(DX, DY + 0.002, DZ + 0.62); gDesk.add(pad);
-    for (let k = 0; k < 8; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 6, 16), steel); ring.position.set(DX - 0.45 + k * 0.13, DY + 0.016, DZ + 0.38); gDesk.add(ring); }
+    // a desk calendar block: the months to come stacked under the page, a stiff back, a spiral along the top
+    const pageMat = new THREE.MeshStandardMaterial({ color: "#efeadf", roughness: 0.95 });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.012, 0.67), new THREE.MeshStandardMaterial({ color: "#1d3a2a", roughness: 0.8 })); back.position.set(DX, DY - 0.002, DZ + 0.705); back.castShadow = back.receiveShadow = true; gDesk.add(back);
+    for (let k = 0; k < 3; k++) { const pg = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.0018, 0.63 - k * 0.004), pageMat); pg.position.set(DX + (k - 1) * 0.004, DY + 0.005 + k * 0.002, DZ + 0.7 + (k % 2 ? 0.003 : -0.002)); pg.receiveShadow = true; gDesk.add(pg); }
+    for (let k = 0; k < 15; k++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.017, 0.0035, 8, 20, Math.PI * 1.25), steel);
+      ring.rotation.y = Math.PI / 2; ring.rotation.z = -0.3; ring.position.set(DX - 0.63 + k * 0.09, DY + 0.017, DZ + 0.39); ring.castShadow = true; gDesk.add(ring);
+    }
     // mug, pen, whistle, notebook, lamp
     const mugMat = new THREE.MeshStandardMaterial({ color: opts.accent || "#2f8f5b", roughness: 0.4 });
     const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.13, 24, 1, true), mugMat); mug.position.set(DX + 0.95, DY + 0.065, DZ + 0.45); mug.castShadow = true;
@@ -951,43 +957,60 @@
       s.mesh.userData.regions = regions;
       s.tex.needsUpdate = true;
     }
+    // A desk-calendar page: punched top, the month in a coloured band, a small month grid with the match days marked,
+    // and the month's matches listed beside it (score coloured by the result, or the hour, and my rating).
     function drawCalendar(m) {
       const s = calSheet, c = s.canvas, ctx = c.getContext("2d"), S = c.width / c.logical, W = c.logical, H = c.height / S; ctx.setTransform(S, 0, 0, S, 0, 0); s.mesh.userData.scale = S;
+      const regions = [], accent = opts.accent || "#2f8f5b", tone = { V: "#2f8f5b", N: "#b39b2c", D: "#c0262d" };
       paper(ctx, W, H, false);
-      const regions = [], accent = opts.accent || "#2f8f5b";
-      ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "center"; ctx.font = `64px ${FONT_UI}`; ctx.fillText(m.title || "", W / 2, 92);
-      for (const [id, x, dir, on] of [["prev", 80, -1, m.hasPrev], ["next", W - 80, 1, m.hasNext]]) {
-        ctx.fillStyle = on ? accent : "#d8d2c8"; ctx.beginPath(); ctx.arc(x, 72, 46, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x - 13 * dir, 50); ctx.lineTo(x + 16 * dir, 72); ctx.lineTo(x - 13 * dir, 94); ctx.closePath(); ctx.fill();
-        if (on) regions.push({ id: "cal:" + id, x: x - 80, y: 0, w: 160, h: 150 });
+      // binding holes along the top
+      for (let k = 0; k < 15; k++) { ctx.fillStyle = "#2a2622"; ctx.beginPath(); ctx.arc(W / 2 - 0.63 / 1.38 * W + k * (0.09 / 1.38) * W, 18, 9, 0, Math.PI * 2); ctx.fill(); }
+      // month band
+      const bandY = 38, bandH = 104;
+      ctx.fillStyle = accent; ctx.fillRect(0, bandY, W, bandH);
+      ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(0, bandY + bandH - 6, W, 6);
+      const [mName, mYear] = String(m.title || "").split(" ");
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `70px ${FONT_DISPLAY}`; ctx.fillText(mName || "", W / 2 - 40, bandY + 76);
+      ctx.font = `46px ${FONT_UI}`; ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.textAlign = "left"; ctx.fillText(mYear || "", W / 2 - 40 + ctx.measureText(mName || "").width / 2 + 80, bandY + 72);
+      for (const [id, x, dir, on] of [["prev", 70, -1, m.hasPrev], ["next", W - 70, 1, m.hasNext]]) {
+        ctx.fillStyle = on ? "#fff" : "rgba(255,255,255,0.3)"; ctx.beginPath(); ctx.arc(x, bandY + bandH / 2, 36, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = on ? accent : "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.moveTo(x - 10 * dir, bandY + bandH / 2 - 17); ctx.lineTo(x + 13 * dir, bandY + bandH / 2); ctx.lineTo(x - 10 * dir, bandY + bandH / 2 + 17); ctx.closePath(); ctx.fill();
+        if (on) regions.push({ id: "cal:" + id, x: x - 70, y: 0, w: 140, h: bandY + bandH + 10 });
       }
-      const rows = m.rows || [], top = 140, rowH = Math.min(142, (H - top - 16) / Math.max(1, rows.length));
-      if (!rows.length) { ctx.fillStyle = "#8a7f72"; ctx.font = `52px ${FONT_HAND}`; ctx.fillText("Pas de match ce mois-ci", W / 2, top + 140); }
-      const tone = { V: "#2f8f5b", N: "#9a8a2a", D: "#c0262d" };
+      // month grid on the left
+      const key = m.key != null ? m.key : null;
+      const top = bandY + bandH + 18, gx = 30, gw = 440, rows = m.rows || [];
+      if (key != null) {
+        const y = Math.floor(key / 12), mo = key % 12;
+        const offset = (new Date(Date.UTC(y, mo, 1)).getUTCDay() + 6) % 7, len = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+        const cw = gw / 7, ch = Math.min(58, (H - top - 50) / 6.4);
+        ctx.font = `28px ${FONT_UI}`; ctx.textAlign = "center";
+        ["L", "M", "M", "J", "V", "S", "D"].forEach((d, k) => { ctx.fillStyle = k >= 5 ? "#c0262d" : "#8b8174"; ctx.fillText(d, gx + cw * k + cw / 2, top + 26); });
+        const byDay = Object.fromEntries(rows.map((r) => [r.day, r]));
+        for (let d = 1; d <= len; d++) {
+          const i = offset + d - 1, cx = gx + cw * (i % 7) + cw / 2, cy = top + 44 + ch * Math.floor(i / 7) + ch / 2;
+          const r = byDay[d];
+          if (r) { ctx.fillStyle = r.result ? tone[r.result] : accent; ctx.beginPath(); ctx.arc(cx, cy, ch * 0.44, 0, Math.PI * 2); ctx.fill(); }
+          ctx.fillStyle = r ? "#fff" : (i % 7 >= 5 ? "#c0262d" : "#3b352e"); ctx.font = `${r ? 32 : 30}px ${FONT_UI}`; ctx.fillText(String(d), cx, cy + 11);
+          if (r) regions.push({ id: "match:" + r.id, x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch });
+        }
+      }
+      // a line between the grid and the list, like a fold
+      ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx + gw + 24, top); ctx.lineTo(gx + gw + 24, H - 24); ctx.stroke();
+      // the matches of the month
+      const lx = gx + gw + 50, lw = W - lx - 30;
+      const rowH = Math.min(96, (H - top - 20) / Math.max(1, rows.length));
+      if (!rows.length) { ctx.fillStyle = "#8a7f72"; ctx.textAlign = "center"; ctx.font = `48px ${FONT_HAND}`; ctx.fillText("Pas de match ce mois-ci", lx + lw / 2, top + 140); }
       rows.forEach((r, k) => {
-        const y = top + k * rowH, mid = y + rowH / 2;
-        if (k) { ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke(); }
-        const fs = Math.min(64, rowH * 0.46);
-        // date
-        ctx.textAlign = "left"; ctx.fillStyle = "#8b8174"; ctx.font = `${fs * 0.7}px ${FONT_UI}`; ctx.fillText(r.wd, 50, mid - fs * 0.15);
-        ctx.fillStyle = "#1b1b1b"; ctx.font = `${fs}px ${FONT_UI}`; ctx.fillText(String(r.day), 50, mid + fs * 0.75);
-        // opponent
-        fitFont(ctx, "vs " + r.opponent, FONT_UI, fs, W - 640); ctx.fillText("vs " + r.opponent, 175, mid + fs * 0.35);
-        // score (coloured by the result) or kick-off hour
-        const sx = W - 330;
-        if (r.score) {
-          ctx.fillStyle = tone[r.result]; roundRect(ctx, sx - 110, mid - fs * 0.72, 220, fs * 1.44, 18); ctx.fill();
-          ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `${fs}px ${FONT_UI}`; ctx.fillText(r.score, sx, mid + fs * 0.35);
-        } else {
-          ctx.fillStyle = "#6b6257"; ctx.textAlign = "center"; ctx.font = `${fs * 0.85}px ${FONT_UI}`; ctx.fillText(r.hour || "", sx, mid + fs * 0.3);
-        }
-        // my rating
-        const rx = W - 110;
-        if (r.rating != null) {
-          ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(rx, mid, fs * 0.82, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#1b1b1b"; ctx.lineWidth = 3; ctx.stroke();
-          ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "center"; ctx.font = `${fs * 0.72}px ${FONT_UI}`; ctx.fillText(r.rating.toFixed(1), rx, mid + fs * 0.25);
-        }
-        regions.push({ id: "match:" + r.id, x: 0, y, w: W, h: rowH });
+        const y0 = top + k * rowH, mid = y0 + rowH / 2, fs = Math.min(44, rowH * 0.46);
+        if (k) { ctx.strokeStyle = "rgba(0,0,0,0.08)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx + lw, y0); ctx.stroke(); }
+        ctx.textAlign = "left"; ctx.fillStyle = r.result ? tone[r.result] : accent; ctx.font = `${fs}px ${FONT_UI}`; ctx.fillText(`${r.wd.replace(".", "")} ${r.day}`, lx, mid + fs * 0.35);
+        ctx.fillStyle = "#1b1b1b"; fitFont(ctx, "vs " + r.opponent, FONT_UI, fs, lw - 400); ctx.fillText("vs " + r.opponent, lx + 130, mid + fs * 0.35);
+        const sx = lx + lw - 200;
+        if (r.score) { ctx.fillStyle = tone[r.result] || "#8a8a8a"; roundRect(ctx, sx - 75, mid - fs * 0.68, 150, fs * 1.36, 14); ctx.fill(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = `${fs * 0.95}px ${FONT_UI}`; ctx.fillText(r.score, sx, mid + fs * 0.32); }
+        else { ctx.fillStyle = "#6b6257"; ctx.textAlign = "center"; ctx.font = `${fs * 0.85}px ${FONT_UI}`; ctx.fillText(r.hour || "", sx, mid + fs * 0.3); }
+        if (r.rating != null) { const rx = lx + lw - 40; ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(rx, mid, fs * 0.72, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#1b1b1b"; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = "#1b1b1b"; ctx.textAlign = "center"; ctx.font = `${fs * 0.62}px ${FONT_UI}`; ctx.fillText(r.rating.toFixed(1), rx, mid + fs * 0.22); }
+        regions.push({ id: "match:" + r.id, x: lx - 10, y: y0, w: lw + 20, h: rowH });
       });
       s.mesh.userData.regions = regions;
       s.tex.needsUpdate = true;
