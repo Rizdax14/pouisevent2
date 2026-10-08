@@ -171,7 +171,7 @@
       for (const m of reflective) { m.envMap = env; m.envMapIntensity = m.userData.envI || 0.6; m.needsUpdate = true; }
       roomEnv = env;
     });
-    let roomEnv = null; const reflective = [];
+    let roomEnv = null; const reflective = [], tickers = [];
 
     // ---------- shirts ----------
     const SW = 1.0;
@@ -351,7 +351,32 @@
       g.add(cup, base);
       return g;
     }
-    [[gold, 0.62, 0], [silver, 0.48, -0.45], [gold, 0.42, 0.46]].forEach(([m, s, x]) => { const t = trophy(m, s); t.position.set(BX + x, -0.395 + 0.12 * s, -0.55); gBoard.add(t); });
+    // one big cup: polished gold, ear handles, a stepped black base with an engraved plate
+    (function bigCup() {
+      const g = new THREE.Group();
+      const goldP = new THREE.MeshPhysicalMaterial({ color: "#e9b949", metalness: 1, roughness: 0.14, clearcoat: 0.6, clearcoatRoughness: 0.1, envMap });
+      goldP.userData.envI = 1.4; reflective.push(goldP);
+      const prof = [[0, 0.0], [0.11, 0.0], [0.11, 0.015], [0.085, 0.025], [0.05, 0.04], [0.035, 0.09], [0.03, 0.15], [0.042, 0.17], [0.03, 0.19], [0.05, 0.22], [0.1, 0.25], [0.15, 0.3], [0.18, 0.37], [0.195, 0.45], [0.2, 0.5], [0.215, 0.52], [0.205, 0.53], [0.19, 0.515], [0.0, 0.515]]
+        .map(([x, y]) => new THREE.Vector2(x, y));
+      const cupM = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), goldP); cupM.castShadow = true;
+      // a band around the bowl
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.183, 0.006, 8, 64), goldP); band.rotation.x = Math.PI / 2; band.position.y = 0.38;
+      for (const sx of [-1, 1]) {
+        const hc = new THREE.CatmullRomCurve3([V3(sx * 0.17, 0.45, 0), V3(sx * 0.27, 0.48, 0), V3(sx * 0.3, 0.38, 0), V3(sx * 0.22, 0.29, 0), V3(sx * 0.14, 0.28, 0)]);
+        const h = new THREE.Mesh(new THREE.TubeGeometry(hc, 40, 0.014, 10), goldP); h.castShadow = true; g.add(h);
+      }
+      const blk = new THREE.MeshPhysicalMaterial({ color: "#121113", roughness: 0.25, clearcoat: 0.8, envMap }); reflective.push(blk);
+      const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.34), blk); b1.position.y = -0.105;
+      const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.07, 0.27), blk); b2.position.y = -0.035;
+      b1.castShadow = b2.castShadow = true;
+      const c = canvas2d(512, 128), ctx = c.getContext("2d");
+      const gg = ctx.createLinearGradient(0, 0, 0, 128); gg.addColorStop(0, "#f3d27a"); gg.addColorStop(1, "#b8862a"); ctx.fillStyle = gg; ctx.fillRect(0, 0, 512, 128);
+      ctx.fillStyle = "#3a2a0c"; ctx.textAlign = "center"; ctx.font = `46px ${FONT_UI}`; ctx.fillText("BIÈRE LEVERCULSEC", 256, 62); ctx.font = `30px ${FONT_UI}`; ctx.fillText("CHAMPIONS · DEPUIS 2024", 256, 104);
+      const plateM = new THREE.MeshStandardMaterial({ map: finish(c), metalness: 0.6, roughness: 0.3, envMap }); reflective.push(plateM);
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.06), plateM); plate.position.set(0, -0.105, 0.171);
+      g.add(cupM, band, b1, b2, plate);
+      g.scale.setScalar(0.74); g.position.set(BX, -0.395 + 0.14 * 0.74, -0.52); gBoard.add(g);
+    })();
     // a ball and two cones on the floor
     function ballTexture() {
       const c = canvas2d(512, 256), ctx = c.getContext("2d");
@@ -519,19 +544,72 @@
       ball2.position.set(-0.62, -0.69, 0.42); ball2.rotation.set(1.1, 0.3, 0.2); ball2.castShadow = true; gRack.add(ball2);
     })();
 
-    // the club flag pinned on the board wall, like the one at the fence
-    (function banner() {
+
+    // framed photos of the team on the wall behind the shirts
+    (function frames() {
+      const frameMat = new THREE.MeshStandardMaterial({ color: "#151214", roughness: 0.5 });
+      const matBoard = new THREE.MeshStandardMaterial({ color: "#f2eee6", roughness: 0.9 });
+      [["photo-shoutoh", -0.6, 0.64, 0.27, 0.405, 0.03], ["photo-jardin", 0.6, 0.64, 0.27, 0.405, -0.025], ["photo-fete", 0, -0.08, 0.5, 0.333, 0]].forEach(([name, x, y, w, h, rz]) => {
+        const g = new THREE.Group();
+        const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.07, h + 0.07, 0.025), frameMat); fr.castShadow = true;
+        const mb = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.03, h + 0.03), matBoard); mb.position.z = 0.0131;
+        const pm = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.35 });
+        const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), pm); pic.position.z = 0.014;
+        texLoader.load(ROOM + name + ".jpg?v=1", (t) => { t.encoding = THREE.sRGBEncoding; pm.map = t; pm.needsUpdate = true; });
+        g.add(fr, mb, pic); g.position.set(x, y, -0.735); g.rotation.z = rz; gRack.add(g);
+      });
+    })();
+
+    // a ball in the club colours on the trophy shelf
+    (function clubBall() {
       const c = canvas2d(1024, 512), ctx = c.getContext("2d");
-      ctx.fillStyle = "#f2efe6"; ctx.fillRect(0, 0, 1024, 512);
-      ctx.strokeStyle = GREEN; ctx.lineWidth = 18; ctx.strokeRect(20, 20, 984, 472);
-      ctx.fillStyle = GREEN; ctx.font = `92px ${FONT_DISPLAY}`; ctx.textAlign = "center"; ctx.fillText("Allez", 700, 210); ctx.font = `74px ${FONT_UI}`; ctx.fillText("LEVERCULSEC", 700, 320);
+      ctx.fillStyle = GREEN; ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillStyle = CREAM;
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 8; k++) {
+        const x = k * 128 + (r % 2) * 64, y = 64 + r * 128;
+        ctx.beginPath(); for (let j = 0; j < 6; j++) { const an = j * Math.PI / 3; ctx.lineTo(x + Math.cos(an) * 46, y + Math.sin(an) * 40); } ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = GREEN_D; ctx.lineWidth = 5;
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 8; k++) { const x = k * 128 + (r % 2) * 64, y = 64 + r * 128; ctx.beginPath(); for (let j = 0; j < 6; j++) { const an = j * Math.PI / 3; ctx.lineTo(x + Math.cos(an) * 46, y + Math.sin(an) * 40); } ctx.closePath(); ctx.stroke(); }
       const tex = finish(c);
-      crestImg.then((im) => { if (!im) return; const s = 360 / Math.max(im.width, im.height); ctx.drawImage(im, 230 - im.width * s / 2, 256 - im.height * s / 2, im.width * s, im.height * s); tex.needsUpdate = true; });
-      const geo = new THREE.PlaneGeometry(1.4, 0.55, 20, 8), p = geo.attributes.position;
-      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); p.setZ(i, 0.02 * Math.sin(x * 5) * (0.5 - y) + 0.03 * (0.37 - Math.abs(y)) * Math.cos(x * 2)); p.setY(i, y - 0.04 * Math.cos(x * 2.1) * (0.5 - y)); }
-      geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, side: THREE.DoubleSide }));
-      m.position.set(BX, -0.15, -0.73); m.rotation.z = -0.015; m.receiveShadow = true; gBoard.add(m);
+      crestImg.then((im) => { if (!im) return; for (const cx of [256, 768]) { ctx.fillStyle = CREAM; ctx.beginPath(); ctx.arc(cx, 256, 92, 0, Math.PI * 2); ctx.fill(); const s2 = 160 / Math.max(im.width, im.height); ctx.drawImage(im, cx - im.width * s2 / 2, 256 - im.height * s2 / 2, im.width * s2, im.height * s2); } tex.needsUpdate = true; });
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.11, 40, 28), new THREE.MeshPhysicalMaterial({ map: tex, roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.3 }));
+      b.position.set(BX - 0.48, -0.395 + 0.11, -0.5); b.rotation.set(0.2, -0.6, 0.1); b.castShadow = true; gBoard.add(b);
+    })();
+
+    // a green smoke flare on the right of the shelf, smoking for real
+    (function flare() {
+      const g = new THREE.Group();
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.2, 20), new THREE.MeshStandardMaterial({ color: "#1d1d1f", roughness: 0.5 }));
+      const lab = new THREE.Mesh(new THREE.CylinderGeometry(0.0285, 0.0285, 0.08, 20, 1, true), new THREE.MeshStandardMaterial({ color: GREEN, roughness: 0.6 }));
+      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, 0.03, 16), new THREE.MeshBasicMaterial({ color: "#c8ffd8" }));
+      can.position.y = 0.1; lab.position.y = 0.1; tip.position.y = 0.215; can.castShadow = true;
+      g.add(can, lab, tip); g.position.set(BX + 0.52, -0.395, -0.5); g.rotation.z = -0.25; gBoard.add(g);
+      const glow = new THREE.PointLight("#3dff7a", 0.9, 1.6, 2); glow.position.set(BX + 0.47, -0.15, -0.4); gBoard.add(glow);
+      // soft round puff, reused by every particle
+      const c = canvas2d(128, 128), ctx = c.getContext("2d"), gr = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+      gr.addColorStop(0, "rgba(255,255,255,0.85)"); gr.addColorStop(0.5, "rgba(255,255,255,0.35)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, 128, 128);
+      const puffTex = finish(c, false);
+      const N = low ? 22 : 40, puffs = [];
+      const origin = new THREE.Vector3(BX + 0.47, -0.17, -0.5);
+      for (let k = 0; k < N; k++) {
+        const m = new THREE.SpriteMaterial({ map: puffTex, color: k % 3 ? "#4fd27e" : "#8be8a8", transparent: true, depthWrite: false, opacity: 0 });
+        const sp = new THREE.Sprite(m); gBoard.add(sp);
+        puffs.push({ sp, life: k / N, speed: 0.75 + Math.random() * 0.5, drift: (Math.random() - 0.5) * 0.25, spin: Math.random() * 6 });
+      }
+      tickers.push((dt, t) => {
+        if (cam.zone !== "board" && cam.t >= 1) return; // only alive where it can be seen
+        for (const p of puffs) {
+          p.life += dt * 0.22 * p.speed; if (p.life > 1) { p.life -= 1; p.drift = (Math.random() - 0.5) * 0.25; }
+          const L = p.life, rise = L * 1.25;
+          p.sp.position.set(origin.x + p.drift * L * 1.5 + Math.sin(t * 0.8 + p.spin) * 0.05 * L + 0.2 * L + 0.9 * L * L, origin.y + rise * 0.8, origin.z + 0.1 * L);
+          const sc = 0.1 + L * 0.7; p.sp.scale.set(sc, sc, 1);
+          p.sp.material.opacity = Math.min(1, L * 8) * Math.pow(1 - L, 1.3) * 0.85;
+          p.sp.material.rotation = p.spin + L * 1.5;
+        }
+        glow.intensity = 0.75 + 0.25 * Math.sin(t * 13) * Math.sin(t * 7.3);
+      });
     })();
 
     // a cold one on the coach's desk
@@ -1039,6 +1117,7 @@
         const sway = reduced ? 0 : Math.sin(t * 1.3 + s.phase) * (0.01 + 0.018 * w);
         s.group.position.set(s.x, RAIL_Y, s.z); s.group.rotation.set(0, s.ry, sway);
       });
+      for (const f of tickers) f(dt, t);
       renderer.render(scene, camera);
     }
 
