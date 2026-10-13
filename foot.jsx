@@ -50,8 +50,13 @@ async function applyLineupChange(matchId, { add, remove }) {
   }
 }
 
+// Today's squad: the roster without former players (role "ancien", kept for their history). Only they go on a match sheet.
+function currentSquad(roster) {
+  return roster.filter((r) => r.role !== "ancien");
+}
+// …and only regulars and occasional players answer presences.
 function attendanceRoster(roster) {
-  return roster.filter((r) => r.role !== "invite");
+  return roster.filter((r) => r.role !== "invite" && r.role !== "ancien");
 }
 
 function lineupIdsFor(lineups, matchId) {
@@ -163,7 +168,7 @@ function FootAttendanceButtons({ myStatus, saving, onSet, compact, matchIso }) {
 
 // ---- lineup (feuille de match) ------------------------------------------------------------------------------------
 function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, presence }) {
-  const ids = [...new Set([...roster.map((r) => r.player_id), ...(extraIds || [])])];
+  const ids = [...new Set([...currentSquad(roster).map((r) => r.player_id), ...(extraIds || [])])];
   const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
   const players = ids.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean)
     .sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
@@ -505,15 +510,16 @@ function FootRosterManager({ roster, reload }) {
 
   const nameOf = (p) => footShortName(p) || "";
   const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
-  const team = PLAYERS.filter((p) => roleByPlayer[p.id]).sort(byName);
+  const isCurrent = (id) => roleByPlayer[id] && roleByPlayer[id] !== "ancien";
+  const team = PLAYERS.filter((p) => isCurrent(p.id)).sort(byName);
   const visibleTeam = filterPlayersByName(team, search, nameOf);
-  const others = PLAYERS.filter((p) => !roleByPlayer[p.id]).sort(byName);
+  const others = PLAYERS.filter((p) => !isCurrent(p.id)).sort(byName);
   const visibleOthers = filterPlayersByName(others, addSearch, nameOf);
   const ageOf = (iso) => { if (!iso) return null; const d = new Date(iso), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return a; };
 
   return (
     <FCard>
-      <FHeading right={<FChip tone="soft">{roster.length} joueurs</FChip>}>Effectif</FHeading>
+      <FHeading right={<FChip tone="soft">{team.length} joueurs</FChip>}>Effectif {shortSeason(seasonOf(new Date().toISOString()))}</FHeading>
       <input style={FOOT_INPUT_STYLE} placeholder="Rechercher dans l'effectif…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Rechercher dans l'effectif" />
       {team.length === 0 && <FEmpty icon="users" title="Effectif vide" text="Ajoute des joueurs avec le bouton ci-dessous." />}
       {team.length > 0 && visibleTeam.length === 0 && <FEmpty icon="users" title="Aucun résultat" text={`Aucun joueur de l'effectif ne correspond à « ${search} ».`} />}
@@ -538,10 +544,11 @@ function FootRosterManager({ roster, reload }) {
                   onBlur={(e) => { const v = e.target.value.trim(); if (v !== (numberByPlayer[p.id] || "")) setNumber(p.id, v); }}
                   style={{ ...FOOT_INPUT_STYLE, width: 70, marginBottom: 0, textAlign: "center", padding: "8px 6px", minHeight: 40, fontFamily: FF.ui }} />
                 <select value={roleByPlayer[p.id] || ""} disabled={saving === p.id} onChange={(e) => setRole(p.id, e.target.value)} aria-label={`Rôle de ${nameOf(p)}`} style={{ ...FOOT_SELECT_STYLE, flex: 1, minWidth: 0 }}>
-                  <option value="">Hors équipe</option>
                   <option value="regulier">Régulier</option>
                   <option value="occasionnel">Occasionnel</option>
                   <option value="invite">Invité</option>
+                  <option value="ancien">Plus dans l'équipe (ancien)</option>
+                  <option value="">Retirer complètement</option>
                 </select>
               </div>
             </div>
@@ -566,7 +573,7 @@ function FootRosterManager({ roster, reload }) {
             {visibleOthers.map((p) => (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
                 <FAvatar playerId={p.id} name={nameOf(p)} size={34} />
-                <div style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}</div>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf(p)}{roleByPlayer[p.id] === "ancien" && <span style={{ color: FC.muted, fontSize: 12 }}> · ancien</span>}</div>
                 <FBtn size="sm" icon="plus" disabled={saving === p.id} onClick={() => setRole(p.id, addRole)}>Ajouter</FBtn>
               </div>
             ))}
@@ -688,14 +695,70 @@ function FootActivityCard({ activity, roster, rows, currentPlayer, isAdmin, relo
   );
 }
 
-function FootAdminPage({ roster, activities, reload }) {
+function FootAdminPage({ roster, activities, matches, lineups, events, reload }) {
   return (
     <div className="ft-page">
       <FootCreateMatchForm reload={reload} />
       <FootCreateActivityForm reload={reload} />
       <FootActivitiesAdmin activities={activities || []} reload={reload} />
-      <FootRosterManager roster={roster} reload={reload} />
+      <FootSquads roster={roster} matches={matches || []} lineups={lineups || []} events={events || []} reload={reload} />
     </div>
+  );
+}
+
+// The current squad (editable) and the squads of past seasons (their listed players + whoever played that season).
+function FootSquads({ roster, matches, lineups, events, reload }) {
+  const now = seasonOf(new Date().toISOString());
+  const past = Object.keys(FOOT_SEASON_SQUADS).filter((s) => s < now).sort().reverse();
+  const [season, setSeason] = React.useState(now);
+  return (
+    <>
+      <FSegmented value={season} onChange={setSeason} options={[[now, "Actuel"], ...past.map((s) => [s, shortSeason(s)])]} style={{ marginBottom: 12, background: "rgba(255,255,255,0.92)" }} />
+      {season === now
+        ? <FootRosterManager roster={roster} reload={reload} />
+        : <FootPastSquad key={season} season={season} roster={roster} matches={matches} lineups={lineups} events={events} reload={reload} />}
+    </>
+  );
+}
+
+function FootPastSquad({ season, roster, matches, lineups, events, reload }) {
+  const [saving, setSaving] = React.useState(null);
+  const seasonMatches = matches.filter((m) => seasonOf(m.match_datetime) === season);
+  const ids = new Set(seasonMatches.map((m) => m.id));
+  const seasonLineups = lineups.filter((l) => ids.has(l.match_id));
+  const stats = Object.fromEntries(computePlayerStats(seasonMatches, seasonLineups, events.filter((e) => ids.has(e.match_id)), {}).map((s) => [s.playerId, s]));
+  const played = new Set(seasonLineups.map((l) => l.player_id));
+  const squadIds = [...new Set([...(FOOT_SEASON_SQUADS[season] || []), ...roster.filter((r) => r.role !== "invite" && played.has(r.player_id)).map((r) => r.player_id)])];
+  const nameOf = (p) => footShortName(p) || "";
+  const players = squadIds.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const roleOf = (id) => (roster.find((r) => r.player_id === id) || {}).role;
+  const inCurrent = (id) => roleOf(id) && roleOf(id) !== "ancien";
+  async function bringBack(id) {
+    setSaving(id);
+    try { assertUpsertOk(await SUPABASE.from("foot_roster").upsert({ player_id: id, role: "regulier" }, { onConflict: "player_id" })); await reload(); }
+    catch (e) { console.warn("roster update failed", e); }
+    setSaving(null);
+  }
+  return (
+    <FCard>
+      <FHeading right={<FChip tone="soft">{players.length} joueurs</FChip>}>Effectif {shortSeason(season)}</FHeading>
+      <div style={{ fontSize: 13, color: FC.muted, marginBottom: 6 }}>Les joueurs de cette saison. Seul l'effectif actuel répond aux présences et va sur les convocations.</div>
+      {players.map((p) => {
+        const st = stats[p.id];
+        return (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${FC.line}` }}>
+            <FAvatar playerId={p.id} name={nameOf(p)} size={38} linkable />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, overflowWrap: "anywhere" }}>{nameOf(p)}</div>
+              <div style={{ fontSize: 12, color: FC.muted }}>{st ? `${st.played} match${st.played > 1 ? "s" : ""} · ${st.goals} but${st.goals > 1 ? "s" : ""} · ${st.assists} passe${st.assists > 1 ? "s" : ""}` : "Pas de match enregistré"}</div>
+            </div>
+            {inCurrent(p.id)
+              ? <FChip tone="soft">Effectif actuel</FChip>
+              : <FBtn size="sm" variant="secondary" icon="plus" disabled={saving === p.id} onClick={() => bringBack(p.id)}>Actuel</FBtn>}
+          </div>
+        );
+      })}
+    </FCard>
   );
 }
 
@@ -814,7 +877,7 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
   const [err, setErr] = React.useState(null);
 
   // Keep a player who has since left the roster selectable when editing their old goal.
-  const rosterIds = new Set(roster.map((r) => r.player_id));
+  const rosterIds = new Set(currentSquad(roster).map((r) => r.player_id));
   [event?.player_id, event?.assist_player_id].forEach((id) => { if (id) rosterIds.add(id); });
   const options = PLAYERS.filter((p) => rosterIds.has(p.id));
 
@@ -923,7 +986,7 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
 function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
-  const options = roster.map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
+  const options = currentSquad(roster).map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
   const can = canConfirmGoal(playerId, busy);
   return (
     <div style={{ background: FC.softer, border: `1.5px solid ${FC.line}`, borderRadius: 18, padding: 14, marginTop: 10 }}>
@@ -3185,7 +3248,7 @@ function FootballApp({ currentPlayer, onBack }) {
             currentPlayer={currentPlayer} navBack={goBack} reload={reloadFoot}
           />
         )}
-        {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} activities={activities} reload={reloadFoot} />}
+        {loaded && page === "admin" && isAdmin && <FootAdminPage roster={roster} activities={activities} matches={matches} lineups={lineups} events={events} reload={reloadFoot} />}
         {loaded && page === "reseaux" && isAdmin && <FootReseauxPage roster={roster} photos={photos} framings={framings} matches={matches} lineups={lineups} events={events} ratings={ratings} reload={reloadFoot} />}
         {loaded && page === "rankings" && <FootRankingsPage />}
         {loaded && page === "stats" && <FootStatsPage matches={matches} lineups={lineups} events={events} ratings={ratings} motmVotes={motmVotes} roster={roster} currentPlayer={currentPlayer} />}

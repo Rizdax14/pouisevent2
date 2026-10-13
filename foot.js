@@ -75,8 +75,14 @@ async function applyLineupChange(matchId, {
     });
   }
 }
+
+// Today's squad: the roster without former players (role "ancien", kept for their history). Only they go on a match sheet.
+function currentSquad(roster) {
+  return roster.filter(r => r.role !== "ancien");
+}
+// …and only regulars and occasional players answer presences.
 function attendanceRoster(roster) {
-  return roster.filter(r => r.role !== "invite");
+  return roster.filter(r => r.role !== "invite" && r.role !== "ancien");
 }
 function lineupIdsFor(lineups, matchId) {
   return lineups.filter(l => l.match_id === matchId).map(l => l.player_id);
@@ -424,7 +430,7 @@ function FootLineupChecklist({
   disabled,
   presence
 }) {
-  const ids = [...new Set([...roster.map(r => r.player_id), ...(extraIds || [])])];
+  const ids = [...new Set([...currentSquad(roster).map(r => r.player_id), ...(extraIds || [])])];
   const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
   const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   if (players.length === 0) return /*#__PURE__*/React.createElement(FEmpty, {
@@ -1305,9 +1311,10 @@ function FootRosterManager({
   }
   const nameOf = p => footShortName(p) || "";
   const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
-  const team = PLAYERS.filter(p => roleByPlayer[p.id]).sort(byName);
+  const isCurrent = id => roleByPlayer[id] && roleByPlayer[id] !== "ancien";
+  const team = PLAYERS.filter(p => isCurrent(p.id)).sort(byName);
   const visibleTeam = filterPlayersByName(team, search, nameOf);
-  const others = PLAYERS.filter(p => !roleByPlayer[p.id]).sort(byName);
+  const others = PLAYERS.filter(p => !isCurrent(p.id)).sort(byName);
   const visibleOthers = filterPlayersByName(others, addSearch, nameOf);
   const ageOf = iso => {
     if (!iso) return null;
@@ -1320,8 +1327,8 @@ function FootRosterManager({
   return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
     right: /*#__PURE__*/React.createElement(FChip, {
       tone: "soft"
-    }, roster.length, " joueurs")
-  }, "Effectif"), /*#__PURE__*/React.createElement("input", {
+    }, team.length, " joueurs")
+  }, "Effectif ", shortSeason(seasonOf(new Date().toISOString()))), /*#__PURE__*/React.createElement("input", {
     style: FOOT_INPUT_STYLE,
     placeholder: "Rechercher dans l'effectif\u2026",
     value: search,
@@ -1425,14 +1432,16 @@ function FootRosterManager({
         minWidth: 0
       }
     }, /*#__PURE__*/React.createElement("option", {
-      value: ""
-    }, "Hors \xE9quipe"), /*#__PURE__*/React.createElement("option", {
       value: "regulier"
     }, "R\xE9gulier"), /*#__PURE__*/React.createElement("option", {
       value: "occasionnel"
     }, "Occasionnel"), /*#__PURE__*/React.createElement("option", {
       value: "invite"
-    }, "Invit\xE9")))), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
+    }, "Invit\xE9"), /*#__PURE__*/React.createElement("option", {
+      value: "ancien"
+    }, "Plus dans l'\xE9quipe (ancien)"), /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Retirer compl\xE8tement")))), open && (hasKey ? /*#__PURE__*/React.createElement(FootPlayerDetailsEditor, {
       key: `${p.id}-${d ? [d.phone, d.email, d.birth_date, d.instagram].join("|") : ""}`,
       player: p,
       detail: d,
@@ -1521,7 +1530,12 @@ function FootRosterManager({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, nameOf(p)), /*#__PURE__*/React.createElement(FBtn, {
+  }, nameOf(p), roleByPlayer[p.id] === "ancien" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.muted,
+      fontSize: 12
+    }
+  }, " \xB7 ancien")), /*#__PURE__*/React.createElement(FBtn, {
     size: "sm",
     icon: "plus",
     disabled: saving === p.id,
@@ -1878,6 +1892,9 @@ function FootActivityCard({
 function FootAdminPage({
   roster,
   activities,
+  matches,
+  lineups,
+  events,
   reload
 }) {
   return /*#__PURE__*/React.createElement("div", {
@@ -1889,9 +1906,131 @@ function FootAdminPage({
   }), /*#__PURE__*/React.createElement(FootActivitiesAdmin, {
     activities: activities || [],
     reload: reload
-  }), /*#__PURE__*/React.createElement(FootRosterManager, {
+  }), /*#__PURE__*/React.createElement(FootSquads, {
+    roster: roster,
+    matches: matches || [],
+    lineups: lineups || [],
+    events: events || [],
+    reload: reload
+  }));
+}
+
+// The current squad (editable) and the squads of past seasons (their listed players + whoever played that season).
+function FootSquads({
+  roster,
+  matches,
+  lineups,
+  events,
+  reload
+}) {
+  const now = seasonOf(new Date().toISOString());
+  const past = Object.keys(FOOT_SEASON_SQUADS).filter(s => s < now).sort().reverse();
+  const [season, setSeason] = React.useState(now);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FSegmented, {
+    value: season,
+    onChange: setSeason,
+    options: [[now, "Actuel"], ...past.map(s => [s, shortSeason(s)])],
+    style: {
+      marginBottom: 12,
+      background: "rgba(255,255,255,0.92)"
+    }
+  }), season === now ? /*#__PURE__*/React.createElement(FootRosterManager, {
     roster: roster,
     reload: reload
+  }) : /*#__PURE__*/React.createElement(FootPastSquad, {
+    key: season,
+    season: season,
+    roster: roster,
+    matches: matches,
+    lineups: lineups,
+    events: events,
+    reload: reload
+  }));
+}
+function FootPastSquad({
+  season,
+  roster,
+  matches,
+  lineups,
+  events,
+  reload
+}) {
+  const [saving, setSaving] = React.useState(null);
+  const seasonMatches = matches.filter(m => seasonOf(m.match_datetime) === season);
+  const ids = new Set(seasonMatches.map(m => m.id));
+  const seasonLineups = lineups.filter(l => ids.has(l.match_id));
+  const stats = Object.fromEntries(computePlayerStats(seasonMatches, seasonLineups, events.filter(e => ids.has(e.match_id)), {}).map(s => [s.playerId, s]));
+  const played = new Set(seasonLineups.map(l => l.player_id));
+  const squadIds = [...new Set([...(FOOT_SEASON_SQUADS[season] || []), ...roster.filter(r => r.role !== "invite" && played.has(r.player_id)).map(r => r.player_id)])];
+  const nameOf = p => footShortName(p) || "";
+  const players = squadIds.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+  const roleOf = id => (roster.find(r => r.player_id === id) || {}).role;
+  const inCurrent = id => roleOf(id) && roleOf(id) !== "ancien";
+  async function bringBack(id) {
+    setSaving(id);
+    try {
+      assertUpsertOk(await SUPABASE.from("foot_roster").upsert({
+        player_id: id,
+        role: "regulier"
+      }, {
+        onConflict: "player_id"
+      }));
+      await reload();
+    } catch (e) {
+      console.warn("roster update failed", e);
+    }
+    setSaving(null);
+  }
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, {
+    right: /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, players.length, " joueurs")
+  }, "Effectif ", shortSeason(season)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: FC.muted,
+      marginBottom: 6
+    }
+  }, "Les joueurs de cette saison. Seul l'effectif actuel r\xE9pond aux pr\xE9sences et va sur les convocations."), players.map(p => {
+    const st = stats[p.id];
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 0",
+        borderTop: `1px solid ${FC.line}`
+      }
+    }, /*#__PURE__*/React.createElement(FAvatar, {
+      playerId: p.id,
+      name: nameOf(p),
+      size: 38,
+      linkable: true
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 16,
+        overflowWrap: "anywhere"
+      }
+    }, nameOf(p)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: FC.muted
+      }
+    }, st ? `${st.played} match${st.played > 1 ? "s" : ""} · ${st.goals} but${st.goals > 1 ? "s" : ""} · ${st.assists} passe${st.assists > 1 ? "s" : ""}` : "Pas de match enregistré")), inCurrent(p.id) ? /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, "Effectif actuel") : /*#__PURE__*/React.createElement(FBtn, {
+      size: "sm",
+      variant: "secondary",
+      icon: "plus",
+      disabled: saving === p.id,
+      onClick: () => bringBack(p.id)
+    }, "Actuel"));
   }));
 }
 
@@ -2165,7 +2304,7 @@ function FootEventEditor({
   const [err, setErr] = React.useState(null);
 
   // Keep a player who has since left the roster selectable when editing their old goal.
-  const rosterIds = new Set(roster.map(r => r.player_id));
+  const rosterIds = new Set(currentSquad(roster).map(r => r.player_id));
   [event?.player_id, event?.assist_player_id].forEach(id => {
     if (id) rosterIds.add(id);
   });
@@ -2454,7 +2593,7 @@ function FootGoalPicker({
 }) {
   const [playerId, setPlayerId] = React.useState("");
   const [assistId, setAssistId] = React.useState("");
-  const options = roster.map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean);
+  const options = currentSquad(roster).map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean);
   const can = canConfirmGoal(playerId, busy);
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8301,6 +8440,9 @@ function FootballApp({
   }), loaded && page === "admin" && isAdmin && /*#__PURE__*/React.createElement(FootAdminPage, {
     roster: roster,
     activities: activities,
+    matches: matches,
+    lineups: lineups,
+    events: events,
     reload: reloadFoot
   }), loaded && page === "reseaux" && isAdmin && /*#__PURE__*/React.createElement(FootReseauxPage, {
     roster: roster,
