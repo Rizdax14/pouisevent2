@@ -262,6 +262,7 @@ function FootWhenWhere({
 const FOOT_PRESENCE_LABEL = {
   present: "Présent",
   absent: "Absent",
+  waiting: "Liste d'attente",
   none: "Pas de réponse"
 };
 function FootPresenceAvatar({
@@ -275,7 +276,7 @@ function FootPresenceAvatar({
     name: name,
     size: size
   });
-  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : FC.muted;
+  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : status === "waiting" ? "#f97316" : FC.muted;
   const d = Math.max(10, Math.round(size * 0.36));
   return /*#__PURE__*/React.createElement("span", {
     style: {
@@ -308,6 +309,13 @@ function FootPresenceAvatar({
 function presenceMap(attendance, matchId) {
   const out = {};
   for (const a of attendance || []) if (a.match_id === matchId) out[a.player_id] = a.status === "present" ? "present" : a.status === "absent" ? "absent" : "none";
+  return out;
+}
+// Same, with "waiting" for the present players beyond the match's minimum (the waiting list): the orange dot.
+function lineupPresence(attendance, match, roster) {
+  const out = presenceMap(attendance, match.id);
+  const rows = (attendance || []).filter(a => a.match_id === match.id);
+  for (const id of computeAttendanceQueue(attendanceRoster(roster), rows, match.min_players).waiting) out[id] = "waiting";
   return out;
 }
 
@@ -494,7 +502,7 @@ function FootLineupSection({
   reload
 }) {
   const current = lineupIdsFor(lineups, match.id);
-  const presence = presenceMap(attendance, match.id);
+  const presence = lineupPresence(attendance, match, roster);
   const [editing, setEditing] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
@@ -2265,7 +2273,7 @@ function FootStartMatchConfig({
     checked: sheet,
     onToggle: toggle,
     disabled: saving,
-    presence: presenceMap(attendance, match.id)
+    presence: lineupPresence(attendance, match, roster)
   })), err && /*#__PURE__*/React.createElement(FMessage, null, err), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

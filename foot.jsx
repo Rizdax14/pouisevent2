@@ -119,10 +119,10 @@ function FootWhenWhere({ match, size = 14 }) {
 }
 
 // Portrait with a small status dot in its corner: green = present, red = absent, grey = no answer yet (no dot when unknown).
-const FOOT_PRESENCE_LABEL = { present: "Présent", absent: "Absent", none: "Pas de réponse" };
+const FOOT_PRESENCE_LABEL = { present: "Présent", absent: "Absent", waiting: "Liste d'attente", none: "Pas de réponse" };
 function FootPresenceAvatar({ id, name, size, status }) {
   if (!status) return <FAvatar playerId={id} name={name} size={size} />;
-  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : FC.muted;
+  const color = status === "present" ? FC.good : status === "absent" ? FC.bad : status === "waiting" ? "#f97316" : FC.muted;
   const d = Math.max(10, Math.round(size * 0.36));
   return (
     <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}>
@@ -135,6 +135,13 @@ function FootPresenceAvatar({ id, name, size, status }) {
 function presenceMap(attendance, matchId) {
   const out = {};
   for (const a of attendance || []) if (a.match_id === matchId) out[a.player_id] = a.status === "present" ? "present" : a.status === "absent" ? "absent" : "none";
+  return out;
+}
+// Same, with "waiting" for the present players beyond the match's minimum (the waiting list): the orange dot.
+function lineupPresence(attendance, match, roster) {
+  const out = presenceMap(attendance, match.id);
+  const rows = (attendance || []).filter((a) => a.match_id === match.id);
+  for (const id of computeAttendanceQueue(attendanceRoster(roster), rows, match.min_players).waiting) out[id] = "waiting";
   return out;
 }
 
@@ -192,7 +199,7 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, pr
 
 function FootLineupSection({ match, roster, lineups, attendance, isAdmin, reload }) {
   const current = lineupIdsFor(lineups, match.id);
-  const presence = presenceMap(attendance, match.id);
+  const presence = lineupPresence(attendance, match, roster);
   const [editing, setEditing] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState(current);
   const [wanted, setWanted] = React.useState(current);
@@ -857,7 +864,7 @@ function FootStartMatchConfig({ match, roster, attendance, lineups, currentPlaye
         </FField>
       </div>
       <FLabel>Convocation ({sheet.length})</FLabel>
-      <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} presence={presenceMap(attendance, match.id)} /></div>
+      <div style={{ margin: "0 0 16px" }}><FootLineupChecklist roster={roster} extraIds={existingSheet} checked={sheet} onToggle={toggle} disabled={saving} presence={lineupPresence(attendance, match, roster)} /></div>
       {err && <FMessage>{err}</FMessage>}
       <div style={{ display: "flex", gap: 10 }}>
         <FBtn variant="ghost" onClick={onCancel} disabled={saving} style={{ flex: 1 }}>Annuler</FBtn>
