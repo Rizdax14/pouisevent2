@@ -228,6 +228,10 @@ function captionFor(kind, c) {
   if (kind === "matchday") return `MATCH DAY ⚽ Bière Leverculsec vs ${c.opponent}\n${c.band}`;
   if (kind === "result") return `RESULTAT ${c.matchType === "amical" ? "Amical" : "FSGT"} ⚽ Bière Leverculsec ${c.bl} vs ${c.opponent} ${c.opp}\n${c.dateLine}`;
   if (kind === "ratings") return `Les notes du dernier match contre ${c.opponent} !`;
+  if (kind === "rankings" && c.phase === "amical") {
+    const next = c.nextChampDay ? `dès ${c.nextChampDay}` : "très bientôt";
+    return `Les stats finales des matchs amicaux 🍺⚽\nButs, passes, décisifs, moyennes et hommes du match : voilà le bilan de la prépa.\nFin des amicaux, place au championnat FSGT ${next} ! 🔥`;
+  }
   if (kind === "rankings") return "Les classements mis à jour après cette nouvelle semaine de compétition !";
   return "";
 }
@@ -333,9 +337,25 @@ function isTargetAvailable(sectionKey, m, lineups) {
   return { ok: true };
 }
 
+// Rankings posts: while the season has only friendlies, they show the friendlies' tally; from the first finished
+// championship match on, the counters restart and only count the championship.
+function rankingsPhase(matches, season) {
+  const seasonOf = _footFn("seasonOf");
+  const played = matches.filter((m) => m.status === "finished" && (season === "all" || seasonOf(m.match_datetime) === season));
+  if (played.some((m) => m.match_type !== "amical")) return "championnat";
+  return played.length ? "amical" : null;
+}
+// "jeudi" when the next championship match is within a week, else null.
+function nextChampDay(matches, now) {
+  const next = matches.filter((m) => m.status === "scheduled" && m.match_type !== "amical" && new Date(m.match_datetime) > now)
+    .sort((a, b) => new Date(a.match_datetime) - new Date(b.match_datetime))[0];
+  if (!next || new Date(next.match_datetime) - now > 7 * 24 * 3600 * 1000) return null;
+  return JOURS[parisParts(new Date(next.match_datetime)).wd].toLowerCase();
+}
+
 // Inputs of captionFor, built from raw rows (same code in the app and on the server).
-function captionContextFor(kind, { matchId, season }, { matches, lineups, events, ratings, players }) {
-  if (kind === "rankings") return { season };
+function captionContextFor(kind, { matchId, season }, { matches, lineups, events, ratings, players }, now = new Date()) {
+  if (kind === "rankings") return { season, phase: rankingsPhase(matches, season), nextChampDay: nextChampDay(matches, now) };
   const match = matches.find((m) => m.id === matchId);
   const sheet = lineups.filter((l) => l.match_id === matchId).map((l) => l.player_id);
   const sheetPlayers = players.filter((p) => sheet.includes(p.id));
@@ -415,5 +435,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { RATING_MIN_SEASONS, ratingEligible, ratedSeasonsOf, RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor };
+  module.exports = { RATING_MIN_SEASONS, ratingEligible, ratedSeasonsOf, RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor, rankingsPhase, nextChampDay };
 }

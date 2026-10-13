@@ -372,7 +372,7 @@ test("captionContextFor builds each caption's inputs from raw data", () => {
   const r = L.captionContextFor("result", { matchId: 1 }, CD);
   assert.deepEqual([r.opponent, r.bl, r.opp, r.dateLine], ["FC Test", 1, 1, L.matchDateLine(CM[0])]);
   assert.deepEqual(L.captionContextFor("ratings", { matchId: 1 }, CD), { opponent: "FC Test" });
-  assert.deepEqual(L.captionContextFor("rankings", { season: "2026-2027" }, CD), { season: "2026-2027" });
+  assert.deepEqual(L.captionContextFor("rankings", { season: "2026-2027" }, CD, new Date("2026-10-13T10:00:00Z")), { season: "2026-2027", phase: "championnat", nextChampDay: null });
   assert.deepEqual(L.captionContextFor("matchday", { matchId: 1 }, CD).names, ["Louis", "Nolan", "Solal"]); // the Groupe is in the same post
 });
 
@@ -557,4 +557,21 @@ test("userTagsFor: usernames only, normalised 0–1 and clamped, one per account
   assert.deepEqual(L.userTagsFor(null, { 1: "a" }), []);
   const many = Array.from({ length: 30 }, (_, i) => ({ playerId: i, x: 100, y: 100 }));
   assert.equal(L.userTagsFor(many, Object.fromEntries(many.map((p) => [p.playerId, "u" + p.playerId]))).length, 20);
+});
+
+test("rankings: friendlies' tally until the first championship match, then the championship only", () => {
+  const now = new Date("2026-10-13T10:00:00Z");
+  const am = { id: 1, status: "finished", match_type: "amical", match_datetime: "2026-09-20T17:00:00Z" };
+  const ch = { id: 2, status: "scheduled", match_type: "championnat", match_datetime: "2026-10-15T17:30:00Z" };
+  assert.equal(L.rankingsPhase([am, ch], "2026-2027"), "amical");
+  assert.equal(L.nextChampDay([am, ch], now), "jeudi");
+  const cap = L.captionFor("rankings", L.captionContextFor("rankings", { season: "2026-2027" }, { matches: [am, ch] }, now));
+  assert.match(cap, /stats finales des matchs amicaux/);
+  assert.match(cap, /championnat FSGT dès jeudi/);
+  const played = { ...ch, status: "finished" };
+  assert.equal(L.rankingsPhase([am, played], "2026-2027"), "championnat");
+  assert.equal(L.captionFor("rankings", L.captionContextFor("rankings", { season: "2026-2027" }, { matches: [am, played] }, now)), "Les classements mis à jour après cette nouvelle semaine de compétition !");
+  assert.equal(L.nextChampDay([am], now), null);
+  assert.equal(L.rankingsPhase([ch], "2026-2027"), null); // nothing played yet
+
 });
