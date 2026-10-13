@@ -168,15 +168,22 @@ function groupeLines(sheetIds, roster, players) {
   });
 }
 
-function goalRows(events, players) {
+// Goal minutes are stored from the start of their half: on the post they count from kick-off
+// (15' of the 2nd half of 20-minute halves → 35'; stoppage time → "20+2").
+function matchMinute(half, minute, halfDuration) {
+  if (!(halfDuration > 0) || !(half >= 1)) return minute;
+  if (minute >= halfDuration) return `${half * halfDuration}+${minute - halfDuration + 1}`;
+  return (half - 1) * halfDuration + minute;
+}
+function goalRows(events, players, halfDuration) {
   const nameOf = (id) => postName(players.find((p) => p.id === id), players);
   return events.filter((e) => e.type === "goal_bl")
     .sort((a, b) => a.half - b.half || a.minute - b.minute)
-    .map((e) => ({ minute: e.minute, scorer: e.own_goal ? "CSC" : nameOf(e.player_id), assist: e.assist_player_id ? nameOf(e.assist_player_id) : null }));
+    .map((e) => ({ minute: matchMinute(e.half, e.minute, halfDuration), scorer: e.own_goal ? "CSC" : nameOf(e.player_id), assist: e.assist_player_id ? nameOf(e.assist_player_id) : null }));
 }
 
-function goalLines(events, players) {
-  return goalRows(events, players).map((g) => `${g.minute}' ${g.scorer}${g.assist ? ` (${g.assist})` : ""}`);
+function goalLines(events, players, halfDuration) {
+  return goalRows(events, players, halfDuration).map((g) => `${g.minute}' ${g.scorer}${g.assist ? ` (${g.assist})` : ""}`);
 }
 
 // The average-rating ranking only counts players rated in at least RATING_MIN_MATCHES matches (rows carry `rated`);
@@ -435,5 +442,5 @@ function sectionState(sectionKey, { matches, lineups, posts, settings, now }) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { RATING_MIN_SEASONS, ratingEligible, ratedSeasonsOf, RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor, rankingsPhase, nextChampDay };
+  module.exports = { RATING_MIN_SEASONS, ratingEligible, ratedSeasonsOf, RATING_MIN_MATCHES, shortName, LAYOUTS, PHOTO_KIND_FOR_LAYOUT, RANKING_PAGES, matchMinute, goalRows, savedFraming, personCenterRatio, centerFramingOnPerson, defaultFraming, framedRect, zoomFramingAt, framingZoomPercent, choosePhoto, photoOrDefault, DEFAULT_PHOTO_PLAYER_ID, pickFeatured, featuredPool, featuredPlayerFor, postName, opponentLabel, matchBand, matchDateLine, groupeLines, goalLines, rankingEntries, ratingRows, rankingRows, captionFor, userTagsFor, availablePosts, INSTA_SECTIONS, RULE_DEFAULTS, parisParts, parisToDate, isoWeekKey, defaultSettings, normalizeSettings, sectionState, targetKey, isTargetAvailable, captionContextFor, rankingsPhase, nextChampDay };
 }

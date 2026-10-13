@@ -575,3 +575,12 @@ test("rankings: friendlies' tally until the first championship match, then the c
   assert.equal(L.rankingsPhase([ch], "2026-2027"), null); // nothing played yet
 
 });
+
+test("goal minutes on the post count from kick-off (2nd-half goals add the first half)", () => {
+  const players = [{ id: 1, name: "Louis" }];
+  const ev = [{ half: 2, minute: 15, type: "goal_bl", player_id: 1 }, { half: 1, minute: 3, type: "goal_bl", player_id: 1 }, { half: 2, minute: 21, type: "goal_bl", player_id: 1 }];
+  assert.deepEqual(L.goalRows(ev, players, 20).map((g) => g.minute), [3, 35, "40+2"]);
+  assert.deepEqual(L.goalLines(ev, players, 20), ["3' Louis", "35' Louis", "40+2' Louis"]);
+  assert.equal(L.matchMinute(1, 20, 20), "20+1"); // the 21st minute of a 20-minute half, like in the app
+  assert.deepEqual(L.goalRows(ev, players).map((g) => g.minute), [3, 15, 21]); // unknown half length: as recorded
+});
