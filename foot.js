@@ -7376,11 +7376,8 @@ function FootRoomScreen({
   const [arrived, setArrived] = React.useState(null);
   const roomSquad = React.useRef(null); // the squad the room is showing
   const pendingShirt = React.useRef(null); // shirt to show when arriving at the rack (a name tapped on the board)
-  const [statsType, setStatsTypeState] = React.useState(() => readPref("foot_room_stats_type", "all", ["all", "championnat", "amical"]));
-  const setStatsType = v => {
-    setStatsTypeState(v);
-    writePref("foot_room_stats_type", v);
-  };
+  // Championnat by default at every visit; "Plus de stats" switches to everything or friendlies for the moment.
+  const [statsType, setStatsType] = React.useState("championnat");
   // seasons: the current one, those with matches, those with a listed squad (newest first)
   const season = seasonOf(new Date().toISOString());
   const seasons = React.useMemo(() => [...new Set([season, ...seasonsFromMatches(matches), ...Object.keys(FOOT_SEASON_SQUADS)])].sort().reverse(), [matches, season]);
@@ -8009,7 +8006,7 @@ function FootRoomScreen({
       borderRadius: 999,
       background: "rgba(255,255,255,0.08)"
     }
-  }, [["all", "Tous"], ["championnat", "Championnat"], ["amical", "Amicaux"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["championnat", "Championnat"], ["all", "Tous"], ["amical", "Amicaux"]].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     role: "radio",
     "aria-checked": statsType === k,
