@@ -91,7 +91,7 @@ test("refreshToken returns the new token", async () => {
 // ---------- Publisher: exactly-once publication ----------
 const { createPublisher } = require("./lib/insta/publisher");
 
-function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail = false, badTag = false } = {}) {
+function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail = false, badTag = false, recent = [], recentFail = null } = {}) {
   const w = { badTag };
   const db = rows.map((r) => ({ ...r }));
   let id = 100;
@@ -113,7 +113,7 @@ function fakeWorld({ rows = [], igFail = null, uploadFail = false, featuredFail 
     featuredId: async (t) => { if (featuredFail) throw new Error("db down"); log.push(`featured ${t.player || "auto"}`); return t.player || 21; },
     async uploadImage(p) { log.push("upload " + p); if (uploadFail) throw new Error("storage down"); },
     publicUrl: (p) => `https://pub/${p}`,
-    igClient: () => ({ async taggable(names) { return new Set(names.filter((u) => u !== w.badTag)); }, async publishImages({ urls, caption, userTags }) { log.push(`ig ${urls.length} ${caption}`); const tagged = userTags && userTags.some((t) => t.length); if (tagged) log.push("tags " + JSON.stringify(userTags)); if (igFail) throw igFail; if (tagged && w.badTag && userTags.flat().some((t) => t.username === w.badTag)) throw new Error("Instagram : Invalid user id"); return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
+    igClient: () => ({ async recentMedia() { log.push("recent"); if (recentFail) throw recentFail; return recent; }, async taggable(names) { return new Set(names.filter((u) => u !== w.badTag)); }, async publishImages({ urls, caption, userTags }) { log.push(`ig ${urls.length} ${caption}`); const tagged = userTags && userTags.some((t) => t.length); if (tagged) log.push("tags " + JSON.stringify(userTags)); if (igFail) throw igFail; if (tagged && w.badTag && userTags.flat().some((t) => t.username === w.badTag)) throw new Error("Instagram : Invalid user id"); return { mediaId: "m9", permalink: "https://instagram.com/p/z" }; } }),
   };
   return { db, log, pub: createPublisher(deps) };
 }
@@ -165,6 +165,41 @@ test("a fresh draft means a publication is in progress: nothing is rendered or s
 test("a stale draft (crashed run) does not block a new publication", async () => {
   const w = fakeWorld({ rows: [{ id: 1, kind: "matchday", match_id: 2, status: "draft", created_at: "2026-10-08T06:00:00Z" }] });
   assert.equal((await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA })).status, "published");
+  assert.ok(w.log.includes("recent")); // Instagram was checked first
+});
+
+test("a crashed run that went live on Instagram is recorded, never posted a second time", async () => {
+  const caption = "MATCH DAY ⚽ Bière Leverculsec vs FC Test\nJEUDI 17H30 | STADE | PARIS";
+  const w = fakeWorld({
+    rows: [{ id: 1, kind: "matchday", match_id: 2, status: "draft", created_at: "2026-10-08T06:00:00Z", caption }],
+    recent: [{ id: "old", caption, timestamp: "2026-10-01T06:00:00+0000" }, { id: "m7", caption, timestamp: "2026-10-08T06:00:40+0000", permalink: "https://instagram.com/p/live" }],
+  });
+  const r = await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
+  assert.equal(r.status, "already_published");
+  assert.ok(!w.log.includes("render") && !w.log.some((l) => l.startsWith("ig ")));
+  assert.equal(w.db[0].status, "published");
+  assert.equal(w.db[0].ig_media_id, "m7");
+  assert.equal(w.db[0].permalink, "https://instagram.com/p/live");
+  assert.equal(w.db.length, 1);
+});
+
+test("if Instagram can't be checked after a crashed run, nothing is posted", async () => {
+  const w = fakeWorld({ rows: [{ id: 1, kind: "matchday", match_id: 2, status: "failed", created_at: "2026-10-08T06:00:00Z" }], recentFail: new Error("réseau") });
+  const r = await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
+  assert.equal(r.status, "failed");
+  assert.ok(!w.log.some((l) => l.startsWith("ig ")));
+});
+
+test("a first publication does not need the Instagram check", async () => {
+  const w = fakeWorld();
+  await w.pub.publishTarget({ kind: "matchday", matchId: 2 }, { data: DATA });
+  assert.ok(!w.log.includes("recent"));
+});
+
+test("recentMedia lists the account's latest posts", async () => {
+  const g = fakeGraph({ "GET /U/media": () => ({ ok: true, status: 200, json: async () => ({ data: [{ id: "1", caption: "x", timestamp: "t" }] }) }) });
+  assert.deepEqual(await mk(g).recentMedia(), [{ id: "1", caption: "x", timestamp: "t" }]);
+  assert.equal(g.calls[0].body.fields, "id,caption,timestamp,permalink");
 });
 
 test("a failed post can be retried; an Instagram error is recorded on the row and reported", async () => {
