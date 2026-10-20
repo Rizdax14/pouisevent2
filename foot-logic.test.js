@@ -477,8 +477,9 @@ test("ratingsTabView keeps averages hidden from a sheet player before voting", (
 test("permissions : bureau, démarrage et édition d'un match", () => {
   const L = require("./foot-logic.js");
   const bureau = L.FOOT_BUREAU_UIDS.map((uid, i) => ({ id: 100 + i, uid }));
-  assert.equal(bureau.length, 5);
+  assert.equal(bureau.length, 2);
   assert.ok(bureau.every((p) => L.isBureau(p)));
+  for (const uid of ["maxime-mar", "samuel-oll", "thomas-pey"]) assert.equal(L.isBureau({ id: 50, uid }), false);
   const membre = { id: 1, uid: "nils-bra" }, starter = { id: 2, uid: "emma-gar" };
   assert.equal(L.isBureau(membre), false);
   assert.equal(L.isBureau({ id: 9, uid: "salome-dev" }), false);
@@ -497,9 +498,9 @@ test("permissions : bureau, démarrage et édition d'un match", () => {
   assert.equal(L.canEditMatch({ status: "live", started_by: null }, membre), false);
   // terminé : le bureau, y compris pour un match lancé par un membre
   const done = { status: "finished", started_by: starter.id };
-  assert.equal(L.canEditMatch(done, bureau[2]), true);
+  assert.equal(L.canEditMatch(done, bureau[0]), true);
   assert.equal(L.canEditMatch(done, starter), false);
-  assert.equal(L.canEditMatch({ status: "scheduled" }, bureau[3]), true);
+  assert.equal(L.canEditMatch({ status: "scheduled" }, bureau[1]), true);
   assert.equal(L.canEditMatch({ status: "scheduled" }, membre), false);
 });
 

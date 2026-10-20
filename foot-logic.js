@@ -382,8 +382,8 @@ function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   };
 }
 
-// Bureau = the 5 officers (Salomé, honorary member, is not part of it).
-const FOOT_BUREAU_UIDS = ["louis-mar", "maxime-mar", "thisma-bru", "samuel-oll", "thomas-pey"];
+// Admins of the foot section: Louis and Thisma only.
+const FOOT_BUREAU_UIDS = ["louis-mar", "thisma-bru"];
 
 function isBureau(player) {
   return !!player && FOOT_BUREAU_UIDS.includes(player.uid);

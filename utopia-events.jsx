@@ -6935,7 +6935,7 @@ function MenuBL({onSection, currentPlayer, onLogout}){
       <div style={{background:BL_GREEN,borderBottom:`1px solid ${BL_GREEN_LIGHT}`,padding:m?"18px 20px":"24px 40px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <img src="/logo-bl.png" alt="Bière LeverCulSec" style={{height:m?48:60,width:"auto"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          {['louis-mar','thisma-bru','maxime-mar','thomas-pey','samuel-oll'].includes(currentPlayer?.uid)&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
+          {['louis-mar','thisma-bru'].includes(currentPlayer?.uid)&&<button onClick={()=>onSection("dataBL")} style={{background:"#ffffff22",border:"1px solid #ffffff44",borderRadius:8,padding:"6px 14px",color:BL_WHITE,fontSize:12,cursor:"pointer",fontWeight:600}}>📊 Data</button>}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:12,color:"#86c99e"}}>{currentPlayer?.name}</div>
             <button onClick={onLogout} style={{background:"none",border:"none",color:"#86c99e66",fontSize:10,cursor:"pointer",padding:0}}>Se déconnecter</button>
@@ -8222,7 +8222,7 @@ function App(){
   );
 
   // Data BL
-  if(section==="dataBL"&&['louis-mar','thisma-bru','maxime-mar','thomas-pey','samuel-oll'].includes(currentPlayer?.uid)) return(
+  if(section==="dataBL"&&['louis-mar','thisma-bru'].includes(currentPlayer?.uid)) return(
     <DataBL onBack={()=>setSection("menu")}/>
   );
 
