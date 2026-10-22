@@ -1192,6 +1192,10 @@ function FootRatingsTab({ match, lineups, ratings, motmVotes, currentPlayer, isA
     if (!motm) { setErr("Choisis ton homme du match en touchant son visage."); return; }
     setBusy(true); setErr(null);
     try {
+      if (!canReedit) {
+        const already = (await sbFetch("foot_ratings", `?match_id=eq.${match.id}&rater_id=eq.${me}&select=ratee_id&limit=1`)) || [];
+        if (already.length) { setErr("Tu as déjà noté ce match : seuls Louis et Thisma peuvent modifier des notes."); setEditing(false); await reload(); setBusy(false); return; }
+      }
       const result = await submitRatings({
         isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
         writeRatings: async () => {
@@ -1216,7 +1220,8 @@ function FootRatingsTab({ match, lineups, ratings, motmVotes, currentPlayer, isA
 
   if (sheetIds.length < 2) return <FCard><FEmpty icon="star" title="Pas de notes" text="Il faut au moins deux joueurs sur la convocation pour noter." /></FCard>;
 
-  const view = ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin });
+  const canReedit = isBureau(currentPlayer);
+  const view = ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin: canReedit });
   const ranked = sheetIds.map((id) => ({ id, avg: averages[id] })).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
 
   return (
@@ -1239,10 +1244,12 @@ function FootRatingsTab({ match, lineups, ratings, motmVotes, currentPlayer, isA
             </div>
           ))}
           <FBtn full size="lg" onClick={save} disabled={busy} style={{ marginTop: 12 }}>{busy ? "…" : "Enregistrer mes notes"}</FBtn>
+          {!canReedit && <div style={{ marginTop: 8, fontSize: 13, color: FC.muted, textAlign: "center" }}>Attention : une fois enregistrées, tes notes ne pourront plus être modifiées.</div>}
         </div>
       )}
 
       {err && <FMessage>{err}</FMessage>}
+      {view.locked && !err && <div style={{ marginBottom: 12, fontSize: 13, color: FC.muted }}>Tes notes sont enregistrées. Seuls Louis et Thisma peuvent les modifier.</div>}
 
       {view.showEditButton && <FBtn size="sm" variant="secondary" icon="pencil" onClick={() => { setScores(mine); setErr(null); setEditing(true); }} style={{ marginBottom: 12 }}>{view.editLabel}</FBtn>}
 

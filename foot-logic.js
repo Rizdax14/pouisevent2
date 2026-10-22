@@ -376,7 +376,9 @@ function ratingsTabView({ validated, isVoter, hasVoted, editing, isAdmin }) {
   return {
     showForm,
     showAverages,
-    showEditButton: !editing && isVoter && !validated,
+    // once a player has voted, only an admin (Louis, Thisma) can reopen their own form
+    showEditButton: !editing && isVoter && !validated && (!hasVoted || !!isAdmin),
+    locked: isVoter && hasVoted && !validated && !isAdmin,
     editLabel: hasVoted ? "Modifier mes notes" : "Noter",
     showHiddenMessage: !showForm && !showAverages,
   };

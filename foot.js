@@ -3066,6 +3066,16 @@ function FootRatingsTab({
     setBusy(true);
     setErr(null);
     try {
+      if (!canReedit) {
+        const already = (await sbFetch("foot_ratings", `?match_id=eq.${match.id}&rater_id=eq.${me}&select=ratee_id&limit=1`)) || [];
+        if (already.length) {
+          setErr("Tu as déjà noté ce match : seuls Louis et Thisma peuvent modifier des notes.");
+          setEditing(false);
+          await reload();
+          setBusy(false);
+          return;
+        }
+      }
       const result = await submitRatings({
         isValidated: async () => !!((await sbFetch("foot_matches", `?id=eq.${match.id}&select=ratings_validated_at`)) || [])[0]?.ratings_validated_at,
         writeRatings: async () => {
@@ -3113,12 +3123,13 @@ function FootRatingsTab({
     title: "Pas de notes",
     text: "Il faut au moins deux joueurs sur la convocation pour noter."
   }));
+  const canReedit = isBureau(currentPlayer);
   const view = ratingsTabView({
     validated,
     isVoter,
     hasVoted,
     editing,
-    isAdmin
+    isAdmin: canReedit
   });
   const ranked = sheetIds.map(id => ({
     id,
@@ -3191,7 +3202,20 @@ function FootRatingsTab({
     style: {
       marginTop: 12
     }
-  }, busy ? "…" : "Enregistrer mes notes")), err && /*#__PURE__*/React.createElement(FMessage, null, err), view.showEditButton && /*#__PURE__*/React.createElement(FBtn, {
+  }, busy ? "…" : "Enregistrer mes notes"), !canReedit && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 13,
+      color: FC.muted,
+      textAlign: "center"
+    }
+  }, "Attention : une fois enregistr\xE9es, tes notes ne pourront plus \xEAtre modifi\xE9es.")), err && /*#__PURE__*/React.createElement(FMessage, null, err), view.locked && !err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12,
+      fontSize: 13,
+      color: FC.muted
+    }
+  }, "Tes notes sont enregistr\xE9es. Seuls Louis et Thisma peuvent les modifier."), view.showEditButton && /*#__PURE__*/React.createElement(FBtn, {
     size: "sm",
     variant: "secondary",
     icon: "pencil",

@@ -461,6 +461,16 @@ test("ratingsTabView hides the form once validated, even if it was open", () => 
   assert.equal(v.showAverages, true);
 });
 
+test("ratingsTabView: a player who voted can no longer edit, only an admin can", () => {
+  const player = ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: false });
+  assert.equal(player.showEditButton, false);
+  assert.equal(player.locked, true);
+  const admin = ratingsTabView({ validated: false, isVoter: true, hasVoted: true, editing: false, isAdmin: true });
+  assert.equal(admin.showEditButton, true);
+  assert.equal(admin.editLabel, "Modifier mes notes");
+  assert.equal(admin.locked, false);
+});
+
 test("ratingsTabView gives a pending voter a way back to the form", () => {
   const v = ratingsTabView({ validated: false, isVoter: true, hasVoted: false, editing: false, isAdmin: false });
   assert.equal(v.showEditButton, true);
