@@ -2122,10 +2122,11 @@ function O2026Page({nav,navBack,o2026Scores,o2026Assignments,currentPlayer}){
       if(rows?.[0]?.data?.visible===false)setRankVisible(false);
     }).catch(()=>{});
     const iv=setInterval(()=>{
+      if(document.hidden)return; // onglet en arrière-plan : pas de requête
       sbFetch("o2026_state","?select=data&epreuve_id=eq.___ranking_visible").then(rows=>{
         setRankVisible(rows?.[0]?.data?.visible!==false);
       }).catch(()=>{});
-    },5000);
+    },60000);
     return()=>clearInterval(iv);
   },[]);
   async function toggleRankVisible(){
@@ -3636,6 +3637,7 @@ function EpreuveO2026Page({epreuveId,nav,navBack,currentPlayer,o2026Assignments,
             // Poll Supabase every 5s
             React.useEffect(()=>{
               async function poll(){
+                if(document.hidden)return; // onglet en arrière-plan : pas de requête
                 try{
                   const [cfg,subs]=await Promise.all([
                     sbFetch("logik_config","?select=target_word&id=eq.1").catch(()=>[]),
@@ -7969,7 +7971,7 @@ function P4Page({currentPlayer,onBack}){
 
   React.useEffect(()=>{
     if(view!=='game'||!gameId)return;
-    const poll=async()=>{try{const g=await p4Load(pin);if(!g)return;const s=g.state;setBoard(s.board||p4Empty());setTurn(s.turn||P4_RED);setWinner(s.winner||null);if(isHost){setOppName(s.guestName||'');setOppReady(!!s.guestReady);}else{setOppName(s.hostName||'');setOppReady(true);}}catch(e){}};
+    const poll=async()=>{if(document.hidden)return;try{const g=await p4Load(pin);if(!g)return;const s=g.state;setBoard(s.board||p4Empty());setTurn(s.turn||P4_RED);setWinner(s.winner||null);if(isHost){setOppName(s.guestName||'');setOppReady(!!s.guestReady);}else{setOppName(s.hostName||'');setOppReady(true);}}catch(e){}};
     poll();pollRef.current=setInterval(poll,600);return()=>clearInterval(pollRef.current);
   },[view,gameId,pin,isHost]);
 
