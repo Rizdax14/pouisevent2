@@ -440,7 +440,9 @@ function FootLineupChecklist({
 }) {
   const ids = [...new Set([...currentSquad(roster).map(r => r.player_id), ...(extraIds || [])])];
   const numberOf = id => (roster.find(r => r.player_id === id) || {}).jersey_number;
-  const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
+  const isGuest = id => (roster.find(r => r.player_id === id) || {}).role === "invite";
+  // guests (role "invite") come last: they are only added here, they never answer presences
+  const players = ids.map(id => PLAYERS.find(p => p.id === id)).filter(Boolean).sort((a, b) => isGuest(a.id) - isGuest(b.id) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   if (players.length === 0) return /*#__PURE__*/React.createElement(FEmpty, {
     icon: "users",
     title: "Aucun joueur",
@@ -479,7 +481,9 @@ function FootLineupChecklist({
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, footShortName(p)), numberOf(p.id) && /*#__PURE__*/React.createElement("span", {
+    }, footShortName(p)), isGuest(p.id) && /*#__PURE__*/React.createElement(FChip, {
+      tone: "soft"
+    }, "Invit\xE9"), numberOf(p.id) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontFamily: FF.ui,
         fontSize: 13,

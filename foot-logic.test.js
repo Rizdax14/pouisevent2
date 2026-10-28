@@ -610,3 +610,12 @@ test("a final note can be « non noté »: the player gets no mark for the match
   assert.deepEqual(L.finalAverages(match, [1, 2], ratings), { 2: 7.5 });
   assert.deepEqual(L.mergeFinalNotes(match.rating_overrides, {}, [1]), { 2: 7.5 }); // back to automatic
 });
+
+test("statsPopulation : un invité n'entre jamais dans les classements, même s'il a joué", () => {
+  const L = require("./foot-logic.js");
+  const roster = [{ player_id: 1, role: "regulier" }, { player_id: 2, role: "invite" }];
+  const lineups = [{ match_id: 9, player_id: 1 }, { match_id: 9, player_id: 2 }];
+  const ids = L.statsPopulation(roster, "2026-2027", lineups);
+  assert.ok(ids.includes(1));
+  assert.ok(!ids.includes(2));
+});

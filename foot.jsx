@@ -177,8 +177,10 @@ function FootAttendanceButtons({ myStatus, saving, onSet, compact, matchIso }) {
 function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, presence }) {
   const ids = [...new Set([...currentSquad(roster).map((r) => r.player_id), ...(extraIds || [])])];
   const numberOf = (id) => (roster.find((r) => r.player_id === id) || {}).jersey_number;
+  const isGuest = (id) => (roster.find((r) => r.player_id === id) || {}).role === "invite";
+  // guests (role "invite") come last: they are only added here, they never answer presences
   const players = ids.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean)
-    .sort((a, b) => (footShortName(a) || "").localeCompare(footShortName(b) || ""));
+    .sort((a, b) => (isGuest(a.id) - isGuest(b.id)) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   if (players.length === 0) return <FEmpty icon="users" title="Aucun joueur" text="Ajoute des joueurs à l'effectif dans l'onglet Admin." />;
   return (
     <div style={{ display: "grid", gap: 6 }}>
@@ -188,6 +190,7 @@ function FootLineupChecklist({ roster, extraIds, checked, onToggle, disabled, pr
           <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 6px 6px", borderRadius: 16, background: on ? FC.accentSoft : FC.softer, border: `1.5px solid ${on ? FC.accent : "transparent"}`, cursor: disabled ? "default" : "pointer", fontSize: 15 }}>
             <FootPresenceAvatar id={p.id} name={footShortName(p)} size={34} status={presence ? presence[p.id] || "none" : null} />
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{footShortName(p)}</span>
+            {isGuest(p.id) && <FChip tone="soft">Invité</FChip>}
             {numberOf(p.id) && <span style={{ fontFamily: FF.ui, fontSize: 13, color: FC.deep }}>n°{numberOf(p.id)}</span>}
             <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(p.id)} />
           </label>
