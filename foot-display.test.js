@@ -182,7 +182,8 @@ test("leagueTables: ranked on goal difference, our line flagged; matchesAgainst 
   assert.deepEqual(D.leagueTables("2027-2028"), []);
   const next = D.leagueTables("2026-2027")[0];
   assert.equal(next.rows.length, 10);
-  assert.equal(next.rows[0].name, "ABH 1"); // nothing played yet: the FSGT order is kept
+  assert.equal(next.rows[0].name, "FC GENILAC 5"); // classement FSGT d'octobre 2026 (poule Seniors A)
+  assert.deepEqual(next.rows.find((r) => r.us), { name: "BIERE LEVERCULSEC", played: 3, w: 2, d: 0, l: 1, bp: 11, bc: 7, diff: 4, us: true, rank: 3 });
   const ms = [
     { id: 1, match_type: "championnat", status: "finished", match_datetime: "2026-04-09T18:00:00Z", opponent_name: "FC Caribou", venue: "domicile" },
     { id: 2, match_type: "championnat", status: "finished", match_datetime: "2026-02-05T18:30:00Z", opponent_name: "FC Caribou", venue: "exterieur" },

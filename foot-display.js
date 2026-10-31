@@ -168,9 +168,17 @@ const FOOT_STANDINGS = {"2024-2025": [{"key": "p1", "label": "Phase 1", "poule":
       ["COPAINS CHOPINES", 16, 5, 4, 7, 63, 66],
       ["AS TRV", 16, 4, 2, 10, 51, 75],
       ["SHOUF TEAM", 16, 5, 3, 8, 48, 74],
-      ["FC ARSENUL", 16, 4, 1, 11, 61, 94]]}], "2026-2027": [{"key": "p1", "label": "Phase 1", "poule": "Poule de brassage", "teams": [
-      ["ABH 1", 0, 0, 0, 0, 0, 0], ["LUDO TEAM", 0, 0, 0, 0, 0, 0], ["PATROLD SCHOOL FC", 0, 0, 0, 0, 0, 0], ["BIERE LEVERCULSEC", 0, 0, 0, 0, 0, 0], ["SHOUF TEAM", 0, 0, 0, 0, 0, 0],
-      ["FC CAF LOIRE", 0, 0, 0, 0, 0, 0], ["FC GENILAC 5", 0, 0, 0, 0, 0, 0], ["AS LES COLLEGUES", 0, 0, 0, 0, 0, 0], ["EN AVANT GUINGUETTE", 0, 0, 0, 0, 0, 0], ["FC FIFOU", 0, 0, 0, 0, 0, 0]]}]};
+      ["FC ARSENUL", 16, 4, 1, 11, 61, 94]]}], "2026-2027": [{"key": "p1", "label": "Phase 1", "poule": "Seniors A", "teams": [
+      ["FC GENILAC 5", 3, 3, 0, 0, 24, 12],
+      ["ABH 1", 3, 2, 0, 1, 16, 10],
+      ["BIERE LEVERCULSEC", 3, 2, 0, 1, 11, 7],
+      ["PATROLD SCHOOL FC", 3, 2, 0, 1, 11, 10],
+      ["LUDO TEAM", 3, 2, 0, 1, 17, 16],
+      ["SHOUF TEAM", 3, 2, 0, 1, 8, 10],
+      ["EN AVANT GUINGUETTE", 3, 0, 0, 3, 6, 11],
+      ["FC CAF LOIRE", 3, 1, 0, 2, 8, 13],
+      ["FC FIFOU", 3, 0, 0, 3, 13, 18],
+      ["AS LES COLLEGUES", 3, 1, 0, 2, 11, 18]]}]};
 const FOOT_US = "BIERE LEVERCULSEC";
 // "FC Dunières", "DUNIERES FC", "Shouf Team (forfait)" → one key; the FSGT and our sheets don't always spell a team the same way
 const TEAM_ALIASES = { jbv: "jvb" };
