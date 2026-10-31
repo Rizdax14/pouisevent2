@@ -192,7 +192,7 @@ function leagueTables(season) {
   return (FOOT_STANDINGS[season] || []).map((ph) => ({
     key: ph.key, label: ph.label, poule: ph.poule,
     rows: ph.teams.map(([name, played, w, d, l, bp, bc]) => ({ name, played, w, d, l, bp, bc, diff: bp - bc, us: teamKey(name) === teamKey(FOOT_US) }))
-      .sort((a, b) => b.diff - a.diff || b.bp - a.bp).map((r, i) => ({ ...r, rank: i + 1 })),
+      .sort((a, b) => b.diff - a.diff || a.bc - b.bc).map((r, i) => ({ ...r, rank: i + 1 })), // à égalité : le moins de buts encaissés, comme la FSGT
   }));
 }
 // Our league matches of the season against a team, oldest first, with the score and its result.

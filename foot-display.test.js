@@ -184,6 +184,8 @@ test("leagueTables: ranked on goal difference, our line flagged; matchesAgainst 
   assert.equal(next.rows.length, 10);
   assert.equal(next.rows[0].name, "FC GENILAC 5"); // classement FSGT d'octobre 2026 (poule Seniors A)
   assert.deepEqual(next.rows.find((r) => r.us), { name: "BIERE LEVERCULSEC", played: 3, w: 2, d: 0, l: 1, bp: 11, bc: 7, diff: 4, us: true, rank: 3 });
+  // même ordre que le PDF de la FSGT : à différence égale, le moins de buts encaissés devant
+  assert.deepEqual(next.rows.map((r) => r.name), ["FC GENILAC 5", "ABH 1", "BIERE LEVERCULSEC", "PATROLD SCHOOL FC", "LUDO TEAM", "SHOUF TEAM", "EN AVANT GUINGUETTE", "FC CAF LOIRE", "FC FIFOU", "AS LES COLLEGUES"]);
   const ms = [
     { id: 1, match_type: "championnat", status: "finished", match_datetime: "2026-04-09T18:00:00Z", opponent_name: "FC Caribou", venue: "domicile" },
     { id: 2, match_type: "championnat", status: "finished", match_datetime: "2026-02-05T18:30:00Z", opponent_name: "FC Caribou", venue: "exterieur" },
