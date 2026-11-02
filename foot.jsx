@@ -2,9 +2,18 @@
 
 // ---- data helpers ------------------------------------------------------------------------------------------
 // "Présent" is only open from the Sunday 17:00 before the match (the bureau can still set it for someone: force).
+// The same answer again changes nothing (the answer time, i.e. the place in the order, is kept).
+// Present → absent asks first: the place in the order of answers is lost.
 async function setMatchAttendance(matchId, playerId, status, { force } = {}) {
   const m = !force && status === "present" && FOOT_MATCHES_REF.current.find((x) => x.id === matchId);
   if (m && !presenceOpen(m.match_datetime)) throw new Error(`Les présences ouvrent ${presenceOpensLabel(m.match_datetime)}`);
+  const rows = await sbFetch("foot_attendance", `?match_id=eq.${matchId}&select=player_id,status,responded_at&order=responded_at.asc`);
+  const cur = (rows || []).find((r) => r.player_id === playerId);
+  if (cur && cur.status === status) return false;
+  if (!force && cur && cur.status === "present" && status === "absent") {
+    const rank = rows.filter((r) => r.status === "present").findIndex((r) => r.player_id === playerId) + 1;
+    if (!window.confirm(`Passer absent ?\n\nTu es n°${rank} dans l'ordre des réponses. Si tu passes absent, tu perds ta place : si tu reviens ensuite, tu repasseras en dernier.`)) return false;
+  }
   assertUpsertOk(await SUPABASE.from("foot_attendance").upsert(
     { match_id: matchId, player_id: playerId, status, responded_at: new Date().toISOString() },
     { onConflict: "match_id,player_id" }
@@ -165,7 +174,8 @@ function FootAttendanceButtons({ myStatus, saving, onSet, compact, matchIso }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 10 }}>
-        <FBtn variant={myStatus === "present" ? "success" : "ghost"} size={compact ? "md" : "lg"} icon={locked ? "clock" : "check"} disabled={saving || locked} onClick={pick("present")} style={{ flex: 1, opacity: locked ? 0.55 : 1 }}>Présent</FBtn>
+        {/* already present: "Présent" can't be clicked again (it would cost the place in the order) */}
+        <FBtn variant={myStatus === "present" ? "success" : "ghost"} size={compact ? "md" : "lg"} icon={locked ? "clock" : "check"} disabled={saving || locked || myStatus === "present"} onClick={pick("present")} style={{ flex: 1, opacity: locked ? 0.55 : 1 }}>Présent</FBtn>
         <FBtn variant={myStatus === "absent" ? "danger" : "ghost"} size={compact ? "md" : "lg"} icon="x" disabled={saving} onClick={pick("absent")} style={{ flex: 1 }}>Absent</FBtn>
       </div>
       {locked && <div style={{ fontSize: 12, color: FC.muted, marginTop: 6, textAlign: "center" }}>« Présent » s'ouvre {presenceOpensLabel(matchIso)}</div>}
