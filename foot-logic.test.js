@@ -21,6 +21,7 @@ const {
   formatRank,
   formatStatValue,
   missingLineupPlayers,
+  isGoalEvent,
   diffLineup,
   diffLineupEdit,
   saveGoalWithSheet,
@@ -270,6 +271,10 @@ test("formatStatValue formats by key and mode", () => {
 
 test("missingLineupPlayers returns scorer/assister not yet on the sheet", () => {
   assert.deepEqual(missingLineupPlayers([1], { type: "goal_bl", player_id: 1, assist_player_id: 2 }), [2]);
+  assert.deepEqual(missingLineupPlayers([1], { type: "shot_on", player_id: 3 }), [3]); // a live action puts the player on the sheet too
+  assert.deepEqual(missingLineupPlayers([3], { type: "foul", player_id: 3 }), []);
+  assert.equal(computeFootScore([{ type: "goal_bl" }, { type: "shot_on" }, { type: "save" }, { type: "goal_opponent" }]).bl, 1); // actions never count
+  assert.deepEqual([{ type: "goal_bl" }, { type: "foul" }, { type: "goal_opponent" }].filter(isGoalEvent).map((e) => e.type), ["goal_bl", "goal_opponent"]);
   assert.deepEqual(missingLineupPlayers([], { type: "goal_opponent", player_id: null, assist_player_id: null }), []);
 });
 

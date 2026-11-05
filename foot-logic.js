@@ -209,7 +209,12 @@ function formatStatValue(value, key, mode) {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
+// Live "soundboard" actions of one of our players (not goals: they never count in the score).
+const FOOT_ACTIONS = ["shot_on", "shot_off", "save", "foul", "yellow", "red"];
+const isGoalEvent = (e) => e.type === "goal_bl" || e.type === "goal_opponent";
+
 function missingLineupPlayers(lineupPlayerIds, payload) {
+  if (FOOT_ACTIONS.includes(payload.type)) return payload.player_id && !lineupPlayerIds.includes(payload.player_id) ? [payload.player_id] : [];
   if (payload.type !== "goal_bl") return [];
   const have = new Set(lineupPlayerIds);
   return [payload.player_id, payload.assist_player_id].filter((id) => id && !have.has(id));
@@ -410,6 +415,8 @@ if (typeof module !== "undefined" && module.exports) {
     canEditMatch,
     canStartMatch,
     computeFootScore,
+    FOOT_ACTIONS,
+    isGoalEvent,
     computeAttendanceBuckets,
     computeAttendanceQueue,
     ballKeeperCounts,

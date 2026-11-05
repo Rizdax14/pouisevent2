@@ -946,7 +946,7 @@ function FootEventEditor({ event, defaultHalf, roster, onSave, onCancel }) {
 function FootEventTimeline({ events, editable, match, roster, lineups, reload }) {
   const [editingId, setEditingId] = React.useState(null); // event id, "new", or null
   const [busyId, setBusyId] = React.useState(null);
-  const sorted = buildEventTimeline(events);
+  const sorted = buildEventTimeline(events.filter(isGoalEvent)); // the live actions (shots, fouls…) have their own card
 
   async function saveEvent(eventId, payload) {
     await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
@@ -1003,39 +1003,167 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
   );
 }
 
-function FootGoalPicker({ roster, onConfirm, onCancel, withAssist, busy }) {
-  const [playerId, setPlayerId] = React.useState("");
-  const [assistId, setAssistId] = React.useState("");
-  const options = currentSquad(roster).map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean);
-  const can = canConfirmGoal(playerId, busy);
+// ---- live "soundboard": a mosaic of actions, then a mosaic of the players' faces ---------------------------
+const FOOT_TILES = [
+  { key: "goal_bl", emoji: "⚽", label: "But", ask: "Qui a marqué ?", main: true },
+  { key: "shot_on", emoji: "🎯", label: "Tir cadré", ask: "Qui a tiré ?" },
+  { key: "shot_off", emoji: "💨", label: "Tir non cadré", ask: "Qui a tiré ?" },
+  { key: "save", emoji: "🧤", label: "Arrêt", ask: "Qui a fait l'arrêt ?" },
+  { key: "foul", emoji: "✋", label: "Faute", ask: "Qui a fait la faute ?" },
+  { key: "yellow", emoji: "🟨", label: "Carton jaune", ask: "Qui a pris le carton ?" },
+  { key: "red", emoji: "🟥", label: "Carton rouge", ask: "Qui a pris le carton ?" },
+  { key: "goal_opponent", emoji: "🥅", label: "But adverse", ask: "", bad: true, wide: true },
+];
+const footTileOf = (type) => FOOT_TILES.find((t) => t.key === type);
+
+function FootSoundboard({ match, roster, lineups, minute, reload }) {
+  const [tile, setTile] = React.useState(null);
+  const [scorer, setScorer] = React.useState(null); // goal: 1st mosaic = scorer, 2nd = assist
+  const [last, setLast] = React.useState(null); // { id, text } — "Annuler" for a few seconds
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => { if (!last) return; const t = setTimeout(() => setLast(null), 7000); return () => clearTimeout(t); }, [last]);
+  const close = () => { setTile(null); setScorer(null); };
+
+  async function send(payload, text) {
+    setBusy(true); setErr(null);
+    let row = null;
+    try {
+      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
+        addToSheet: (ids) => addToLineup(match.id, ids),
+        writeGoal: async () => { [row] = await sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute, ...payload }); },
+      });
+      if (row) setLast({ id: row.id, text });
+      await reload();
+    } catch (e) { console.warn("live action failed", e); setErr("Pas enregistré, réessaie"); }
+    setBusy(false); close();
+  }
+  async function undo() {
+    if (!last) return;
+    const id = last.id; setLast(null);
+    try { await sbFetch("foot_match_events", `?id=eq.${id}`, { method: "DELETE" }); await reload(); } catch (e) { console.warn(e); }
+  }
+  function press(t) {
+    if (t.key === "goal_opponent") return send({ type: "goal_opponent", player_id: null, assist_player_id: null, own_goal: false }, `🥅 But de ${match.opponent_name}`);
+    setTile(t);
+  }
+  function pickPlayer(id) {
+    if (tile.key === "goal_bl") { setScorer(id); return; }
+    send({ type: tile.key, player_id: id, assist_player_id: null, own_goal: false }, `${tile.emoji} ${tile.label} · ${footNameOf(id)}`);
+  }
+  function pickAssist(id) {
+    const own = scorer === "csc";
+    send({ type: "goal_bl", player_id: own ? null : scorer, assist_player_id: id, own_goal: own },
+      `⚽ ${own ? "CSC adverse" : `But de ${footNameOf(scorer)}`}${id ? ` · passe de ${footNameOf(id)}` : ""}`);
+  }
+
   return (
-    <div style={{ background: FC.softer, border: `1.5px solid ${FC.line}`, borderRadius: 18, padding: 14, marginTop: 10 }}>
-      <FField label="Buteur">
-        <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} style={FOOT_INPUT_STYLE}>
-          <option value="">— Choisir —</option>
-          {options.map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
-          <option value="csc">CSC (but contre son camp)</option>
-        </select>
-      </FField>
-      {withAssist && playerId !== "csc" && (
-        <FField label="Passe décisive (optionnel)">
-          <select value={assistId} onChange={(e) => setAssistId(e.target.value)} style={FOOT_INPUT_STYLE}>
-            <option value="">— Aucune —</option>
-            {options.filter((p) => String(p.id) !== playerId).map((p) => <option key={p.id} value={p.id}>{footShortName(p)}</option>)}
-          </select>
-        </FField>
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+        {FOOT_TILES.map((t) => (
+          <button key={t.key} type="button" disabled={busy} onClick={() => press(t)}
+            style={{ gridColumn: t.wide ? "span 2" : undefined, height: 86, borderRadius: 20, border: t.main || t.bad ? "none" : `1.5px solid ${FC.line}`, cursor: "pointer",
+              background: t.main ? FC.accent : t.bad ? FC.bad : FC.softer, color: t.main || t.bad ? "#fff" : FC.deep, boxShadow: `0 4px 0 ${t.main ? FC.deep : t.bad ? "#7d1a15" : FC.line}`,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.03em", textTransform: "uppercase", opacity: busy ? 0.6 : 1 }}>
+            <span style={{ fontSize: 30, lineHeight: 1 }}>{t.emoji}</span>{t.label}
+          </button>
+        ))}
+      </div>
+      {last && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, padding: "8px 10px 8px 14px", borderRadius: 16, background: FC.soft, fontSize: 14, color: FC.text }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{last.text}</span>
+          <FBtn size="sm" variant="ghost" icon="x" onClick={undo}>Annuler</FBtn>
+        </div>
       )}
-      <div style={{ display: "flex", gap: 10 }}>
-        <FBtn variant="ghost" onClick={onCancel} style={{ flex: 1 }}>Annuler</FBtn>
-        <FBtn icon="check" onClick={() => can && onConfirm(playerId === "csc" ? "csc" : Number(playerId), playerId !== "csc" && assistId ? Number(assistId) : null)} disabled={!can} style={{ flex: 1 }}>Valider</FBtn>
+      {err && <FMessage style={{ marginTop: 8 }}>{err}</FMessage>}
+      {tile && (scorer == null
+        ? <FootPlayerMosaic title={`${tile.emoji} ${tile.label}`} ask={tile.ask} match={match} roster={roster} lineups={lineups} keepersFirst={tile.key === "save"}
+            extra={tile.key === "goal_bl" ? { emoji: "🙃", label: "CSC adverse", onPick: () => pickPlayer("csc") } : null} onPick={pickPlayer} onClose={close} />
+        : <FootPlayerMosaic title="⚽ But" ask="Qui a fait la passe ?" match={match} roster={roster} lineups={lineups} without={scorer}
+            extra={{ emoji: "—", label: "Pas de passe", onPick: () => pickAssist(null) }} extraFirst onPick={pickAssist} onClose={close} />)}
+    </div>
+  );
+}
+
+// The faces of the players, big: the match sheet first, everybody else on demand.
+function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose, extra, extraFirst, keepersFirst, without }) {
+  const sheet = lineupIdsFor(lineups || [], match.id);
+  const [all, setAll] = React.useState(sheet.length === 0);
+  const squad = currentSquad(roster).map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).filter((p) => p.id !== without);
+  const keepers = new Set(keepersFirst ? (match.ball_keepers || []) : []);
+  const list = squad.filter((p) => all || sheet.includes(p.id))
+    .sort((a, b) => (keepers.has(b.id) - keepers.has(a.id)) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
+  const cell = { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 4px", borderRadius: 18, background: FC.softer, border: `1.5px solid ${FC.line}`, cursor: "pointer", fontSize: 13, color: FC.text, minWidth: 0 };
+  const extraCell = extra && (
+    <button key="extra" type="button" onClick={extra.onPick} style={cell}>
+      <span style={{ width: 64, height: 64, borderRadius: 32, background: FC.soft, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{extra.emoji}</span>
+      <span style={{ fontFamily: FF.ui, textTransform: "uppercase", fontSize: 12 }}>{extra.label}</span>
+    </button>
+  );
+  return (
+    <div role="dialog" aria-label={title} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(10,14,12,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "86vh", overflowY: "auto", background: "#fff", borderRadius: "26px 26px 0 0", padding: "18px 16px calc(18px + env(safe-area-inset-bottom))" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ fontFamily: FF.display, fontSize: 24, color: FC.deep }}>{title}</div>
+          <FIconBtn icon="x" label="Fermer" onClick={onClose} />
+        </div>
+        <div style={{ fontFamily: FF.ui, fontSize: 17, color: FC.text, marginBottom: 12 }}>{ask}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          {extraFirst && extraCell}
+          {list.map((p) => (
+            <button key={p.id} type="button" onClick={() => onPick(p.id)} style={cell}>
+              <FAvatar playerId={p.id} name={footShortName(p)} size={64} />
+              <span style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{footShortName(p)}</span>
+            </button>
+          ))}
+          {!extraFirst && extraCell}
+        </div>
+        {!all && squad.length > list.length && <FBtn variant="ghost" full size="sm" icon="users" onClick={() => setAll(true)} style={{ marginTop: 12 }}>Voir tous les joueurs</FBtn>}
       </div>
     </div>
   );
 }
 
+// Totals per player of the live actions, then the match thread.
+function FootActionsCard({ events, match, editable, reload }) {
+  const acts = buildEventTimeline(events.filter((e) => FOOT_ACTIONS.includes(e.type)));
+  const [open, setOpen] = React.useState(false);
+  if (!acts.length) return null;
+  const kinds = FOOT_ACTIONS.filter((k) => acts.some((e) => e.type === k));
+  const ids = [...new Set(acts.map((e) => e.player_id))];
+  const count = (id, k) => acts.filter((e) => e.player_id === id && e.type === k).length;
+  const rows = ids.map((id) => ({ id, total: kinds.reduce((s, k) => s + count(id, k), 0) })).sort((a, b) => b.total - a.total);
+  async function del(e) {
+    if (!window.confirm("Supprimer cette action ?")) return;
+    try { await sbFetch("foot_match_events", `?id=eq.${e.id}`, { method: "DELETE" }); await reload(); } catch (err) { console.warn(err); }
+  }
+  return (
+    <FCard>
+      <FHeading>Actions</FHeading>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, color: FC.text }}>
+        <thead><tr><th style={{ textAlign: "left", fontWeight: 400, color: FC.muted, fontSize: 12, padding: "4px 0" }}>Joueur</th>{kinds.map((k) => <th key={k} title={footTileOf(k).label} style={{ fontWeight: 400, padding: "4px 4px" }}>{footTileOf(k).emoji}</th>)}</tr></thead>
+        <tbody>{rows.map(({ id }) => (
+          <tr key={id} style={{ borderTop: `1px solid ${FC.line}` }}>
+            <td style={{ padding: "6px 0" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><FAvatar playerId={id} name={footNameOf(id)} size={26} />{footNameOf(id)}</span></td>
+            {kinds.map((k) => <td key={k} style={{ textAlign: "center", color: count(id, k) ? FC.text : FC.line, fontFamily: FF.ui }}>{count(id, k) || "·"}</td>)}
+          </tr>
+        ))}</tbody>
+      </table>
+      <button type="button" onClick={() => setOpen(!open)} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: FC.muted, fontSize: 13, textDecoration: "underline", cursor: "pointer" }}>{open ? "Masquer le fil du match" : `Voir le fil du match (${acts.length})`}</button>
+      {open && acts.map((e) => (
+        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}`, fontSize: 14 }}>
+          <span style={{ width: 44, color: FC.muted, fontFamily: FF.ui }}>{formatEventMinute(e.minute, match && match.half_duration_min)}</span>
+          <span>{footTileOf(e.type).emoji}</span>
+          <span style={{ flex: 1 }}>{footTileOf(e.type).label} · {footNameOf(e.player_id)}</span>
+          {editable && <FIconBtn icon="trash" label="Supprimer l'action" tone="danger" onClick={() => del(e)} />}
+        </div>
+      ))}
+    </FCard>
+  );
+}
+
 function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   const [now, setNow] = React.useState(Date.now());
-  const [picking, setPicking] = React.useState(null); // null | "bl" | "opponent"
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -1048,21 +1176,6 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
   const running = !!match.half_started_at;
   const paused = !running && !!match.clock_paused;
   const clock = formatMatchClock(elapsedSeconds, match.half_duration_min);
-
-  async function logGoal(type, playerId, assistId) {
-    setBusy(true);
-    try {
-      const own = playerId === "csc";
-      const scorer = own ? null : playerId;
-      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), { type, player_id: scorer, assist_player_id: assistId }, {
-        addToSheet: (ids) => addToLineup(match.id, ids),
-        writeGoal: () => sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute: minutesElapsed, type, player_id: scorer, assist_player_id: assistId, own_goal: own }),
-      });
-      setPicking(null);
-      await reload();
-    } catch (e) { console.warn("log goal failed", e); }
-    setBusy(false);
-  }
 
   async function startHalf() {
     setBusy(true);
@@ -1121,11 +1234,7 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
 
       {(liveAction === "playing" || liveAction === "paused") && (
         <>
-          <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-            <FBtn size="lg" icon="ball" disabled={busy} onClick={() => setPicking("bl")} style={{ flex: 1 }}>But BL</FBtn>
-            <FBtn variant="ghost" size="lg" icon="ball" disabled={busy} onClick={() => logGoal("goal_opponent", null, null)} style={{ flex: 1 }}>But adverse</FBtn>
-          </div>
-          {picking === "bl" && <FootGoalPicker roster={roster} withAssist busy={busy} onCancel={() => setPicking(null)} onConfirm={(playerId, assistId) => logGoal("goal_bl", playerId, assistId)} />}
+          <FootSoundboard match={match} roster={roster} lineups={lineups} minute={minutesElapsed} reload={reload} />
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             {paused
               ? <FBtn variant="success" icon="play" disabled={busy} onClick={startHalf} style={{ flex: 1 }}>Reprendre</FBtn>
@@ -1153,6 +1262,7 @@ function FootLiveView({ match, roster, events, lineups, attendance, currentPlaye
         <FHeading>Buts</FHeading>
         <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
       </FCard>
+      <FootActionsCard events={matchEvents} match={match} editable={isAdmin} reload={reload} />
     </div>
   );
 }
@@ -1381,6 +1491,7 @@ function FootFinishedView({ match, roster, events, lineups, attendance, ratings,
             <FHeading>Buts</FHeading>
             <FootEventTimeline events={matchEvents} editable={isAdmin} match={match} roster={roster} lineups={lineups} reload={reload} />
           </FCard>
+          <FootActionsCard events={matchEvents} match={match} editable={isAdmin} reload={reload} />
         </>
       )}
       {tab === "notes" && <FootRatingsTab match={match} lineups={lineups} ratings={ratings || []} motmVotes={motmVotes || []} currentPlayer={currentPlayer} isAdmin={isAdmin} reload={reload} />}
