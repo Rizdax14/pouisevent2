@@ -2902,7 +2902,8 @@ function FootPlayerMosaic({
       fontSize: 12
     }
   }, extra.label));
-  return /*#__PURE__*/React.createElement("div", {
+  // in <body>: above the bottom bar (the page content sits in its own stacking layer, under the bar)
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     role: "dialog",
     "aria-label": title,
     onClick: onClose,
@@ -2982,7 +2983,7 @@ function FootPlayerMosaic({
     style: {
       marginTop: 12
     }
-  }, "Voir tous les joueurs")));
+  }, "Voir tous les joueurs"))), document.body);
 }
 
 // Totals per player of the live actions, then the match thread.

@@ -1100,7 +1100,8 @@ function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose,
       <span style={{ fontFamily: FF.ui, textTransform: "uppercase", fontSize: 12 }}>{extra.label}</span>
     </button>
   );
-  return (
+  // in <body>: above the bottom bar (the page content sits in its own stacking layer, under the bar)
+  return ReactDOM.createPortal(
     <div role="dialog" aria-label={title} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(10,14,12,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, maxHeight: "86vh", overflowY: "auto", background: "#fff", borderRadius: "26px 26px 0 0", padding: "18px 16px calc(18px + env(safe-area-inset-bottom))" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -1120,7 +1121,8 @@ function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose,
         </div>
         {!all && squad.length > list.length && <FBtn variant="ghost" full size="sm" icon="users" onClick={() => setAll(true)} style={{ marginTop: 12 }}>Voir tous les joueurs</FBtn>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
