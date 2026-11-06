@@ -22,6 +22,7 @@ const {
   formatStatValue,
   missingLineupPlayers,
   isGoalEvent,
+  footBenchState,
   diffLineup,
   diffLineupEdit,
   saveGoalWithSheet,
@@ -273,6 +274,9 @@ test("missingLineupPlayers returns scorer/assister not yet on the sheet", () => 
   assert.deepEqual(missingLineupPlayers([1], { type: "goal_bl", player_id: 1, assist_player_id: 2 }), [2]);
   assert.deepEqual(missingLineupPlayers([1], { type: "shot_on", player_id: 3 }), [3]); // a live action puts the player on the sheet too
   assert.deepEqual(missingLineupPlayers([3], { type: "foul", player_id: 3 }), []);
+  assert.deepEqual(missingLineupPlayers([1], { type: "sub", player_id: 4, assist_player_id: 1 }), [4]); // the player coming on joins the sheet
+  const bench = footBenchState([{ id: 1, half: 1, minute: 10, type: "sub", player_id: 4, assist_player_id: 1 }, { id: 2, half: 2, minute: 30, type: "sub", player_id: 1, assist_player_id: 2 }]);
+  assert.deepEqual([...bench.entries()].sort(), [[1, "field"], [2, "bench"], [4, "field"]]);
   assert.equal(computeFootScore([{ type: "goal_bl" }, { type: "shot_on" }, { type: "save" }, { type: "goal_opponent" }]).bl, 1); // actions never count
   assert.deepEqual([{ type: "goal_bl" }, { type: "foul" }, { type: "goal_opponent" }].filter(isGoalEvent).map((e) => e.type), ["goal_bl", "goal_opponent"]);
   assert.deepEqual(missingLineupPlayers([], { type: "goal_opponent", player_id: null, assist_player_id: null }), []);

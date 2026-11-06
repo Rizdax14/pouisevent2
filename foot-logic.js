@@ -213,7 +213,15 @@ function formatStatValue(value, key, mode) {
 const FOOT_ACTIONS = ["shot_on", "shot_off", "save", "foul", "yellow", "red"];
 const isGoalEvent = (e) => e.type === "goal_bl" || e.type === "goal_opponent";
 
+// Who is on the bench / on the pitch from the substitutions logged so far (sub: player_id comes on, assist_player_id goes off).
+function footBenchState(events) {
+  const st = new Map();
+  for (const e of buildEventTimeline(events)) if (e.type === "sub") { if (e.assist_player_id) st.set(e.assist_player_id, "bench"); if (e.player_id) st.set(e.player_id, "field"); }
+  return st;
+}
+
 function missingLineupPlayers(lineupPlayerIds, payload) {
+  if (payload.type === "sub") return [payload.player_id, payload.assist_player_id].filter((id) => id && !lineupPlayerIds.includes(id));
   if (FOOT_ACTIONS.includes(payload.type)) return payload.player_id && !lineupPlayerIds.includes(payload.player_id) ? [payload.player_id] : [];
   if (payload.type !== "goal_bl") return [];
   const have = new Set(lineupPlayerIds);
@@ -417,6 +425,7 @@ if (typeof module !== "undefined" && module.exports) {
     computeFootScore,
     FOOT_ACTIONS,
     isGoalEvent,
+    footBenchState,
     computeAttendanceBuckets,
     computeAttendanceQueue,
     ballKeeperCounts,

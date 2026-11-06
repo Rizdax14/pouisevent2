@@ -2573,7 +2573,7 @@ function FootEventTimeline({
       }
     }, "Passe de ", /*#__PURE__*/React.createElement(FPlayerLink, {
       id: e.assist_player_id
-    }, footNameOf(e.assist_player_id)))), editable && /*#__PURE__*/React.createElement("span", {
+    }, footNameOf(e.assist_player_id)))), editable && e.id > 0 && /*#__PURE__*/React.createElement("span", {
       style: {
         display: "inline-flex"
       }
@@ -2608,6 +2608,7 @@ function FootEventTimeline({
 }
 
 // ---- live "soundboard": a mosaic of actions, then a mosaic of the players' faces ---------------------------
+// Instant: the action shows at once (score included), it is saved in the background; nothing else is reloaded.
 const FOOT_TILES = [{
   key: "goal_bl",
   emoji: "⚽",
@@ -2635,6 +2636,11 @@ const FOOT_TILES = [{
   label: "Faute",
   ask: "Qui a fait la faute ?"
 }, {
+  key: "sub",
+  emoji: "🔁",
+  label: "Changement",
+  ask: "Qui sort ?"
+}, {
   key: "yellow",
   emoji: "🟨",
   label: "Carton jaune",
@@ -2649,71 +2655,90 @@ const FOOT_TILES = [{
   emoji: "🥅",
   label: "But adverse",
   ask: "",
-  bad: true,
-  wide: true
+  bad: true
 }];
 const footTileOf = type => FOOT_TILES.find(t => t.key === type);
+let FOOT_TMP_ID = 0;
 function FootSoundboard({
   match,
   roster,
   lineups,
+  events,
   minute,
   reload
 }) {
+  const {
+    live
+  } = React.useContext(FootCtx); // { setEvents, setLineups } of the app: local updates, no full reload
   const [tile, setTile] = React.useState(null);
-  const [scorer, setScorer] = React.useState(null); // goal: 1st mosaic = scorer, 2nd = assist
-  const [last, setLast] = React.useState(null); // { id, text } — "Annuler" for a few seconds
-  const [busy, setBusy] = React.useState(false);
+  const [first, setFirst] = React.useState(null); // goal: the scorer (then the assist); sub: who goes off (then who comes on)
+  const [last, setLast] = React.useState(null); // { id, text, pending } — "Annuler" for a few seconds
   const [err, setErr] = React.useState(null);
   React.useEffect(() => {
-    if (!last) return;
+    if (!last || last.pending) return;
     const t = setTimeout(() => setLast(null), 7000);
     return () => clearTimeout(t);
   }, [last]);
   const close = () => {
     setTile(null);
-    setScorer(null);
+    setFirst(null);
   };
-  async function send(payload, text) {
-    setBusy(true);
+  const bench = footBenchState(events || []);
+  function send(payload, text) {
     setErr(null);
-    let row = null;
-    try {
-      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
-        addToSheet: ids => addToLineup(match.id, ids),
-        writeGoal: async () => {
-          [row] = await sbInsert("foot_match_events", {
-            match_id: match.id,
-            half: match.current_half,
-            minute,
-            ...payload
-          });
-        }
-      });
-      if (row) setLast({
-        id: row.id,
-        text
-      });
-      await reload();
-    } catch (e) {
-      console.warn("live action failed", e);
-      setErr("Pas enregistré, réessaie");
-    }
-    setBusy(false);
     close();
+    const tmp = -++FOOT_TMP_ID; // negative = not saved yet
+    const ev = {
+      id: tmp,
+      match_id: match.id,
+      half: match.current_half,
+      minute,
+      ...payload
+    };
+    const missing = missingLineupPlayers(lineupIdsFor(lineups || [], match.id), payload);
+    live.setEvents(es => [...es, ev]);
+    if (missing.length) live.setLineups(ls => [...ls, ...missing.map(player_id => ({
+      match_id: match.id,
+      player_id
+    }))]);
+    setLast({
+      id: tmp,
+      text,
+      pending: true
+    });
+    (async () => {
+      if (missing.length) await addToLineup(match.id, missing);
+      const [row] = await sbInsert("foot_match_events", {
+        match_id: match.id,
+        half: match.current_half,
+        minute,
+        ...payload
+      });
+      live.setEvents(es => es.map(e => e.id === tmp ? row : e));
+      setLast(l => l && l.id === tmp ? {
+        ...l,
+        id: row.id,
+        pending: false
+      } : l);
+    })().catch(e => {
+      console.warn("live action failed", e);
+      live.setEvents(es => es.filter(x => x.id !== tmp));
+      setLast(l => l && l.id === tmp ? null : l);
+      setErr(`Pas enregistré (${text}), réessaie`);
+    });
   }
-  async function undo() {
-    if (!last) return;
+  function undo() {
+    if (!last || last.pending) return;
     const id = last.id;
     setLast(null);
-    try {
-      await sbFetch("foot_match_events", `?id=eq.${id}`, {
-        method: "DELETE"
-      });
-      await reload();
-    } catch (e) {
+    live.setEvents(es => es.filter(x => x.id !== id));
+    sbFetch("foot_match_events", `?id=eq.${id}`, {
+      method: "DELETE"
+    }).catch(e => {
       console.warn(e);
-    }
+      setErr("Annulation pas enregistrée");
+      reload();
+    });
   }
   function press(t) {
     if (t.key === "goal_opponent") return send({
@@ -2725,8 +2750,8 @@ function FootSoundboard({
     setTile(t);
   }
   function pickPlayer(id) {
-    if (tile.key === "goal_bl") {
-      setScorer(id);
+    if (tile.key === "goal_bl" || tile.key === "sub") {
+      setFirst(id);
       return;
     }
     send({
@@ -2736,15 +2761,23 @@ function FootSoundboard({
       own_goal: false
     }, `${tile.emoji} ${tile.label} · ${footNameOf(id)}`);
   }
-  function pickAssist(id) {
-    const own = scorer === "csc";
+  function pickSecond(id) {
+    if (tile.key === "sub") return send({
+      type: "sub",
+      player_id: id,
+      assist_player_id: first,
+      own_goal: false
+    }, `🔁 ${footNameOf(id)} entre, ${footNameOf(first)} sort`);
+    const own = first === "csc";
     send({
       type: "goal_bl",
-      player_id: own ? null : scorer,
+      player_id: own ? null : first,
       assist_player_id: id,
       own_goal: own
-    }, `⚽ ${own ? "CSC adverse" : `But de ${footNameOf(scorer)}`}${id ? ` · passe de ${footNameOf(id)}` : ""}`);
+    }, `⚽ ${own ? "CSC adverse" : `But de ${footNameOf(first)}`}${id ? ` · passe de ${footNameOf(id)}` : ""}`);
   }
+  const onBench = new Set([...bench].filter(([, v]) => v === "bench").map(([k]) => k));
+  const onField = new Set([...bench].filter(([, v]) => v === "field").map(([k]) => k));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 4
@@ -2758,10 +2791,8 @@ function FootSoundboard({
   }, FOOT_TILES.map(t => /*#__PURE__*/React.createElement("button", {
     key: t.key,
     type: "button",
-    disabled: busy,
     onClick: () => press(t),
     style: {
-      gridColumn: t.wide ? "span 2" : undefined,
       height: 86,
       borderRadius: 20,
       border: t.main || t.bad ? "none" : `1.5px solid ${FC.line}`,
@@ -2777,8 +2808,7 @@ function FootSoundboard({
       fontFamily: FF.ui,
       fontSize: 13,
       letterSpacing: "0.03em",
-      textTransform: "uppercase",
-      opacity: busy ? 0.6 : 1
+      textTransform: "uppercase"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -2809,18 +2839,20 @@ function FootSoundboard({
     size: "sm",
     variant: "ghost",
     icon: "x",
+    disabled: last.pending,
     onClick: undo
-  }, "Annuler")), err && /*#__PURE__*/React.createElement(FMessage, {
+  }, last.pending ? "Envoi…" : "Annuler")), err && /*#__PURE__*/React.createElement(FMessage, {
     style: {
       marginTop: 8
     }
-  }, err), tile && (scorer == null ? /*#__PURE__*/React.createElement(FootPlayerMosaic, {
+  }, err), tile && (first == null ? /*#__PURE__*/React.createElement(FootPlayerMosaic, {
     title: `${tile.emoji} ${tile.label}`,
     ask: tile.ask,
     match: match,
     roster: roster,
     lineups: lineups,
     keepersFirst: tile.key === "save",
+    hide: tile.key === "sub" ? onBench : null,
     extra: tile.key === "goal_bl" ? {
       emoji: "🙃",
       label: "CSC adverse",
@@ -2828,20 +2860,32 @@ function FootSoundboard({
     } : null,
     onPick: pickPlayer,
     onClose: close
+  }) : tile.key === "sub" ? /*#__PURE__*/React.createElement(FootPlayerMosaic, {
+    title: "\uD83D\uDD01 Changement",
+    ask: "Qui entre ?",
+    match: match,
+    roster: roster,
+    lineups: lineups,
+    without: first,
+    hide: onField,
+    firstIds: onBench,
+    badge: "Sur le banc",
+    onPick: pickSecond,
+    onClose: close
   }) : /*#__PURE__*/React.createElement(FootPlayerMosaic, {
     title: "\u26BD But",
     ask: "Qui a fait la passe ?",
     match: match,
     roster: roster,
     lineups: lineups,
-    without: scorer,
+    without: first,
     extra: {
       emoji: "—",
       label: "Pas de passe",
-      onPick: () => pickAssist(null)
+      onPick: () => pickSecond(null)
     },
     extraFirst: true,
-    onPick: pickAssist,
+    onPick: pickSecond,
     onClose: close
   })));
 }
@@ -2858,13 +2902,16 @@ function FootPlayerMosaic({
   extra,
   extraFirst,
   keepersFirst,
-  without
+  without,
+  hide,
+  firstIds,
+  badge
 }) {
   const sheet = lineupIdsFor(lineups || [], match.id);
   const [all, setAll] = React.useState(sheet.length === 0);
-  const squad = currentSquad(roster).map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).filter(p => p.id !== without);
-  const keepers = new Set(keepersFirst ? match.ball_keepers || [] : []);
-  const list = squad.filter(p => all || sheet.includes(p.id)).sort((a, b) => keepers.has(b.id) - keepers.has(a.id) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
+  const squad = currentSquad(roster).map(r => PLAYERS.find(p => p.id === r.player_id)).filter(Boolean).filter(p => p.id !== without && !(hide && hide.has(p.id)));
+  const top = new Set([...(keepersFirst ? match.ball_keepers || [] : []), ...(firstIds || [])]);
+  const list = squad.filter(p => all || sheet.includes(p.id) || top.has(p.id)).sort((a, b) => top.has(b.id) - top.has(a.id) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   const cell = {
     display: "flex",
     flexDirection: "column",
@@ -2974,7 +3021,18 @@ function FootPlayerMosaic({
       whiteSpace: "nowrap",
       fontWeight: 600
     }
-  }, footShortName(p)))), !extraFirst && extraCell), !all && squad.length > list.length && /*#__PURE__*/React.createElement(FBtn, {
+  }, footShortName(p)), badge && firstIds && firstIds.has(p.id) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginTop: -4,
+      padding: "1px 8px",
+      borderRadius: 999,
+      background: FC.accent,
+      color: "#fff",
+      fontFamily: FF.ui,
+      fontSize: 10,
+      textTransform: "uppercase"
+    }
+  }, badge))), !extraFirst && extraCell), !all && squad.length > list.length && /*#__PURE__*/React.createElement(FBtn, {
     variant: "ghost",
     full: true,
     size: "sm",
@@ -2993,11 +3051,11 @@ function FootActionsCard({
   editable,
   reload
 }) {
-  const acts = buildEventTimeline(events.filter(e => FOOT_ACTIONS.includes(e.type)));
+  const acts = buildEventTimeline(events.filter(e => FOOT_ACTIONS.includes(e.type) || e.type === "sub"));
   const [open, setOpen] = React.useState(false);
   if (!acts.length) return null;
   const kinds = FOOT_ACTIONS.filter(k => acts.some(e => e.type === k));
-  const ids = [...new Set(acts.map(e => e.player_id))];
+  const ids = [...new Set(acts.filter(e => e.type !== "sub").map(e => e.player_id))];
   const count = (id, k) => acts.filter(e => e.player_id === id && e.type === k).length;
   const rows = ids.map(id => ({
     id,
@@ -3014,7 +3072,7 @@ function FootActionsCard({
       console.warn(err);
     }
   }
-  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Actions"), /*#__PURE__*/React.createElement("table", {
+  return /*#__PURE__*/React.createElement(FCard, null, /*#__PURE__*/React.createElement(FHeading, null, "Actions"), ids.length > 0 && /*#__PURE__*/React.createElement("table", {
     style: {
       width: "100%",
       borderCollapse: "collapse",
@@ -3097,7 +3155,15 @@ function FootActionsCard({
     style: {
       flex: 1
     }
-  }, footTileOf(e.type).label, " \xB7 ", footNameOf(e.player_id)), editable && /*#__PURE__*/React.createElement(FIconBtn, {
+  }, e.type === "sub" ? /*#__PURE__*/React.createElement(React.Fragment, null, "Changement \xB7 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.good
+    }
+  }, "\u2191 ", footNameOf(e.player_id)), " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: FC.bad
+    }
+  }, "\u2193 ", footNameOf(e.assist_player_id))) : /*#__PURE__*/React.createElement(React.Fragment, null, footTileOf(e.type).label, " \xB7 ", footNameOf(e.player_id))), editable && e.id > 0 && /*#__PURE__*/React.createElement(FIconBtn, {
     icon: "trash",
     label: "Supprimer l'action",
     tone: "danger",
@@ -3260,6 +3326,7 @@ function FootLiveAdminConsole({
     match: match,
     roster: roster,
     lineups: lineups,
+    events: events,
     minute: minutesElapsed,
     reload: reload
   }), /*#__PURE__*/React.createElement("div", {
@@ -8818,7 +8885,11 @@ function FootballApp({
       photos,
       framings,
       themeName: theme,
-      openPlayer
+      openPlayer,
+      live: {
+        setEvents,
+        setLineups
+      }
     }
   }, roomOn && dataReady && /*#__PURE__*/React.createElement(FootRoomScreen, {
     visible: roomVisible,

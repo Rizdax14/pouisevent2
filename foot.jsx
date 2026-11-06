@@ -984,7 +984,7 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
               <div style={{ fontSize: 15, fontWeight: 600, color: ours ? FC.text : FC.muted }}>{ours ? (e.own_goal ? "CSC (but contre son camp)" : <FPlayerLink id={e.player_id}>{footNameOf(e.player_id)}</FPlayerLink>) : "But adverse"}</div>
               {ours && e.assist_player_id && <div style={{ fontSize: 13, color: FC.muted }}>Passe de <FPlayerLink id={e.assist_player_id}>{footNameOf(e.assist_player_id)}</FPlayerLink></div>}
             </div>
-            {editable && (
+            {editable && e.id > 0 && (
               <span style={{ display: "inline-flex" }}>
                 <FIconBtn icon="pencil" label="Modifier le but" onClick={() => setEditingId(e.id)} disabled={busyId === e.id} />
                 <FIconBtn icon="trash" label="Supprimer le but" tone="danger" onClick={() => deleteEvent(e)} disabled={busyId === e.id} />
@@ -1004,67 +1004,82 @@ function FootEventTimeline({ events, editable, match, roster, lineups, reload })
 }
 
 // ---- live "soundboard": a mosaic of actions, then a mosaic of the players' faces ---------------------------
+// Instant: the action shows at once (score included), it is saved in the background; nothing else is reloaded.
 const FOOT_TILES = [
   { key: "goal_bl", emoji: "⚽", label: "But", ask: "Qui a marqué ?", main: true },
   { key: "shot_on", emoji: "🎯", label: "Tir cadré", ask: "Qui a tiré ?" },
   { key: "shot_off", emoji: "💨", label: "Tir non cadré", ask: "Qui a tiré ?" },
   { key: "save", emoji: "🧤", label: "Arrêt", ask: "Qui a fait l'arrêt ?" },
   { key: "foul", emoji: "✋", label: "Faute", ask: "Qui a fait la faute ?" },
+  { key: "sub", emoji: "🔁", label: "Changement", ask: "Qui sort ?" },
   { key: "yellow", emoji: "🟨", label: "Carton jaune", ask: "Qui a pris le carton ?" },
   { key: "red", emoji: "🟥", label: "Carton rouge", ask: "Qui a pris le carton ?" },
-  { key: "goal_opponent", emoji: "🥅", label: "But adverse", ask: "", bad: true, wide: true },
+  { key: "goal_opponent", emoji: "🥅", label: "But adverse", ask: "", bad: true },
 ];
 const footTileOf = (type) => FOOT_TILES.find((t) => t.key === type);
+let FOOT_TMP_ID = 0;
 
-function FootSoundboard({ match, roster, lineups, minute, reload }) {
+function FootSoundboard({ match, roster, lineups, events, minute, reload }) {
+  const { live } = React.useContext(FootCtx); // { setEvents, setLineups } of the app: local updates, no full reload
   const [tile, setTile] = React.useState(null);
-  const [scorer, setScorer] = React.useState(null); // goal: 1st mosaic = scorer, 2nd = assist
-  const [last, setLast] = React.useState(null); // { id, text } — "Annuler" for a few seconds
-  const [busy, setBusy] = React.useState(false);
+  const [first, setFirst] = React.useState(null); // goal: the scorer (then the assist); sub: who goes off (then who comes on)
+  const [last, setLast] = React.useState(null); // { id, text, pending } — "Annuler" for a few seconds
   const [err, setErr] = React.useState(null);
-  React.useEffect(() => { if (!last) return; const t = setTimeout(() => setLast(null), 7000); return () => clearTimeout(t); }, [last]);
-  const close = () => { setTile(null); setScorer(null); };
+  React.useEffect(() => { if (!last || last.pending) return; const t = setTimeout(() => setLast(null), 7000); return () => clearTimeout(t); }, [last]);
+  const close = () => { setTile(null); setFirst(null); };
+  const bench = footBenchState(events || []);
 
-  async function send(payload, text) {
-    setBusy(true); setErr(null);
-    let row = null;
-    try {
-      await saveGoalWithSheet(lineupIdsFor(lineups || [], match.id), payload, {
-        addToSheet: (ids) => addToLineup(match.id, ids),
-        writeGoal: async () => { [row] = await sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute, ...payload }); },
-      });
-      if (row) setLast({ id: row.id, text });
-      await reload();
-    } catch (e) { console.warn("live action failed", e); setErr("Pas enregistré, réessaie"); }
-    setBusy(false); close();
+  function send(payload, text) {
+    setErr(null); close();
+    const tmp = -(++FOOT_TMP_ID); // negative = not saved yet
+    const ev = { id: tmp, match_id: match.id, half: match.current_half, minute, ...payload };
+    const missing = missingLineupPlayers(lineupIdsFor(lineups || [], match.id), payload);
+    live.setEvents((es) => [...es, ev]);
+    if (missing.length) live.setLineups((ls) => [...ls, ...missing.map((player_id) => ({ match_id: match.id, player_id }))]);
+    setLast({ id: tmp, text, pending: true });
+    (async () => {
+      if (missing.length) await addToLineup(match.id, missing);
+      const [row] = await sbInsert("foot_match_events", { match_id: match.id, half: match.current_half, minute, ...payload });
+      live.setEvents((es) => es.map((e) => (e.id === tmp ? row : e)));
+      setLast((l) => (l && l.id === tmp ? { ...l, id: row.id, pending: false } : l));
+    })().catch((e) => {
+      console.warn("live action failed", e);
+      live.setEvents((es) => es.filter((x) => x.id !== tmp));
+      setLast((l) => (l && l.id === tmp ? null : l));
+      setErr(`Pas enregistré (${text}), réessaie`);
+    });
   }
-  async function undo() {
-    if (!last) return;
+  function undo() {
+    if (!last || last.pending) return;
     const id = last.id; setLast(null);
-    try { await sbFetch("foot_match_events", `?id=eq.${id}`, { method: "DELETE" }); await reload(); } catch (e) { console.warn(e); }
+    live.setEvents((es) => es.filter((x) => x.id !== id));
+    sbFetch("foot_match_events", `?id=eq.${id}`, { method: "DELETE" }).catch((e) => { console.warn(e); setErr("Annulation pas enregistrée"); reload(); });
   }
   function press(t) {
     if (t.key === "goal_opponent") return send({ type: "goal_opponent", player_id: null, assist_player_id: null, own_goal: false }, `🥅 But de ${match.opponent_name}`);
     setTile(t);
   }
   function pickPlayer(id) {
-    if (tile.key === "goal_bl") { setScorer(id); return; }
+    if (tile.key === "goal_bl" || tile.key === "sub") { setFirst(id); return; }
     send({ type: tile.key, player_id: id, assist_player_id: null, own_goal: false }, `${tile.emoji} ${tile.label} · ${footNameOf(id)}`);
   }
-  function pickAssist(id) {
-    const own = scorer === "csc";
-    send({ type: "goal_bl", player_id: own ? null : scorer, assist_player_id: id, own_goal: own },
-      `⚽ ${own ? "CSC adverse" : `But de ${footNameOf(scorer)}`}${id ? ` · passe de ${footNameOf(id)}` : ""}`);
+  function pickSecond(id) {
+    if (tile.key === "sub") return send({ type: "sub", player_id: id, assist_player_id: first, own_goal: false }, `🔁 ${footNameOf(id)} entre, ${footNameOf(first)} sort`);
+    const own = first === "csc";
+    send({ type: "goal_bl", player_id: own ? null : first, assist_player_id: id, own_goal: own },
+      `⚽ ${own ? "CSC adverse" : `But de ${footNameOf(first)}`}${id ? ` · passe de ${footNameOf(id)}` : ""}`);
   }
+  const onBench = new Set([...bench].filter(([, v]) => v === "bench").map(([k]) => k));
+  const onField = new Set([...bench].filter(([, v]) => v === "field").map(([k]) => k));
 
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         {FOOT_TILES.map((t) => (
-          <button key={t.key} type="button" disabled={busy} onClick={() => press(t)}
-            style={{ gridColumn: t.wide ? "span 2" : undefined, height: 86, borderRadius: 20, border: t.main || t.bad ? "none" : `1.5px solid ${FC.line}`, cursor: "pointer",
+          <button key={t.key} type="button" onClick={() => press(t)}
+            style={{ height: 86, borderRadius: 20, border: t.main || t.bad ? "none" : `1.5px solid ${FC.line}`, cursor: "pointer",
               background: t.main ? FC.accent : t.bad ? FC.bad : FC.softer, color: t.main || t.bad ? "#fff" : FC.deep, boxShadow: `0 4px 0 ${t.main ? FC.deep : t.bad ? "#7d1a15" : FC.line}`,
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.03em", textTransform: "uppercase", opacity: busy ? 0.6 : 1 }}>
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontFamily: FF.ui, fontSize: 13, letterSpacing: "0.03em", textTransform: "uppercase" }}>
             <span style={{ fontSize: 30, lineHeight: 1 }}>{t.emoji}</span>{t.label}
           </button>
         ))}
@@ -1072,27 +1087,31 @@ function FootSoundboard({ match, roster, lineups, minute, reload }) {
       {last && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, padding: "8px 10px 8px 14px", borderRadius: 16, background: FC.soft, fontSize: 14, color: FC.text }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{last.text}</span>
-          <FBtn size="sm" variant="ghost" icon="x" onClick={undo}>Annuler</FBtn>
+          <FBtn size="sm" variant="ghost" icon="x" disabled={last.pending} onClick={undo}>{last.pending ? "Envoi…" : "Annuler"}</FBtn>
         </div>
       )}
       {err && <FMessage style={{ marginTop: 8 }}>{err}</FMessage>}
-      {tile && (scorer == null
+      {tile && (first == null
         ? <FootPlayerMosaic title={`${tile.emoji} ${tile.label}`} ask={tile.ask} match={match} roster={roster} lineups={lineups} keepersFirst={tile.key === "save"}
+            hide={tile.key === "sub" ? onBench : null}
             extra={tile.key === "goal_bl" ? { emoji: "🙃", label: "CSC adverse", onPick: () => pickPlayer("csc") } : null} onPick={pickPlayer} onClose={close} />
-        : <FootPlayerMosaic title="⚽ But" ask="Qui a fait la passe ?" match={match} roster={roster} lineups={lineups} without={scorer}
-            extra={{ emoji: "—", label: "Pas de passe", onPick: () => pickAssist(null) }} extraFirst onPick={pickAssist} onClose={close} />)}
+        : tile.key === "sub"
+          ? <FootPlayerMosaic title="🔁 Changement" ask="Qui entre ?" match={match} roster={roster} lineups={lineups} without={first} hide={onField}
+              firstIds={onBench} badge="Sur le banc" onPick={pickSecond} onClose={close} />
+          : <FootPlayerMosaic title="⚽ But" ask="Qui a fait la passe ?" match={match} roster={roster} lineups={lineups} without={first}
+              extra={{ emoji: "—", label: "Pas de passe", onPick: () => pickSecond(null) }} extraFirst onPick={pickSecond} onClose={close} />)}
     </div>
   );
 }
 
 // The faces of the players, big: the match sheet first, everybody else on demand.
-function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose, extra, extraFirst, keepersFirst, without }) {
+function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose, extra, extraFirst, keepersFirst, without, hide, firstIds, badge }) {
   const sheet = lineupIdsFor(lineups || [], match.id);
   const [all, setAll] = React.useState(sheet.length === 0);
-  const squad = currentSquad(roster).map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).filter((p) => p.id !== without);
-  const keepers = new Set(keepersFirst ? (match.ball_keepers || []) : []);
-  const list = squad.filter((p) => all || sheet.includes(p.id))
-    .sort((a, b) => (keepers.has(b.id) - keepers.has(a.id)) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
+  const squad = currentSquad(roster).map((r) => PLAYERS.find((p) => p.id === r.player_id)).filter(Boolean).filter((p) => p.id !== without && !(hide && hide.has(p.id)));
+  const top = new Set([...(keepersFirst ? (match.ball_keepers || []) : []), ...(firstIds || [])]);
+  const list = squad.filter((p) => all || sheet.includes(p.id) || top.has(p.id))
+    .sort((a, b) => (top.has(b.id) - top.has(a.id)) || (footShortName(a) || "").localeCompare(footShortName(b) || ""));
   const cell = { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 4px", borderRadius: 18, background: FC.softer, border: `1.5px solid ${FC.line}`, cursor: "pointer", fontSize: 13, color: FC.text, minWidth: 0 };
   const extraCell = extra && (
     <button key="extra" type="button" onClick={extra.onPick} style={cell}>
@@ -1115,6 +1134,7 @@ function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose,
             <button key={p.id} type="button" onClick={() => onPick(p.id)} style={cell}>
               <FAvatar playerId={p.id} name={footShortName(p)} size={64} />
               <span style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{footShortName(p)}</span>
+              {badge && firstIds && firstIds.has(p.id) && <span style={{ marginTop: -4, padding: "1px 8px", borderRadius: 999, background: FC.accent, color: "#fff", fontFamily: FF.ui, fontSize: 10, textTransform: "uppercase" }}>{badge}</span>}
             </button>
           ))}
           {!extraFirst && extraCell}
@@ -1128,11 +1148,11 @@ function FootPlayerMosaic({ title, ask, match, roster, lineups, onPick, onClose,
 
 // Totals per player of the live actions, then the match thread.
 function FootActionsCard({ events, match, editable, reload }) {
-  const acts = buildEventTimeline(events.filter((e) => FOOT_ACTIONS.includes(e.type)));
+  const acts = buildEventTimeline(events.filter((e) => FOOT_ACTIONS.includes(e.type) || e.type === "sub"));
   const [open, setOpen] = React.useState(false);
   if (!acts.length) return null;
   const kinds = FOOT_ACTIONS.filter((k) => acts.some((e) => e.type === k));
-  const ids = [...new Set(acts.map((e) => e.player_id))];
+  const ids = [...new Set(acts.filter((e) => e.type !== "sub").map((e) => e.player_id))];
   const count = (id, k) => acts.filter((e) => e.player_id === id && e.type === k).length;
   const rows = ids.map((id) => ({ id, total: kinds.reduce((s, k) => s + count(id, k), 0) })).sort((a, b) => b.total - a.total);
   async function del(e) {
@@ -1142,7 +1162,7 @@ function FootActionsCard({ events, match, editable, reload }) {
   return (
     <FCard>
       <FHeading>Actions</FHeading>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, color: FC.text }}>
+      {ids.length > 0 && <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, color: FC.text }}>
         <thead><tr><th style={{ textAlign: "left", fontWeight: 400, color: FC.muted, fontSize: 12, padding: "4px 0" }}>Joueur</th>{kinds.map((k) => <th key={k} title={footTileOf(k).label} style={{ fontWeight: 400, padding: "4px 4px" }}>{footTileOf(k).emoji}</th>)}</tr></thead>
         <tbody>{rows.map(({ id }) => (
           <tr key={id} style={{ borderTop: `1px solid ${FC.line}` }}>
@@ -1150,14 +1170,16 @@ function FootActionsCard({ events, match, editable, reload }) {
             {kinds.map((k) => <td key={k} style={{ textAlign: "center", color: count(id, k) ? FC.text : FC.line, fontFamily: FF.ui }}>{count(id, k) || "·"}</td>)}
           </tr>
         ))}</tbody>
-      </table>
+      </table>}
       <button type="button" onClick={() => setOpen(!open)} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: FC.muted, fontSize: 13, textDecoration: "underline", cursor: "pointer" }}>{open ? "Masquer le fil du match" : `Voir le fil du match (${acts.length})`}</button>
       {open && acts.map((e) => (
         <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: `1px solid ${FC.line}`, fontSize: 14 }}>
           <span style={{ width: 44, color: FC.muted, fontFamily: FF.ui }}>{formatEventMinute(e.minute, match && match.half_duration_min)}</span>
           <span>{footTileOf(e.type).emoji}</span>
-          <span style={{ flex: 1 }}>{footTileOf(e.type).label} · {footNameOf(e.player_id)}</span>
-          {editable && <FIconBtn icon="trash" label="Supprimer l'action" tone="danger" onClick={() => del(e)} />}
+          <span style={{ flex: 1 }}>{e.type === "sub"
+            ? <>Changement · <span style={{ color: FC.good }}>↑ {footNameOf(e.player_id)}</span> <span style={{ color: FC.bad }}>↓ {footNameOf(e.assist_player_id)}</span></>
+            : <>{footTileOf(e.type).label} · {footNameOf(e.player_id)}</>}</span>
+          {editable && e.id > 0 && <FIconBtn icon="trash" label="Supprimer l'action" tone="danger" onClick={() => del(e)} />}
         </div>
       ))}
     </FCard>
@@ -1236,7 +1258,7 @@ function FootLiveAdminConsole({ match, roster, events, lineups, reload }) {
 
       {(liveAction === "playing" || liveAction === "paused") && (
         <>
-          <FootSoundboard match={match} roster={roster} lineups={lineups} minute={minutesElapsed} reload={reload} />
+          <FootSoundboard match={match} roster={roster} lineups={lineups} events={events} minute={minutesElapsed} reload={reload} />
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             {paused
               ? <FBtn variant="success" icon="play" disabled={busy} onClick={startHalf} style={{ flex: 1 }}>Reprendre</FBtn>
@@ -3372,7 +3394,7 @@ function FootballApp({ currentPlayer, onBack }) {
     : FOOT_PAGE_TITLES[page] || ["Foot", null];
 
   return (
-    <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer }}>
+    <FootCtx.Provider value={{ photos, framings, themeName: theme, openPlayer, live: { setEvents, setLineups } }}>
       {roomOn && dataReady && (
         <FootRoomScreen visible={roomVisible} page={page} theme={theme} onHome={onBack} onLeaveRoom={() => setRoom(false)} settings={settingsItems}
           roster={roster} attendance={attendance} reload={reloadFoot} matches={matches} events={events} lineups={lineups} ratings={ratings} motmVotes={motmVotes} currentPlayer={currentPlayer} nav={nav} openPlayer={openPlayer}  onWarm={() => roomWarm.current.resolve()} onBroken={() => roomWarm.current.resolve()} />
