@@ -1,11 +1,7 @@
-# Calls the site every ~10 minutes so automatic Instagram posts leave at their slot,
-# and renews the Instagram token every Monday. Needs the repository secret INSTA_ADMIN_KEY.
-# (Vercel's own cron is limited to once a day on the free plan, so GitHub does the scheduling.)
-name: Instagram scheduler
+# Les posts Instagram de Leverculsec sont maintenant publiés par Utopia (module Réseaux, utopiacustom.world) :
+# plus de déclenchement automatique ici (sinon chaque post partirait deux fois). Lancement à la main seulement.
+name: Instagram scheduler (arrêté : remplacé par Utopia)
 on:
-  schedule:
-    - cron: "*/10 * * * *"
-    - cron: "17 5 * * 1"
   workflow_dispatch:
 concurrency:
   group: insta-scheduler
